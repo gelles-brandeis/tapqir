@@ -1,0 +1,98 @@
+1a2
+> import numpy as np
+9c10
+< from pyro.infer import SVI, TraceEnum_ELBO
+---
+> from pyro.infer import SVI, TraceEnum_ELBO, JitTraceEnum_ELBO
+15a17
+> from pyro.util import ignore_jit_warnings
+42c44
+<         self.target_locs = self.target_locs.reshape(self.N,self.F,1,1,2).repeat(1,1,1,1,1)
+---
+>         self.target_locs = self.target_locs.reshape(self.N,self.F,1,1,2)
+50c52
+<         self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
+---
+>         self.optim = pyro.optim.AdamW({"lr": lr, "betas": [0.9, 0.999]})
+53a56
+>             #"w_loc", "w_beta", "x_mode", "x_size", "y_mode", "y_size", "x0_size_v", "y0_size_v", "height_loc_v"]), self.optim, loss=self.elbo) 
+57a61,68
+>     def Location(self, mode, size, loc, scale):
+>         mode = (mode - loc) / scale
+>         concentration1 = mode * (size - 2) + 1
+>         concentration0 = (1 - mode) * (size - 2) + 1
+>         base_distribution = dist.Beta(concentration1, concentration0)
+>         transforms =  [AffineTransform(loc=loc, scale=scale)]
+>         return dist.TransformedDistribution(base_distribution, transforms)
+> 
+61,66c72,74
+<         # select target locs for given indices
+<         spot_locs = self.target_locs[batch_idx] # ind,F,D,D,2
+<         # adjust for the center of the first frame
+<         # x0 and y0 can be either scalars or vectors
+<         spot_locs[...,0] += x0
+<         spot_locs[...,1] += y0
+---
+>         spot_locs = self.target_locs[batch_idx] # select target locs for given indices
+>         spot_locs[...,0] += x0 # adjust for the center of the first frame
+>         spot_locs[...,1] += y0 # x0 and y0 can be either scalars or vectors
+69d76
+<         # height can be either a scalar or a vector
+80a88
+>         #N_plate = pyro.plate("N_plate", self.N, 16, dim=-4)
+95a104,105
+>             #x0_size = pyro.sample("x0_size", dist.HalfNormal(1000.))
+>             #y0_size = pyro.sample("y0_size", dist.HalfNormal(1000.))
+102a113,116
+>         #x0_size = torch.cat((torch.ones(1), x0_size), 0)
+>         #y0_size = torch.cat((torch.ones(1), y0_size), 0)
+>         #x0_size += 2.
+>         #y0_size += 2.
+112a127,128
+>                     #x0 = pyro.sample("x0", self.Location(0., x0_size[z], -(self.D+3)/2, self.D+3))
+>                     #y0 = pyro.sample("y0", self.Location(0., y0_size[z], -(self.D+3)/2, self.D+3))
+144a161,162
+>         #x0_size_v = pyro.param("x0_size_v", (((self.D+3)/(2*0.5))**2 - 1)*torch.ones(self.K-1), constraint=constraints.greater_than(2.))
+>         #y0_size_v = pyro.param("y0_size_v", (((self.D+3)/(2*0.5))**2 - 1)*torch.ones(self.K-1), constraint=constraints.greater_than(2.))
+155,158c173,180
+<         x_loc = pyro.param("x_loc", self.data.x_loc.reshape(self.N,self.F,1,1), constraint=constraints.real)
+<         x_scale = pyro.param("x_scale", self.data.x_scale.reshape(self.N,self.F,1,1), constraint=constraints.positive)
+<         y_loc = pyro.param("y_loc", self.data.y_loc.reshape(self.N,self.F,1,1), constraint=constraints.real)
+<         y_scale = pyro.param("y_scale", self.data.y_scale.reshape(self.N,self.F,1,1), constraint=constraints.positive)
+---
+>         x_loc = pyro.param("x_loc", torch.zeros(self.N,self.F,1,1), constraint=constraints.real)
+>         x_scale = pyro.param("x_scale", torch.ones(self.N,self.F,1,1), constraint=constraints.positive)
+>         y_loc = pyro.param("y_loc", torch.zeros(self.N,self.F,1,1), constraint=constraints.real)
+>         y_scale = pyro.param("y_scale", torch.ones(self.N,self.F,1,1), constraint=constraints.positive)
+>         #x_mode = pyro.param("x_mode", self.data.x_mode.reshape(self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+>         #x_size = pyro.param("x_size", self.data.x_size.reshape(self.N,self.F,1,1), constraint=constraints.greater_than(2.))
+>         #y_mode = pyro.param("y_mode", self.data.y_mode.reshape(self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+>         #y_size = pyro.param("y_size", self.data.y_size.reshape(self.N,self.F,1,1), constraint=constraints.greater_than(2.))
+172a195,196
+>                 #pyro.sample("x0_size", dist.Delta(x0_size_v))
+>                 #pyro.sample("y0_size", dist.Delta(y0_size_v))
+181a206,207
+>                     #pyro.sample("x0", self.Location(x_mode[batch_idx], x_size[batch_idx], -(self.D+3)/2, self.D+3))
+>                     #pyro.sample("y0", self.Location(y_mode[batch_idx], y_size[batch_idx], -(self.D+3)/2, self.D+3))
+209,211c235,242
+<         for p in pyro.get_param_store().get_all_param_names():
+<             torch.save(pyro.param(p).detach().squeeze(), os.path.join(self.data.path, "runs", "classifier", 
+<                 "{}".format(self.__name__), "K{}".format(self.K), "{}.pt".format(p)))
+---
+>         self.optim.save(os.path.join(self.data.path, "runs", "classifier", 
+>                 "{}".format(self.__name__), "K{}".format(self.K), "optimizer"))
+>         pyro.get_param_store().save(os.path.join(self.data.path, "runs", "classifier", 
+>                 "{}".format(self.__name__), "K{}".format(self.K), "params"))
+>         np.savetxt(os.path.join(self.data.path, "runs", "classifier", 
+>                 "{}".format(self.__name__), "K{}".format(self.K), "epoch_count"), np.array([self.epoch_count]))
+>         #for p in pyro.get_param_store().get_all_param_names():
+>         #    torch.save(pyro.param(p).detach().squeeze(), os.path.join(self.data.path, "runs", "features", "{}.pt".format(p)))
+213a245,252
+> 
+>     def load(self):
+>         self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "classifier", 
+>                 "{}".format(self.__name__), "K{}".format(self.K), "epoch_count")))
+>         self.optim.load(os.path.join(self.data.path, "runs", "classifier", 
+>                 "{}".format(self.__name__), "K{}".format(self.K), "optimizer"))
+>         pyro.get_param_store().load(os.path.join(self.data.path, "runs", "classifier", 
+>                 "{}".format(self.__name__), "K{}".format(self.K), "params"))

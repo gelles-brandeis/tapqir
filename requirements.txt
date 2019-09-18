@@ -1,0 +1,4 @@
+conda install numpy scipy pandas matplotlib qgrid seaborn tqdm scikit-learn jupyter future line_profiler configparser
+conda install pytorch torchvision cudatoolkit=10.0 -c pytorch
+pip install pyro-ppl==0.3.4
+pip install tb-nightly

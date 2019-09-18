@@ -1,0 +1,191 @@
+import numpy as np
+import torch
+import torch.distributions.constraints as constraints
+from torch.distributions.transforms import AffineTransform
+import pyro
+from pyro import poutine
+from pyro.infer import  config_enumerate
+import pyro.distributions as dist
+
+
+class Noise:
+    """An abstract class representing a noise model"""
+    
+    #_params = {}
+    
+    def CameraUnit(self, locs, **kwargs):
+        raise NotImplementedError
+        
+    #@profile    
+    def model(self, batch_idx, frame_idx):
+        # noise variables
+        noise_params = dict()
+        for var in self._params:
+            noise_params[var] = pyro.sample(var, self._params[var]["prior"])
+        
+        # locs model
+        locs, N_plate, F_plate = self.locs_mixture_model(batch_idx, frame_idx)
+        
+        with N_plate: 
+            with F_plate: 
+        #for n in pyro.plate("N_plate", self.N, subsample=batch_idx, dim=-4): 
+        #    for f in pyro.plate("F_plate", self.F, subsample=frame_idx, dim=-3): 
+                with pyro.plate("x_plate", size=self.D, dim=-2):
+                    with pyro.plate("y_plate", size=self.D, dim=-1):
+                        pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data[batch_idx][:,frame_idx])
+                        #pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data[n,f])
+
+    #@profile    
+    def guide(self, batch_idx, frame_idx):
+        # noise variables
+        for var in self._params:
+            guide_params = dict()
+            for param in self._params[var]["guide_params"]:
+                guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
+            pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
+        
+        # locs guide
+        self.locs_mixture_guide(batch_idx, frame_idx)
+
+    def hmm_model(self, batch_idx):
+        # noise variables
+        noise_params = dict()
+        for var in self._params:
+            noise_params[var] = pyro.sample(var, self._params[var]["prior"])
+        
+        # locs model
+        locs, N_plate = self.locs_mixture_model(batch_idx)
+        
+        with N_plate: 
+            with pyro.plate("x_plate", size=self.D, dim=-2):
+                with pyro.plate("y_plate", size=self.D, dim=-1):
+                    pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data[batch_idx])
+
+    def hmm_guide(self, batch_idx):
+        # noise variables
+        for var in self._params:
+            guide_params = dict()
+            for param in self._params[var]["guide_params"]:
+                guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
+            pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
+        
+        # locs guide
+        self.locs_mixture_guide(batch_idx)
+
+    def mcmc_model(self):
+        # noise variables
+        noise_params = dict()
+        for var in self._params:
+            noise_params[var] = pyro.sample(var, self._params[var]["prior"])
+        
+        # locs model
+        locs = self.locs_mcmc()
+        
+        with pyro.plate("sample_axis", size=self.N, dim=-4):
+            with pyro.plate("frame_axis", size=self.F, dim=-3):
+                with pyro.plate("x_axis", size=self.D, dim=-2):
+                    with pyro.plate("y_axis", size=self.D, dim=-1):
+                        pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data._store)
+        
+        
+    #@profile    
+    def feature_model(self, batch_idx, frame_idx):
+        # noise variables
+        noise_params = dict()
+        for var in self._params:
+            noise_params[var] = pyro.sample(var, self._params[var]["prior"])
+        
+        # locs model
+        locs = self.locs_feature_model(batch_idx, frame_idx)
+        
+        with pyro.plate("sample_axis", size=self.N, subsample=batch_idx, dim=-4):
+            with pyro.plate("frame_axis", size=self.F, subsample=frame_idx, dim=-3):
+                with pyro.plate("x_axis", size=self.D, dim=-2):
+                    with pyro.plate("y_axis", size=self.D, dim=-1):
+                        pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data[batch_idx][:,frame_idx])
+
+    
+    #@profile    
+    def feature_guide(self, batch_idx, frame_idx):
+        # noise variables
+        for var in self._params:
+            guide_params = dict()
+            for param in self._params[var]["guide_params"]:
+                guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
+            pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
+        
+        # locs guide
+        self.locs_feature_guide(batch_idx, frame_idx)
+            
+            
+    def sample(self):
+        # global variables p(theta)
+        locs = self.locs_sample()
+        # global noise variables
+        noise_params = dict()
+        for var in self._params:
+            guide_params = dict()
+            for param in self._params[var]["guide_params"]:
+                guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
+            noise_params[var] = pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
+            
+        #z = pyro.param("z_probs")
+        sample_data = pyro.sample("data", self.CameraUnit(locs, **noise_params))
+        sample_data = sample_data[pyro.param("z_probs").detach().argmax(dim=1),np.arange(len(self.data))]
+        return sample_data.detach()
+    
+
+    
+class GammaNoise(Noise):
+    
+    _params = {
+        "offset": {
+            "prior": dist.Uniform(torch.tensor(0.), torch.tensor(100.)),
+            "guide_dist": dist.Delta,
+            "guide_params": {
+                "v": {"name": "offset_v", "init_tensor": torch.tensor(90.), "constraint": constraints.interval(0, 90.9)}
+            }
+        },
+        "gain": {
+            "prior": dist.HalfNormal(torch.tensor(500.)),
+            "guide_dist": dist.Delta,
+            "guide_params": {
+                "v": {"name": "gain_v", "init_tensor": torch.tensor(10.), "constraint": constraints.positive}
+            } }
+    }
+    
+    def CameraUnit(self, locs, gain, offset):
+        base_distribution = dist.Gamma(locs/gain, 1/gain)
+        transforms =  [AffineTransform(loc=offset, scale=1)]
+        return dist.TransformedDistribution(base_distribution, transforms)
+        
+class GammaNoiseNoOffset(Noise):
+    
+    _params = {
+        "gain": {
+            "prior": dist.HalfNormal(500.),
+            "guide_dist": dist.Delta,
+            "guide_params": {
+                "v": {"name": "gain_v", "init_tensor": torch.tensor(10.), "constraint": constraints.positive}
+            }
+        }
+    }
+    
+    def CameraUnit(self, locs, gain):
+        return dist.Gamma(locs/gain, 1/gain).to_event(2)
+
+    
+class NormalNoise(Noise):
+    
+    _params = {
+        "noise": {
+            "prior": dist.HalfNormal(500.),
+            "guide_dist": dist.Delta,
+            "guide_params": {
+                "v": {"name": "noise_v", "init_tensor": torch.tensor(10.), "constraint": constraints.positive}
+            }
+        }
+    }
+    
+    def CameraUnit(self, locs, noise):
+        return dist.Normal(locs, noise).to_event(2)
