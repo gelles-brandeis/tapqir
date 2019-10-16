@@ -39,28 +39,40 @@ else:
     print("using device: cpu")
 
 from cosmos.models.FeatureExtraction import FeatureExtraction
+from cosmos.models.FExtraction import FExtraction
+from cosmos.models.JExtraction import JExtraction
+from cosmos.models.JunkExtraction import JunkExtraction
 #from models.Modelv1 import Modelv1
 #from models.Modelv2 import Modelv2
 from cosmos.models.Modelv3 import Modelv3
 from cosmos.models.Modelv4 import Modelv4
 from cosmos.models.Test import Test 
 from cosmos.models.Modelv5 import Modelv5
+from cosmos.models.Modelv6 import Modelv6
+from cosmos.models.Modelv7 import Modelv7
 #from cosmos.models.HMMv1 import HMMv1
 models = dict()
 models["feature"] = FeatureExtraction
+models["feat"] = FExtraction
+models["junk"] = JExtraction
+#models["junk"] = JunkExtraction
 #models["v1"] = Modelv1
 #models["v2"] = Modelv2
 models["v3"] = Modelv3
 models["v4"] = Modelv4
 models["test"] = Test
 models["v5"] = Modelv5
+models["v6"] = Modelv6
+models["v7"] = Modelv7
 #models["hmm"] = HMMv1
 
 from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.utils.feature_read import ReadFeatures 
 
 data = ReadAoi(args.dataset, device)
-if args.model == "feature":
+if args.model in ["feature", "feat"]:
+    model = models[args.model](data, args.dataset, lr=args.learning_rate, jit=args.jit) # change here
+elif args.model in ["junk"]:
     model = models[args.model](data, args.dataset, lr=args.learning_rate, jit=args.jit) # change here
 else:
     data = ReadFeatures(data, args.dataset, device)

@@ -25,13 +25,13 @@ def per_param_args(module_name, param_name):
     else:
         return {"lr": 0.002}
 
-class Modelv5:
+class Modelv6:
     """ Gaussian Spot Model """
     def __init__(self, data, dataset, K, lr, jit, noise="GammaOffset"):
         # D - number of pixel along axis
         # K - number of states
         # data - number of frames, y axis, x axis
-        self.__name__ = "v5"
+        self.__name__ = "v6"
         self.data = data
         self.dataset = dataset
         self.N, self.F, self.D, _ = data._store.shape
@@ -61,7 +61,7 @@ class Modelv5:
         self.fixed = SVI(self.model, poutine.block(self.guide, hide=["height_loc_loc", "h_loc_1", "h_beta_1", "w_loc_1", "w_beta_1", "x_mode_1", "y_mode_1", "size_1",
                                 "h_loc_2", "h_beta_2", "w_loc_2", "w_beta_2", "x_mode_2", "y_mode_2", "size_2"]), self.optim, loss=self.elbo) 
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "detector", "{}".format(self.__name__), "K{}".format(self.K)))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "tracker", "{}".format(self.__name__), "K{}".format(self.K)))
         
     # Ideal 2D gaussian spot
     def gaussian_spot(self, batch_idx, height, width, x0, y0):
@@ -88,6 +88,7 @@ class Modelv5:
         base_distribution = dist.Beta(concentration1, concentration0)
         transforms =  [AffineTransform(loc=loc, scale=scale)]
         return dist.TransformedDistribution(base_distribution, transforms)
+
     
     @config_enumerate
     def model(self):
@@ -102,7 +103,8 @@ class Modelv5:
         F_plate = pyro.plate("F_plate", self.F, dim=-3)
         
         # Global Variables
-        pi = pyro.sample("pi", dist.Dirichlet(0.5 * torch.ones(self.K+1)))
+        pi = pyro.sample("pi", dist.Dirichlet(0.5 * torch.ones(self.K)))
+        junk_pi = pyro.sample("junk_pi", dist.Dirichlet(0.5 * torch.ones(2)))
         background_loc = pyro.sample("background_loc", dist.HalfNormal(1000.).expand([1,1,1,1]))
         background_beta = pyro.sample("background_beta", dist.HalfNormal(100.).expand([1,1,1,1]))
         
@@ -112,27 +114,34 @@ class Modelv5:
         width_loc = pyro.sample("width_loc", dist.HalfNormal(10.))
         width_beta = pyro.sample("width_beta", dist.HalfNormal(5.))
                 
-        x0_size = 2. * torch.ones(1)
-        y0_size = 2. * torch.ones(1)
+        x0_size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
+        y0_size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
 
         with N_plate as batch_idx:
             with F_plate:
                 # AoI & Frame Local Variables
                 background = pyro.sample("background", dist.Gamma(background_loc*background_beta, background_beta))
                 z = pyro.sample("z", dist.Categorical(pi))
+                j = pyro.sample("j", dist.Categorical(junk_pi))
+                m = z + j
                 spot = {}
                 for k in range(1,self.K+1):
-                    with poutine.mask(mask=(z == k).byte()):
+                    with poutine.mask(mask=(m == k).byte()):
+                        theta_pi = torch.ones(k)/k 
+                        dist0 = dist.Multinomial(0, theta_pi)
+                        dist1 = dist.Multinomial(1, theta_pi)
+                        theta = pyro.sample("theta_{}".format(k), dist.MaskedMixture(z.byte(), dist0, dist1))
+                        theta = theta.permute(4,0,1,2,3).long()
                         with pyro.plate("K_plate_{}".format(k), k, dim=-5):
                             height = pyro.sample("height_{}".format(k), dist.Gamma(height_loc * height_beta, height_beta))
                             width = pyro.sample("width_{}".format(k), dist.Gamma(width_loc * width_beta, width_beta))
-                            x0 = pyro.sample("x0_{}".format(k), self.Location(0., x0_size, -(self.D+3)/2, self.D+3))
-                            y0 = pyro.sample("y0_{}".format(k), self.Location(0., y0_size, -(self.D+3)/2, self.D+3))
+                            x0 = pyro.sample("x0_{}".format(k), self.Location(0., x0_size[theta], -(self.D+3)/2, self.D+3))
+                            y0 = pyro.sample("y0_{}".format(k), self.Location(0., y0_size[theta], -(self.D+3)/2, self.D+3))
 
-                            spot[k] = self.gaussian_spot(batch_idx, height, width, x0, y0)
+                        spot[k] = self.gaussian_spot(batch_idx, height, width, x0, y0)
 
                 # return locs for K classes
-                locs = torch. where(z == 1, spot[1], torch.zeros_like(spot[1])) + torch.where(z == 2, spot[2], torch.zeros_like(spot[2])) + background
+                locs = torch. where(m == 1, spot[1], torch.zeros_like(spot[1])) + torch.where(m == 2, spot[2], torch.zeros_like(spot[2])) + background
                 with pyro.plate("x_plate", size=self.D, dim=-2):
                     with pyro.plate("y_plate", size=self.D, dim=-1):
                         pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data[batch_idx])
@@ -152,9 +161,10 @@ class Modelv5:
         F_plate = pyro.plate("F_plate", self.F, dim=-3)
 
         # Global Parameters
-        pi_concentration = pyro.param("pi_concentration", torch.ones(self.K+1)*self.N*self.F/(self.K+1), constraint=constraints.positive)
-        #background_loc_loc = pyro.param("background_loc_loc", self.data.b_loc.mean()*torch.ones(1), constraint=constraints.positive)
-        background_loc_loc = pyro.param("background_loc_loc", self.data.background.mean()*torch.ones(1), constraint=constraints.positive)
+        pi_concentration = pyro.param("pi_concentration", torch.ones(self.K)*self.N*self.F/self.K, constraint=constraints.positive)
+        junk_pi_concentration = pyro.param("junk_pi_concentration", torch.ones(2)*self.N*self.F/2, constraint=constraints.positive)
+        background_loc_loc = pyro.param("background_loc_loc", self.data.b_loc_1.mean()*torch.ones(1), constraint=constraints.positive)
+        #background_loc_loc = pyro.param("background_loc_loc", self.data.background.mean()*torch.ones(1), constraint=constraints.positive)
         background_loc_beta = pyro.param("background_loc_beta", torch.ones(1), constraint=constraints.positive)
         background_beta_loc = pyro.param("background_beta_loc", 10*torch.ones(1), constraint=constraints.positive)
         background_beta_beta = pyro.param("background_beta_beta", torch.ones(1), constraint=constraints.positive)
@@ -164,16 +174,16 @@ class Modelv5:
         height_beta_beta = pyro.param("height_beta_beta", torch.ones(1), constraint=constraints.positive)
         #width_loc_loc = pyro.param("width_loc_loc", self.data.w_loc.mean()*torch.ones(self.K-1), constraint=constraints.positive)
         width_loc_loc = pyro.param("width_loc_loc", 1.5*torch.ones(1), constraint=constraints.positive)
-        width_loc_beta = pyro.param("width_loc_beta", torch.ones(1), constraint=constraints.positive)
-        width_beta_loc = pyro.param("width_beta_loc", torch.ones(1), constraint=constraints.positive)
-        width_beta_beta = pyro.param("width_beta_beta", torch.ones(1), constraint=constraints.positive)
+        width_loc_beta = pyro.param("width_loc_beta", torch.ones(1)*10, constraint=constraints.positive)
+        width_beta_loc = pyro.param("width_beta_loc", torch.ones(1)*10, constraint=constraints.positive)
+        width_beta_beta = pyro.param("width_beta_beta", torch.ones(1)*10, constraint=constraints.positive)
 
 
         b_loc = pyro.param("b_loc", self.data.b_loc_1.reshape(self.N,self.F,1,1), constraint=constraints.positive)
         b_beta = pyro.param("b_beta", self.data.b_beta_1, constraint=constraints.positive)
         
         # local variables
-        w_loc, w_beta, h_loc, h_beta, x_mode, size, y_mode = {}, {}, {}, {}, {}, {}, {}
+        w_loc, w_beta, h_loc, h_beta, x_mode, size, y_mode, theta_pi = {}, {}, {}, {}, {}, {}, {}, {}
         w_loc[1] = pyro.param("w_loc_1", self.data.w_loc_1, constraint=constraints.positive)
         w_beta[1] = pyro.param("w_beta_1", self.data.w_beta_1, constraint=constraints.positive)
         h_loc[1] = pyro.param("h_loc_1", self.data.h_loc_1.reshape(1,self.N,self.F,1,1), constraint=constraints.positive)
@@ -190,11 +200,14 @@ class Modelv5:
         size[2] = pyro.param("size_2", self.data.size_2.reshape(2,self.N,self.F,1,1), constraint=constraints.greater_than(2.))
         y_mode[2] = pyro.param("y_mode_2", self.data.y_mode_2.reshape(2,self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
 
-        z_probs = pyro.param("z_probs", torch.ones(self.N,self.F,1,1,self.K+1) / (self.K+1), constraint=constraints.simplex)
+        theta_pi[1] = pyro.param("theta_pi_1", torch.ones(self.N,self.F,1,1,1), constraint=constraints.simplex)
+        theta_pi[2] = pyro.param("theta_pi_2", torch.ones(self.N,self.F,1,1,2) / 2, constraint=constraints.simplex)
+        z_probs = pyro.param("z_probs", torch.ones(self.N,self.F,1,1,self.K) / (self.K), constraint=constraints.simplex)
+        j_probs = pyro.param("j_probs", torch.ones(self.N,self.F,1,1,2) / 2, constraint=constraints.simplex)
         
         # Global Variables
         pyro.sample("pi", dist.Dirichlet(pi_concentration))
-        #pyro.sample("junk_pi", dist.Dirichlet(junk_pi_concentration))
+        pyro.sample("junk_pi", dist.Dirichlet(junk_pi_concentration))
         pyro.sample("background_loc", dist.Gamma(background_loc_loc * background_loc_beta, background_loc_beta))
         pyro.sample("background_beta", dist.Gamma(background_beta_loc * background_beta_beta, background_beta_beta))
         #with K_plate:
@@ -209,8 +222,13 @@ class Modelv5:
                 # AoI & Frame Local Variables
                 pyro.sample("background", dist.Gamma(b_loc[batch_idx] * b_beta, b_beta))
                 z = pyro.sample("z", dist.Categorical(z_probs[batch_idx]))
+                j = pyro.sample("j", dist.Categorical(j_probs[batch_idx]))
+                m = z + j
                 for k in range(1,self.K+1):
-                    with poutine.mask(mask=(z == k).byte()):
+                    with poutine.mask(mask=(m == k).byte()):
+                        #dist0 = dist.Multinomial(0, theta_pi[k])
+                        #dist1 = dist.Multinomial(1, theta_pi[k])
+                        #theta = pyro.sample("theta_{}".format(k), dist.MaskedMixture(z.byte(), dist0, dist1))
                         with pyro.plate("K_plate_{}".format(k), k, dim=-5):
                             pyro.sample("height_{}".format(k), dist.Gamma(h_loc[k][:,batch_idx] * h_beta[k][:,batch_idx], h_beta[k][:,batch_idx]))
                             pyro.sample("width_{}".format(k), dist.Gamma(w_loc[k] * w_beta[k] * size[k][:,batch_idx], w_beta[k] * size[k][:,batch_idx]))

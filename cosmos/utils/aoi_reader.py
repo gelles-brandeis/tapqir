@@ -37,7 +37,8 @@ def ReadAoi(dataset, device):
     drift_mat["driftlist"][:, 1:3] = np.cumsum(
         drift_mat["driftlist"][:, 1:3], axis=0)
     # convert driftlist into DataFrame
-    drift_df = pd.DataFrame(drift_mat["driftlist"], columns=["frame", "dx", "dy", "timestamp"])
+    drift_df = pd.DataFrame(drift_mat["driftlist"][:,:3], columns=["frame", "dx", "dy"])
+    #drift_df = pd.DataFrame(drift_mat["driftlist"], columns=["frame", "dx", "dy", "timestamp"])
     drift_df = drift_df.astype({"frame": int}).set_index("frame")
     print("done")
 
@@ -50,7 +51,7 @@ def ReadAoi(dataset, device):
     else:
         aoi_df = pd.DataFrame(aoi_mat["aoiinfo2"], columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
     aoi_df = aoi_df.astype({"aoi": int}).set_index("aoi")
-    print("adjusting target position to frame 1 ... ", end="")
+    print("adjusting target position from frame {} to frame 1 ... ".format(aoi_df.at[1, "frame"]), end="")
     aoi_df["x"] = aoi_df["x"] - drift_df.at[int(aoi_df.at[1, "frame"]), "dx"]
     aoi_df["y"] = aoi_df["y"] - drift_df.at[int(aoi_df.at[1, "frame"]), "dy"]
     print("done")
@@ -65,6 +66,12 @@ def ReadAoi(dataset, device):
         aoi_list = np.unique(framelist[dataset][:,0])
         aoi_df = aoi_df.loc[aoi_list]
         labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
+    elif dataset in ["LarryCy3sigma54"]:
+        f1 = 170
+        f2 = 1000 #4576
+        drift_df = drift_df.loc[f1:f2]
+        aoi_list = np.array([2,4,8,10,11,14,15,18,19,20,21,23,24,25,26,32])
+        aoi_df = aoi_df.loc[aoi_list]
 
     print("saving drift_df.csv and aoi_df.csv files ..., ", end="")
     drift_df.to_csv(os.path.join(path_header, "drift_df.csv"))

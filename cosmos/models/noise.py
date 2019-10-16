@@ -17,10 +17,12 @@ def CameraUnit(locs, gain, offset):
 
 _noise["GammaOffset"] = {
     "offset": {
-        "prior": dist.Uniform(torch.tensor(0.), torch.tensor(100.)),
+        #"prior": dist.Uniform(torch.tensor(0.), torch.tensor(100.)),
+        "prior": dist.Uniform(torch.tensor(0.), torch.tensor(1080.)),
         "guide_dist": dist.Delta,
         "guide_params": {
-            "v": {"name": "offset_v", "init_tensor": torch.tensor(90.), "constraint": constraints.interval(0, 90.9)}
+            #"v": {"name": "offset_v", "init_tensor": torch.tensor(90.), "constraint": constraints.interval(0, 90.9)}
+            "v": {"name": "offset_v", "init_tensor": torch.tensor(1000.), "constraint": constraints.interval(0, 1080)}
         }
     },
     "gain": {

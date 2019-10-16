@@ -83,7 +83,8 @@ class GlimpseDataset(Dataset):
         data_sorted, _ = self._store.reshape(self.N,self.F,-1).sort(dim=2)
         self.background = data_sorted[...,self.D*2:self.D*4].mean(dim=2)
         self.height = data_sorted[...,-self.D*4:-self.D*2].mean(dim=2) - self.background
-        self.background -= 90
+        self.background -= 1000
+        #self.background -= 90
     
     def __len__(self):
         return len(self.target)
