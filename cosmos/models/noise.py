@@ -15,9 +15,13 @@ def CameraUnit(locs, gain, offset):
     transforms =  [AffineTransform(loc=offset, scale=1)]
     return dist.TransformedDistribution(base_distribution, transforms)
 
+#from cosmos.utils.aoi_reader import ReadAoi
+#data = ReadAoi("Gracecy3", device)
+#offset_max = data.min() - 0.1
+
 _noise["GammaOffset"] = {
     "offset": {
-        #"prior": dist.Uniform(torch.tensor(0.), torch.tensor(100.)),
+        #"prior": dist.Uniform(torch.tensor(0.), torch.tensor(90.9)),
         "prior": dist.Uniform(torch.tensor(0.), torch.tensor(1080.)),
         "guide_dist": dist.Delta,
         "guide_params": {
@@ -26,10 +30,10 @@ _noise["GammaOffset"] = {
         }
     },
     "gain": {
-        "prior": dist.HalfNormal(torch.tensor(500.)),
+        "prior": dist.HalfNormal(torch.tensor(100.)),
         "guide_dist": dist.Delta,
         "guide_params": {
-            "v": {"name": "gain_v", "init_tensor": torch.tensor(10.), "constraint": constraints.positive}
+            "v": {"name": "gain_v", "init_tensor": torch.tensor(5.), "constraint": constraints.positive}
         } }
 }
 _noise_fn["GammaOffset"] = CameraUnit

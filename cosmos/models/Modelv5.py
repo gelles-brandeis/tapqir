@@ -42,14 +42,12 @@ class Modelv5:
         
         # create meshgrid of DxD pixel positions
         x_pixel, y_pixel = torch.meshgrid(torch.arange(self.D), torch.arange(self.D))
-        self.pixel_pos = torch.stack((x_pixel, y_pixel), dim=2).float()
-        self.pixel_pos = self.pixel_pos.reshape(1,1,self.D,self.D,2)
+        self.pixel_pos = torch.stack((x_pixel, y_pixel), dim=2).to(torch.float32)
+        self.pixel_pos = self.pixel_pos.reshape(1,1,self.D,self.D,1,2)
         
         # drift locs for 2D gaussian spot
         self.target_locs = torch.tensor((self.data.drift[["dx", "dy"]].values.reshape(1,self.F,2) + self.data.target[["x", "y"]].values.reshape(self.N,1,2)), dtype=torch.float32)
-        self.target_locs = self.target_locs.reshape(1,self.N,self.F,1,1,2).permute(1,2,3,4,0,5) # N,F,1,1,K,2
-        # scale matrix for gaussian spot
-        self.spot_scale = torch.eye(2).reshape(1,1,1,1,2,2)
+        self.target_locs = self.target_locs.reshape(self.N,self.F,1,1,1,1,2).repeat(1,1,1,1,self.K,self.K,1)# N,F,1,1,M,K,2
         
         pyro.clear_param_store()
         self.epoch_count = 0
@@ -58,28 +56,26 @@ class Modelv5:
         self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
         #self.optim = pyro.optim.Adam(per_param_args)
         self.elbo = JitTraceEnum_ELBO() if jit else TraceEnum_ELBO()
-        self.fixed = SVI(self.model, poutine.block(self.guide, hide=["height_loc_loc", "h_loc_1", "h_beta_1", "w_loc_1", "w_beta_1", "x_mode_1", "y_mode_1", "size_1",
-                                "h_loc_2", "h_beta_2", "w_loc_2", "w_beta_2", "x_mode_2", "y_mode_2", "size_2"]), self.optim, loss=self.elbo) 
+        self.fixed = SVI(self.model, poutine.block(self.guide, hide=["height_loc_loc", "h_loc", "h_beta", "w_loc", "w_beta", "x_mode", "y_mode", "size",
+                                ]), self.optim, loss=self.elbo) 
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "detector", "{}".format(self.__name__), "K{}".format(self.K)))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "detector", "{}".format(self.__name__), "M{}".format(self.K)))
         
     # Ideal 2D gaussian spot
     def gaussian_spot(self, batch_idx, height, width, x0, y0):
         # return gaussian spot with height, width, and drift adjusted position xy
-        k = height.shape[0]
-        spot_locs = self.target_locs[batch_idx].repeat(1,1,1,1,k,1) # select target locs for given indices
-        spot_locs[...,0] += x0.permute(1,2,3,4,0) # adjust for the center of the first frame
-        spot_locs[...,1] += y0.permute(1,2,3,4,0) # x0 and y0 can be either scalars or vectors
-        if k == 1:
-            rv = dist.MultivariateNormal(spot_locs.reshape(len(batch_idx),self.F,1,1,2), scale_tril=self.spot_scale * width.reshape(len(batch_idx),self.F,1,1).view(width.size()+(1,1)))
-        if k > 1:
-            p = height / height.sum(dim=0)
-            logits = torch.log(p/(1-p))
-            logits = logits.permute(1,2,3,4,0)
-            w = width.reshape(k,1,len(batch_idx),self.F,1,1).repeat(1,2,1,1,1,1).permute(2,3,4,5,0,1)
-            rv = dist.MixtureOfDiagNormals(locs=spot_locs, coord_scale=w, component_logits=logits)
-        gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos)) #* 2 * math.pi #* width**2
-        return height.sum(dim=0) * gaussian_spot #
+        spot_locs = self.target_locs[batch_idx]# N,F,1,1,M,K,2 select target locs for given indices
+        spot_locs[...,0] += x0 # N,F,D,D,M,K,2 .permute(1,2,3,4,5,0) # adjust for the center of the first frame
+        spot_locs[...,1] += y0 #.permute(1,2,3,4,5,0) # x0 and y0 can be either scalars or vectors
+        # N,F,D,D,M,K -> tril
+        height = height.tril() + 1e-3
+        p = height / height.sum(dim=-1, keepdims=True)
+        logits = torch.log(p/(1-p))
+        logits = logits # N,F,D,D,M,K
+        w = width.unsqueeze(dim=-1).repeat(1,1,1,1,1,1,2) # N,F,D,D,M,K,2
+        rv = dist.MixtureOfDiagNormals(locs=spot_locs, coord_scale=w, component_logits=logits)
+        gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos)) # N,F,D,D,M
+        return height.sum(dim=-1) * gaussian_spot # N,F,D,D,M
     
     def Location(self, mode, size, loc, scale):
         mode = (mode - loc) / scale
@@ -97,14 +93,13 @@ class Modelv5:
             noise_params[var] = pyro.sample(var, self._params[var]["prior"])
 
         #plates
-        #K_plate = pyro.plate("K_plate", self.K-1) 
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-4)
-        F_plate = pyro.plate("F_plate", self.F, dim=-3)
+        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-2)
+        F_plate = pyro.plate("F_plate", self.F, dim=-1)
         
         # Global Variables
         pi = pyro.sample("pi", dist.Dirichlet(0.5 * torch.ones(self.K+1)))
-        background_loc = pyro.sample("background_loc", dist.HalfNormal(1000.).expand([1,1,1,1]))
-        background_beta = pyro.sample("background_beta", dist.HalfNormal(100.).expand([1,1,1,1]))
+        background_loc = pyro.sample("background_loc", dist.HalfNormal(1000.))
+        background_beta = pyro.sample("background_beta", dist.HalfNormal(100.))
         
         #with K_plate:
         height_loc = pyro.sample("height_loc", dist.HalfNormal(500.))
@@ -115,27 +110,26 @@ class Modelv5:
         x0_size = 2. * torch.ones(1)
         y0_size = 2. * torch.ones(1)
 
+
         with N_plate as batch_idx:
+            nind, find, xind, yind = torch.meshgrid(torch.arange(len(batch_idx)),torch.arange(self.F),torch.arange(self.D),torch.arange(self.D))
             with F_plate:
                 # AoI & Frame Local Variables
-                background = pyro.sample("background", dist.Gamma(background_loc*background_beta, background_beta))
-                z = pyro.sample("z", dist.Categorical(pi))
-                spot = {}
-                for k in range(1,self.K+1):
-                    with poutine.mask(mask=(z == k).byte()):
-                        with pyro.plate("K_plate_{}".format(k), k, dim=-5):
-                            height = pyro.sample("height_{}".format(k), dist.Gamma(height_loc * height_beta, height_beta))
-                            width = pyro.sample("width_{}".format(k), dist.Gamma(width_loc * width_beta, width_beta))
-                            x0 = pyro.sample("x0_{}".format(k), self.Location(0., x0_size, -(self.D+3)/2, self.D+3))
-                            y0 = pyro.sample("y0_{}".format(k), self.Location(0., y0_size, -(self.D+3)/2, self.D+3))
+                background = pyro.sample("background", dist.Gamma(background_loc*background_beta, background_beta).expand([1,1,1,1]).to_event(2))
+                m = pyro.sample("m", dist.Categorical(pi)) # N,F,1,1
+                tril_mask = torch.ones(1,1,1,1,self.K,self.K).tril().byte()
+                with poutine.mask(mask=(m > 0).byte()):
+                    height = pyro.sample("height", dist.Gamma(height_loc * height_beta, height_beta).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
+                    width = pyro.sample("width", dist.Gamma(width_loc * width_beta, width_beta).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
+                    x0 = pyro.sample("x0", self.Location(0., x0_size, -(self.D+3)/2, self.D+3).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
+                    y0 = pyro.sample("y0", self.Location(0., y0_size, -(self.D+3)/2, self.D+3).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
 
-                            spot[k] = self.gaussian_spot(batch_idx, height, width, x0, y0)
-
+                spot = self.gaussian_spot(batch_idx, height, width, x0, y0)
+                spot = torch.cat([torch.zeros(len(batch_idx),self.F,self.D,self.D,1), spot], dim=-1)
                 # return locs for K classes
-                locs = torch. where(z == 1, spot[1], torch.zeros_like(spot[1])) + torch.where(z == 2, spot[2], torch.zeros_like(spot[2])) + background
-                with pyro.plate("x_plate", size=self.D, dim=-2):
-                    with pyro.plate("y_plate", size=self.D, dim=-1):
-                        pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data[batch_idx])
+                locs = spot[nind,find,xind,yind,m.view(m.size()+(1,1))] + background
+                #locs = spot[...,0] + background
+                pyro.sample("data", self.CameraUnit(locs, **noise_params).to_event(2), obs=self.data[batch_idx])
     
     @config_enumerate
     def guide(self):
@@ -146,10 +140,19 @@ class Modelv5:
                 guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
             pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
 
+        ######
+        h_max = np.percentile(self.data.h_loc[...,0,0].cpu(), 95)
+        p1 = torch.where(self.data.h_loc[...,0,0] < h_max, self.data.h_loc[...,0,0]/h_max, torch.tensor(1.))
+
+        m2 = p1 * 0.35 + 0.1
+        m1 = p1 * 0.35 + 0.1
+        m0 = 1 - m1 - m2 
+
+        m_probs = torch.stack((m0,m1,m2), dim=-1)
+
         # plates
-        #K_plate = pyro.plate("K_plate", self.K-1)
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-4)
-        F_plate = pyro.plate("F_plate", self.F, dim=-3)
+        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-2)
+        F_plate = pyro.plate("F_plate", self.F, dim=-1)
 
         # Global Parameters
         pi_concentration = pyro.param("pi_concentration", torch.ones(self.K+1)*self.N*self.F/(self.K+1), constraint=constraints.positive)
@@ -169,28 +172,20 @@ class Modelv5:
         width_beta_beta = pyro.param("width_beta_beta", torch.ones(1), constraint=constraints.positive)
 
 
-        b_loc = pyro.param("b_loc", self.data.b_loc_1.reshape(self.N,self.F,1,1), constraint=constraints.positive)
-        b_beta = pyro.param("b_beta", self.data.b_beta_1, constraint=constraints.positive)
+        b_loc = pyro.param("b_loc", self.data.b_loc, constraint=constraints.positive)
+        b_beta = pyro.param("b_beta", self.data.b_beta, constraint=constraints.positive)
         
         # local variables
-        w_loc, w_beta, h_loc, h_beta, x_mode, size, y_mode = {}, {}, {}, {}, {}, {}, {}
-        w_loc[1] = pyro.param("w_loc_1", self.data.w_loc_1, constraint=constraints.positive)
-        w_beta[1] = pyro.param("w_beta_1", self.data.w_beta_1, constraint=constraints.positive)
-        h_loc[1] = pyro.param("h_loc_1", self.data.h_loc_1.reshape(1,self.N,self.F,1,1), constraint=constraints.positive)
-        h_beta[1] = pyro.param("h_beta_1", self.data.h_beta_1.reshape(1,self.N,self.F,1,1), constraint=constraints.positive)
-        x_mode[1] = pyro.param("x_mode_1", self.data.x_mode_1.reshape(1,self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        size[1] = pyro.param("size_1", self.data.size_1.reshape(1,self.N,self.F,1,1), constraint=constraints.greater_than(2.))
-        y_mode[1] = pyro.param("y_mode_1", self.data.y_mode_1.reshape(1,self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+        w_loc = pyro.param("w_loc", self.data.w_loc, constraint=constraints.positive)
+        w_beta = pyro.param("w_beta", self.data.w_beta, constraint=constraints.positive)
+        h_loc = pyro.param("h_loc", self.data.h_loc, constraint=constraints.positive)
+        h_beta = pyro.param("h_beta", self.data.h_beta, constraint=constraints.positive)
+        x_mode = pyro.param("x_mode", self.data.x_mode, constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+        size = pyro.param("size", self.data.size, constraint=constraints.greater_than(2.))
+        y_mode = pyro.param("y_mode", self.data.y_mode, constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
 
-        w_loc[2] = pyro.param("w_loc_2", self.data.w_loc_2, constraint=constraints.positive)
-        w_beta[2] = pyro.param("w_beta_2", self.data.w_beta_2, constraint=constraints.positive)
-        h_loc[2] = pyro.param("h_loc_2", self.data.h_loc_2.reshape(2,self.N,self.F,1,1), constraint=constraints.positive)
-        h_beta[2] = pyro.param("h_beta_2", self.data.h_beta_2.reshape(2,self.N,self.F,1,1), constraint=constraints.positive)
-        x_mode[2] = pyro.param("x_mode_2", self.data.x_mode_2.reshape(2,self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        size[2] = pyro.param("size_2", self.data.size_2.reshape(2,self.N,self.F,1,1), constraint=constraints.greater_than(2.))
-        y_mode[2] = pyro.param("y_mode_2", self.data.y_mode_2.reshape(2,self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-
-        z_probs = pyro.param("z_probs", torch.ones(self.N,self.F,1,1,self.K+1) / (self.K+1), constraint=constraints.simplex)
+        #m_probs = pyro.param("m_probs", torch.ones(self.N,self.F,self.K+1) / (self.K+1), constraint=constraints.simplex)
+        m_probs = pyro.param("m_probs", m_probs.reshape(self.N,self.F,self.K+1), constraint=constraints.simplex)
         
         # Global Variables
         pyro.sample("pi", dist.Dirichlet(pi_concentration))
@@ -202,20 +197,18 @@ class Modelv5:
         pyro.sample("height_beta", dist.Gamma(height_beta_loc * height_beta_beta, height_beta_beta))
         pyro.sample("width_loc", dist.Gamma(width_loc_loc * width_loc_beta, width_loc_beta))
         pyro.sample("width_beta", dist.Gamma(width_beta_loc * width_beta_beta, width_beta_beta))
-        
 
         with N_plate as batch_idx:
             with F_plate:
                 # AoI & Frame Local Variables
-                pyro.sample("background", dist.Gamma(b_loc[batch_idx] * b_beta, b_beta))
-                z = pyro.sample("z", dist.Categorical(z_probs[batch_idx]))
-                for k in range(1,self.K+1):
-                    with poutine.mask(mask=(z == k).byte()):
-                        with pyro.plate("K_plate_{}".format(k), k, dim=-5):
-                            pyro.sample("height_{}".format(k), dist.Gamma(h_loc[k][:,batch_idx] * h_beta[k][:,batch_idx], h_beta[k][:,batch_idx]))
-                            pyro.sample("width_{}".format(k), dist.Gamma(w_loc[k] * w_beta[k] * size[k][:,batch_idx], w_beta[k] * size[k][:,batch_idx]))
-                            pyro.sample("x0_{}".format(k), self.Location(x_mode[k][:,batch_idx], size[k][:,batch_idx], -(self.D+3)/2, self.D+3))
-                            pyro.sample("y0_{}".format(k), self.Location(y_mode[k][:,batch_idx], size[k][:,batch_idx], -(self.D+3)/2, self.D+3))
+                pyro.sample("background", dist.Gamma(b_loc[batch_idx] * b_beta, b_beta).to_event(2))
+                m = pyro.sample("m", dist.Categorical(m_probs[batch_idx]))
+                tril_mask = torch.ones(1,1,1,1,self.K,self.K).tril().byte()
+                with poutine.mask(mask=(m > 0).byte()):
+                    pyro.sample("height", dist.Gamma(h_loc[batch_idx] * h_beta[batch_idx], h_beta[batch_idx]).mask(tril_mask).to_event(4))
+                    pyro.sample("width", dist.Gamma(w_loc * w_beta * size[batch_idx], w_beta * size[batch_idx]).mask(tril_mask).to_event(4))
+                    pyro.sample("x0", self.Location(x_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
+                    pyro.sample("y0", self.Location(y_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
 
         #return height, width, background, x0, y0
 
@@ -240,18 +233,18 @@ class Modelv5:
 
     def save(self, verbose=True):
         self.optim.save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
-                "{}".format(self.__name__), "K{}".format(self.K), "optimizer"))
+                "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
         pyro.get_param_store().save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
-                "{}".format(self.__name__), "K{}".format(self.K), "params"))
+                "{}".format(self.__name__), "M{}".format(self.K), "params"))
         np.savetxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
-                "{}".format(self.__name__), "K{}".format(self.K), "epoch_count"), np.array([self.epoch_count]))
+                "{}".format(self.__name__), "M{}".format(self.K), "epoch_count"), np.array([self.epoch_count]))
         if verbose:
             print("Classification results were saved in {}...".format(self.data.path))
 
     def load(self):
         self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
-                "{}".format(self.__name__), "K{}".format(self.K), "epoch_count")))
+                "{}".format(self.__name__), "M{}".format(self.K), "epoch_count")))
         self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
-                "{}".format(self.__name__), "K{}".format(self.K), "optimizer"))
+                "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
         pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
-                "{}".format(self.__name__), "K{}".format(self.K), "params"))
+                "{}".format(self.__name__), "M{}".format(self.K), "params"))

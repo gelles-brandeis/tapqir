@@ -16,13 +16,9 @@ def ReadFeatures(data, dataset, device):
     #for attr in pyro.get_param_store().keys():
     #    setattr(data, attr, pyro.param(attr).detach().squeeze().to(device))
 
-    pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "K1", "params"))
+    pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "M2", "params"))
     for attr in pyro.get_param_store().keys():
-        setattr(data, attr, pyro.param(attr).detach().squeeze().to(device))
-
-    pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "K2", "params"))
-    for attr in pyro.get_param_store().keys():
-        setattr(data, attr, pyro.param(attr).detach().squeeze().to(device))
+        setattr(data, attr, pyro.param(attr).detach().to(device))
 
     print("Features were read from saved files.")
 

@@ -41,6 +41,7 @@ else:
 from cosmos.models.FeatureExtraction import FeatureExtraction
 from cosmos.models.FExtraction import FExtraction
 from cosmos.models.JExtraction import JExtraction
+from cosmos.models.KExtraction import KExtraction
 from cosmos.models.JunkExtraction import JunkExtraction
 #from models.Modelv1 import Modelv1
 #from models.Modelv2 import Modelv2
@@ -55,6 +56,7 @@ models = dict()
 models["feature"] = FeatureExtraction
 models["feat"] = FExtraction
 models["junk"] = JExtraction
+models["guess"] = KExtraction
 #models["junk"] = JunkExtraction
 #models["v1"] = Modelv1
 #models["v2"] = Modelv2
@@ -72,7 +74,7 @@ from cosmos.utils.feature_read import ReadFeatures
 data = ReadAoi(args.dataset, device)
 if args.model in ["feature", "feat"]:
     model = models[args.model](data, args.dataset, lr=args.learning_rate, jit=args.jit) # change here
-elif args.model in ["junk"]:
+elif args.model in ["junk", "guess"]:
     model = models[args.model](data, args.dataset, lr=args.learning_rate, jit=args.jit) # change here
 else:
     data = ReadFeatures(data, args.dataset, device)
