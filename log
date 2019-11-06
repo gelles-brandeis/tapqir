@@ -1,4 +1,36 @@
-  0%|          | 0/1000 [00:00<?, ?it/s]
+  0%|          | 0/15000 [00:00<?, ?it/s]/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [64,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [65,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [66,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [67,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [68,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [69,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [70,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [71,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [72,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [73,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [74,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [75,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [76,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [77,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [78,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [79,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [80,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [81,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [82,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [83,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [84,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [85,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [86,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [87,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [88,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [89,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [90,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [91,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [92,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [93,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [94,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:60: lambda [](int)->auto::operator()(int)->auto: block: [114,0,0], thread: [95,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+
 Traceback (most recent call last):
   File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/poutine/trace_messenger.py", line 147, in __call__
     ret = self.fn(*args, **kwargs)
@@ -6,31 +38,21 @@ Traceback (most recent call last):
     return fn(*args, **kwargs)
   File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/poutine/messenger.py", line 10, in _context_wrap
     return fn(*args, **kwargs)
-  File "/home/ordabayev/Documents/cosmos/cosmos/models/Modelv6.py", line 133, in model
-    theta = pyro.sample("theta", dist.MaskedMixture(z.byte(), dist0, dist1)) # N,F,1,1,M,K
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/primitives.py", line 112, in sample
-    apply_stack(msg)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/poutine/runtime.py", line 195, in apply_stack
-    default_process_message(msg)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/poutine/runtime.py", line 156, in default_process_message
-    msg["value"] = msg["fn"](*msg["args"], **msg["kwargs"])
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/distributions/torch_distribution.py", line 42, in __call__
-    return self.rsample(sample_shape) if self.has_rsample else self.sample(sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/distributions/mixture.py", line 104, in sample
-    result = self.component0.sample(sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/independent.py", line 82, in sample
-    return self.base_dist.sample(sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/multinomial.py", line 91, in sample
-    samples = self._categorical.sample(torch.Size((self.total_count,)) + sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/categorical.py", line 107, in sample
-    sample_2d = torch.multinomial(probs_2d, 1, True)
-RuntimeError: invalid argument 2: prob_dist must be 1 or 2 dim at /pytorch/aten/src/THC/generic/THCTensorRandom.cu:44
+  File "/home/ordabayev/Documents/cosmos/cosmos/models/Modelv6.py", line 158, in model
+    pyro.sample("data", self.CameraUnit(locs, gain, offset).to_event(2), obs=self.data[batch_idx])
+  File "/home/ordabayev/Documents/cosmos/cosmos/models/noise.py", line 14, in CameraUnit
+    base_distribution = dist.Gamma(locs/gain, 1/gain)
+  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/gamma.py", line 48, in __init__
+    super(Gamma, self).__init__(batch_shape, validate_args=validate_args)
+  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/distribution.py", line 35, in __init__
+    if not constraint.check(getattr(self, param)).all():
+RuntimeError: CUDA error: device-side assert triggered
 
 During handling of the above exception, another exception occurred:
 
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
-  File "/home/ordabayev/Documents/cosmos/cosmos/models/Modelv6.py", line 242, in epoch
+  File "/home/ordabayev/Documents/cosmos/cosmos/models/Modelv6.py", line 283, in epoch
     epoch_loss = self.svi.step()
   File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/infer/svi.py", line 100, in step
     loss = self.loss_and_grads(self.model, self.guide, *args, **kwargs)
@@ -52,56 +74,52 @@ Traceback (most recent call last):
     return fn(*args, **kwargs)
   File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/poutine/messenger.py", line 10, in _context_wrap
     return fn(*args, **kwargs)
-  File "/home/ordabayev/Documents/cosmos/cosmos/models/Modelv6.py", line 133, in model
-    theta = pyro.sample("theta", dist.MaskedMixture(z.byte(), dist0, dist1)) # N,F,1,1,M,K
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/primitives.py", line 112, in sample
-    apply_stack(msg)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/poutine/runtime.py", line 195, in apply_stack
-    default_process_message(msg)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/poutine/runtime.py", line 156, in default_process_message
-    msg["value"] = msg["fn"](*msg["args"], **msg["kwargs"])
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/distributions/torch_distribution.py", line 42, in __call__
-    return self.rsample(sample_shape) if self.has_rsample else self.sample(sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/pyro/distributions/mixture.py", line 104, in sample
-    result = self.component0.sample(sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/independent.py", line 82, in sample
-    return self.base_dist.sample(sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/multinomial.py", line 91, in sample
-    samples = self._categorical.sample(torch.Size((self.total_count,)) + sample_shape)
-  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/categorical.py", line 107, in sample
-    sample_2d = torch.multinomial(probs_2d, 1, True)
-RuntimeError: invalid argument 2: prob_dist must be 1 or 2 dim at /pytorch/aten/src/THC/generic/THCTensorRandom.cu:44
-       Trace Shapes:             
-        Param Sites:             
-       Sample Sites:             
-         offset dist        |    
-               value        |    
-           gain dist        |    
-               value        |    
-        N_plate dist        |    
-               value     16 |    
-        F_plate dist        |    
-               value    831 |    
-             pi dist        | 2  
-               value        | 2  
-        junk_pi dist        | 2  
-               value        | 2  
- background_loc dist        |    
-               value      1 |    
-background_beta dist        |    
-               value      1 |    
-     height_loc dist        |    
-               value      1 |    
-    height_beta dist        |    
-               value      1 |    
-      width_loc dist        |    
-               value      1 |    
-     width_beta dist        |    
-               value      1 |    
-     background dist 16 831 | 1 1
-               value 16 831 | 1 1
-              z dist 16 831 |    
-               value 16 831 |    
-              j dist 16 831 |    
-               value 16 831 |    
+  File "/home/ordabayev/Documents/cosmos/cosmos/models/Modelv6.py", line 158, in model
+    pyro.sample("data", self.CameraUnit(locs, gain, offset).to_event(2), obs=self.data[batch_idx])
+  File "/home/ordabayev/Documents/cosmos/cosmos/models/noise.py", line 14, in CameraUnit
+    base_distribution = dist.Gamma(locs/gain, 1/gain)
+  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/gamma.py", line 48, in __init__
+    super(Gamma, self).__init__(batch_shape, validate_args=validate_args)
+  File "/home/ordabayev/anaconda3/envs/pyro/lib/python3.7/site-packages/torch/distributions/distribution.py", line 35, in __init__
+    if not constraint.check(getattr(self, param)).all():
+RuntimeError: CUDA error: device-side assert triggered
+       Trace Shapes:                 
+        Param Sites:                 
+       Sample Sites:                 
+         offset dist        |        
+               value        |        
+           gain dist        |        
+               value        |        
+        N_plate dist        |        
+               value     16 |        
+        F_plate dist        |        
+               value    831 |        
+             pi dist        | 2      
+               value        | 2      
+        junk_pi dist        | 2      
+               value        | 2      
+ background_loc dist        |        
+               value      1 |        
+background_beta dist        |        
+               value      1 |        
+     height_loc dist        |        
+               value      1 |        
+    height_beta dist        |        
+               value      1 |        
+          width dist        |        
+               value      1 |        
+     background dist 16 831 | 1 1    
+               value 16 831 | 1 1    
+              z dist 16 831 |        
+               value 16 831 |        
+              j dist 16 831 |        
+               value 16 831 |        
+          theta dist 16 831 | 1 1 2 2
+               value 16 831 | 1 1 2 2
+         height dist 16 831 | 1 1 2 2
+               value 16 831 | 1 1 2 2
+             x0 dist 16 831 | 1 1 2 2
+               value 16 831 | 1 1 2 2
+             y0 dist 16 831 | 1 1 2 2
+               value 16 831 | 1 1 2 2
 

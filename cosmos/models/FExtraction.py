@@ -51,7 +51,7 @@ class FExtraction:
         spot_locs[...,0] += x0 # adjust for the center of the first frame
         spot_locs[...,1] += y0 # x0 and y0 can be either scalars or vectors
         rv = dist.MultivariateNormal(spot_locs, scale_tril=self.spot_scale * width.view(width.size()+(1,1)))
-        gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos)) * 2 * math.pi * width**2
+        gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos))# * 2 * math.pi * width**2
         return height * gaussian_spot #
     
     def Location(self, mode, size, loc, scale):
@@ -64,37 +64,46 @@ class FExtraction:
 
     def model(self):
         # noise variables
-        noise_params = dict()
-        for var in self._params:
-            noise_params[var] = pyro.sample(var, self._params[var]["prior"])
+        #noise_params = dict()
+        #for var in self._params:
+        #    noise_params[var] = pyro.sample(var, self._params[var]["prior"])
+        offset_max = self.data._store.min() - 0.1
+        offset = pyro.sample("offset", dist.Uniform(torch.tensor(0.), offset_max))
+        gain = pyro.sample("gain", dist.HalfNormal(torch.tensor(50.)))
 
         N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-4)
         F_plate = pyro.plate("F_plate", size=self.F, dim=-3)
         
-        width = pyro.sample("width", dist.Gamma(1, 0.1))
+        #width = pyro.sample("width", dist.Gamma(1, 0.1))
+        width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5))
         with N_plate as batch_idx:
             with F_plate:
                 background = pyro.sample("background", dist.HalfNormal(1000.))
-                height = pyro.sample("height", dist.HalfNormal(500.))
+                height = pyro.sample("height", dist.HalfNormal(3000.))
                 #width = pyro.sample("width", dist.Gamma(1, 0.1))
                 #x0 = pyro.sample("x0", dist.Normal(0.,10.))
                 #y0 = pyro.sample("y0", dist.Normal(0.,10.))
-                x0 = pyro.sample("x0", self.Location(0., 3., -(self.D+3)/2, self.D+3))
-                y0 = pyro.sample("y0", self.Location(0., 3., -(self.D+3)/2, self.D+3))
+                x0 = pyro.sample("x0", self.Location(0., 2., -(self.D+3)/2, self.D+3))
+                y0 = pyro.sample("y0", self.Location(0., 2., -(self.D+3)/2, self.D+3))
 
                 locs = self.gaussian_spot(batch_idx, height, width, x0, y0) + background
                 with pyro.plate("x_plate", size=self.D, dim=-2):
                     with pyro.plate("y_plate", size=self.D, dim=-1):
-                        pyro.sample("data", self.CameraUnit(locs, **noise_params), obs=self.data[batch_idx])
+                        pyro.sample("data", self.CameraUnit(locs, gain, offset), obs=self.data[batch_idx])
 
 
     def guide(self):
         # noise variables
-        for var in self._params:
-            guide_params = dict()
-            for param in self._params[var]["guide_params"]:
-                guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
-            pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
+        #for var in self._params:
+        #    guide_params = dict()
+        #    for param in self._params[var]["guide_params"]:
+        #        guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
+        #    pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
+        offset_max = self.data._store.min() - 0.1
+        offset_v = pyro.param("offset_v", offset_max-10, constraint=constraints.interval(0,offset_max.item()))
+        gain_v = pyro.param("gain_v", torch.tensor(5.), constraint=constraints.positive)
+        pyro.sample("offset", dist.Delta(offset_v))
+        pyro.sample("gain", dist.Delta(gain_v))
 
         N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-4)
         F_plate = pyro.plate("F_plate", size=self.F, dim=-3)
@@ -106,8 +115,10 @@ class FExtraction:
         
         # local variables
         #w_loc = pyro.param("w_loc", torch.ones(1)*1.5, constraint=constraints.positive)
-        w_loc = pyro.param("w_loc", torch.ones(1)*1.5, constraint=constraints.positive)
-        w_beta = pyro.param("w_beta", torch.ones(1)*100, constraint=constraints.positive)
+        #w_loc = pyro.param("w_loc", torch.ones(1)*1.5, constraint=constraints.positive)
+        #w_beta = pyro.param("w_beta", torch.ones(1)*100, constraint=constraints.positive)
+        w_mode = pyro.param("w_mode", torch.ones(1)*1.35, constraint=constraints.interval(0.5,3.))
+        w_size = pyro.param("w_size", torch.ones(1)*100., constraint=constraints.greater_than(2.))
         #w_beta = pyro.param("w_beta", torch.ones(self.N,self.F,1,1), constraint=constraints.positive)
         #h_loc = pyro.param("h_loc", self.data.height.reshape(self.N,self.F,1,1), constraint=constraints.positive)
         h_loc = pyro.param("h_loc", 100*torch.ones(self.N,self.F,1,1), constraint=constraints.positive)
@@ -118,7 +129,8 @@ class FExtraction:
         y_mode = pyro.param("y_mode", torch.zeros(self.N,self.F,1,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
         #y_size = pyro.param("y_size", 1000 * torch.ones(self.N,self.F,1,1), constraint=constraints.greater_than(2.))
         
-        pyro.sample("width", dist.Gamma(w_loc * w_beta, w_beta))
+        #pyro.sample("width", dist.Gamma(w_loc * w_beta, w_beta))
+        pyro.sample("width", self.Location(w_mode, w_size, 0.5, 2.5))
         with N_plate as batch_idx:
             with F_plate:
                 # local height and locs
