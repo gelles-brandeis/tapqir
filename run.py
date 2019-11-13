@@ -73,13 +73,16 @@ from cosmos.utils.feature_read import ReadFeatures
 
 data = ReadAoi(args.dataset, device)
 if args.model in ["feature", "feat"]:
-    model = models[args.model](data, args.dataset, lr=args.learning_rate, jit=args.jit) # change here
+    model = models[args.model](data, args.dataset, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
 elif args.model in ["junk", "guess"]:
-    model = models[args.model](data, args.dataset, lr=args.learning_rate, jit=args.jit) # change here
+    model = models[args.model](data, args.dataset, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
 else:
-    data = ReadFeatures(data, args.dataset, device)
-    model = models[args.model](data, args.dataset, K=2, lr=args.learning_rate, jit=args.jit) # change here
+    #data = ReadFeatures(data, args.dataset, device)
+    model = models[args.model](data, args.dataset, K=2, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
 
+if args.num_epochs:
+    model.load()
+    model.epoch(args.num_epochs) 
 
 #print("classifying {}".format(args.dataset))
 #model.fixed_epoch(args.n_batch, args.num_epochs)

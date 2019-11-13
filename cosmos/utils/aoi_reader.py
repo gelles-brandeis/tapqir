@@ -68,10 +68,10 @@ def ReadAoi(dataset, device):
         labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
     elif dataset in ["LarryCy3sigma54"]:
         f1 = 170
-        f2 = 1000 #4576
+        f2 = 4576 #1000 #
         drift_df = drift_df.loc[f1:f2]
-        aoi_list = np.array([2,4,8,10,11,14,15,18,19,20,21,23,24,25,26,32])
-        aoi_df = aoi_df.loc[aoi_list]
+        #aoi_list = np.array([2,4,8,10,11,14,15,18,19,20,21,23,24,25,26,32])
+        #aoi_df = aoi_df.loc[aoi_list]
 
     print("saving drift_df.csv and aoi_df.csv files ..., ", end="")
     drift_df.to_csv(os.path.join(path_header, "drift_df.csv"))

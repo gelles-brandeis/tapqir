@@ -75,7 +75,7 @@ class FExtraction:
         F_plate = pyro.plate("F_plate", size=self.F, dim=-3)
         
         #width = pyro.sample("width", dist.Gamma(1, 0.1))
-        width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5))
+        width = pyro.sample("width", self.Location(1.4, 4., 0.5, 2.5))
         with N_plate as batch_idx:
             with F_plate:
                 background = pyro.sample("background", dist.HalfNormal(1000.))

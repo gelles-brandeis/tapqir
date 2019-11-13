@@ -27,7 +27,7 @@ def per_param_args(module_name, param_name):
 
 class Modelv6:
     """ Gaussian Spot Model """
-    def __init__(self, data, dataset, K, lr, jit, noise="GammaOffset"):
+    def __init__(self, data, dataset, K, lr, n_batch, jit, noise="GammaOffset"):
         # D - number of pixel along axis
         # K - number of states
         # data - number of frames, y axis, x axis
@@ -38,6 +38,7 @@ class Modelv6:
         self.K = K
         self._params = _noise[noise]
         self.CameraUnit = _noise_fn[noise]
+        self.n_batch = n_batch
         
         # create meshgrid of DxD pixel positions
         x_pixel, y_pixel = torch.meshgrid(torch.arange(self.D), torch.arange(self.D))
@@ -50,7 +51,7 @@ class Modelv6:
         self.spot_scale = torch.eye(2).reshape(1,1,1,1,2,2)
         
         pyro.clear_param_store()
-        pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "M2", "params"))
+        pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "M2/lr/0.0005/h/330", "params"))
         self.epoch_count = 0
         self.lr = lr
         self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
@@ -110,7 +111,7 @@ class Modelv6:
         gain = pyro.sample("gain", dist.HalfNormal(torch.tensor(50.)))
 
         #plates
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-2)
+        N_plate = pyro.plate("N_plate", self.N, subsample_size=self.n_batch, dim=-2)
         F_plate = pyro.plate("F_plate", self.F, dim=-1)
         
         # Global Variables
@@ -165,9 +166,8 @@ class Modelv6:
                 #guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
                 #guide_params[param] = pyro.param(self._params[var]["guide_params"][param]["name"]) 
             #pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
-        offset_max = self.data._store.min() - 0.1
-        offset_v = pyro.param("offset_v", offset_max-10, constraint=constraints.interval(0,offset_max.item()))
-        gain_v = pyro.param("gain_v", torch.tensor(10.), constraint=constraints.positive)
+        offset_v = pyro.param("offset_v")
+        gain_v = pyro.param("gain_v")
         pyro.sample("offset", dist.Delta(offset_v))
         pyro.sample("gain", dist.Delta(gain_v))
 
@@ -190,7 +190,7 @@ class Modelv6:
         j_probs = torch.stack((j0,j1), dim=-1)
 
         # plates
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-2)
+        N_plate = pyro.plate("N_plate", self.N, subsample_size=self.n_batch, dim=-2)
         F_plate = pyro.plate("F_plate", self.F, dim=-1)
 
         # Global Parameters
@@ -271,7 +271,7 @@ class Modelv6:
                     pyro.sample("y0", self.Location(y_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
 
 
-    def fixed_epoch(self, n_batch, num_epochs):
+    def fixed_epoch(self, num_epochs):
         for epoch in tqdm(range(num_epochs)):
             epoch_loss = self.fixed.step()
             if not (self.epoch_count % 1000):    
@@ -281,7 +281,7 @@ class Modelv6:
         self.save()
 
 
-    def epoch(self, n_batch, num_epochs):
+    def epoch(self, num_epochs):
         for epoch in tqdm(range(num_epochs)):
             epoch_loss = self.svi.step()
             if not (self.epoch_count % 1000):    
@@ -301,9 +301,13 @@ class Modelv6:
             print("Classification results were saved in {}...".format(self.data.path))
 
     def load(self):
-        self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "tracker", 
-                "{}".format(self.__name__), "M{}".format(self.K), "epoch_count")))
-        self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "tracker", 
-                "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
-        pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "tracker", 
-                "{}".format(self.__name__), "M{}".format(self.K), "params"))
+        try:
+            self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "tracker", 
+                    "{}".format(self.__name__), "M{}".format(self.K), "epoch_count")))
+            self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "tracker", 
+                    "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
+            pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "tracker", 
+                    "{}".format(self.__name__), "M{}".format(self.K), "params"))
+            print("loaded previous run")
+        except:
+            pass

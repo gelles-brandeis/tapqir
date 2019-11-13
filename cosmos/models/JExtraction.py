@@ -25,7 +25,7 @@ def per_param_args(module_name, param_name):
 
 class JExtraction:
     """ Gaussian Spot Model """
-    def __init__(self, data, dataset, lr, jit, noise="GammaOffset"):
+    def __init__(self, data, dataset, lr, n_batch, jit, noise="GammaOffset"):
         self.data = data
         self.dataset = dataset
         self.N, self.F, self.D, _ = data._store.shape
@@ -33,6 +33,9 @@ class JExtraction:
         self.M = 2
         self._params = _noise[noise]
         self.CameraUnit = _noise_fn[noise]
+        self.h_loc = 330 
+        self.lr = lr
+        self.n_batch = n_batch
         
         # create meshgrid of DxD pixel positions
         x_pixel, y_pixel = torch.meshgrid(torch.arange(self.D), torch.arange(self.D))
@@ -49,12 +52,12 @@ class JExtraction:
         pyro.clear_param_store()
         self.epoch_count = 0
         #self.optim = pyro.optim.Adam(per_param_args)
-        self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
+        self.optim = pyro.optim.Adam({"lr": self.lr, "betas": [0.9, 0.999]})
         self.elbo = JitTrace_ELBO() if jit else Trace_ELBO()
         self.fixed = SVI(self.model, poutine.block(self.guide, hide=["w_mode", "w_size"]), 
                                         self.optim, loss=self.elbo) 
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "junk", "M{}".format(self.M)))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "junk", "M{}/lr/{}/h/{}".format(self.M,self.lr,self.h_loc)))
         
     # Ideal 2D gaussian spot
     def gaussian_spot(self, batch_idx, height, width, x0, y0, k):
@@ -103,7 +106,7 @@ class JExtraction:
         offset = pyro.sample("offset", dist.Uniform(torch.tensor(0.), offset_max))
         gain = pyro.sample("gain", dist.HalfNormal(torch.tensor(50.)))
 
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-2)
+        N_plate = pyro.plate("N_plate", self.N, subsample_size=self.n_batch, dim=-2)
         F_plate = pyro.plate("F_plate", size=self.F, dim=-1)
         
         x0_size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
@@ -111,15 +114,12 @@ class JExtraction:
         #x0_size = torch.tensor(2.)
         #y0_size = torch.tensor(2.)
 
-        width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5))
+        width = pyro.sample("width", self.Location(1.4, 4., 0.5, 2.5))
         with N_plate as batch_idx:
             with F_plate:
                 background = pyro.sample("background", dist.HalfNormal(1000.).expand([1,1,1,1]).to_event(2))
-                tril_mask = torch.ones(1,1,1,1,self.K,self.K).tril()
-                #tril_mask[...,self.M-1,:] = 0
-                tril_mask = tril_mask.byte()
+                tril_mask = torch.ones(1,1,1,1,self.K,self.K).tril().byte()
                 height = pyro.sample("height", dist.HalfNormal(3000.).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4)) # N,F,1,1,M,K
-                #width = pyro.sample("width", dist.Gamma(1., 0.1).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
                 #width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
                 x0 = pyro.sample("x0", self.Location(0., x0_size, -(self.D+3)/2, self.D+3).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4)) # N,F,1,1,M,K
                 y0 = pyro.sample("y0", self.Location(0., y0_size, -(self.D+3)/2, self.D+3).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4)) # N,F,1,1,M,K
@@ -127,11 +127,7 @@ class JExtraction:
                 for k in range(self.K):
                     spot = self.gaussian_spot(batch_idx, height, width, x0, y0, k)
                     locs = spot + background
-                #locs = spot[...,0] + background
                     pyro.sample("data_{}".format(k), self.CameraUnit(locs, gain, offset).to_event(2), obs=self.data[batch_idx])
-                #    locs = spot[...,k] + background
-                #    pyro.sample("data_{}".format(k), self.CameraUnit(locs, gain, offset).to_event(2), obs=self.data[batch_idx])
-                    #pyro.sample("data_{}".format(k), self.CameraUnit(locs, **noise_params).to_event(2), obs=self.data[batch_idx])
 
     def guide(self):
         # noise variables
@@ -146,7 +142,7 @@ class JExtraction:
         pyro.sample("offset", dist.Delta(offset_v))
         pyro.sample("gain", dist.Delta(gain_v))
 
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=16, dim=-2)
+        N_plate = pyro.plate("N_plate", self.N, subsample_size=self.n_batch, dim=-2)
         F_plate = pyro.plate("F_plate", size=self.F, dim=-1)
         
         # global locs variables
@@ -159,7 +155,8 @@ class JExtraction:
         w_size = pyro.param("w_size", torch.ones(1)*100., constraint=constraints.greater_than(2.))
         #w_loc = pyro.param("w_loc", torch.ones(1)*1.5, constraint=constraints.positive)
         #w_beta = pyro.param("w_beta", torch.ones(1)*100., constraint=constraints.positive)
-        h_loc = pyro.param("h_loc", 1000*torch.ones(self.N,self.F,1,1,self.K,self.K), constraint=constraints.positive)
+        h_loc = pyro.param("h_loc", self.h_loc*torch.ones(self.N,self.F,1,1,self.K,self.K), constraint=constraints.positive)
+        #h_loc = pyro.param("h_loc", self.h_loc*torch.ones(1), constraint=constraints.positive)
         h_beta = pyro.param("h_beta", torch.ones(self.N,self.F,1,1,self.K,self.K), constraint=constraints.positive)
         #r_mode = pyro.param("r_mode", torch.zeros(self.N,self.F,1,1,self.K,self.K), constraint=constraints.interval(0,(self.D**2-2*self.F+1)/4))
         #phi_mode = pyro.param("phi_mode", torch.zeros(self.N,self.F,1,1,self.K,self.K), constraint=constraints.interval(0,2*math.pi))
@@ -170,8 +167,8 @@ class JExtraction:
         #mode[...,1,0] += 2.5
         #mode[...,1,1] -= 2.5
         y_mode = pyro.param("y_mode", torch.zeros(self.N,self.F,1,1,self.K,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        intensity = torch.ones(self.N,self.F,1,1,self.K,self.K)*10.
-        intensity[...,1] = (((self.D+3)/(2*0.5))**2 - 1)
+        intensity = torch.ones(self.N,self.F,1,1,self.K,self.K)*(((self.D+3)/(2*0.5))**2 - 1)
+        #intensity[...,1] = (((self.D+3)/(2*0.5))**2 - 1)
         size = pyro.param("size", intensity, constraint=constraints.greater_than(2.))
         #x_size = pyro.param("x_size", psize, constraint=constraints.greater_than(2.))
         #y_size = pyro.param("y_size", psize, constraint=constraints.greater_than(2.))
@@ -180,19 +177,15 @@ class JExtraction:
         with N_plate as batch_idx:
             with F_plate:
                 pyro.sample("background", dist.Gamma(b_loc[batch_idx] * b_beta, b_beta).to_event(2))
-                tril_mask = torch.ones(len(batch_idx),self.F,1,1,self.K,self.K).tril()
-                #tril_mask[...,self.M-1,:] = 0
-                tril_mask = tril_mask.byte()
+                tril_mask = torch.ones(len(batch_idx),self.F,1,1,self.K,self.K).tril().byte()
                 pyro.sample("height", dist.Gamma(h_loc[batch_idx] * h_beta[batch_idx], h_beta[batch_idx]).mask(tril_mask).to_event(4))
-                #pyro.sample("width", dist.Gamma(w_loc[batch_idx] * w_beta * size[batch_idx], w_beta * size[batch_idx]).mask(tril_mask).to_event(4))
                 #pyro.sample("width", self.Location(w_mode, w_size[batch_idx], 0.5, 2.5).mask(tril_mask).to_event(4))
-                #pyro.sample("width", dist.Gamma(w_loc[batch_idx] * w_beta * size[batch_idx], w_beta * size[batch_idx]).mask(tril_mask).to_event(4))
                 pyro.sample("x0", self.Location(x_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
                 pyro.sample("y0", self.Location(y_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
                 #pyro.sample("x0", self.Location(x_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
                 #pyro.sample("y0", self.Location(y_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
 
-    def fixed_epoch(self, n_batch, num_epochs):
+    def fixed_epoch(self, num_epochs):
         for epoch in tqdm(range(num_epochs)):
             epoch_loss = self.fixed.step()
             if not (self.epoch_count % 1000):    
@@ -201,7 +194,7 @@ class JExtraction:
             self.epoch_count += 1
         self.save()
 
-    def epoch(self, n_batch, num_epochs):
+    def epoch(self, num_epochs):
         for epoch in tqdm(range(num_epochs)):
             epoch_loss = self.svi.step()
             if not (self.epoch_count % 1000):    
@@ -211,13 +204,17 @@ class JExtraction:
         self.save()
 
     def save(self, verbose=True):
-        self.optim.save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}".format(self.M), "optimizer"))
-        pyro.get_param_store().save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}".format(self.M), "params"))
-        np.savetxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}".format(self.M), "epoch_count"), np.array([self.epoch_count]))
+        self.optim.save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}/lr/{}/h/{}".format(self.M,self.lr,self.h_loc), "optimizer"))
+        pyro.get_param_store().save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}/lr/{}/h/{}".format(self.M,self.lr,self.h_loc), "params"))
+        np.savetxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}/lr/{}/h/{}".format(self.M,self.lr,self.h_loc), "epoch_count"), np.array([self.epoch_count]))
         if verbose:
             print("Features were extracted and saved in {}.".format(self.data.path))
 
     def load(self):
-        self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}".format(self.M), "epoch_count")))
-        self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}".format(self.M), "optimizer"))
-        pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}".format(self.M), "params"))
+        try:
+            self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}/lr/{}/h/{}".format(self.M,self.lr,self.h_loc), "epoch_count")))
+            self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}/lr/{}/h/{}".format(self.M,self.lr,self.h_loc), "optimizer"))
+            pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "junk", "M{}/lr/{}/h/{}".format(self.M,self.lr,self.h_loc), "params"))
+            print("loaded previous run")
+        except:
+            pass
