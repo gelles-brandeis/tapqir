@@ -35,11 +35,11 @@ def m_param(pi, lamda, K):
     return m_pi
 
 def theta_param(pi, lamda, K):
-    theta_pi = torch.zeros(K+1,K+1)
-    theta_pi[0,0] = 1
+    theta_pi = torch.zeros(1,1,1,1,1,K+1,K+1)
+    theta_pi[...,0,0] = 1
     for k in range(1,K+1):
-        theta_pi[k,0] = bernoulli(0, pi) * poisson(k, lamda) / m_param(pi, lamda, K)[k]
-        theta_pi[k,1:k+1] = bernoulli(1, pi) * poisson(k-1, lamda) / m_param(pi, lamda, K)[k]
+        theta_pi[...,k,0] = bernoulli(0, pi) * poisson(k, lamda) / m_param(pi, lamda, K)[k]
+        theta_pi[...,k,1:k+1] = bernoulli(1, pi) * poisson(k-1, lamda) / m_param(pi, lamda, K)[k]
     return theta_pi
 
 def theta_encoder(theta_cat, K, nidx, fidx, xidx, yidx):
@@ -80,7 +80,8 @@ class Modelv7:
         self.spot_scale = torch.eye(2).reshape(1,1,1,1,2,2)
         
         pyro.clear_param_store()
-        pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "M2/lr/0.0005/h/330", "params"))
+        #pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "M2.noamort", "params"))
+        pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "junk", "M2/lr/0.0005/h/10", "params"))
         self.epoch_count = 0
         self.lr = lr
         self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
@@ -157,7 +158,7 @@ class Modelv7:
         x0_size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
         y0_size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
 
-        width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5))
+        #width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5))
         with N_plate as batch_idx:
             nind, find, xind, yind = torch.meshgrid(torch.arange(len(batch_idx)),torch.arange(self.F),torch.arange(self.D),torch.arange(self.D))
             nidx, fidx, xidx, yidx = torch.meshgrid(torch.arange(len(batch_idx)),torch.arange(self.F),torch.arange(1),torch.arange(1))
@@ -178,6 +179,7 @@ class Modelv7:
                 #    theta = theta.masked_fill((1-z.view(z.size()+(1,1,1,1))).bool(), 0).long()
                 #with poutine.mask(mask=(m > 0).byte()):
                 height = pyro.sample("height", dist.Gamma(height_loc * height_beta, height_beta).expand([1,1,1,1,self.K]).mask(mask).to_event(3))
+                width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5))
                 x0 = pyro.sample("x0", self.Location(0., x0_size[theta], -(self.D+3)/2, self.D+3).mask(mask).to_event(2))
                 y0 = pyro.sample("y0", self.Location(0., y0_size[theta], -(self.D+3)/2, self.D+3).mask(mask).to_event(2))
 

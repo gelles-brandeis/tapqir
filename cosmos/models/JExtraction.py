@@ -33,7 +33,7 @@ class JExtraction:
         self.M = 2
         self._params = _noise[noise]
         self.CameraUnit = _noise_fn[noise]
-        self.h_loc = 330 
+        self.h_loc = 10 
         self.lr = lr
         self.n_batch = n_batch
         
@@ -71,7 +71,7 @@ class JExtraction:
         if k == 0:
             #spot_locs = spot_locs.reshape(len(batch_idx),self.F,1,1,2) 
             spot_locs = spot_locs[...,0,0,:]
-            width = width.reshape(1,1,1,1)
+            width = width[...,0,0]
             rv = dist.MultivariateNormal(spot_locs, scale_tril=self.spot_scale * width.view(width.size()+(1,1)))
             gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos)) # N,F,D,D,M
             height = height[...,0]
@@ -84,7 +84,7 @@ class JExtraction:
             #logits = logits # N,F,D,D,M,K
             #w = width.unsqueeze(dim=-1).repeat(1,1,1,1,1,1,2) # N,F,D,D,M,K,2
             #w = width.reshape(1,1,1,1,1,1,1).repeat(len(batch_idx),self.F,1,1,2,2,2) # N,F,D,D,M,K,2
-            w = width.reshape(1,1,1,1,1,1).repeat(len(batch_idx),self.F,1,1,k+1,2) # N,F,D,D,M,K,2
+            w = width[...,k,:k+1].reshape(len(batch_idx),self.F,1,1,k+1,1).repeat(1,1,1,1,1,2) # N,F,D,D,M,K,2
             rv = dist.MixtureOfDiagNormals(locs=spot_locs, coord_scale=w, component_logits=logits)
             gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos)) # N,F,D,D,M
             return height.sum(dim=-1) * gaussian_spot # N,F,D,D,M
@@ -98,10 +98,6 @@ class JExtraction:
         return dist.TransformedDistribution(base_distribution, transforms)
 
     def model(self):
-        # noise variables
-        #noise_params = dict()
-        #for var in self._params:
-        #    noise_params[var] = pyro.sample(var, self._params[var]["prior"])
         offset_max = self.data._store.min() - 0.1
         offset = pyro.sample("offset", dist.Uniform(torch.tensor(0.), offset_max))
         gain = pyro.sample("gain", dist.HalfNormal(torch.tensor(50.)))
@@ -111,16 +107,13 @@ class JExtraction:
         
         x0_size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
         y0_size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
-        #x0_size = torch.tensor(2.)
-        #y0_size = torch.tensor(2.)
 
-        width = pyro.sample("width", self.Location(1.4, 4., 0.5, 2.5))
         with N_plate as batch_idx:
             with F_plate:
                 background = pyro.sample("background", dist.HalfNormal(1000.).expand([1,1,1,1]).to_event(2))
                 tril_mask = torch.ones(1,1,1,1,self.K,self.K).tril().byte()
                 height = pyro.sample("height", dist.HalfNormal(3000.).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4)) # N,F,1,1,M,K
-                #width = pyro.sample("width", self.Location(1.3, 4., 0.5, 2.5).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
+                width = pyro.sample("width", self.Location(1.4, 4., 0.5, 2.5).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4))
                 x0 = pyro.sample("x0", self.Location(0., x0_size, -(self.D+3)/2, self.D+3).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4)) # N,F,1,1,M,K
                 y0 = pyro.sample("y0", self.Location(0., y0_size, -(self.D+3)/2, self.D+3).expand([1,1,1,1,self.K,self.K]).mask(tril_mask).to_event(4)) # N,F,1,1,M,K
 
@@ -130,12 +123,6 @@ class JExtraction:
                     pyro.sample("data_{}".format(k), self.CameraUnit(locs, gain, offset).to_event(2), obs=self.data[batch_idx])
 
     def guide(self):
-        # noise variables
-        #for var in self._params:
-            #guide_params = dict()
-            #for param in self._params[var]["guide_params"]:
-                #guide_params[param] = pyro.param(**self._params[var]["guide_params"][param]) 
-            #pyro.sample(var, self._params[var]["guide_dist"](**guide_params))
         offset_max = self.data._store.min() - 0.1
         offset_v = pyro.param("offset_v", offset_max-50, constraint=constraints.interval(0,offset_max.item()))
         gain_v = pyro.param("gain_v", torch.tensor(5.), constraint=constraints.positive)
@@ -150,9 +137,10 @@ class JExtraction:
         b_beta = pyro.param("b_beta", torch.ones(1)*10., constraint=constraints.positive)
         
         # local variables
-        #w_mode = pyro.param("w_mode", torch.ones(self.N,self.F,1,1,self.K,self.K)*1.5, constraint=constraints.interval(0.5,2.5))
-        w_mode = pyro.param("w_mode", torch.ones(1)*1.35, constraint=constraints.interval(0.5,3.))
-        w_size = pyro.param("w_size", torch.ones(1)*100., constraint=constraints.greater_than(2.))
+        w_mode = pyro.param("w_mode", torch.ones(self.N,self.F,1,1,self.K,self.K)*1.35, constraint=constraints.interval(0.5,3.))
+        w_size = pyro.param("w_size", torch.ones(self.N,self.F,1,1,self.K,self.K)*100., constraint=constraints.greater_than(2.))
+        #w_mode = pyro.param("w_mode", torch.ones(1)*1.35, constraint=constraints.interval(0.5,3.))
+        #w_size = pyro.param("w_size", torch.ones(1)*100., constraint=constraints.greater_than(2.))
         #w_loc = pyro.param("w_loc", torch.ones(1)*1.5, constraint=constraints.positive)
         #w_beta = pyro.param("w_beta", torch.ones(1)*100., constraint=constraints.positive)
         h_loc = pyro.param("h_loc", self.h_loc*torch.ones(self.N,self.F,1,1,self.K,self.K), constraint=constraints.positive)
@@ -173,13 +161,13 @@ class JExtraction:
         #x_size = pyro.param("x_size", psize, constraint=constraints.greater_than(2.))
         #y_size = pyro.param("y_size", psize, constraint=constraints.greater_than(2.))
         
-        pyro.sample("width", self.Location(w_mode, w_size, 0.5, 2.5))
+        #pyro.sample("width", self.Location(w_mode, w_size, 0.5, 2.5))
         with N_plate as batch_idx:
             with F_plate:
                 pyro.sample("background", dist.Gamma(b_loc[batch_idx] * b_beta, b_beta).to_event(2))
                 tril_mask = torch.ones(len(batch_idx),self.F,1,1,self.K,self.K).tril().byte()
                 pyro.sample("height", dist.Gamma(h_loc[batch_idx] * h_beta[batch_idx], h_beta[batch_idx]).mask(tril_mask).to_event(4))
-                #pyro.sample("width", self.Location(w_mode, w_size[batch_idx], 0.5, 2.5).mask(tril_mask).to_event(4))
+                pyro.sample("width", self.Location(w_mode[batch_idx], w_size[batch_idx], 0.5, 2.5).mask(tril_mask).to_event(4))
                 pyro.sample("x0", self.Location(x_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
                 pyro.sample("y0", self.Location(y_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))
                 #pyro.sample("x0", self.Location(x_mode[batch_idx], size[batch_idx], -(self.D+3)/2, self.D+3).mask(tril_mask).to_event(4))

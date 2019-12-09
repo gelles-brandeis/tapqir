@@ -14,7 +14,7 @@ import argparse
 parser = argparse.ArgumentParser(description="classifier")
 parser.add_argument("-m", "--model", default="v3", type=str)#,
                        # help="one of: {}".format(", ".join(sorted(models.keys()))))
-parser.add_argument("-n", "--num-epochs", default=100, type=int)
+parser.add_argument("-n", "--num-epochs", type=int)
 parser.add_argument("-N", "--n-batch", default=16, type=int)
 parser.add_argument("-lr", "--learning-rate", default=0.02, type=float)
 #parser.add_argument("-F", "--f-batch", default=64, type=int)
@@ -44,13 +44,17 @@ from cosmos.models.JExtraction import JExtraction
 from cosmos.models.KExtraction import KExtraction
 from cosmos.models.JunkExtraction import JunkExtraction
 #from models.Modelv1 import Modelv1
-#from models.Modelv2 import Modelv2
+from cosmos.models.Modelv2 import Modelv2
 from cosmos.models.Modelv3 import Modelv3
 from cosmos.models.Modelv4 import Modelv4
 from cosmos.models.Test import Test 
 from cosmos.models.Modelv5 import Modelv5
 from cosmos.models.Modelv6 import Modelv6
 from cosmos.models.Modelv7 import Modelv7
+from cosmos.models.Modelv9 import Modelv9
+from cosmos.models.Modelv10 import Modelv10
+from cosmos.models.Modelv11 import Modelv11
+from cosmos.models.Modelv12 import Modelv12
 #from cosmos.models.HMMv1 import HMMv1
 models = dict()
 models["feature"] = FeatureExtraction
@@ -59,13 +63,17 @@ models["junk"] = JExtraction
 models["guess"] = KExtraction
 #models["junk"] = JunkExtraction
 #models["v1"] = Modelv1
-#models["v2"] = Modelv2
+models["v2"] = Modelv2
 models["v3"] = Modelv3
 models["v4"] = Modelv4
 models["test"] = Test
 models["v5"] = Modelv5
 models["v6"] = Modelv6
 models["v7"] = Modelv7
+models["v9"] = Modelv9
+models["v10"] = Modelv10
+models["v11"] = Modelv11
+models["v12"] = Modelv12
 #models["hmm"] = HMMv1
 
 from cosmos.utils.aoi_reader import ReadAoi

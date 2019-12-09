@@ -1,4 +1,5 @@
 import math
+import numpy as np
 import os
 import torch
 import torch.distributions.constraints as constraints
@@ -6,24 +7,35 @@ from torch.distributions.transforms import AffineTransform
 import pyro
 from pyro import poutine
 from pyro.infer import config_enumerate
-from pyro.infer import SVI, TraceEnum_ELBO
+from pyro.infer import SVI, JitTraceEnum_ELBO, TraceEnum_ELBO, Trace_ELBO
 from pyro.optim import Adam
+import pyro.poutine as poutine
 import pyro.distributions as dist
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from utils import write_summary
-from glimpse_reader import Sampler
 from tqdm import tqdm
+
+from cosmos.utils.utils import write_summary
+from cosmos.utils.glimpse_reader import Sampler
+from cosmos.models.noise import _noise, _noise_fn
 
 class Modelv2:
     """ Gaussian Spot Model """
-    def __init__(self, data, K, lr):
+    def __init__(self, data, dataset, K, lr, n_batch, jit, noise="GammaOffset"):
         # D - number of pixel along axis
         # K - number of states
         # data - number of frames, y axis, x axis
+        self.__name__ = "v9"
         self.data = data
+        self.dataset = dataset
         self.N, self.F, self.D, _ = data._store.shape
+        assert K >= 2
         self.K = K
+        self._params = _noise[noise]
+        self.CameraUnit = _noise_fn[noise]
+        self.h_loc = 10 
+        self.lr = lr
+        self.n_batch = n_batch
         
         # create meshgrid of DxD pixel positions
         x_pixel, y_pixel = torch.meshgrid(torch.arange(self.D), torch.arange(self.D))
@@ -50,7 +62,7 @@ class Modelv2:
             "w_loc", "w_beta", "x_loc", "x_scale", "y_loc", "y_scale", "x0_scale_v", "y0_scale_v"]), self.optim, loss=self.elbo)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
         #self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "classifier", "K{}".format(self.K), "lr{}".format(self.lr)))
-        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "classifier", "K{}".format(self.K), "prefit"))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "detector", "{}".format(self.__name__), "M{}".format(self.K)))
         
     # Ideal 2D gaussian spot
     #@profile
