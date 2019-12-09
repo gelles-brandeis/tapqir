@@ -55,6 +55,7 @@ from cosmos.models.Modelv9 import Modelv9
 from cosmos.models.Modelv10 import Modelv10
 from cosmos.models.Modelv11 import Modelv11
 from cosmos.models.Modelv12 import Modelv12
+from cosmos.models.Modelv13 import Modelv13
 #from cosmos.models.HMMv1 import HMMv1
 models = dict()
 models["feature"] = FeatureExtraction
@@ -74,6 +75,7 @@ models["v9"] = Modelv9
 models["v10"] = Modelv10
 models["v11"] = Modelv11
 models["v12"] = Modelv12
+models["v13"] = Modelv13
 #models["hmm"] = HMMv1
 
 from cosmos.utils.aoi_reader import ReadAoi

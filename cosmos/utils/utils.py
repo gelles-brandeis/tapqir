@@ -181,22 +181,13 @@ def view_m_probs(aoi, data, f1, f2, m1, m2, sp):
     plt.show()
 
 def view_theta(aoi, data, f1, f2, theta1, theta2, m):
-    if m:
-        m_colors = np.zeros((len(data.drift),4)) + to_rgba_array("C0")
-        m_colors[:,3] = data.m_probs[aoi,:,1]
-        m_colors_1 = np.zeros((len(data.drift),4)) + to_rgba_array("C3")
-        m_colors_1[:,3] = data.m_probs[aoi,:,2]
-        m_colors_2 = np.zeros((len(data.drift),4)) + to_rgba_array("C2")
-        m_colors_2[:,3] = data.m_probs[aoi,:,2]
-
     plt.figure(figsize=(25,5))
-
     # height
-    if theta1: plt.scatter(data.drift.index.values[f1:f2+1], data.theta_probs[aoi,f1:f2+1,0,0,1,0], s=10, color="C3")
-    if theta2: plt.scatter(data.drift.index.values[f1:f2+1], data.theta_probs[aoi,f1:f2+1,0,0,1,1], s=10, color="C2")
-    if m: plt.scatter(data.drift.index.values[f1:f2+1], data.theta_probs[aoi,f1:f2+1,0,0,1,0], s=10, color=m_colors_1[f1:f2+1])
-    if m: plt.scatter(data.drift.index.values[f1:f2+1], data.theta_probs[aoi,f1:f2+1,0,0,1,1], s=10, color=m_colors_2[f1:f2+1])
-    #if m: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C3")
+    if theta1: plt.plot(data.drift.index.values[f1:f2+1], (data.m_probs[aoi,f1:f2+1,0,0,1]+data.m_probs[aoi,f1:f2+1,0,0,3])*data.theta_probs[aoi,f1:f2+1,0,0,1], marker="o", ms=5, color="C3")
+    if theta2: plt.plot(data.drift.index.values[f1:f2+1], (data.m_probs[aoi,f1:f2+1,0,0,2]+data.m_probs[aoi,f1:f2+1,0,0,3])*data.theta_probs[aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
+    #if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[0,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
+    #if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[1,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
+    #if sp: plt.plot(data.drift.index.values[f1:f2+1], data.l_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C4")
     #if binder: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,2], marker="o", ms=5, color="C4")
     plt.ylim(-0.02,)
     plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
