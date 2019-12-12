@@ -80,22 +80,22 @@ class Model:
         self.save()
 
     def save(self, verbose=True):
-        self.optim.save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
+        self.optim.save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
                 "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
-        pyro.get_param_store().save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
+        pyro.get_param_store().save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
                 "{}".format(self.__name__), "M{}".format(self.K), "params"))
-        np.savetxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
+        np.savetxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
                 "{}".format(self.__name__), "M{}".format(self.K), "epoch_count"), np.array([self.epoch_count]))
         if verbose:
             print("Classification results were saved in {}...".format(self.data.path))
 
     def load(self):
         try:
-            self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
+            self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
                     "{}".format(self.__name__), "M{}".format(self.K), "epoch_count")))
-            self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
+            self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
                     "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
-            pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), "detector", 
+            pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
                     "{}".format(self.__name__), "M{}".format(self.K), "params"))
             print("loaded previous run")
         except:

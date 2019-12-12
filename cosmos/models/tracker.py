@@ -55,19 +55,19 @@ def theta_param(pi, lamda, K):
     #        k += 1
 
 
-class Modelv13(Model):
+class Tracker(Model):
     """ Gaussian Spot Model """
     def __init__(self, data, dataset, K, lr, n_batch, jit, noise="GammaOffset"):
         super().__init__(data, dataset, K, lr, n_batch, jit, noise="GammaOffset")
-        self.__name__ = "v13"
+        self.__name__ = "tracker"
         
         pyro.clear_param_store()
-        pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "detector", "v12/M{}".format(self.K), "params"))
+        pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "detector/K{}".format(self.K), "params"))
         self.epoch_count = 0
         self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
         self.elbo = JitTraceEnum_ELBO() if jit else TraceEnum_ELBO()
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "detector", "{}".format(self.__name__), "M{}".format(self.K)))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "{}".format(self.__name__), "K{}".format(self.K)))
         self.mcc = True 
         
     def model(self):

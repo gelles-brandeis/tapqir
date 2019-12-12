@@ -3,9 +3,12 @@ Thumbs.db
 *.lnk
 *.o
 __pycache__/
-cosmos/models/__pycache__
+cosmos/__pycache__/
+cosmos/utils/__pycache__/
+cosmos/models/__pycache__/
 .ipynb_checkpoints/
 log
+old/
 
 singmol_mex.mexmaci64
 

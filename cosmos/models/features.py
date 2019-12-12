@@ -21,18 +21,18 @@ from cosmos.models.noise import _noise, _noise_fn
 from cosmos.models.helper import Model 
 
 
-class Modelv11(Model):
-    """ Gaussian Spot Model """
+class Features(Model):
+    """ Extract features of the Gaussian Spot Model """
     def __init__(self, data, dataset, K, lr, n_batch, jit, noise="GammaOffset"):
         super().__init__(data, dataset, K, lr, n_batch, jit, noise="GammaOffset")
-        self.__name__ = "v11"
+        self.__name__ = "features"
         
         pyro.clear_param_store()
         self.epoch_count = 0
         self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
         self.elbo = JitTrace_ELBO() if jit else Trace_ELBO()
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "detector", "{}".format(self.__name__), "M{}".format(self.K)))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "{}".format(self.__name__), "K{}".format(self.K)))
         self.mcc = False
     
     def model(self):
