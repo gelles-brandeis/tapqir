@@ -5,6 +5,7 @@ Thumbs.db
 __pycache__/
 cosmos/models/__pycache__
 .ipynb_checkpoints/
+log
 
 singmol_mex.mexmaci64
 
