@@ -2,6 +2,9 @@ Thumbs.db
 *.asv
 *.lnk
 *.o
+__pycache__/
+cosmos/models/__pycache__
+.ipynb_checkpoints/
 
 singmol_mex.mexmaci64
 

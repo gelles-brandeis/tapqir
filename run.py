@@ -51,8 +51,8 @@ from cosmos.models.Test import Test
 from cosmos.models.Modelv5 import Modelv5
 from cosmos.models.Modelv6 import Modelv6
 from cosmos.models.Modelv7 import Modelv7
-from cosmos.models.Modelv9 import Modelv9
-from cosmos.models.Modelv10 import Modelv10
+#from cosmos.models.Modelv9 import Modelv9
+#from cosmos.models.Modelv10 import Modelv10
 from cosmos.models.Modelv11 import Modelv11
 from cosmos.models.Modelv12 import Modelv12
 from cosmos.models.Modelv13 import Modelv13
@@ -71,8 +71,8 @@ models["test"] = Test
 models["v5"] = Modelv5
 models["v6"] = Modelv6
 models["v7"] = Modelv7
-models["v9"] = Modelv9
-models["v10"] = Modelv10
+#models["v9"] = Modelv9
+#models["v10"] = Modelv10
 models["v11"] = Modelv11
 models["v12"] = Modelv12
 models["v13"] = Modelv13

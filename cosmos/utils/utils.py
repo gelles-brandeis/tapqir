@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import pyro
+from pyro.ops.stats import hpdi
 from matplotlib.colors import to_rgba_array
 import torch.distributions as dist
 from torch.distributions.transforms import AffineTransform
@@ -23,19 +24,16 @@ from torch.distributions.transforms import AffineTransform
 
 def write_summary(epoch_count, epoch_loss, model, svi, writer, feature=False, mcc=False):
     
-    #if feature:
-    #    epoch_loss = svi.evaluate_loss(model.data[:])
-    #else:
-    #    epoch_loss = svi.evaluate_loss(
-    #            torch.arange(model.N), torch.arange(model.F))
     writer.add_scalar("ELBO", -epoch_loss, epoch_count)
-    if model.data.labels:
-        mask = model.data.labels["detected"].values < 2
-        predictions = pyro.param("z_probs").squeeze().detach().cpu().argmax(dim=2).reshape(-1)[mask]
-        labels = model.data.labels["detected"].values[mask]
-        writer.add_scalar("MCC", matthews_corrcoef(labels, predictions), epoch_count)
-    #if not feature:
-    #    writer.add_scalar("Uncertain", len(torch.nonzero((pyro.param("z_probs").cpu().squeeze()[...,0] > 0.3) & (pyro.param("z_probs").cpu().squeeze()[...,0] < 0.7))[:,0].unique()), epoch_count)
+    if mcc:
+        mask = model.data.labels["spotpicker"].values < 2
+        k_probs = torch.zeros(model.N,model.F,2)
+        k_probs[...,0] = pyro.param("m_probs").squeeze()[...,1] + pyro.param("m_probs").squeeze()[...,3]
+        k_probs[...,1] = pyro.param("m_probs").squeeze()[...,2] + pyro.param("m_probs").squeeze()[...,3]
+        z_probs = k_probs[...,0] * pyro.param("theta_probs").squeeze()[...,1] + k_probs[...,1] * pyro.param("theta_probs").squeeze()[...,2]
+        model.data.labels["probs"] = z_probs.reshape(-1).detach().cpu().numpy()
+        model.data.labels["binary"] = model.data.labels["probs"] > 0.5
+        writer.add_scalar("MCC", matthews_corrcoef(model.data.labels["spotpicker"].values[mask], model.data.labels["binary"].values[mask]), epoch_count)
     
     for p in pyro.get_param_store().get_all_param_names():
         if pyro.param(p).squeeze().dim() == 0:
@@ -159,426 +157,15 @@ def view_probs(aoi, data, f1, f2, binder, junk, sp):
     #plt.legend()
     plt.tight_layout()
     plt.show()
-
-def view_m_probs(aoi, data, f1, f2, m1, m2, sp):
-    plt.figure(figsize=(25,5))
-    # height
-    if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,0,0,1]+data.m_probs[aoi,f1:f2+1,0,0,3], marker="o", ms=5, color="C3")
-    if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,0,0,2]+data.m_probs[aoi,f1:f2+1,0,0,3], marker="o", ms=5, color="C2")
-    #if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[0,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
-    #if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[1,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
-    #if sp: plt.plot(data.drift.index.values[f1:f2+1], data.l_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C4")
-    #if binder: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,2], marker="o", ms=5, color="C4")
-    plt.ylim(-0.02,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
-    plt.ylabel("probability", fontsize=25)
-    plt.xlabel("frame #", fontsize=25)
-    plt.gca().set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    plt.gca().tick_params(axis="x", labelsize=20)
-    plt.gca().tick_params(axis="y", labelsize=20)
-    #plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-def view_theta(aoi, data, f1, f2, theta1, theta2, m):
-    plt.figure(figsize=(25,5))
-    # height
-    if theta1: plt.plot(data.drift.index.values[f1:f2+1], (data.m_probs[aoi,f1:f2+1,0,0,1]+data.m_probs[aoi,f1:f2+1,0,0,3])*data.theta_probs[aoi,f1:f2+1,0,0,1], marker="o", ms=5, color="C3")
-    if theta2: plt.plot(data.drift.index.values[f1:f2+1], (data.m_probs[aoi,f1:f2+1,0,0,2]+data.m_probs[aoi,f1:f2+1,0,0,3])*data.theta_probs[aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
-    #if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[0,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
-    #if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[1,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
-    #if sp: plt.plot(data.drift.index.values[f1:f2+1], data.l_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C4")
-    #if binder: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,2], marker="o", ms=5, color="C4")
-    plt.ylim(-0.02,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
-    plt.ylabel("probability", fontsize=25)
-    plt.xlabel("frame #", fontsize=25)
-    plt.gca().set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    plt.gca().tick_params(axis="x", labelsize=20)
-    plt.gca().tick_params(axis="y", labelsize=20)
-    #plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-def view_junk_summary(aoi, data, f1, f2, m1, m2, m):
     
-    if m:
-        data.m_probs = np.zeros((data.N,data.F,3))
-        data.m_probs[:,:,0] = data.z_probs[:,:,0] * data.j_probs[:,:,0]
-        data.m_probs[:,:,2] = data.z_probs[:,:,1] * data.j_probs[:,:,1]
-        data.m_probs[:,:,1] = 1 - data.m_probs[:,:,0] - data.m_probs[:,:,2]
-    #b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc[aoi] * data.b_beta[aoi], data.b_beta[aoi]).sample((1000,)))
-    b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc[aoi,:,0,0] * data.b_beta, data.b_beta).sample((1000,)))
-    b_mean = data.b_loc[aoi,:,0,0].cpu().numpy()
-
-    if m1:
-        h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0,0,0] * data.h_beta[aoi,:,0,0,0,0], data.h_beta[aoi,:,0,0,0,0]).sample((1000,)))
-        #h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc * data.size[aoi,:,0,0,0,0] * data.h_beta[aoi,:,0,0,0,0], data.h_beta[aoi,:,0,0,0,0]).sample((1000,)))
-        h_mean = data.h_loc[aoi,:,0,0,0,0].cpu().numpy()
-
-        x_hpd1, x_hpd2 = hpd(Location(data.x_mode[aoi,:,0,0,0,0], data.size[aoi,:,0,0,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #x_hpd1, x_hpd2 = hpd(Location(data.x_mode[aoi,:,0,0,0,0], data.x_size[aoi,:,0,0,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        x_mean = data.x_mode[aoi,:,0,0,0,0].cpu().numpy()
-
-        y_hpd1, y_hpd2 = hpd(Location(data.y_mode[aoi,:,0,0,0,0], data.size[aoi,:,0,0,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #y_hpd1, y_hpd2 = hpd(Location(data.y_mode[aoi,:,0,0,0,0], data.y_size[aoi,:,0,0,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        y_mean = data.y_mode[aoi,:,0,0,0,0].cpu().numpy()
-
-        #w_hpd1, w_hpd2 = hpd(Location(data.w_mode, data.w_size[aoi,:,0,0,0,0], 0.5, 3.).sample((1000,)))
-        #w_mean = data.w_loc.cpu().numpy()
-        #w_hpd1, w_hpd2 = hpd(dist.Gamma(data.w_loc[aoi,:,0,0,0,0] * data.w_beta[aoi,:,0,0,0,0], data.w_beta[aoi,:,0,0,0,0]).sample((1000,)))
-        #w_mean = data.w_mode.cpu().numpy()
-
-    if m2:
-        jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0,1,0] * data.h_beta[aoi,:,0,0,1,0], data.h_beta[aoi,:,0,0,1,0]).sample((1000,)))
-        #jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc * data.size[aoi,:,0,0,1,0] * data.h_beta[aoi,:,0,0,1,0], data.h_beta[aoi,:,0,0,1,0]).sample((1000,)))
-        jh_mean_1 = data.h_loc[aoi,:,0,0,1,0].cpu().numpy()
-
-        jx_hpd1_1, jx_hpd2_1 = hpd(Location(data.x_mode[aoi,:,0,0,1,0], data.size[aoi,:,0,0,1,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jx_hpd1_1, jx_hpd2_1 = hpd(Location(data.x_mode[aoi,:,0,0,1,0], data.x_size[aoi,:,0,0,1,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jx_mean_1 = data.x_mode[aoi,:,0,0,1,0].cpu().numpy()
-
-        jy_hpd1_1, jy_hpd2_1 = hpd(Location(data.y_mode[aoi,:,0,0,1,0], data.size[aoi,:,0,0,1,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jy_hpd1_1, jy_hpd2_1 = hpd(Location(data.y_mode[aoi,:,0,0,1,0], data.y_size[aoi,:,0,0,1,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jy_mean_1 = data.y_mode[aoi,:,0,0,1,0].cpu().numpy()
-
-        #jw_hpd1_1, jw_hpd2_1 = hpd(Location(data.w_mode, data.w_size[aoi,:,0,0,1,0], 0.5, 3.).sample((1000,)))
-        #jw_mean_1 = data.w_loc.cpu().numpy()
-        #jw_hpd1_1, jw_hpd2_1 = hpd(dist.Gamma(data.w_loc[aoi,:,0,0,1,0] * data.w_beta[aoi,:,0,0,1,0], data.w_beta[aoi,:,0,0,1,0]).sample((1000,)))
-        #jw_mean_1 = data.w_mode.cpu().numpy()
-
-        jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0,1,1] * data.h_beta[aoi,:,0,0,1,1], data.h_beta[aoi,:,0,0,1,1]).sample((1000,)))
-        #jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc * data.size[aoi,:,0,0,1,1] * data.h_beta[aoi,:,0,0,1,1], data.h_beta[aoi,:,0,0,1,1]).sample((1000,)))
-        jh_mean_2 = data.h_loc[aoi,:,0,0,1,1].cpu().numpy()
-
-        jx_hpd1_2, jx_hpd2_2 = hpd(Location(data.x_mode[aoi,:,0,0,1,1], data.size[aoi,:,0,0,1,1], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jx_hpd1_2, jx_hpd2_2 = hpd(Location(data.x_mode[aoi,:,0,0,1,1], data.x_size[aoi,:,0,0,1,1], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jx_mean_2 = data.x_mode[aoi,:,0,0,1,1].cpu().numpy()
-
-        jy_hpd1_2, jy_hpd2_2 = hpd(Location(data.y_mode[aoi,:,0,0,1,1], data.size[aoi,:,0,0,1,1], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jy_hpd1_2, jy_hpd2_2 = hpd(Location(data.y_mode[aoi,:,0,0,1,1], data.y_size[aoi,:,0,0,1,1], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jy_mean_2 = data.y_mode[aoi,:,0,0,1,1].cpu().numpy()
-
-        #jw_hpd1_2, jw_hpd2_2 = hpd(Location(data.w_mode, data.w_size[aoi,:,0,0,1,1], 0.5, 3.).sample((1000,)))
-        #jw_mean_2 = data.w_loc.cpu().numpy()
-        #jw_hpd1_2, jw_hpd2_2 = hpd(dist.Gamma(data.w_loc[aoi,:,0,0,1,1] * data.w_beta[aoi,:,0,0,1,1], data.w_beta[aoi,:,0,0,1,1]).sample((1000,)))
-        #jw_mean_2 = data.w_mode.cpu().numpy()
-
-    if m:
-        m_colors = np.zeros((len(data.drift),4)) + to_rgba_array("C0")
-        m_colors[:,3] = data.m_probs[aoi,:,1]
-        m_colors_1 = np.zeros((len(data.drift),4)) + to_rgba_array("C3")
-        m_colors_1[:,3] = data.m_probs[aoi,:,2]
-        m_colors_2 = np.zeros((len(data.drift),4)) + to_rgba_array("C2")
-        m_colors_2[:,3] = data.m_probs[aoi,:,2]
-
-    plt.figure(figsize=(15,15))
-    # height
-    plt.subplot(5,1,1)
-    if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd1[f1:f2+1], h_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_1[f1:f2+1], jh_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_2[f1:f2+1], jh_hpd2_2[f1:f2+1], color="C2", alpha=0.2)
-    if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd1[f1:f2+1], h_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_1[f1:f2+1], jh_hpd2_1[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C3", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_2[f1:f2+1], jh_hpd2_2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C2", alpha=0.2)
-
-    if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1], s=10, color="C0")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_1[f1:f2+1], s=10, color="C3")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_2[f1:f2+1], s=10, color="C2")
-    if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
-    plt.ylim(0,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("intensity", fontsize=20) 
-
-    # x position
-    plt.subplot(5,1,2)
-    if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd1[f1:f2+1], x_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_1[f1:f2+1], jx_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_2[f1:f2+1], jx_hpd2_2[f1:f2+1], color="C2", alpha=0.2)
-    if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd1[f1:f2+1], x_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_1[f1:f2+1], jx_hpd2_1[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C3", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_2[f1:f2+1], jx_hpd2_2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C2", alpha=0.2)
-
-    if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1], s=10, color="C0")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_1[f1:f2+1], s=10, color="C3")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_2[f1:f2+1], s=10, color="C2")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fx_mean[f1:f2+1], s=10, color="C0")
-    if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
-    plt.ylim(-(data.D+3)/2, (data.D+3)/2)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("x position", fontsize=20)
-    
-    # y position
-    plt.subplot(5,1,3)
-    if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd1[f1:f2+1], y_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_1[f1:f2+1], jy_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_2[f1:f2+1], jy_hpd2_2[f1:f2+1], color="C2", alpha=0.2)
-    if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd1[f1:f2+1], y_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_1[f1:f2+1], jy_hpd2_1[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C3", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_2[f1:f2+1], jy_hpd2_2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C2", alpha=0.2)
-
-    if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1], s=10, color="C0")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_1[f1:f2+1], s=10, color="C3")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_2[f1:f2+1], s=10, color="C2")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fy_mean[f1:f2+1], s=10, color="C0")
-    if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
-    plt.ylim(-(data.D+3)/2, (data.D+3)/2)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("y position", fontsize=20)
-    
-    # width
-    plt.subplot(5,1,4)
-    #if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd1[f1:f2+1], w_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    #if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_1[f1:f2+1], jw_hpd2_1[f1:f2+1], color="C2", alpha=0.2)
-    #if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_2[f1:f2+1], jw_hpd2_2[f1:f2+1], color="C3", alpha=0.2)
-    #if feature: plt.fill_between(data.drift.index.values[f1:f2+1], fw_hpd1[f1:f2+1], fw_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    #if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd1[f1:f2+1], w_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    #if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_1[f1:f2+1], jw_hpd2_1[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C2", alpha=0.2)
-    #if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_2[f1:f2+1], jw_hpd2_2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C3", alpha=0.2)
-
-    #if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color="C0")
-    #if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_1[f1:f2+1], s=10, color="C2")
-    #if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_2[f1:f2+1], s=10, color="C3")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fw_mean[f1:f2+1], s=10, color="C0")
-    #if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    #if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    #if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fw_mean[f1:f2+1], s=10, color="C0")
-    #if binder: plt.scatter([data.drift.index.values[f1], data.drift.index.values[f2]], [w_mean, w_mean], s=10, color="C0")
-    #if junk: plt.scatter([data.drift.index.values[f1], data.drift.index.values[f2]], [jw_mean, jw_mean], s=10, color="C0")
-    #if binder: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color=z_colors[f1:f2+1])
-    #if junk: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean[f1:f2+1], s=10, color=j_colors[f1:f2+1])
-    plt.ylim(0,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("width", fontsize=20)
-    
-    # background 
-    plt.subplot(5,1,5)
-    plt.fill_between(data.drift.index.values[f1:f2+1], b_hpd1[f1:f2+1], b_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    plt.scatter(data.drift.index.values[f1:f2+1], b_mean[f1:f2+1], s=10, color="C0")
-    plt.ylim(0,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("background", fontsize=20)
-    plt.xlabel("frame #", fontsize=20)
-    
-    #plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-def view_feature_summary(aoi, data, f1, f2, jfeature, feature, binder, junk):
-    
-    #b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc[aoi] * data.b_beta[aoi], data.b_beta[aoi]).sample((1000,)))
-    #b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc[aoi,:,0,0] * data.b_beta, data.b_beta).sample((1000,)))
-    #b_mean = data.b_loc[aoi,:,0,0].cpu().numpy()
-
-    if feature:
-        #b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc_1[aoi,:,0,0] * data.b_beta_1, data.b_beta_1).sample((1000,)))
-        #b_mean = data.b_loc_1[aoi,:,0,0].cpu().numpy()
-
-        h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0] * data.h_beta[aoi,:,0,0], data.h_beta[aoi,:,0,0]).sample((1000,)))
-        h_mean = data.h_loc[aoi,:,0,0].cpu().numpy()
-
-        x_hpd1, x_hpd2 = hpd(Location(data.x_mode[aoi,:,0,0], data.size[aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        x_mean = data.x_mode[aoi,:,0,0].cpu().numpy()
-
-        y_hpd1, y_hpd2 = hpd(Location(data.y_mode[aoi,:,0,0], data.size[aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        y_mean = data.y_mode[aoi,:,0,0].cpu().numpy()
-
-        #w_hpd1, w_hpd2 = hpd(dist.Gamma(data.w_loc * data.w_beta * data.size[aoi,:,0,0], data.w_beta * data.size[aoi,:,0,0]).sample((1000,)))
-        #w_mean = data.w_loc.cpu().numpy()
-        w_hpd1, w_hpd2 = hpd(Location(data.w_mode, data.w_size, 0.5, 3.).sample((1000,)))
-        w_mean = data.w_mode.cpu().numpy()
-
-    if jfeature:
-        #b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc_2[aoi,:,0,0] * data.b_beta_2, data.b_beta_2).sample((1000,)))
-        #b_mean = data.b_loc_2[aoi,:,0,0].cpu().numpy()
-
-        jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc_2[1,aoi,:,0,0] * data.h_beta_2[1,aoi,:,0,0], data.h_beta_2[1,aoi,:,0,0]).sample((1000,)))
-        jh_mean_1 = data.h_loc_2[1,aoi,:,0,0].cpu().numpy()
-
-        jx_hpd1_1, jx_hpd2_1 = hpd(Location(data.x_mode_2[1,aoi,:,0,0], data.size_2[1,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jx_mean_1 = data.x_mode_2[1,aoi,:,0,0].cpu().numpy()
-
-        jy_hpd1_1, jy_hpd2_1 = hpd(Location(data.y_mode_2[1,aoi,:,0,0], data.size_2[1,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jy_mean_1 = data.y_mode_2[1,aoi,:,0,0].cpu().numpy()
-
-        jw_hpd1_1, jw_hpd2_1 = hpd(dist.Gamma(data.w_loc_2 * data.w_beta_2 * data.size_2[1,aoi,:,0,0], data.w_beta_2 * data.size_2[1,aoi,:,0,0]).sample((1000,)))
-        jw_mean_1 = data.w_loc_2.cpu().numpy()
-
-        jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc_2[0,aoi,:,0,0] * data.h_beta_2[0,aoi,:,0,0], data.h_beta_2[0,aoi,:,0,0]).sample((1000,)))
-        jh_mean_2 = data.h_loc_2[0,aoi,:,0,0].cpu().numpy()
-
-        jx_hpd1_2, jx_hpd2_2 = hpd(Location(data.x_mode_2[0,aoi,:,0,0], data.size_2[0,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jx_mean_2 = data.x_mode_2[0,aoi,:,0,0].cpu().numpy()
-
-        jy_hpd1_2, jy_hpd2_2 = hpd(Location(data.y_mode_2[0,aoi,:,0,0], data.size_2[0,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jy_mean_2 = data.y_mode_2[0,aoi,:,0,0].cpu().numpy()
-
-        jw_hpd1_2, jw_hpd2_2 = hpd(dist.Gamma(data.w_loc_2 * data.w_beta_2 * data.size_2[0,aoi,:,0,0], data.w_beta_2 * data.size_2[0,aoi,:,0,0]).sample((1000,)))
-        jw_mean_2 = data.w_loc_2.cpu().numpy()
-
-
-    if binder:
-        z_colors = np.zeros((len(data.drift),4)) + to_rgba_array("C2")
-        z_colors[:,3] = data.z_probs.cpu().numpy()[aoi,:,1]
-
-        #h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc * data.size[aoi] * data.h_beta[aoi], data.h_beta[aoi]).sample((1000,)))
-        #h_mean = (data.h_loc * data.size[aoi]).cpu().numpy()
-
-        x_hpd1, x_hpd2 = hpd(Location(data.x_mode[aoi], data.x_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        x_mean = data.x_mode[aoi].cpu().numpy()
-
-        y_hpd1, y_hpd2 = hpd(Location(data.y_mode[aoi], data.y_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        y_mean = data.y_mode[aoi].cpu().numpy()
-
-        #w_hpd1, w_hpd2 = hpd(dist.Gamma(data.w_loc[aoi] * data.w_beta * data.size[aoi], data.w_beta * data.size[aoi]).sample((1000,)))
-        w_mean = data.w_loc[aoi].cpu().numpy()
-
-        h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc[aoi] * data.h_beta[aoi], data.h_beta[aoi]).sample((1000,)))
-        h_mean = data.h_loc[aoi].cpu().numpy()
-
-        #x_hpd1, x_hpd2 = hpd(Location(data.x_mode[aoi], data.x_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #x_mean = data.x_mode[aoi].cpu().numpy()
-
-        #y_hpd1, y_hpd2 = hpd(Location(data.y_mode[aoi], data.y_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #y_mean = data.y_mode[aoi].cpu().numpy()
-
-        w_hpd1, w_hpd2 = hpd(dist.Gamma(data.w_loc[aoi] * data.w_beta[aoi], data.w_beta[aoi]).sample((1000,)))
-        #w_mean = data.w_loc[aoi].cpu().numpy()
-
-    if junk:
-        j_colors = np.zeros((len(data.drift),4)) + to_rgba_array("C3")
-        j_colors[:,3] = data.j_probs.cpu().numpy()[aoi,:,1]
-
-        #jh_hpd1, jh_hpd2 = hpd(dist.Gamma(data.h_loc * data.jsize[aoi] * data.jh_beta[aoi], data.jh_beta[aoi]).sample((1000,)))
-        #jh_mean = (data.h_loc * data.jsize[aoi]).cpu().numpy()
-
-        jx_hpd1, jx_hpd2 = hpd(Location(data.jx_mode[aoi], data.jx_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jx_mean = data.jx_mode[aoi].cpu().numpy()
-
-        jy_hpd1, jy_hpd2 = hpd(Location(data.jy_mode[aoi], data.jy_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jy_mean = data.jy_mode[aoi].cpu().numpy()
-
-        #jw_hpd1, jw_hpd2 = hpd(dist.Gamma(data.jw_loc[aoi] * data.w_beta * data.jsize[aoi], data.w_beta * data.jsize[aoi]).sample((1000,)))
-        jw_mean = data.jw_loc[aoi].cpu().numpy()
-
-        jh_hpd1, jh_hpd2 = hpd(dist.Gamma(data.jh_loc[aoi] * data.jh_beta[aoi], data.jh_beta[aoi]).sample((1000,)))
-        jh_mean = data.jh_loc[aoi].cpu().numpy()
-
-        #jx_hpd1, jx_hpd2 = hpd(Location(data.jx_mode[aoi], data.jx_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jx_mean = data.jx_mode[aoi].cpu().numpy()
-
-        #jy_hpd1, jy_hpd2 = hpd(Location(data.jy_mode[aoi], data.jy_size[aoi], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jy_mean = data.jy_mode[aoi].cpu().numpy()
-
-        jw_hpd1, jw_hpd2 = hpd(dist.Gamma(data.jw_loc[aoi] * data.jw_beta[aoi], data.jw_beta[aoi]).sample((1000,)))
-        #jw_mean = data.jw_loc[aoi].cpu().numpy()
-
-
-    plt.figure(figsize=(15,15))
-    # height
-    plt.subplot(5,1,1)
-    if feature: plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd1[f1:f2+1], h_hpd2[f1:f2+1], color="C2", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_1[f1:f2+1], jh_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_2[f1:f2+1], jh_hpd2_2[f1:f2+1], color="C4", alpha=0.2)
-    #if feature: plt.fill_between(data.drift.index.values[f1:f2+1], fh_hpd1[f1:f2+1], fh_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if binder: plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd1[f1:f2+1], h_hpd2[f1:f2+1], where=(data.z_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C2", alpha=0.2)
-    if junk: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1[f1:f2+1], jh_hpd2[f1:f2+1], where=(data.j_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C3", alpha=0.2)
-
-    if feature: plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1], s=10, color="C2")
-    if jfeature: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_1[f1:f2+1], s=10, color="C3")
-    if jfeature: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_2[f1:f2+1], s=10, color="C4")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fh_mean[f1:f2+1], s=10, color="C0")
-    if binder: plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1], s=10, color=z_colors[f1:f2+1])
-    if junk: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean[f1:f2+1], s=10, color=j_colors[f1:f2+1])
-    plt.ylim(0,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("height", fontsize=20) 
-
-    # x position
-    plt.subplot(5,1,2)
-    #plt.hlines([-2.5,0,2.5], data.drift.index.values[0], data.drift.index.values[-1], linestyles='dashed')
-    if feature: plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd1[f1:f2+1], x_hpd2[f1:f2+1], color="C2", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_1[f1:f2+1], jx_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_2[f1:f2+1], jx_hpd2_2[f1:f2+1], color="C4", alpha=0.2)
-    #if feature: plt.fill_between(data.drift.index.values[f1:f2+1], fx_hpd1[f1:f2+1], fx_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if binder: plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd1[f1:f2+1], x_hpd2[f1:f2+1], where=(data.z_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C2", alpha=0.2)
-    if junk: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1[f1:f2+1], jx_hpd2[f1:f2+1], where=(data.j_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C3", alpha=0.2)
-
-    if feature: plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1], s=10, color="C2")
-    if jfeature: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_1[f1:f2+1], s=10, color="C3")
-    if jfeature: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_2[f1:f2+1], s=10, color="C4")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fx_mean[f1:f2+1], s=10, color="C0")
-    if binder: plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1], s=10, color=z_colors[f1:f2+1])
-    if junk: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean[f1:f2+1], s=10, color=j_colors[f1:f2+1])
-    plt.ylim(-(data.D+3)/2, (data.D+3)/2)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("x position", fontsize=20)
-    
-    # y position
-    plt.subplot(5,1,3)
-    #plt.hlines([-2.5,0,2.5], data.drift.index.values[0], data.drift.index.values[-1], linestyles='dashed')
-    if feature: plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd1[f1:f2+1], y_hpd2[f1:f2+1], color="C2", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_1[f1:f2+1], jy_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_2[f1:f2+1], jy_hpd2_2[f1:f2+1], color="C4", alpha=0.2)
-    #if feature: plt.fill_between(data.drift.index.values[f1:f2+1], fy_hpd1[f1:f2+1], fy_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if binder: plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd1[f1:f2+1], y_hpd2[f1:f2+1], where=(data.z_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C2", alpha=0.2)
-    if junk: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1[f1:f2+1], jy_hpd2[f1:f2+1], where=(data.j_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C3", alpha=0.2)
-
-    if feature: plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1], s=10, color="C2")
-    if jfeature: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_1[f1:f2+1], s=10, color="C3")
-    if jfeature: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_2[f1:f2+1], s=10, color="C4")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fy_mean[f1:f2+1], s=10, color="C0")
-    if binder: plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1], s=10, color=z_colors[f1:f2+1])
-    if junk: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean[f1:f2+1], s=10, color=j_colors[f1:f2+1])
-    plt.ylim(-(data.D+3)/2, (data.D+3)/2)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("y position", fontsize=20)
-    
-    # width
-    plt.subplot(5,1,4)
-    if feature: plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd1[f1:f2+1], w_hpd2[f1:f2+1], color="C2", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_1[f1:f2+1], jw_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if jfeature: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_2[f1:f2+1], jw_hpd2_2[f1:f2+1], color="C4", alpha=0.2)
-    #if feature: plt.fill_between(data.drift.index.values[f1:f2+1], fw_hpd1[f1:f2+1], fw_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if binder: plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd1[f1:f2+1], w_hpd2[f1:f2+1], where=(data.z_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C2", alpha=0.2)
-    if junk: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1[f1:f2+1], jw_hpd2[f1:f2+1], where=(data.j_probs[aoi,f1:f2+1,1].numpy()>0.5), color="C3", alpha=0.2)
-
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color="C2")
-    #if jfeature: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean[f1:f2+1], s=10, color="C3")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fw_mean[f1:f2+1], s=10, color="C0")
-    if binder: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color=z_colors[f1:f2+1])
-    if junk: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean[f1:f2+1], s=10, color=j_colors[f1:f2+1])
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fw_mean[f1:f2+1], s=10, color="C0")
-    #if binder: plt.scatter([data.drift.index.values[f1], data.drift.index.values[f2]], [w_mean, w_mean], s=10, color="C0")
-    #if junk: plt.scatter([data.drift.index.values[f1], data.drift.index.values[f2]], [jw_mean, jw_mean], s=10, color="C0")
-    #if binder: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color=z_colors[f1:f2+1])
-    #if junk: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean[f1:f2+1], s=10, color=j_colors[f1:f2+1])
-    plt.ylim(0,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    plt.ylabel("width", fontsize=20)
-    
-    # background 
-    #plt.subplot(5,1,5)
-    #plt.fill_between(data.drift.index.values[f1:f2+1], b_hpd1[f1:f2+1], b_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    #plt.scatter(data.drift.index.values[f1:f2+1], b_mean[f1:f2+1], s=10, color="C0")
-    #plt.ylim(0,)
-    #plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
-    #plt.ylabel("background", fontsize=20)
-    #plt.xlabel("frame #", fontsize=20)
-    
-    #plt.legend()
-    plt.tight_layout()
-    plt.show()
-    
-def view_aoi(aoi, frame, data, target, binder, junk):
+def view_aoi(aoi, frame, data, target, z, junk, m1, m2):
     #fig = plt.figure(figsize=(30,1.5), dpi=600)
+    k_probs = torch.zeros(len(data.drift),2)
+    k_probs[:,0] = data.m_probs[aoi,:,0,0,1]+data.m_probs[aoi,:,0,0,3]
+    k_probs[:,1] = data.m_probs[aoi,:,0,0,2]+data.m_probs[aoi,:,0,0,3]
+    if z:
+        z_probs = k_probs[:,0]*data.theta_probs[aoi,:,0,0,1] + k_probs[:,1]*data.theta_probs[aoi,:,0,0,2]
+
     fig = plt.figure(figsize=(15,3), dpi=600)
     for i in range(20):
         ax = fig.add_subplot(2,10,i+1)
@@ -586,9 +173,13 @@ def view_aoi(aoi, frame, data, target, binder, junk):
         plt.imshow(data._store[aoi,frame+i].cpu(), cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
         if target:
             plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5, data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5, "b+", markersize=10, mew=3, alpha=0.7)
-        if binder:
-            z_color = to_rgba_array("C2", data.z_probs.cpu().numpy()[aoi,frame+i,1])[0]
-            plt.gca().add_patch(Rectangle((0, 0), data.D*data.z_probs.cpu().numpy()[aoi,frame+i,1], 0.25, edgecolor=z_color, lw=4, facecolor="none"))
+        if m1:
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + data.y_mean[aoi,frame+i,0,0,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + data.x_mean[aoi,frame+i,0,0,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
+        if m2:
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + data.y_mean[aoi,frame+i,0,0,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + data.x_mean[aoi,frame+i,0,0,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
+        if z:
+            z_color = to_rgba_array("C2", z_probs[frame+i])[0]
+            plt.gca().add_patch(Rectangle((0, 0), data.D*z_probs[frame+i], 0.25, edgecolor=z_color, lw=4, facecolor="none"))
             #plt.plot(data.target.iloc[aoi, 2] + data.y_mode[aoi, frame+i] + 0.5, data.target.iloc[aoi, 1] + data.x_mode[aoi, frame+i] + 0.5, "g+", markersize=10, mew=3, alpha=data.z_probs[aoi, frame+i, 1])
         if junk:
             j_color = to_rgba_array("C3", data.j_probs.cpu().numpy()[aoi,frame+i,1])[0]
@@ -642,45 +233,6 @@ def view_aoi_class_average(data, K):
     plt.tight_layout()
     plt.show()
 
-def hpd(trace, mass_frac=0.95) :
-    """
-    Returns highest probability density region given by
-    a set of samples.
-
-    Parameters
-    ----------
-    trace : array
-        1D array of MCMC samples for a single variable
-    mass_frac : float with 0 < mass_frac <= 1
-        The fraction of the probability to be included in
-        the HPD.  For example, `massfrac` = 0.95 gives a
-        95% HPD.
-        
-    Returns
-    -------
-    output : array, shape (2,)
-        The bounds of the HPD
-    """
-    # Get sorted list
-    d = np.sort(np.copy(trace), axis=0)
-    #print(d)
-
-    # Number of total samples taken
-    n = len(trace)
-    f = trace.shape[1]
-    
-    # Get number of samples that should be included in HPD
-    n_samples = np.floor(mass_frac * n).astype(int)
-    
-    # Get width (in units of data) of all intervals with n_samples samples
-    int_width = d[n_samples:] - d[:n-n_samples]
-    
-    # Pick out minimal interval
-    min_int = np.argmin(int_width, axis=0)
-    
-    # Return interval
-    return np.array([d[min_int, np.arange(f)], d[min_int+n_samples, np.arange(f)]])
-
 
 def Location(mode, size, loc, scale):
     mode = (mode - loc) / scale
@@ -690,191 +242,140 @@ def Location(mode, size, loc, scale):
     transforms =  [AffineTransform(loc=loc, scale=scale)]
     return dist.TransformedDistribution(base_distribution, transforms)
 
-def view_clutter_summary(aoi, data, f1, f2, m1, m2, m):
+
+def view_theta(aoi, data, f1, f2, theta1, theta2, z, labels):
+    if theta1 or theta2 or z:
+        k_probs = torch.zeros(len(data.drift),2)
+        k_probs[:,0] = data.m_probs[aoi,:,0,0,1]+data.m_probs[aoi,:,0,0,3]
+        k_probs[:,1] = data.m_probs[aoi,:,0,0,2]+data.m_probs[aoi,:,0,0,3]
+
+    plt.figure(figsize=(25,5))
+    # height
+    if theta1: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,0]*data.theta_probs[aoi,f1:f2+1,0,0,1], marker="o", ms=5, color="C0", label="theta1")
+    if theta2: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,1]*data.theta_probs[aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C1", label="theta2")
+    if z: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,0]*data.theta_probs[aoi,f1:f2+1,0,0,1] + k_probs[f1:f2+1,1]*data.theta_probs[aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2", label="z")
+    if labels: plt.plot(data.drift.index.values[f1:f2+1], data.labels.iloc[aoi*data.F+f1:aoi*data.F+f2+1,0], marker="o", ms=5, color="C3", label="spotpicker")
+    #if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[0,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
+    #if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[1,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
+    #if sp: plt.plot(data.drift.index.values[f1:f2+1], data.l_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C4")
+    #if binder: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,2], marker="o", ms=5, color="C4")
+    plt.ylim(-0.02,)
+    plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
+    plt.ylabel("probability", fontsize=30)
+    plt.xlabel("frame #", fontsize=30)
+    plt.gca().set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    plt.gca().tick_params(axis="x", labelsize=25)
+    plt.gca().tick_params(axis="y", labelsize=25)
+    plt.legend(fontsize=30)
+    plt.tight_layout()
+    plt.show()
+
+def view_m_probs(aoi, data, f1, f2, m1, m2, sp):
+    plt.figure(figsize=(25,5))
+    # height
+    if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,0,0,1]+data.m_probs[aoi,f1:f2+1,0,0,3], marker="o", ms=5, color="C0")
+    if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,0,0,2]+data.m_probs[aoi,f1:f2+1,0,0,3], marker="o", ms=5, color="C1")
+    #if sp: plt.plot(data.drift.index.values[f1:f2+1], data.l_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C4")
+    #if binder: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,2], marker="o", ms=5, color="C4")
+    plt.ylim(-0.02,)
+    plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
+    plt.ylabel("probability", fontsize=25)
+    plt.xlabel("frame #", fontsize=25)
+    plt.gca().set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    plt.gca().tick_params(axis="x", labelsize=20)
+    plt.gca().tick_params(axis="y", labelsize=20)
+    #plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def view_clutter_summary(aoi, data, f1, f2, m2, m):
     
-    #b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc[aoi] * data.b_beta[aoi], data.b_beta[aoi]).sample((1000,)))
-    b_hpd1, b_hpd2 = hpd(dist.Gamma(data.b_loc[aoi,:,0,0] * data.D**2, data.D**2).sample((1000,)))
-    b_mean = data.b_loc[aoi,:,0,0].cpu().numpy()
-
-    if m1:
-        #h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc.item() * data.size[0,aoi,:,0,0] * data.h_beta[0,aoi,:,0,0], data.h_beta[0,aoi,:,0,0]).sample((1000,)))
-        #h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc * data.size[aoi,:,0,0,0,0] * data.h_beta[aoi,:,0,0,0,0], data.h_beta[aoi,:,0,0,0,0]).sample((1000,)))
-        #h_mean = data.h_loc.item() * data.size[0,aoi,:,0,0].cpu().numpy()
-        h_hpd1, h_hpd2 = hpd(dist.Gamma(data.h_loc[0,aoi,:,0,0], 1).sample((1000,)))
-        h_mean = data.h_loc[0,aoi,:,0,0].cpu().numpy()
-
-        #x_hpd1, x_hpd2 = hpd(Location(data.x_mode[0,aoi,:,0,0], data.size[0,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #x_hpd1, x_hpd2 = hpd(Location(data.x_mode[aoi,:,0,0,0,0], data.x_size[aoi,:,0,0,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #x_mean = data.x_mode[0,aoi,:,0,0].cpu().numpy()
-        scale = torch.sqrt((data.w_mode**2 + 1/12) / data.h_loc[0,aoi,:,0,0] + 8 * math.pi * data.w_mode**4 * data.b_loc[aoi,:,0,0] / data.h_loc[0,aoi,:,0,0]**2)
-        #scale = data.w_mode / torch.sqrt(data.h_loc[0,aoi,:,0,0])
-        x_hpd1, x_hpd2 = hpd(dist.Normal(data.x_mode[0,aoi,:,0,0], scale).sample((1000,)))
-        x_mean = data.x_mode[0,aoi,:,0,0].cpu().numpy()
-
-        #y_hpd1, y_hpd2 = hpd(Location(data.y_mode[0,aoi,:,0,0], data.size[0,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #y_hpd1, y_hpd2 = hpd(Location(data.y_mode[aoi,:,0,0,0,0], data.y_size[aoi,:,0,0,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #y_mean = data.y_mode[0,aoi,:,0,0].cpu().numpy()
-        y_hpd1, y_hpd2 = hpd(dist.Normal(data.y_mode[0,aoi,:,0,0], scale).sample((1000,)))
-        y_mean = data.y_mode[0,aoi,:,0,0].cpu().numpy()
-
-        #w_hpd1, w_hpd2 = hpd(Location(data.w_mode[aoi,:,0,0,0,0], data.w_size[aoi,:,0,0,0,0], 0.5, 2.5).sample((1000,)))
-        #w_mean = data.w_mode[aoi,:,0,0,0,0].cpu().numpy()
-        #w_hpd1, w_hpd2 = hpd(dist.Gamma(data.w_loc * data.w_beta[aoi,:,0,0,0,0], data.w_beta[aoi,:,0,0,0,0]).sample((1000,)))
-        #w_mean = data.w_mode.cpu().numpy()
+    b_hpd = hpdi(dist.Gamma(data.b_loc[aoi].squeeze() * data.b_beta, data.b_beta).sample((1000,)), 0.95, dim=0)
+    #b_hpd = hpdi(dist.Gamma(data.b_loc[aoi].squeeze() * data.D**2, data.D**2).sample((1000,)), 0.95, dim=0)
+    b_mean = data.b_loc[aoi].squeeze()
 
     if m2:
-        #jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc.item() * data.size[0,aoi,:,0,0] * data.h_beta[0,aoi,:,0,0], data.h_beta[0,aoi,:,0,0]).sample((1000,)))
-        #jh_mean_1 = data.h_loc.item() * data.size[0,aoi,:,0,0].cpu().numpy()
-        #jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc[0,aoi,:,0,0] * data.h_beta[0,aoi,:,0,0], data.h_beta[0,aoi,:,0,0]).sample((1000,)))
-        jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0,0], 1).sample((1000,)))
-        jh_mean_1 = data.h_loc[aoi,:,0,0,0].cpu().numpy()
-        #jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0,1,0] * data.h_beta[aoi,:,0,0,1,0], data.h_beta[aoi,:,0,0,1,0]).sample((1000,)))
-        #jh_hpd1_1, jh_hpd2_1 = hpd(dist.Gamma(data.h_loc * data.size[aoi,:,0,0,1,0] * data.h_beta[aoi,:,0,0,1,0], data.h_beta[aoi,:,0,0,1,0]).sample((1000,)))
-        #jh_mean_1 = data.h_loc[aoi,:,0,0,1,0].cpu().numpy()
+        #h_hpd = hpdi(dist.Gamma(data.h_loc[aoi].squeeze(), 1).sample((1000,)), 0.95, dim=0)
+        h_hpd = hpdi(dist.Gamma(data.h_loc[aoi].squeeze() * data.h_beta, data.h_beta).sample((1000,)), 0.95, dim=0)
+        h_mean = data.h_loc[aoi].squeeze()
 
-        #jx_hpd1_1, jx_hpd2_1 = hpd(Location(data.x_mode[0,aoi,:,0,0], data.size[0,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jx_hpd1_1, jx_hpd2_1 = hpd(Location(data.x_mode[0,aoi,:,0,0], data.size.item() * data.h_loc[0,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #size = (data.D+3)**2 * data.h_loc[0,aoi,:,0,0] / (4 * (data.w_mode[0,aoi,:,0,0] ** 2 + 1/12))
-        #scale = data.w_mode / torch.sqrt(data.h_loc[0,aoi,:,0,0])
-        #scale = torch.sqrt((data.w_mode**2 + 1/12) / data.h_loc[0,aoi,:,0,0] + 8 * math.pi * data.w_mode**4 * data.b_loc[aoi,:,0,0] / data.h_loc[0,aoi,:,0,0]**2)
-        scale = torch.sqrt((data.w_mode[aoi,:,0,0,0]**2 + 1/12) / data.h_loc[aoi,:,0,0,0] + 8 * math.pi * data.w_mode[aoi,:,0,0,0]**4 * data.b_loc[aoi,:,0,0] / data.h_loc[aoi,:,0,0,0]**2)
-        jx_hpd1_1, jx_hpd2_1 = hpd(dist.Normal(data.x_mode[aoi,:,0,0,0], scale).sample((1000,)))
-        jx_mean_1 = data.x_mode[aoi,:,0,0,0].cpu().numpy()
-        #jx_hpd1_1, jx_hpd2_1 = hpd(Location(data.x_mode[aoi,:,0,0,1,0], data.size[aoi,:,0,0,1,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jx_mean_1 = data.x_mode[aoi,:,0,0,1,0].cpu().numpy()
+        #scale = torch.sqrt((data.w_mode[aoi].squeeze()**2 + 1/12) / data.h_loc[aoi].squeeze() + 8 * math.pi * data.w_mode[aoi].squeeze()**4 * data.b_loc[aoi,:,0,0].unsqueeze(dim=-1) / data.h_loc[aoi].squeeze()**2)
+        #x_hpd = hpdi(dist.Normal(data.x_mode[aoi].squeeze(), scale).sample((1000,)), 0.95, dim=0)
+        x_hpd = hpdi(dist.Normal(data.x_mean[aoi].squeeze(), data.scale[aoi].squeeze()).sample((1000,)), 0.95, dim=0)
+        x_mean = data.x_mean[aoi].squeeze()
 
-        #jy_hpd1_1, jy_hpd2_1 = hpd(Location(data.y_mode[0,aoi,:,0,0], data.size[0,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jy_hpd1_1, jy_hpd2_1 = hpd(dist.Normal(data.y_mode[aoi,:,0,0,0], scale).sample((1000,)))
-        jy_mean_1 = data.y_mode[aoi,:,0,0,0].cpu().numpy()
-        #jy_hpd1_1, jy_hpd2_1 = hpd(Location(data.y_mode[aoi,:,0,0,1,0], data.size[aoi,:,0,0,1,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jy_mean_1 = data.y_mode[aoi,:,0,0,1,0].cpu().numpy()
+        #y_hpd = hpdi(dist.Normal(data.y_mode[aoi].squeeze(), scale).sample((1000,)), 0.95, dim=0)
+        y_hpd = hpdi(dist.Normal(data.y_mean[aoi].squeeze(), data.scale[aoi].squeeze()).sample((1000,)), 0.95, dim=0)
+        y_mean = data.y_mean[aoi].squeeze()
 
-        #jw_hpd1_1, jw_hpd2_1 = hpd(Location(data.w_mode[aoi,:,0,0,1,0], data.w_size[aoi,:,0,0,1,0], 0.5, 2.5).sample((1000,)))
-        #jw_mean_1 = data.w_mode[aoi,:,0,0,1,0].cpu().numpy()
-        #jw_hpd1_1, jw_hpd2_1 = hpd(dist.Gamma(data.w_loc[aoi,:,0,0,1,0] * data.w_beta[aoi,:,0,0,1,0], data.w_beta[aoi,:,0,0,1,0]).sample((1000,)))
-        #jw_mean_1 = data.w_mode.cpu().numpy()
-
-        #jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc.item() * data.size[1,aoi,:,0,0] * data.h_beta[1,aoi,:,0,0], data.h_beta[1,aoi,:,0,0]).sample((1000,)))
-        #jh_mean_2 = data.h_loc.item() * data.size[1,aoi,:,0,0].cpu().numpy()
-        #jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc[1,aoi,:,0,0] * data.h_beta[1,aoi,:,0,0], data.h_beta[1,aoi,:,0,0]).sample((1000,)))
-        jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0,1], 1).sample((1000,)))
-        jh_mean_2 = data.h_loc[aoi,:,0,0,1].cpu().numpy()
-        #jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc[aoi,:,0,0,1,1] * data.h_beta[aoi,:,0,0,1,1], data.h_beta[aoi,:,0,0,1,1]).sample((1000,)))
-        #jh_hpd1_2, jh_hpd2_2 = hpd(dist.Gamma(data.h_loc * data.size[aoi,:,0,0,1,1] * data.h_beta[aoi,:,0,0,1,1], data.h_beta[aoi,:,0,0,1,1]).sample((1000,)))
-        #jh_mean_2 = data.h_loc[aoi,:,0,0,1,1].cpu().numpy()
-
-        #jx_hpd1_2, jx_hpd2_2 = hpd(Location(data.x_mode[1,aoi,:,0,0], data.size[1,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jx_hpd1_2, jx_hpd2_2 = hpd(Location(data.x_mode[1,aoi,:,0,0], data.size.item() * data.h_loc[1,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #size = (data.D+3)**2 * data.h_loc[1,aoi,:,0,0] / (4 * (data.w_mode[1,aoi,:,0,0] ** 2 + 1/12))
-        scale = torch.sqrt((data.w_mode[aoi,:,0,0,1]**2 + 1/12) / data.h_loc[aoi,:,0,0,1] + 8 * math.pi * data.w_mode[aoi,:,0,0,1]**4 * data.b_loc[aoi,:,0,0] / data.h_loc[aoi,:,0,0,1]**2)
-        #scale = data.w_mode / torch.sqrt(data.h_loc[1,aoi,:,0,0])
-        jx_hpd1_2, jx_hpd2_2 = hpd(dist.Normal(data.x_mode[aoi,:,0,0,1], scale).sample((1000,)))
-        jx_mean_2 = data.x_mode[aoi,:,0,0,1].cpu().numpy()
-        #jx_hpd1_2, jx_hpd2_2 = hpd(Location(data.x_mode[aoi,:,0,0,1,1], data.size[aoi,:,0,0,1,1], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jx_mean_2 = data.x_mode[aoi,:,0,0,1,1].cpu().numpy()
-
-        #jy_hpd1_2, jy_hpd2_2 = hpd(Location(data.y_mode[1,aoi,:,0,0], data.size[1,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jy_hpd1_2, jy_hpd2_2 = hpd(Location(data.y_mode[1,aoi,:,0,0], data.size * data.h_loc[1,aoi,:,0,0], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        jy_hpd1_2, jy_hpd2_2 = hpd(dist.Normal(data.y_mode[aoi,:,0,0,1], scale).sample((1000,)))
-        jy_mean_2 = data.y_mode[aoi,:,0,0,1].cpu().numpy()
-        #jy_hpd1_2, jy_hpd2_2 = hpd(Location(data.y_mode[aoi,:,0,0,1,1], data.size[aoi,:,0,0,1,1], -(data.D+3)/2, (data.D+3)).sample((1000,)))
-        #jy_mean_2 = data.y_mode[aoi,:,0,0,1,1].cpu().numpy()
-
-        #jw_hpd1_2, jw_hpd2_2 = hpd(Location(data.w_mode[aoi,:,0,0,1,1], data.w_size[aoi,:,0,0,1,1], 0.5, 2.5).sample((1000,)))
-        #jw_mean_2 = data.w_mode[aoi,:,0,0,1,1].cpu().numpy()
-        #jw_hpd1_2, jw_hpd2_2 = hpd(dist.Gamma(data.w_loc[aoi,:,0,0,1,1] * data.w_beta[aoi,:,0,0,1,1], data.w_beta[aoi,:,0,0,1,1]).sample((1000,)))
-        #jw_mean_2 = data.w_mode.cpu().numpy()
+        w_hpd = hpdi(Location(data.w_mode[aoi].squeeze(), data.w_size[aoi].squeeze(), 0.5, 2.5).sample((1000,)), 0.95, dim=0)
+        w_mean = data.w_mode[aoi].squeeze()
 
     if m:
-        #m_colors = np.zeros((len(data.drift),4)) + to_rgba_array("C0")
-        #m_colors[:,3] = data.m_probs[aoi,:,1]
-        m_colors_1 = np.zeros((len(data.drift),4)) + to_rgba_array("C3")
-        m_colors_1[:,3] = data.m_probs[0,aoi,:,0,0,1]
-        m_colors_2 = np.zeros((len(data.drift),4)) + to_rgba_array("C2")
-        m_colors_2[:,3] = data.m_probs[1,aoi,:,0,0,1]
+        k_probs = np.zeros((len(data.drift),2))
+        k_probs[:,0] = data.m_probs[aoi,:,0,0,1]+data.m_probs[aoi,:,0,0,3]
+        k_probs[:,1] = data.m_probs[aoi,:,0,0,2]+data.m_probs[aoi,:,0,0,3]
+        m_colors = np.zeros((2,len(data.drift),4))
+        m_colors[0] += to_rgba_array("C0")
+        m_colors[0,:,3] = k_probs[:,0]
+        m_colors[1] += to_rgba_array("C1")
+        m_colors[1,:,3] = k_probs[:,1]
 
     plt.figure(figsize=(15,15))
     # height
     plt.subplot(5,1,1)
-    if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd1[f1:f2+1], h_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_1[f1:f2+1], jh_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_2[f1:f2+1], jh_hpd2_2[f1:f2+1], color="C2", alpha=0.2)
-    if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd1[f1:f2+1], h_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_1[f1:f2+1], jh_hpd2_1[f1:f2+1], where=(data.m_probs[0,aoi,f1:f2+1,0,0,1]>0.5), color="C3", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jh_hpd1_2[f1:f2+1], jh_hpd2_2[f1:f2+1], where=(data.m_probs[1,aoi,f1:f2+1,0,0,1]>0.5), color="C2", alpha=0.2)
-
-    if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1], s=10, color="C0")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_1[f1:f2+1], s=10, color="C3")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_2[f1:f2+1], s=10, color="C2")
-    if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jh_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
+    for k in range(2):
+        if m2 and not m:
+            plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd[0][f1:f2+1,k], h_hpd[1][f1:f2+1,k], color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1,k], s=10, color="C{}".format(k))
+        if m and m2:
+            plt.fill_between(data.drift.index.values[f1:f2+1], h_hpd[0][f1:f2+1,k], h_hpd[1][f1:f2+1,k], where=(k_probs[f1:f2+1,k]>0.5), color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], h_mean[f1:f2+1,k], s=10, color=m_colors[k,f1:f2+1])
     plt.ylim(0,)
     plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
     plt.ylabel("intensity", fontsize=20) 
 
     # x position
     plt.subplot(5,1,2)
-    if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd1[f1:f2+1], x_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_1[f1:f2+1], jx_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_2[f1:f2+1], jx_hpd2_2[f1:f2+1], color="C2", alpha=0.2)
-    if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd1[f1:f2+1], x_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_1[f1:f2+1], jx_hpd2_1[f1:f2+1], where=(data.m_probs[0,aoi,f1:f2+1,0,0,1]>0.5), color="C3", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jx_hpd1_2[f1:f2+1], jx_hpd2_2[f1:f2+1], where=(data.m_probs[1,aoi,f1:f2+1,0,0,1]>0.5), color="C2", alpha=0.2)
-
-    if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1], s=10, color="C0")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_1[f1:f2+1], s=10, color="C3")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_2[f1:f2+1], s=10, color="C2")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fx_mean[f1:f2+1], s=10, color="C0")
-    if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jx_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
+    for k in range(2):
+        if m2 and not m:
+            plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd[0][f1:f2+1,k], x_hpd[1][f1:f2+1,k], color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1,k], s=10, color="C{}".format(k))
+        if m and m2:
+            plt.fill_between(data.drift.index.values[f1:f2+1], x_hpd[0][f1:f2+1,k], x_hpd[1][f1:f2+1,k], where=(k_probs[f1:f2+1,k]>0.5), color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], x_mean[f1:f2+1,k], s=10, color=m_colors[k,f1:f2+1])
     plt.ylim(-(data.D+3)/2, (data.D+3)/2)
     plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
     plt.ylabel("x position", fontsize=20)
     
     # y position
     plt.subplot(5,1,3)
-    if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd1[f1:f2+1], y_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_1[f1:f2+1], jy_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_2[f1:f2+1], jy_hpd2_2[f1:f2+1], color="C2", alpha=0.2)
-    if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd1[f1:f2+1], y_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_1[f1:f2+1], jy_hpd2_1[f1:f2+1], where=(data.m_probs[0,aoi,f1:f2+1,0,0,1]>0.5), color="C3", alpha=0.2)
-    if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jy_hpd1_2[f1:f2+1], jy_hpd2_2[f1:f2+1], where=(data.m_probs[1,aoi,f1:f2+1,0,0,1]>0.5), color="C2", alpha=0.2)
-
-    if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1], s=10, color="C0")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_1[f1:f2+1], s=10, color="C3")
-    if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_2[f1:f2+1], s=10, color="C2")
-    #if feature: plt.scatter(data.drift.index.values[f1:f2+1], fy_mean[f1:f2+1], s=10, color="C0")
-    if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jy_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
+    for k in range(2):
+        if m2 and not m:
+            plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd[0][f1:f2+1,k], y_hpd[1][f1:f2+1,k], color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1,k], s=10, color="C{}".format(k))
+        if m and m2:
+            plt.fill_between(data.drift.index.values[f1:f2+1], y_hpd[0][f1:f2+1,k], y_hpd[1][f1:f2+1,k], where=(k_probs[f1:f2+1,k]>0.5), color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], y_mean[f1:f2+1,k], s=10, color=m_colors[k,f1:f2+1])
     plt.ylim(-(data.D+3)/2, (data.D+3)/2)
     plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
     plt.ylabel("y position", fontsize=20)
     
     # width
     plt.subplot(5,1,4)
-    #if m1 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd1[f1:f2+1], w_hpd2[f1:f2+1], color="C0", alpha=0.2)
-    #if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_1[f1:f2+1], jw_hpd2_1[f1:f2+1], color="C3", alpha=0.2)
-    #if m2 and not m: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_2[f1:f2+1], jw_hpd2_2[f1:f2+1], color="C2", alpha=0.2)
-    #if m and m1: plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd1[f1:f2+1], w_hpd2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,1]>0.5), color="C0", alpha=0.2)
-    #if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_1[f1:f2+1], jw_hpd2_1[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C3", alpha=0.2)
-    #if m and m2: plt.fill_between(data.drift.index.values[f1:f2+1], jw_hpd1_2[f1:f2+1], jw_hpd2_2[f1:f2+1], where=(data.m_probs[aoi,f1:f2+1,2]>0.5), color="C2", alpha=0.2)
-
-    #if m1 and not m: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color="C0")
-    #if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_1[f1:f2+1], s=10, color="C3")
-    #if m2 and not m: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_2[f1:f2+1], s=10, color="C2")
-    #if m and m1: plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1], s=10, color=m_colors[f1:f2+1])
-    #if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_1[f1:f2+1], s=10, color=m_colors_1[f1:f2+1])
-    #if m and m2: plt.scatter(data.drift.index.values[f1:f2+1], jw_mean_2[f1:f2+1], s=10, color=m_colors_2[f1:f2+1])
-    plt.ylim(0,)
+    for k in range(2):
+        if m2 and not m:
+            plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd[0][f1:f2+1,k], w_hpd[1][f1:f2+1,k], color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1,k], s=10, color="C{}".format(k))
+        if m and m2:
+            plt.fill_between(data.drift.index.values[f1:f2+1], w_hpd[0][f1:f2+1,k], w_hpd[1][f1:f2+1,k], where=(k_probs[f1:f2+1,k]>0.5), color="C{}".format(k), alpha=0.2)
+            plt.scatter(data.drift.index.values[f1:f2+1], w_mean[f1:f2+1,k], s=10, color=m_colors[k,f1:f2+1])
     plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
     plt.ylabel("width", fontsize=20)
     
     # background 
     plt.subplot(5,1,5)
-    plt.fill_between(data.drift.index.values[f1:f2+1], b_hpd1[f1:f2+1], b_hpd2[f1:f2+1], color="C0", alpha=0.2)
+    plt.fill_between(data.drift.index.values[f1:f2+1], b_hpd[0][f1:f2+1], b_hpd[1][f1:f2+1], color="C0", alpha=0.2)
     plt.scatter(data.drift.index.values[f1:f2+1], b_mean[f1:f2+1], s=10, color="C0")
     plt.ylim(0,)
     plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
