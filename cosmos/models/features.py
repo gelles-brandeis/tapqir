@@ -23,8 +23,8 @@ from cosmos.models.helper import Model
 
 class Features(Model):
     """ Extract features of the Gaussian Spot Model """
-    def __init__(self, data, dataset, K, lr, n_batch, jit, noise="GammaOffset"):
-        super().__init__(data, dataset, K, lr, n_batch, jit, noise="GammaOffset")
+    def __init__(self, data, control, K, lr, n_batch, jit, noise="GammaOffset"):
+        super().__init__(data, control, K, lr, n_batch, jit, noise="GammaOffset")
         self.__name__ = "features"
         
         pyro.clear_param_store()
@@ -32,7 +32,7 @@ class Features(Model):
         self.optim = pyro.optim.Adam({"lr": lr, "betas": [0.9, 0.999]})
         self.elbo = JitTrace_ELBO() if jit else Trace_ELBO()
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.dataset), "{}".format(self.__name__), "K{}".format(self.K)))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.data.path,"runs", "{}".format(self.data.name), "{}".format(self.__name__), "K{}".format(self.K)))
         self.mcc = False
     
     def model(self):
@@ -42,8 +42,8 @@ class Features(Model):
         gain = pyro.sample("gain", dist.HalfNormal(50.))
 
         #plates
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=self.n_batch, dim=-4)
-        F_plate = pyro.plate("F_plate", self.F, dim=-3)
+        N_plate = pyro.plate("N_plate", self.data.N, subsample_size=self.n_batch, dim=-4)
+        F_plate = pyro.plate("F_plate", self.data.F, dim=-3)
         
         with N_plate as batch_idx:
             with F_plate:
@@ -66,22 +66,22 @@ class Features(Model):
         pyro.sample("gain", dist.Delta(gain_v))
 
         # plates
-        N_plate = pyro.plate("N_plate", self.N, subsample_size=self.n_batch, dim=-4)
-        F_plate = pyro.plate("F_plate", self.F, dim=-3)
+        N_plate = pyro.plate("N_plate", self.data.N, subsample_size=self.n_batch, dim=-4)
+        F_plate = pyro.plate("F_plate", self.data.F, dim=-3)
 
         # Global Parameters
-        b_loc = pyro.param("b_loc", torch.ones(self.N,self.F,1,1)*10., constraint=constraints.positive)
+        b_loc = pyro.param("b_loc", torch.ones(self.data.N,self.data.F,1,1)*10., constraint=constraints.positive)
         b_beta = pyro.param("b_beta", torch.ones(1)*self.D**2, constraint=constraints.positive)
-        w_mode = pyro.param("w_mode", torch.ones(self.N,self.F,1,1,self.K)*1.35, constraint=constraints.interval(0.5,3.))
-        w_size = pyro.param("w_size", torch.ones(self.N,self.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
+        w_mode = pyro.param("w_mode", torch.ones(self.data.N,self.data.F,1,1,self.K)*1.35, constraint=constraints.interval(0.5,3.))
+        w_size = pyro.param("w_size", torch.ones(self.data.N,self.data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
         #w_mode = pyro.param("w_mode", torch.ones(1)*1.35, constraint=constraints.interval(0.5,3.))
         #w_size = pyro.param("w_size", torch.ones(1)*1000., constraint=constraints.greater_than(2.))
-        intensity = torch.ones(self.N,self.F,1,1,self.K)*10.
+        intensity = torch.ones(self.data.N,self.data.F,1,1,self.K)*10.
         intensity[...,1] = 30. # 30 is better than 100
         h_loc = pyro.param("h_loc", intensity, constraint=constraints.positive)
         h_beta = pyro.param("h_beta", torch.ones(1), constraint=constraints.positive)
-        x_mean = pyro.param("x_mean", torch.zeros(self.N,self.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        y_mean = pyro.param("y_mean", torch.zeros(self.N,self.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+        x_mean = pyro.param("x_mean", torch.zeros(self.data.N,self.data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+        y_mean = pyro.param("y_mean", torch.zeros(self.data.N,self.data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
         #var = (w_mode**2 + 1/12) / h_loc + 8 * math.pi * w_mode**4 * b_loc.unsqueeze(dim=-1) / h_loc**2
         #size = ((self.D+3)**2/4) / var - 1
         #x_conc0 = pyro.param("x_conc0", size/2, constraint=constraints.greater_than(1.))

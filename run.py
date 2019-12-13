@@ -4,7 +4,6 @@ import numpy as np
 import pyro
 # pyro & pytorch
 import torch
-from pyro import poutine
 pyro.enable_validation(True)
 # loading & saving data
 from tqdm import tqdm
@@ -17,8 +16,8 @@ parser.add_argument("-m", "--model", default="v3", type=str)#,
 parser.add_argument("-n", "--num-epochs", type=int)
 parser.add_argument("-N", "--n-batch", default=16, type=int)
 parser.add_argument("-lr", "--learning-rate", default=0.02, type=float)
-#parser.add_argument("-F", "--f-batch", default=64, type=int)
 parser.add_argument("-d", "--dataset", type=str)
+parser.add_argument("-nc", "--negative-control", type=str)
 parser.add_argument('--cuda0', action='store_true')
 parser.add_argument('--cuda1', action='store_true')
 parser.add_argument('--jit', action='store_true')
@@ -38,61 +37,22 @@ else:
     device = torch.device("cpu")
     print("using device: cpu")
 
-from cosmos.models.FeatureExtraction import FeatureExtraction
-from cosmos.models.FExtraction import FExtraction
-from cosmos.models.JExtraction import JExtraction
-from cosmos.models.KExtraction import KExtraction
-from cosmos.models.JunkExtraction import JunkExtraction
-#from models.Modelv1 import Modelv1
-from cosmos.models.Modelv2 import Modelv2
-from cosmos.models.Modelv3 import Modelv3
-from cosmos.models.Modelv4 import Modelv4
-from cosmos.models.Test import Test 
-from cosmos.models.Modelv5 import Modelv5
-from cosmos.models.Modelv6 import Modelv6
-from cosmos.models.Modelv7 import Modelv7
-#from cosmos.models.Modelv9 import Modelv9
-#from cosmos.models.Modelv10 import Modelv10
-from cosmos.models.Modelv11 import Modelv11
-from cosmos.models.Modelv12 import Modelv12
-from cosmos.models.Modelv13 import Modelv13
-#from cosmos.models.HMMv1 import HMMv1
-models = dict()
-models["feature"] = FeatureExtraction
-models["feat"] = FExtraction
-models["junk"] = JExtraction
-models["guess"] = KExtraction
-#models["junk"] = JunkExtraction
-#models["v1"] = Modelv1
-models["v2"] = Modelv2
-models["v3"] = Modelv3
-models["v4"] = Modelv4
-models["test"] = Test
-models["v5"] = Modelv5
-models["v6"] = Modelv6
-models["v7"] = Modelv7
-#models["v9"] = Modelv9
-#models["v10"] = Modelv10
-models["v11"] = Modelv11
-models["v12"] = Modelv12
-models["v13"] = Modelv13
-#models["hmm"] = HMMv1
-
 from cosmos.utils.aoi_reader import ReadAoi
-from cosmos.utils.feature_read import ReadFeatures 
+from cosmos.models.features import Features 
+from cosmos.models.detector import Detector
+from cosmos.models.tracker import Tracker
+models = dict()
+models["features"] = Features
+models["detector"] = Detector
+models["tracker"] = Tracker
 
 data = ReadAoi(args.dataset, device)
-if args.model in ["feature", "feat"]:
-    model = models[args.model](data, args.dataset, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
-elif args.model in ["junk", "guess"]:
-    model = models[args.model](data, args.dataset, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
+if args.negative_control:
+    control = ReadAoi(args.negative_control, device)
 else:
-    #data = ReadFeatures(data, args.dataset, device)
-    model = models[args.model](data, args.dataset, K=2, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
+    control = None
+model = models[args.model](data, control, K=2, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
 
 if args.num_epochs:
     model.load()
     model.epoch(args.num_epochs) 
-
-#print("classifying {}".format(args.dataset))
-#model.fixed_epoch(args.n_batch, args.num_epochs)

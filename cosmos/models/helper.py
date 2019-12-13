@@ -10,14 +10,14 @@ from tqdm import tqdm
 
 class Model:
     """ Gaussian Spot Model """
-    def __init__(self, data, dataset, K, lr, n_batch, jit, noise="GammaOffset"):
+    def __init__(self, data, control, K, lr, n_batch, jit, noise="GammaOffset"):
         # D - number of pixel along axis
         # K - number of states
         # data - number of frames, y axis, x axis
         self.data = data
-        self.dataset = dataset
-        self.N, self.F, self.D, _ = data._store.shape
+        self.control = control 
         self.K = K
+        self.D = data.D
         self._params = _noise[noise]
         self.CameraUnit = _noise_fn[noise]
         self.lr = lr
@@ -28,8 +28,8 @@ class Model:
         self.pixel_pos = torch.stack((x_pixel, y_pixel), dim=-1).float()
         
         # drift locs for 2D gaussian spot
-        self.target_locs = torch.tensor((self.data.drift[["dx", "dy"]].values.reshape(1,self.F,2) + self.data.target[["x", "y"]].values.reshape(self.N,1,2)), dtype=torch.float32)
-        self.target_locs = self.target_locs.reshape(self.N,self.F,1,1,1,2).repeat(1,1,1,1,self.K,1)# N,F,1,1,M,K,2
+        self.target_locs = torch.tensor((self.data.drift[["dx", "dy"]].values.reshape(1,self.data.F,2) + self.data.target[["x", "y"]].values.reshape(self.data.N,1,2)), dtype=torch.float32)
+        self.target_locs = self.target_locs.reshape(self.data.N,self.data.F,1,1,1,2).repeat(1,1,1,1,self.K,1)# N,F,1,1,M,K,2
 
     def Location(self, mean, size, loc, scale):
         """
@@ -60,7 +60,7 @@ class Model:
         spot_locs = self.target_locs[batch_idx] # N,F,1,1,M,K,2 select target locs for given indices
         spot_locs[...,0] += x0 # N,F,1,1,K,2
         spot_locs[...,1] += y0 # N,F,1,1,K,2
-        spot = torch.zeros(batch_idx.shape[0],self.F,self.D,self.D)
+        spot = torch.zeros(batch_idx.shape[0],self.data.F,self.D,self.D)
         for k in range(self.K):
             #w = width.reshape(1,1,1,1)
             w = width[...,k] # N,F,1,1
@@ -80,23 +80,23 @@ class Model:
         self.save()
 
     def save(self, verbose=True):
-        self.optim.save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
-                "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
-        pyro.get_param_store().save(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
-                "{}".format(self.__name__), "M{}".format(self.K), "params"))
-        np.savetxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
-                "{}".format(self.__name__), "M{}".format(self.K), "epoch_count"), np.array([self.epoch_count]))
+        self.optim.save(os.path.join(self.data.path, "runs", "{}".format(self.data.name), 
+                "{}".format(self.__name__), "K{}".format(self.K), "optimizer"))
+        pyro.get_param_store().save(os.path.join(self.data.path, "runs", "{}".format(self.data.name), 
+                "{}".format(self.__name__), "K{}".format(self.K), "params"))
+        np.savetxt(os.path.join(self.data.path, "runs", "{}".format(self.data.name), 
+                "{}".format(self.__name__), "K{}".format(self.K), "epoch_count"), np.array([self.epoch_count]))
         if verbose:
             print("Classification results were saved in {}...".format(self.data.path))
 
     def load(self):
         try:
-            self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
-                    "{}".format(self.__name__), "M{}".format(self.K), "epoch_count")))
-            self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
-                    "{}".format(self.__name__), "M{}".format(self.K), "optimizer"))
-            pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.dataset), 
-                    "{}".format(self.__name__), "M{}".format(self.K), "params"))
+            self.epoch_count = int(np.loadtxt(os.path.join(self.data.path, "runs", "{}".format(self.data.name), 
+                    "{}".format(self.__name__), "K{}".format(self.K), "epoch_count")))
+            self.optim.load(os.path.join(self.data.path, "runs", "{}".format(self.data.name), 
+                    "{}".format(self.__name__), "K{}".format(self.K), "optimizer"))
+            pyro.get_param_store().load(os.path.join(self.data.path, "runs", "{}".format(self.data.name), 
+                    "{}".format(self.__name__), "K{}".format(self.K), "params"))
             print("loaded previous run")
         except:
             pass

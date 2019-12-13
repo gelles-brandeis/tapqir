@@ -21,8 +21,9 @@ class Sampler(Dataset):
 class GlimpseDataset(Dataset):
     """ CoSMoS Dataset """
     
-    def __init__(self, D, aoi_df, drift_df, header, path, device, labels=None):
+    def __init__(self, name, D, aoi_df, drift_df, header, path, device, labels=None):
         # store metadata
+        self.name = name
         self.header, self.path  = header, path
         self.D, self.height, self.width = D, int(self.header["height"]), int(self.header["width"])
         self.N = len(aoi_df)
@@ -32,13 +33,13 @@ class GlimpseDataset(Dataset):
         # labels
         self.labels = labels
         try:
-            self._store = torch.load(os.path.join(path, "data.pt"), map_location=device)
+            self._store = torch.load(os.path.join(path, "{}_data.pt".format(self.name)), map_location=device)
             assert (self.N, self.F, self.D, self.D) == self._store.shape
-            self.target = pd.read_csv(os.path.join(path, "target.csv"), index_col="aoi")
-            self.drift = pd.read_csv(os.path.join(path, "drift.csv"), index_col="frame")
-            print("aois were read from data.pt, target.csv, and drift.csv files")
+            self.target = pd.read_csv(os.path.join(path, "{}_target.csv".format(self.name)), index_col="aoi")
+            self.drift = pd.read_csv(os.path.join(path, "{}_drift.csv".format(self.name)), index_col="frame")
+            print("\nreading aois from {}_data.pt, {}_target.csv, and {}_drift.csv files ... done".format(self.name,self.name,self.name))
         except:
-            print("reading aois from glimpse files")
+            print("\nreading aois from glimpse files")
             # target location
             self.target = pd.DataFrame(data={"frame": aoi_df["frame"], "x": 0., "y": 0., "abs_x": aoi_df["x"], "abs_y": aoi_df["y"]}, index=aoi_df.index)
             # drift
@@ -71,10 +72,10 @@ class GlimpseDataset(Dataset):
                         self.target.at[aoi, "y"] = aoi_df.at[aoi, "y"] - left_y - 1
             # convert data into torch tensor
             self._store = torch.tensor(self._store, dtype=torch.float32)
-            torch.save(self._store, os.path.join(path, "data.pt"))
-            self.target.to_csv(os.path.join(path, "target.csv"))
-            self.drift.to_csv(os.path.join(path, "drift.csv"))
-            print("aois were saved to data.pt, target.csv, and drift.csv files")
+            torch.save(self._store, os.path.join(path, "{}_data.pt".format(self.name)))
+            self.target.to_csv(os.path.join(path, "{}_target.csv".format(self.name)))
+            self.drift.to_csv(os.path.join(path, "{}_drift.csv".format(self.name)))
+            print("aois were saved to {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
         # calculate integrated intensity
         self.intensity = self._store.mean(dim=(2,3))
         # calculate low and high percentiles for imaging

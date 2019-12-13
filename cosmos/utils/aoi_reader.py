@@ -9,8 +9,9 @@ import configparser
 from cosmos.utils.glimpse_reader import GlimpseDataset
 
 def ReadAoi(dataset, device):
+    print("\n*** {} ***".format(dataset))
     print("reading config.ini for {} ... ".format(dataset), end="")
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(allow_no_value=True)
     config.read("config.ini")
     assert dataset in config
 
@@ -22,7 +23,7 @@ def ReadAoi(dataset, device):
     print("done")
 
     # convert header into dict format
-    print("reading header ... ", end="")
+    print("reading header.mat file ... ", end="")
     mat_header = loadmat(os.path.join(path_header, "header.mat"))
     header = dict()
     for i, dt in  enumerate(mat_header["vid"].dtype.names):
@@ -31,7 +32,7 @@ def ReadAoi(dataset, device):
 
 
     # load driftlist mat file
-    print("reading drift file ... ", end="")
+    print("reading {} file ... ".format(drift_filename), end="")
     drift_mat = loadmat(os.path.join(path, drift_filename))
     # calculate the cumulative sum of dx and dy
     print("calculating cumulative drift ... ", end="")
@@ -44,7 +45,7 @@ def ReadAoi(dataset, device):
     print("done")
 
     # load aoiinfo mat file
-    print("reading aoiinfo file ... ", end="")
+    print("reading {} file ... ".format(aoi_filename), end="")
     aoi_mat = loadmat(os.path.join(path, aoi_filename))
     # convert aoiinfo into DataFrame
     if dataset in ["Gracecy3"]:
@@ -66,7 +67,7 @@ def ReadAoi(dataset, device):
         aoi_list = np.unique(framelist[dataset][:,0])
         aoi_df = aoi_df.loc[aoi_list]
         labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
-    elif dataset in ["LarryCy3sigma54"]:
+    elif dataset in ["LarryCy3sigma54Short"]:
         f1 = 170
         f2 = 1000 #4576
         drift_df = drift_df.loc[f1:f2]
@@ -74,32 +75,33 @@ def ReadAoi(dataset, device):
         aoi_df = aoi_df.loc[aoi_list]
         print("reading labels ...", end="")
         #labels_mat = loadmat("/home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b27p131g_specific_Intervals.dat")
-    elif dataset in ["Gracecy3"]:
+    elif dataset in ["Gracecy3Short"]:
         aoi_list = np.arange(160,240)
         aoi_df = aoi_df.loc[aoi_list]
 
-    print("saving drift_df.csv and aoi_df.csv files ..., ", end="")
-    drift_df.to_csv(os.path.join(path_header, "drift_df.csv"))
-    aoi_df.to_csv(os.path.join(path_header, "aoi_df.csv"))
-    print("done")
-    #drift_df.head(6)
-
     labels = None
-    labels_mat = loadmat(os.path.join(path, labels_filename))
-    index = pd.MultiIndex.from_product([aoi_df.index.values, drift_df.index.values], names=["aoi", "frame"])
-    labels = pd.DataFrame(data=np.zeros((len(aoi_df)*len(drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
-    spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0,0]
-    for sp in spot_picker:
-        aoi = int(sp[-1])
-        start = int(sp[1])
-        end = int(sp[2])
-        if sp[0] in [-2., 0., 2.]:
-            labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
-        elif sp[0] in [-3., 1., 3.]:
-            labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
-    labels.to_csv(os.path.join(path_header, "labels.csv"))
-    print("saved and done")
+    if labels_filename:
+        print("reading {} file ... ".format(labels_filename), end="")
+        labels_mat = loadmat(os.path.join(path, labels_filename))
+        index = pd.MultiIndex.from_product([aoi_df.index.values, drift_df.index.values], names=["aoi", "frame"])
+        labels = pd.DataFrame(data=np.zeros((len(aoi_df)*len(drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
+        spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0,0]
+        for sp in spot_picker:
+            aoi = int(sp[-1])
+            start = int(sp[1])
+            end = int(sp[2])
+            if sp[0] in [-2., 0., 2.]:
+                labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
+            elif sp[0] in [-3., 1., 3.]:
+                labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
+        print("done")
 
-    data = GlimpseDataset(D=14, aoi_df=aoi_df, drift_df=drift_df, header=header, path=path_header, device=device, labels=labels)
+    print("\nsaving drift_df.csv, {}_aoi_df.csv, {}_labels.csv files ..., ".format(dataset,dataset), end="")
+    drift_df.to_csv(os.path.join(path_header, "drift_df.csv"))
+    aoi_df.to_csv(os.path.join(path_header, "{}_aoi_df.csv".format(dataset)))
+    if labels_filename: labels.to_csv(os.path.join(path_header, "{}_labels.csv".format(dataset)))
+    print("done")
+
+    data = GlimpseDataset(dataset, D=14, aoi_df=aoi_df, drift_df=drift_df, header=header, path=path_header, device=device, labels=labels)
 
     return data
