@@ -11,11 +11,11 @@ from tqdm import tqdm
 import argparse
 
 parser = argparse.ArgumentParser(description="classifier")
-parser.add_argument("-m", "--model", default="v3", type=str)#,
+parser.add_argument("-m", "--model", default="features", type=str)#,
                        # help="one of: {}".format(", ".join(sorted(models.keys()))))
 parser.add_argument("-n", "--num-epochs", type=int)
 parser.add_argument("-N", "--n-batch", default=16, type=int)
-parser.add_argument("-lr", "--learning-rate", default=0.02, type=float)
+parser.add_argument("-lr", "--learning-rate", default=0.0005, type=float)
 parser.add_argument("-d", "--dataset", type=str)
 parser.add_argument("-nc", "--negative-control", type=str)
 parser.add_argument('--cuda0', action='store_true')

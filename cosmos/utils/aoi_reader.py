@@ -67,11 +67,12 @@ def ReadAoi(dataset, device):
         aoi_list = np.unique(framelist[dataset][:,0])
         aoi_df = aoi_df.loc[aoi_list]
         labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
-    elif dataset in ["LarryCy3sigma54Short"]:
+    elif dataset in ["LarryCy3sigma54Short", "LarryCy3sigma54NegativeControlShort"]:
         f1 = 170
         f2 = 1000 #4576
         drift_df = drift_df.loc[f1:f2]
-        aoi_list = np.array([2,4,8,10,11,14,15,18,19,20,21,23,24,25,26,32])
+        #aoi_list = np.array([2,4,8,10,11,14,15,18,19,20,21,23,24,25,26,32])
+        aoi_list = np.arange(1,33)
         aoi_df = aoi_df.loc[aoi_list]
         print("reading labels ...", end="")
         #labels_mat = loadmat("/home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b27p131g_specific_Intervals.dat")
