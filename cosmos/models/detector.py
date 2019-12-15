@@ -53,11 +53,11 @@ class Detector(Model):
                 background = pyro.sample("background", dist.HalfNormal(1000.))
                 m = pyro.sample("m", dist.Categorical(m_pi)) # N,F,1,1
                 m = m_matrix[m] # N,F,1,1,K
-                height = pyro.sample("height", dist.Gamma(height_loc * height_beta, height_beta).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1)) # K,N,F,1,1
+                height = pyro.sample("height", dist.Gamma(height_loc * height_beta, height_beta).expand([len(batch_idx),self.data.F,1,1,self.K]).mask(m).to_event(1)) # K,N,F,1,1
                 height = height.masked_fill(~m.bool(), 0.)
-                width = pyro.sample("width", self.Location(width_mode, width_size, 0.5, 2.5).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1))
-                x0 = pyro.sample("x0", dist.Normal(0., 10.).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1))
-                y0 = pyro.sample("y0", dist.Normal(0., 10.).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1))
+                width = pyro.sample("width", self.Location(width_mode, width_size, 0.5, 2.5).expand([len(batch_idx),self.data.F,1,1,self.K]).mask(m).to_event(1))
+                x0 = pyro.sample("x0", dist.Normal(0., 10.).expand([len(batch_idx),self.data.F,1,1,self.K]).mask(m).to_event(1))
+                y0 = pyro.sample("y0", dist.Normal(0., 10.).expand([len(batch_idx),self.data.F,1,1,self.K]).mask(m).to_event(1))
 
                 spot_locs = self.target_locs[batch_idx] # N,F,1,1,M,K,2 select target locs for given indices
                 locs = self.gaussian_spot(spot_locs, height, width, x0, y0) + background
@@ -71,11 +71,11 @@ class Detector(Model):
                     background = pyro.sample("c_background", dist.HalfNormal(1000.))
                     m = pyro.sample("c_m", dist.Categorical(c_m_pi)) # N,F,1,1
                     m = m_matrix[m] # N,F,1,1,K
-                    height = pyro.sample("c_height", dist.Gamma(height_loc * height_beta, height_beta).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1)) # K,N,F,1,1
+                    height = pyro.sample("c_height", dist.Gamma(height_loc * height_beta, height_beta).expand([len(batch_idx),self.control.F,1,1,self.K]).mask(m).to_event(1)) # K,N,F,1,1
                     height = height.masked_fill(~m.bool(), 0.)
-                    width = pyro.sample("c_width", self.Location(width_mode, width_size, 0.5, 2.5).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1))
-                    x0 = pyro.sample("c_x0", dist.Normal(0., 10.).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1))
-                    y0 = pyro.sample("c_y0", dist.Normal(0., 10.).expand([len(batch_idx),self.F,1,1,self.K]).mask(m).to_event(1))
+                    width = pyro.sample("c_width", self.Location(width_mode, width_size, 0.5, 2.5).expand([len(batch_idx),self.control.F,1,1,self.K]).mask(m).to_event(1))
+                    x0 = pyro.sample("c_x0", dist.Normal(0., 10.).expand([len(batch_idx),self.control.F,1,1,self.K]).mask(m).to_event(1))
+                    y0 = pyro.sample("c_y0", dist.Normal(0., 10.).expand([len(batch_idx),self.control.F,1,1,self.K]).mask(m).to_event(1))
 
                     spot_locs = self.control_locs[batch_idx] # N,F,1,1,M,K,2 select target locs for given indices
                     locs = self.gaussian_spot(spot_locs, height, width, x0, y0) + background
@@ -122,14 +122,14 @@ class Detector(Model):
                     pyro.sample("c_y0", dist.Normal(param("c_y_mean")[batch_idx], param("c_scale")[batch_idx]).mask(m).to_event(1))
 
     def parameters(self):
-        pyro.get_param_store().load(os.path.join(data.path, "runs", dataset, "features/K{}".format(self.K), "params"))
+        pyro.get_param_store().load(os.path.join(self.data.path, "runs", self.data.name, "features/K{}".format(self.K), "lr0.001", "params"))
 
         param("height_loc_v", torch.tensor([200.]), constraint=constraints.positive)
         param("height_beta_v", torch.tensor([1.]), constraint=constraints.positive)
         param("width_mode_v", torch.tensor([1.3]), constraint=constraints.positive)
         param("width_size_v", torch.tensor([100.]), constraint=constraints.positive)
         #param("m_pi_concentration", torch.ones(4)*self.data.N*self.data.F/4, constraint=constraints.positive)
-        param("pi_concentration", torch.ones(2)*self.N*self.F/2, constraint=constraints.positive)
+        param("pi_concentration", torch.ones(2)*self.data.N*self.data.F/2, constraint=constraints.positive)
         param("lamda_loc", torch.tensor([0.1]), constraint=constraints.positive)
         param("lamda_beta", torch.tensor([10.]), constraint=constraints.positive)
 

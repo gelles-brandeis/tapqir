@@ -8,6 +8,7 @@ from cosmos.models.noise import _noise, _noise_fn
 from cosmos.utils.utils import write_summary
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import math
 
 class Model:
     """ Gaussian Spot Model """
