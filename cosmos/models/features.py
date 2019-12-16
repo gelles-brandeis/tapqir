@@ -9,7 +9,8 @@ import pyro.distributions as dist
 from pyro import param 
 
 from cosmos.models.noise import _noise, _noise_fn
-from cosmos.models.helper import Model 
+from cosmos.models.model import Model 
+from cosmos.models.helper import Location 
 
 
 class Features(Model):
@@ -31,7 +32,7 @@ class Features(Model):
                 background = pyro.sample("background", dist.HalfNormal(1000.))
                 with pyro.plate("K_plate", self.K, dim=-1):
                     height = pyro.sample("height", dist.HalfNormal(3000.)) # N,F,1,1,K
-                    width = pyro.sample("width", self.Location(1.3, 10., 0.5, 2.5))
+                    width = pyro.sample("width", Location(1.3, 10., 0.5, 2.5))
                     x0 = pyro.sample("x0", dist.Normal(0., 10.))
                     y0 = pyro.sample("y0", dist.Normal(0., 10.))
 
@@ -47,7 +48,7 @@ class Features(Model):
                     background = pyro.sample("c_background", dist.HalfNormal(1000.))
                     with pyro.plate("c_K_plate", self.K, dim=-1):
                         height = pyro.sample("c_height", dist.HalfNormal(3000.)) # N,F,1,1,K
-                        width = pyro.sample("c_width", self.Location(1.3, 10., 0.5, 2.5))
+                        width = pyro.sample("c_width", Location(1.3, 10., 0.5, 2.5))
                         x0 = pyro.sample("c_x0", dist.Normal(0., 10.))
                         y0 = pyro.sample("c_y0", dist.Normal(0., 10.))
 
@@ -67,7 +68,7 @@ class Features(Model):
                 pyro.sample("background", dist.Gamma(param("b_loc")[batch_idx] * param("b_beta"), param("b_beta")))
                 with pyro.plate("K_plate", self.K, dim=-1):
                     pyro.sample("height", dist.Gamma(param("h_loc")[batch_idx] * param("h_beta"), param("h_beta")))
-                    pyro.sample("width", self.Location(param("w_mode")[batch_idx], param("w_size")[batch_idx], 0.5, 2.5))
+                    pyro.sample("width", Location(param("w_mode")[batch_idx], param("w_size")[batch_idx], 0.5, 2.5))
                     pyro.sample("x0", dist.Normal(param("x_mean")[batch_idx], param("scale")[batch_idx]))
                     pyro.sample("y0", dist.Normal(param("y_mean")[batch_idx], param("scale")[batch_idx]))
 
@@ -77,7 +78,7 @@ class Features(Model):
                     pyro.sample("c_background", dist.Gamma(param("c_b_loc")[batch_idx] * param("b_beta"), param("b_beta")))
                     with pyro.plate("c_K_plate", self.K, dim=-1):
                         pyro.sample("c_height", dist.Gamma(param("c_h_loc")[batch_idx] * param("h_beta"), param("h_beta")))
-                        pyro.sample("c_width", self.Location(param("c_w_mode")[batch_idx], param("c_w_size")[batch_idx], 0.5, 2.5))
+                        pyro.sample("c_width", Location(param("c_w_mode")[batch_idx], param("c_w_size")[batch_idx], 0.5, 2.5))
                         pyro.sample("c_x0", dist.Normal(param("c_x_mean")[batch_idx], param("c_scale")[batch_idx]))
                         pyro.sample("c_y0", dist.Normal(param("c_y_mean")[batch_idx], param("c_scale")[batch_idx]))
 

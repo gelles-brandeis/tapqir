@@ -21,14 +21,8 @@ from pyro.ops.stats import hpdi
 from matplotlib.colors import to_rgba_array
 import torch.distributions as dist
 from torch.distributions.transforms import AffineTransform
+from cosmos.models.helper import Location
 
-def Location(mode, size, loc, scale):
-    mode = (mode - loc) / scale
-    concentration1 = mode * (size - 2) + 1
-    concentration0 = (1 - mode) * (size - 2) + 1
-    base_distribution = dist.Beta(concentration1, concentration0)
-    transforms =  [AffineTransform(loc=loc, scale=scale)]
-    return dist.TransformedDistribution(base_distribution, transforms)
 
 def view_glimpse(frame, aoi, aoi_df, drift_df, header, path_glimpse, selected_aoi, all_aois, label, offset):
     height = int(header["height"])
@@ -60,29 +54,6 @@ def view_glimpse(frame, aoi, aoi_df, drift_df, header, path_glimpse, selected_ao
         plt.gca().add_patch(Rectangle((width-70, height-70), 70, 70, edgecolor="g", facecolor="none"))
         #np.stack((img[:70,:70], img[:70,-70:], img[-70:,:70], img[-70:,-70:])).reshape(-1)
         
-    plt.show()
-
-def view_theta(aoi, data, f1, f2, theta1, theta2, z, labels):
-    if theta1 or theta2 or z:
-        k_probs = torch.zeros(len(data.drift),2)
-        k_probs[:,0] = data.m_probs[aoi,:,0,0,0,1]+data.m_probs[aoi,:,0,0,0,3]
-        k_probs[:,1] = data.m_probs[aoi,:,0,0,0,2]+data.m_probs[aoi,:,0,0,0,3]
-
-    plt.figure(figsize=(25,5))
-    # height
-    if theta1: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,0]*data.theta_probs[aoi,f1:f2+1,0,0,1], marker="o", ms=5, color="C0", label="theta1")
-    if theta2: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,1]*data.theta_probs[aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C1", label="theta2")
-    if z: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,0]*data.theta_probs[aoi,f1:f2+1,0,0,0,1] + k_probs[f1:f2+1,1]*data.theta_probs[aoi,f1:f2+1,0,0,0,2], marker="o", ms=5, color="C2", label="z")
-    if labels: plt.plot(data.drift.index.values[f1:f2+1], data.labels.iloc[aoi*data.F+f1:aoi*data.F+f2+1,0], marker="o", ms=5, color="C3", label="spotpicker")
-    plt.ylim(-0.02,)
-    plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
-    plt.ylabel("probability", fontsize=30)
-    plt.xlabel("frame #", fontsize=30)
-    plt.gca().set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    plt.gca().tick_params(axis="x", labelsize=25)
-    plt.gca().tick_params(axis="y", labelsize=25)
-    plt.legend(fontsize=30)
-    plt.tight_layout()
     plt.show()
 
 def view_m_probs(aoi, data, f1, f2, m, z, labels):
