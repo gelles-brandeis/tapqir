@@ -4,12 +4,10 @@ import os
 import pickle
 
 #import qgrid
-import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import pandas as pd
-from ipywidgets import interact
 from matplotlib.patches import Rectangle
 from sklearn.metrics import matthews_corrcoef
 from torch.utils.data import DataLoader

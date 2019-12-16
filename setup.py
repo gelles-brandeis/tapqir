@@ -1,11 +1,23 @@
+import os
 import setuptools
+
+PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
+VERSION = """
+# This file is auto-generated with the version information during setup.py installation.
+__version__ = '{}'
+"""
+
+# Find cosmos version.
+for line in open(os.path.join(PROJECT_PATH, 'cosmos', '__init__.py')):
+    if line.startswith('version_prefix = '):
+        version = line.strip().split()[2][1:-1]
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="cosmos",
-    version="0.0.1",
+    version=version,
     author="Yerdos Ordabayev",
     author_email="ordabayev@brandeis.edu",
     description="Bayesian analysis of the single-molecule image data",

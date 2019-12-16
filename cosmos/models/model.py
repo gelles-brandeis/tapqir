@@ -72,28 +72,28 @@ class Model:
             spot.append(height[...,k] * gaussian_spot) # N,F,D,D
         return torch.stack(spot, dim=-1).sum(dim=-1, keepdim=True)
 
-    def epoch(self, num_epochs):
+    def train(self, num_epochs):
         for epoch in tqdm(range(num_epochs)):
             #with torch.autograd.detect_anomaly():
             epoch_loss = self.svi.step()
             if not (self.epoch_count % 1000):    
                 write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer, feature=False, mcc=self.mcc)
-                self.save(verbose=False)
+                self.save_checkpoint(verbose=False)
             self.epoch_count += 1
         self.save()
 
-    def save(self, verbose=True):
+    def save_checkpoint(self, verbose=True):
         self.optim.save(os.path.join(self.path, "optimizer"))
         pyro.get_param_store().save(os.path.join(self.path, "params"))
         np.savetxt(os.path.join(self.path, "epoch_count"), np.array([self.epoch_count]))
         if verbose:
-            print("Classification results were saved in {}...".format(self.path))
+            print("done saving model and optimizer checkpoints in {}...".format(self.path))
 
-    def load(self):
+    def load_checkpoint(self):
         try:
             self.epoch_count = int(np.loadtxt(os.path.join(self.path, "epoch_count")))
             self.optim.load(os.path.join(self.path, "optimizer"))
             pyro.get_param_store().load(os.path.join(self.path, "params"))
-            print("loaded from {}".format(self.path))
+            print("done loading model and optimizer states from {}".format(self.path))
         except:
             pass

@@ -10,6 +10,7 @@ cosmos/models/__pycache__/
 log
 old/
 bashrun.sh
+cosmos.egg-info/
 
 singmol_mex.mexmaci64
 
