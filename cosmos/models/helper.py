@@ -4,6 +4,8 @@ import os
 from torch.distributions.transforms import AffineTransform
 import pyro
 import pyro.distributions as dist
+from pyro.infer import SVI
+from pyro.optim import Adam
 from cosmos.models.noise import _noise, _noise_fn
 from cosmos.utils.utils import write_summary
 from torch.utils.tensorboard import SummaryWriter
@@ -39,6 +41,21 @@ class Model:
             # drift locs for 2D gaussian spot
             self.control_locs = torch.tensor((self.control.drift[["dx", "dy"]].values.reshape(1,self.control.F,2) + self.control.target[["x", "y"]].values.reshape(self.control.N,1,2)), dtype=torch.float32)
             self.control_locs = self.control_locs.reshape(self.control.N,self.control.F,1,1,1,2).repeat(1,1,1,1,self.K,1)# N,F,1,1,M,K,2
+        
+        pyro.clear_param_store()
+        self.parameters()
+        self.epoch_count = 0
+        self.optim = pyro.optim.Adam({"lr": self.lr, "betas": [0.9, 0.999]})
+        self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+
+    def model(self):
+        raise NotImplementedError
+
+    def guide(self):
+        raise NotImplementedError
+
+    def parameters(self):
+        raise NotImplementedError
 
     def Location(self, mean, size, loc, scale):
         """
@@ -66,16 +83,17 @@ class Model:
     # Ideal 2D gaussian spot
     def gaussian_spot(self, spot_locs, height, width, x0, y0):
         # return gaussian spot with height, width, and drift adjusted position xy
-        spot_locs[...,0] += x0 # N,F,1,1,K,2
+        #self.target_locs = self.target_locs.reshape(self.data.N,self.data.F,1,1,1,2).repeat(1,1,1,1,self.K,1)# N,F,1,1,K,2
+        spot_locs[...,0] += x0 # N,F,1,1,K,2   4,N,F,1,1,K
         spot_locs[...,1] += y0 # N,F,1,1,K,2
-        spot = torch.zeros(height.shape[0],height.shape[1],self.D,self.D)
+        spot = []
         for k in range(self.K):
             #w = width.reshape(1,1,1,1)
-            w = width[...,k] # N,F,1,1
+            w = width[...,k] # N,F,1,1   4,N,F,1,1
             rv = dist.MultivariateNormal(spot_locs[...,k,:], scale_tril=torch.eye(2) * w.view(w.size()+(1,1)))
             gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos)) # N,F,D,D
-            spot += height[...,k] * gaussian_spot # N,F,D,D
-        return spot
+            spot.append(height[...,k] * gaussian_spot) # N,F,D,D
+        return torch.stack(spot, dim=-1).sum(dim=-1, keepdim=True)
 
     def epoch(self, num_epochs):
         for epoch in tqdm(range(num_epochs)):

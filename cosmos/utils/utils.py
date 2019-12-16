@@ -27,7 +27,7 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer, feature=False, mc
     writer.add_scalar("ELBO", -epoch_loss, epoch_count)
     if mcc:
         mask = model.data.labels["spotpicker"].values < 2
-        k_probs = torch.zeros(model.N,model.F,2)
+        k_probs = torch.zeros(model.data.N,model.data.F,2)
         k_probs[...,0] = pyro.param("m_probs").squeeze()[...,1] + pyro.param("m_probs").squeeze()[...,3]
         k_probs[...,1] = pyro.param("m_probs").squeeze()[...,2] + pyro.param("m_probs").squeeze()[...,3]
         z_probs = k_probs[...,0] * pyro.param("theta_probs").squeeze()[...,1] + k_probs[...,1] * pyro.param("theta_probs").squeeze()[...,2]

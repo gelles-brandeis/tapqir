@@ -65,19 +65,15 @@ def view_glimpse(frame, aoi, aoi_df, drift_df, header, path_glimpse, selected_ao
 def view_theta(aoi, data, f1, f2, theta1, theta2, z, labels):
     if theta1 or theta2 or z:
         k_probs = torch.zeros(len(data.drift),2)
-        k_probs[:,0] = data.m_probs[aoi,:,0,0,1]+data.m_probs[aoi,:,0,0,3]
-        k_probs[:,1] = data.m_probs[aoi,:,0,0,2]+data.m_probs[aoi,:,0,0,3]
+        k_probs[:,0] = data.m_probs[aoi,:,0,0,0,1]+data.m_probs[aoi,:,0,0,0,3]
+        k_probs[:,1] = data.m_probs[aoi,:,0,0,0,2]+data.m_probs[aoi,:,0,0,0,3]
 
     plt.figure(figsize=(25,5))
     # height
     if theta1: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,0]*data.theta_probs[aoi,f1:f2+1,0,0,1], marker="o", ms=5, color="C0", label="theta1")
     if theta2: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,1]*data.theta_probs[aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C1", label="theta2")
-    if z: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,0]*data.theta_probs[aoi,f1:f2+1,0,0,1] + k_probs[f1:f2+1,1]*data.theta_probs[aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2", label="z")
+    if z: plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,0]*data.theta_probs[aoi,f1:f2+1,0,0,0,1] + k_probs[f1:f2+1,1]*data.theta_probs[aoi,f1:f2+1,0,0,0,2], marker="o", ms=5, color="C2", label="z")
     if labels: plt.plot(data.drift.index.values[f1:f2+1], data.labels.iloc[aoi*data.F+f1:aoi*data.F+f2+1,0], marker="o", ms=5, color="C3", label="spotpicker")
-    #if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[0,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
-    #if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[1,aoi,f1:f2+1,0,0,2], marker="o", ms=5, color="C2")
-    #if sp: plt.plot(data.drift.index.values[f1:f2+1], data.l_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C4")
-    #if binder: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,2], marker="o", ms=5, color="C4")
     plt.ylim(-0.02,)
     plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
     plt.ylabel("probability", fontsize=30)
@@ -89,25 +85,40 @@ def view_theta(aoi, data, f1, f2, theta1, theta2, z, labels):
     plt.tight_layout()
     plt.show()
 
-def view_m_probs(aoi, data, f1, f2, m1, m2, sp):
+def view_m_probs(aoi, data, f1, f2, m, z, labels):
+    if m or z:
+        k_probs = np.zeros((len(data.drift),2))
+        k_probs[:,0] = param("m_probs").squeeze().detach()[aoi,:,1] + param("m_probs").squeeze().detach()[aoi,:,3]
+        k_probs[:,1] = param("m_probs").squeeze().detach()[aoi,:,2] + param("m_probs").squeeze().detach()[aoi,:,3]
+    if z: z_probs = k_probs[:,0] * param("theta_probs").squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("theta_probs").squeeze().detach().numpy()[aoi,:,2]
+
     plt.figure(figsize=(25,5))
-    # height
-    if m1: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,0,0,1]+data.m_probs[aoi,f1:f2+1,0,0,3], marker="o", ms=5, color="C0")
-    if m2: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,0,0,2]+data.m_probs[aoi,f1:f2+1,0,0,3], marker="o", ms=5, color="C1")
-    #if sp: plt.plot(data.drift.index.values[f1:f2+1], data.l_probs[aoi,f1:f2+1,1], marker="o", ms=5, color="C4")
-    #if binder: plt.plot(data.drift.index.values[f1:f2+1], data.m_probs[aoi,f1:f2+1,2], marker="o", ms=5, color="C4")
+    if m:
+        for k in range(2):
+            plt.plot(data.drift.index.values[f1:f2+1], k_probs[f1:f2+1,k], marker="o", ms=5, color="C{}".format(k), label="m{}".format(k))
+    if z: plt.plot(data.drift.index.values[f1:f2+1], z_probs[f1:f2+1], marker="o", ms=5, color="C2", label="z")
+    if labels: plt.plot(data.drift.index.values[f1:f2+1], data.labels.iloc[aoi*data.F+f1:aoi*data.F+f2+1,0], marker="o", ms=5, color="C3", label="spotpicker")
     plt.ylim(-0.02,)
     plt.xlim(data.drift.index.values[f1:f2+1].min()-0.1, data.drift.index.values[f1:f2+1].max()+0.1)
-    plt.ylabel("probability", fontsize=25)
-    plt.xlabel("frame #", fontsize=25)
+    plt.ylabel("probability", fontsize=30)
+    plt.xlabel("frame #", fontsize=30)
     plt.gca().set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    plt.gca().tick_params(axis="x", labelsize=20)
-    plt.gca().tick_params(axis="y", labelsize=20)
-    #plt.legend()
+    plt.gca().tick_params(axis="x", labelsize=25)
+    plt.gca().tick_params(axis="y", labelsize=25)
+    plt.legend(fontsize=30)
     plt.tight_layout()
     plt.show()
 
-def view_parameters(aoi, data, f1, f2, m2, m, params):
+def view_parameters(aoi, data, f1, f2, m, params):
+    if m:
+        k_probs = np.zeros((len(data.drift),2))
+        k_probs[:,0] = param("m_probs").squeeze().detach()[aoi,:,1] + param("m_probs").squeeze().detach()[aoi,:,3]
+        k_probs[:,1] = param("m_probs").squeeze().detach()[aoi,:,2] + param("m_probs").squeeze().detach()[aoi,:,3]
+        m_colors = np.zeros((2,len(data.drift),4))
+        m_colors[0] += to_rgba_array("C0")
+        m_colors[0,:,3] = k_probs[:,0]
+        m_colors[1] += to_rgba_array("C1")
+        m_colors[1,:,3] = k_probs[:,1]
     
     plt.figure(figsize=(15, 3 * len(params)))
     for i, p in enumerate(params):
@@ -137,9 +148,8 @@ def view_parameters(aoi, data, f1, f2, m2, m, params):
             plt.scatter(data.drift.index.values[f1:f2+1], mean[f1:f2+1], s=10, color="C0", label="K")
         else:
             for k in range(2):
-                #if m2 and not m:
-                plt.fill_between(data.drift.index.values[f1:f2+1], hpd[0][f1:f2+1,k], hpd[1][f1:f2+1,k], color="C{}".format(k), alpha=0.2)
-                plt.scatter(data.drift.index.values[f1:f2+1], mean[f1:f2+1,k], s=10, color="C{}".format(k), label="K={}".format(k))
+                plt.fill_between(data.drift.index.values[f1:f2+1], hpd[0][f1:f2+1,k], hpd[1][f1:f2+1,k], where=(k_probs[f1:f2+1,k]>0.5) if m else None, color="C{}".format(k), alpha=0.2)
+                plt.scatter(data.drift.index.values[f1:f2+1], mean[f1:f2+1,k], s=10, color=m_colors[k] if m else "C{}".format(k), label="K={}".format(k))
         plt.xlim(data.drift.index.values[f1:f2+1].min()-2, data.drift.index.values[f1:f2+1].max()+2)
         plt.ylabel(p, fontsize=20)
     
@@ -147,15 +157,3 @@ def view_parameters(aoi, data, f1, f2, m2, m, params):
     plt.legend()
     plt.tight_layout()
     plt.show()
-"""
-    if m:
-        k_probs = np.zeros((len(data.drift),2))
-        k_probs[:,0] = data.m_probs[aoi,:,0,0,1]+data.m_probs[aoi,:,0,0,3]
-        k_probs[:,1] = data.m_probs[aoi,:,0,0,2]+data.m_probs[aoi,:,0,0,3]
-        m_colors = np.zeros((2,len(data.drift),4))
-        m_colors[0] += to_rgba_array("C0")
-        m_colors[0,:,3] = k_probs[:,0]
-        m_colors[1] += to_rgba_array("C1")
-        m_colors[1,:,3] = k_probs[:,1]
-
-"""
