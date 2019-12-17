@@ -6,11 +6,15 @@ import torch
 pyro.enable_validation(True)
 from tqdm import tqdm
 import argparse
+import logging
 
 from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.features import Features 
 from cosmos.models.detector import Detector
 from cosmos.models.tracker import Tracker
+
+logging.basicConfig(filename="example.log", format="%(relativeCreated) 9d %(message)s", level=logging.DEBUG)
+#log = logging.getLogger()
 
 # setup and training
 def main(args):
@@ -18,15 +22,14 @@ def main(args):
         device = torch.device("cuda:0")
         torch.cuda.set_device(0)
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
-        print("using device: cuda{}".format(torch.cuda.current_device()))
     elif args.cuda1:
         device = torch.device("cuda:1")
         torch.cuda.set_device(1)
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
-        print("using device: cuda{}".format(torch.cuda.current_device()))
     else:
         device = torch.device("cpu")
-        print("using device: cpu")
+    logging.info("Using device: cuda{}".format(device))
+    #logging.info("Using device: cuda{}".format(torch.cuda.current_device()))
 
     models = dict()
     models["features"] = Features

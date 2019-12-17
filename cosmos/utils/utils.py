@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import pyro
+from pyro import param
 from pyro.ops.stats import hpdi
 from matplotlib.colors import to_rgba_array
 import torch.distributions as dist
@@ -117,14 +118,13 @@ def view_probs(aoi, data, f1, f2, binder, junk, sp):
     plt.tight_layout()
     plt.show()
     
-def view_aoi(aoi, frame, data, target, z, m1, m2):
+def view_aoi(aoi, frame, data, target, z, m1, m2, labels):
     #fig = plt.figure(figsize=(30,1.5), dpi=600)
     if m1 or m2 or z:
-        k_probs = torch.zeros(len(data.drift),2)
-        k_probs[:,0] = data.m_probs[aoi,:,0,0,1]+data.m_probs[aoi,:,0,0,3]
-        k_probs[:,1] = data.m_probs[aoi,:,0,0,2]+data.m_probs[aoi,:,0,0,3]
-    if z:
-        z_probs = k_probs[:,0]*data.theta_probs[aoi,:,0,0,1] + k_probs[:,1]*data.theta_probs[aoi,:,0,0,2]
+        k_probs = np.zeros((len(data.drift),2))
+        k_probs[:,0] = param("m_probs").squeeze().detach()[aoi,:,1] + param("m_probs").squeeze().detach()[aoi,:,3]
+        k_probs[:,1] = param("m_probs").squeeze().detach()[aoi,:,2] + param("m_probs").squeeze().detach()[aoi,:,3]
+    if z: z_probs = k_probs[:,0] * param("theta_probs").squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("theta_probs").squeeze().detach().numpy()[aoi,:,2]
 
     fig = plt.figure(figsize=(15,3), dpi=600)
     for i in range(20):
@@ -134,25 +134,17 @@ def view_aoi(aoi, frame, data, target, z, m1, m2):
         if target:
             plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5, data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5, "b+", markersize=10, mew=3, alpha=0.7)
         if m1:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + data.y_mean[aoi,frame+i,0,0,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + data.x_mean[aoi,frame+i,0,0,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("y_mean").squeeze().detach().numpy()[aoi,frame+i,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("x_mean").squeeze().detach().numpy()[aoi,frame+i,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
         if m2:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + data.y_mean[aoi,frame+i,0,0,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + data.x_mean[aoi,frame+i,0,0,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("y_mean").squeeze().detach().numpy()[aoi,frame+i,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("x_mean").squeeze().detach().numpy()[aoi,frame+i,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
         if z:
             z_color = to_rgba_array("C2", z_probs[frame+i])[0]
             plt.gca().add_patch(Rectangle((0, 0), data.D*z_probs[frame+i], 0.25, edgecolor=z_color, lw=4, facecolor="none"))
-            #plt.plot(data.target.iloc[aoi, 2] + data.y_mode[aoi, frame+i] + 0.5, data.target.iloc[aoi, 1] + data.x_mode[aoi, frame+i] + 0.5, "g+", markersize=10, mew=3, alpha=data.z_probs[aoi, frame+i, 1])
+        if labels:
+            if data.labels.iloc[aoi*data.F+frame+i,0] == 1:
+                plt.gca().add_patch(Rectangle((0, data.D-1), data.D, 0.25, edgecolor="C3", lw=4, facecolor="none"))
         plt.gca().axes.get_xaxis().set_ticks([])
         plt.gca().axes.get_yaxis().set_ticks([])
-        #plt.gca().axes.xaxis.set_ticklabels([])
-        #plt.gca().axes.yaxis.set_ticklabels([])
-        #elif show_class == "spotpicker":
-        #    rgb_color = np.zeros((3,))
-        #    for k in range(2):
-        #        rgb_color += to_rgba_array(l_colors[k])[0,:3] * data.l_probs.cpu().numpy()[aoi,frame+i,k]
-            #k = data.predictions[aoi,frame+i]
-        #    rgb_color = np.where(rgb_color > 1., 1., rgb_color)
-        #    plt.gca().add_patch(Rectangle((0, 0), data.D-1, data.D-1, edgecolor=rgb_color, lw=4, facecolor="none"))
-    #plt.tight_layout()
     plt.show()
     
 def view_aoi_class_summary(data, k):

@@ -5,14 +5,15 @@ import torch
 from scipy.io import loadmat
 from tqdm import tqdm
 import configparser
+import logging
 
 from cosmos.utils.glimpse_reader import GlimpseDataset
 
 def ReadAoi(dataset, device):
-    print("\n*** {} ***".format(dataset))
-    print("reading config.ini for {} ... ".format(dataset), end="")
+    logging.info("*** {} ***".format(dataset))
+    logging.info("reading config.ini for {} ... ".format(dataset))
     config = configparser.ConfigParser(allow_no_value=True)
-    config.read("config.ini")
+    config.read("../config.ini")
     assert dataset in config
 
     path_header = config[dataset]["path_header"]
@@ -20,32 +21,32 @@ def ReadAoi(dataset, device):
     aoi_filename = config[dataset]["aoi_filename"]
     drift_filename = config[dataset]["drift_filename"]
     labels_filename = config[dataset]["labels_filename"]
-    print("done")
+    logging.info("done")
 
     # convert header into dict format
-    print("reading header.mat file ... ", end="")
+    logging.info("reading header.mat file ... ")
     mat_header = loadmat(os.path.join(path_header, "header.mat"))
     header = dict()
     for i, dt in  enumerate(mat_header["vid"].dtype.names):
         header[dt] = np.squeeze(mat_header["vid"][0,0][i])
-    print("done")
+    logging.info("done")
 
 
     # load driftlist mat file
-    print("reading {} file ... ".format(drift_filename), end="")
+    logging.info("reading {} file ... ".format(drift_filename))
     drift_mat = loadmat(os.path.join(path, drift_filename))
     # calculate the cumulative sum of dx and dy
-    print("calculating cumulative drift ... ", end="")
+    logging.info("calculating cumulative drift ... ")
     drift_mat["driftlist"][:, 1:3] = np.cumsum(
         drift_mat["driftlist"][:, 1:3], axis=0)
     # convert driftlist into DataFrame
     drift_df = pd.DataFrame(drift_mat["driftlist"][:,:3], columns=["frame", "dx", "dy"])
     #drift_df = pd.DataFrame(drift_mat["driftlist"], columns=["frame", "dx", "dy", "timestamp"])
     drift_df = drift_df.astype({"frame": int}).set_index("frame")
-    print("done")
+    logging.info("done")
 
     # load aoiinfo mat file
-    print("reading {} file ... ".format(aoi_filename), end="")
+    logging.info("reading {} file ... ".format(aoi_filename))
     aoi_mat = loadmat(os.path.join(path, aoi_filename))
     # convert aoiinfo into DataFrame
     if dataset in ["Gracecy3"]:
@@ -53,10 +54,10 @@ def ReadAoi(dataset, device):
     else:
         aoi_df = pd.DataFrame(aoi_mat["aoiinfo2"], columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
     aoi_df = aoi_df.astype({"aoi": int}).set_index("aoi")
-    print("adjusting target position from frame {} to frame 1 ... ".format(aoi_df.at[1, "frame"]), end="")
+    logging.info("adjusting target position from frame {} to frame 1 ... ".format(aoi_df.at[1, "frame"]))
     aoi_df["x"] = aoi_df["x"] - drift_df.at[int(aoi_df.at[1, "frame"]), "dx"]
     aoi_df["y"] = aoi_df["y"] - drift_df.at[int(aoi_df.at[1, "frame"]), "dy"]
-    print("done")
+    logging.info("done")
 
 
     if dataset in ["FL_1_1117_0OD", "FL_3339_4444_0p8OD"]:

@@ -80,7 +80,7 @@ class Model:
                 write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer, feature=False, mcc=self.mcc)
                 self.save_checkpoint(verbose=False)
             self.epoch_count += 1
-        self.save()
+        #self.save_checkpoint()
 
     def save_checkpoint(self, verbose=True):
         self.optim.save(os.path.join(self.path, "optimizer"))
