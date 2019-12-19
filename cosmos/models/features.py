@@ -92,7 +92,7 @@ class Features(Model):
         param("gain_v", torch.tensor(5.), constraint=constraints.positive)
 
         param("b_loc", torch.ones(self.data.N,self.data.F,1,1,1)*10., constraint=constraints.positive)
-        param("b_beta", torch.ones(1)*self.D**2, constraint=constraints.positive)
+        param("b_beta", torch.ones(1)*30, constraint=constraints.positive)
         intensity = torch.ones(self.data.N,self.data.F,1,1,self.K)*10.
         intensity[...,1] = 30. # 30 is better than 100
         param("h_loc", intensity, constraint=constraints.positive)

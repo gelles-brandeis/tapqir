@@ -11,10 +11,10 @@ _noise = dict()
 _noise_fn = dict()
     
 def CameraUnit(locs, gain, offset):
-    base_distribution = dist.Gamma(locs, 1.)
-    transforms =  [AffineTransform(loc=offset, scale=gain)]
-    #base_distribution = dist.Gamma(locs/gain, 1/gain)
-    #transforms =  [AffineTransform(loc=offset, scale=1)]
+    #base_distribution = dist.Gamma(locs, 1.)
+    #transforms =  [AffineTransform(loc=offset, scale=gain)]
+    base_distribution = dist.Gamma(locs/gain, 1/gain)
+    transforms =  [AffineTransform(loc=offset, scale=1)]
     return dist.TransformedDistribution(base_distribution, transforms)
 
 #from cosmos.utils.aoi_reader import ReadAoi

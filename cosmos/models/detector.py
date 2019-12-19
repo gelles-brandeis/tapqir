@@ -17,7 +17,7 @@ class Detector(Model):
     """ Detect the number of Gaussian Spots """
     def __init__(self, data, control, K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "detector"
-        self.elbo = JitTraceEnum_ELBO() if jit else TraceEnum_ELBO()
+        self.elbo = JitTraceEnum_ELBO(ignore_jit_warnings=True) if jit else TraceEnum_ELBO()
         self.mcc = False
         super().__init__(data, control, K, lr, n_batch, jit, noise="GammaOffset")
     
@@ -123,19 +123,20 @@ class Detector(Model):
                             pyro.sample("c_y0", dist.Normal(param("c_y_mean")[batch_idx], param("c_scale")[batch_idx]))
 
     def parameters(self):
-        pyro.get_param_store().load(os.path.join(self.data.path, "runs", self.data.name, "features/K{}".format(self.K), "lr0.001", "params"))
+        pyro.get_param_store().load(os.path.join(self.data.path, "runs", self.data.name, "features/K{}".format(self.K), "lr{}".format(self.lr), "params"))
 
-        param("height_loc_v", torch.tensor([200.]), constraint=constraints.positive)
+        h_max = np.percentile(param("h_loc").detach().cpu(), 98)
+        param("height_loc_v", torch.tensor([h_max]), constraint=constraints.positive)
         param("height_beta_v", torch.tensor([1.]), constraint=constraints.positive)
         param("width_mode_v", torch.tensor([1.3]), constraint=constraints.positive)
         param("width_size_v", torch.tensor([100.]), constraint=constraints.positive)
-        #param("m_pi_concentration", torch.ones(4)*self.data.N*self.data.F/4, constraint=constraints.positive)
         param("pi_concentration", torch.ones(2)*self.data.N*self.data.F/2, constraint=constraints.positive)
         param("lamda_loc", torch.tensor([0.1]), constraint=constraints.positive)
         param("lamda_beta", torch.tensor([10.]), constraint=constraints.positive)
+            #param("m_pi_concentration", torch.ones(4)*self.data.N*self.data.F/4, constraint=constraints.positive)
+            #param("c_m_pi_concentration", torch.ones(4)*self.control.N*self.control.F/4, constraint=constraints.positive)
 
         # Data
-        h_max = np.percentile(param("h_loc").detach().cpu(), 95)
         p = torch.where(param("h_loc").detach() < h_max, param("h_loc").detach()/h_max, torch.tensor(1.))
 
         m3 = 0.9 * p[...,0] * p[...,1] + 0.025
@@ -158,4 +159,3 @@ class Detector(Model):
 
             m_probs = torch.stack((m0,m1,m2,m3), dim=-1)
             param("c_m_probs", m_probs.reshape(self.control.N,self.control.F,1,1,1,4), constraint=constraints.simplex)
-            param("c_m_pi_concentration", torch.ones(4)*self.control.N*self.control.F/4, constraint=constraints.positive)

@@ -1,0 +1,32 @@
+      863 Using device: cudacpu
+      863 *** None ***
+      863 reading config.ini for None ... 
+      875 Using device: cudacpu
+      863 Using device: cudacpu
+    91861 *** None ***
+    91861 reading config.ini for None ... 
+      864 Using device: cudacpu
+    17667 *** None ***
+    17668 reading config.ini for None ... 
+2019-12-19 00:11:13,922 - Using device: cuda0
+2019-12-19 00:11:30,549 - *** None ***
+2019-12-19 00:11:30,549 - reading config.ini for None ... 
+2019-12-19 12:14:18,420 - Using device: cuda0
+2019-12-19 12:14:52,730 - Using device: cuda0
+2019-12-19 12:15:19,565 - Using device: cuda0
+2019-12-19 12:19:24,640 - Using device: cuda0
+2019-12-19 12:19:58,339 - Using device: cuda0
+2019-12-19 12:20:05,860 - Using device: cuda0
+2019-12-19 12:20:50,321 - Using device: cuda0
+2019-12-19 12:24:38,884 - Using device: cuda0
+2019-12-19 12:25:38,508 - Using device: cuda0
+2019-12-19 12:27:09,911 - Using device: cuda0
+2019-12-19 12:28:23,347 - Using device: cuda0
+2019-12-19 13:55:42,550 - Using device: cuda0
+2019-12-19 13:55:42,551 - Dataset: LarryCy3sigma54Short
+2019-12-19 13:55:42,551 - Device: cuda:0
+2019-12-19 13:55:47,257 - Loaded data from glimpse files
+2019-12-19 14:01:31,634 - Using device: cuda0
+2019-12-19 14:01:31,636 - Dataset: LarryCy3sigma54Short
+2019-12-19 14:01:31,636 - Device: cuda:0
+2019-12-19 14:01:35,897 - Loaded data from glimpse files

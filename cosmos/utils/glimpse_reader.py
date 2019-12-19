@@ -1,5 +1,7 @@
 import os
-
+import configparser
+from scipy.io import loadmat
+import logging
 import numpy as np
 import pandas as pd
 import torch
@@ -21,71 +23,184 @@ class Sampler(Dataset):
 class GlimpseDataset(Dataset):
     """ CoSMoS Dataset """
     
-    def __init__(self, name, D, aoi_df, drift_df, header, path, device, labels=None):
+    #def __init__(self, name, D, aoi_df, drift_df, header, path, device, labels=None):
+    def __init__(self, dataset, device):
         # store metadata
-        self.name = name
-        self.header, self.path  = header, path
-        self.D, self.height, self.width = D, int(self.header["height"]), int(self.header["width"])
-        self.N = len(aoi_df)
-        self.F = len(drift_df)
-        # integrated intensity
-        self.intensity = np.zeros((len(aoi_df),len(drift_df)))
-        # labels
-        self.labels = labels
+        self.name = dataset 
+        self.device = device
+        self.read_cfg()
+        self.load_data()
+
+    def read_cfg(self):
+        config = configparser.ConfigParser(allow_no_value=True)
+        config.read("datasets.cfg")
+        files = ["dir", "header", "aoiinfo", "driftlist", "labels"]
+        self.path_to = {}
+        if self.name in config:
+            for FILE in files:
+                self.path_to[FILE] = config[self.name][FILE]
+        else:
+            config.add_section(self.name)
+            for FILE in files:
+                self.path_to[FILE] = input("{}: ".format(FILE))
+                config.set(self.name, FILE, self.path_to[FILE])
+            with open("datasets.cfg", "w") as configfile:
+                config.write(configfile)
+        self.path = self.path_to["dir"]
+        print(self.path)
+        logging.basicConfig(filename=os.path.join(self.path, "cosmos.log"), format="%(asctime)s - %(message)s", level=logging.DEBUG)
+        logging.info("Dataset: {}".format(self.name))
+        logging.info("Device: {}".format(self.device))
+
+    def load_data(self):
         try:
-            self._store = torch.load(os.path.join(path, "{}_data.pt".format(self.name)), map_location=device)
-            assert (self.N, self.F, self.D, self.D) == self._store.shape
-            self.target = pd.read_csv(os.path.join(path, "{}_target.csv".format(self.name)), index_col="aoi")
-            self.drift = pd.read_csv(os.path.join(path, "{}_drift.csv".format(self.name)), index_col="frame")
-            print("\nreading aois from {}_data.pt, {}_target.csv, and {}_drift.csv files ... done".format(self.name,self.name,self.name))
+            self._store = torch.load(os.path.join(self.path_to["dir"], "{}_data.pt".format(self.name)), map_location=self.device)
+            self.N, self.F, self.D, _ == self._store.shape
+            #assert (self.N, self.F, self.D, self.D) == self._store.shape
+            self.target = pd.read_csv(os.path.join(self.path_to["dir"], "{}_target.csv".format(self.name)), index_col="aoi")
+            self.drift = pd.read_csv(os.path.join(self.path_to["dir"], "{}_drift.csv".format(self.name)), index_col="frame")
+            logging.info("Loaded data from {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
         except:
-            print("\nreading aois from glimpse files")
-            # target location
-            self.target = pd.DataFrame(data={"frame": aoi_df["frame"], "x": 0., "y": 0., "abs_x": aoi_df["x"], "abs_y": aoi_df["y"]}, index=aoi_df.index)
-            # drift
-            self.drift = pd.DataFrame(data={"dx": 0., "dy": 0., "abs_dx": drift_df["dx"], "abs_dy": drift_df["dy"]}, index=drift_df.index)
-            self._store = np.ones((len(aoi_df),len(drift_df), self.D, self.D)) * 2**15
-            # loop through each frame
-            for i, frame in enumerate(tqdm(drift_df.index)):
-                # read the entire frame image
-                glimpse_number = self.header["filenumber"][frame - 1]
-                glimpse_path = os.path.join(self.path, "{}.glimpse".format(glimpse_number))
-                offset = self.header["offset"][frame - 1]
-                with open(glimpse_path, "rb") as fid:
-                    fid.seek(offset)
-                    img = np.fromfile(fid, dtype='>i2', count=self.height*self.width).reshape(self.height, self.width)
-                    
-                # new drift list (fractional part)
-                self.drift.at[frame, "dx"] = drift_df.at[frame, "dx"] % 1 
-                self.drift.at[frame, "dy"] = drift_df.at[frame, "dy"] % 1 
-                # loop through each aoi
-                for j, aoi in enumerate(aoi_df.index):
-                    # top left corner of aoi
-                    # integer part (target center - half aoi width) + integer part (drift)
-                    top_x = int((aoi_df.at[aoi, "x"] - self.D * 0.5) // 1 + drift_df.at[frame, "dx"] // 1)
-                    left_y = int((aoi_df.at[aoi, "y"] - self.D * 0.5) // 1 + drift_df.at[frame, "dy"] // 1)
-                    # j-th frame, i-th aoi
-                    self._store[j,i,:,:] += img[top_x:top_x+self.D, left_y:left_y+self.D]
-                    # new target center for the first frame
-                    if i == 0:
-                        self.target.at[aoi, "x"] = aoi_df.at[aoi, "x"] - top_x - 1
-                        self.target.at[aoi, "y"] = aoi_df.at[aoi, "y"] - left_y - 1
-            # convert data into torch tensor
-            self._store = torch.tensor(self._store, dtype=torch.float32)
-            torch.save(self._store, os.path.join(path, "{}_data.pt".format(self.name)))
-            self.target.to_csv(os.path.join(path, "{}_target.csv".format(self.name)))
-            self.drift.to_csv(os.path.join(path, "{}_drift.csv".format(self.name)))
-            print("aois were saved to {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
+            self.read_mat()
+            self.read_glimpse()
+
+    def read_mat(self):
+        # convert header into dict format
+        #logging.info("reading header.mat file ... ")
+        mat_header = loadmat(self.path_to["header"])
+        self.header = dict()
+        for i, dt in  enumerate(mat_header["vid"].dtype.names):
+            self.header[dt] = np.squeeze(mat_header["vid"][0,0][i])
+        #logging.info("done")
+
+        # load driftlist mat file
+        #logging.info("reading {} file ... ".format(drift_filename))
+        drift_mat = loadmat(self.path_to["driftlist"])
+        # calculate the cumulative sum of dx and dy
+        #logging.info("calculating cumulative drift ... ")
+        drift_mat["driftlist"][:, 1:3] = np.cumsum(
+            drift_mat["driftlist"][:, 1:3], axis=0)
+        # convert driftlist into DataFrame
+        self.drift_df = pd.DataFrame(drift_mat["driftlist"][:,:3], columns=["frame", "dx", "dy"])
+        #drift_df = pd.DataFrame(drift_mat["driftlist"], columns=["frame", "dx", "dy", "timestamp"])
+        self.drift_df = self.drift_df.astype({"frame": int}).set_index("frame")
+        #logging.info("done")
+
+        # load aoiinfo mat file
+        #logging.info("reading {} file ... ".format(aoi_filename))
+        aoi_mat = loadmat(self.path_to["aoiinfo"])
+        # convert aoiinfo into DataFrame
+        if self.name in ["Gracecy3"]:
+            self.aoi_df = pd.DataFrame(aoi_mat["aoifits"]["aoiinfo2"][0,0], columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+        else:
+            self.aoi_df = pd.DataFrame(aoi_mat["aoiinfo2"], columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+        self.aoi_df["x"] = self.aoi_df["x"] - self.drift_df.at[int(self.aoi_df.at[1, "frame"]), "dx"]
+        self.aoi_df["y"] = self.aoi_df["y"] - self.drift_df.at[int(self.aoi_df.at[1, "frame"]), "dy"]
+        #logging.info("done")
+
+
+        labels = None
+        if self.name in ["FL_1_1117_0OD", "FL_3339_4444_0p8OD"]:
+            framelist = loadmat("/home/ordabayev/Documents/Datasets/Bayesian_test_files/B33p44a_FrameList_files.dat")
+            f1 = framelist[dataset][0,2]
+            f2 = framelist[dataset][-1,2]
+            self.drift_df = self.drift_df.loc[f1:f2]
+            aoi_list = np.unique(framelist[dataset][:,0])
+            self.aoi_df = self.aoi_df.loc[aoi_list]
+            #labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
+            index = pd.MultiIndex.from_arrays([framelist[dataset][:,0], framelist[dataset][:,2]], names=["aoi", "frame"])
+            labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
+            labels["spotpicker"] = framelist[dataset][:,1]
+        elif self.name in ["LarryCy3sigma54Short", "LarryCy3sigma54NegativeControlShort"]:
+            f1 = 170
+            f2 = 1000 #4576
+            self.drift_df = self.drift_df.loc[f1:f2]
+            #aoi_list = np.array([2,4,8,10,11,14,15,18,19,20,21,23,24,25,26,32])
+            aoi_list = np.arange(1,33)
+            self.aoi_df = self.aoi_df.loc[aoi_list]
+            print("reading labels ...", end="")
+            #labels_mat = loadmat("/home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b27p131g_specific_Intervals.dat")
+        elif self.name in ["Gracecy3Short"]:
+            aoi_list = np.arange(160,240)
+            self.aoi_df = self.aoi_df.loc[aoi_list]
+
+        if self.path_to["labels"]:
+            #print("reading {} file ... ".format(labels_filename), end="")
+            labels_mat = loadmat(self.path_to["labels"])
+            index = pd.MultiIndex.from_product([self.aoi_df.index.values, self.drift_df.index.values], names=["aoi", "frame"])
+            labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
+            spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0,0]
+            for sp in spot_picker:
+                aoi = int(sp[-1])
+                start = int(sp[1])
+                end = int(sp[2])
+                if sp[0] in [-2., 0., 2.]:
+                    labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
+                elif sp[0] in [-3., 1., 3.]:
+                    labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
+            #print("done")
+
+        #print("\nsaving drift_df.csv, {}_aoi_df.csv, {}_labels.csv files ..., ".format(dataset,dataset), end="")
+        #drift_df.to_csv(os.path.join(self.path_to["dir"], "drift_df.csv"))
+        #aoi_df.to_csv(os.path.join(self.path_to["dir"], "{}_aoi_df.csv".format(self.name)))
+        if self.path_to["labels"]: labels.to_csv(os.path.join(self.path_to["dir"], "{}_labels.csv".format(self.name)))
+        #print("done")
+
+    def read_glimpse(self, D=14):
+        self.D, self.height, self.width = D, int(self.header["height"]), int(self.header["width"])
+        self.N = len(self.aoi_df)
+        self.F = len(self.drift_df)
+        # integrated intensity
+        #self.intensity = np.zeros((len(aoi_df),len(self.drift_df)))
+        # labels
+        #print("\nreading aois from glimpse files")
+        # target location
+        self.target = pd.DataFrame(data={"frame": self.aoi_df["frame"], "x": 0., "y": 0., "abs_x": self.aoi_df["x"], "abs_y": self.aoi_df["y"]}, index=self.aoi_df.index)
+        # drift
+        self.drift = pd.DataFrame(data={"dx": 0., "dy": 0., "abs_dx": self.drift_df["dx"], "abs_dy": self.drift_df["dy"]}, index=self.drift_df.index)
+        self._store = np.ones((self.N, self.F, self.D, self.D)) * 2**15
+        # loop through each frame
+        for i, frame in enumerate(tqdm(self.drift_df.index)):
+            # read the entire frame image
+            glimpse_number = self.header["filenumber"][frame - 1]
+            glimpse_path = os.path.join(self.path_to["dir"], "{}.glimpse".format(glimpse_number))
+            offset = self.header["offset"][frame - 1]
+            with open(glimpse_path, "rb") as fid:
+                fid.seek(offset)
+                img = np.fromfile(fid, dtype='>i2', count=self.height*self.width).reshape(self.height, self.width)
+                
+            # new drift list (fractional part)
+            self.drift.at[frame, "dx"] = self.drift_df.at[frame, "dx"] % 1 
+            self.drift.at[frame, "dy"] = self.drift_df.at[frame, "dy"] % 1 
+            # loop through each aoi
+            for j, aoi in enumerate(self.aoi_df.index):
+                # top left corner of aoi
+                # integer part (target center - half aoi width) + integer part (drift)
+                top_x = int((self.aoi_df.at[aoi, "x"] - self.D * 0.5) // 1 + self.drift_df.at[frame, "dx"] // 1)
+                left_y = int((self.aoi_df.at[aoi, "y"] - self.D * 0.5) // 1 + self.drift_df.at[frame, "dy"] // 1)
+                # j-th frame, i-th aoi
+                self._store[j,i,:,:] += img[top_x:top_x+self.D, left_y:left_y+self.D]
+                # new target center for the first frame
+                if i == 0:
+                    self.target.at[aoi, "x"] = self.aoi_df.at[aoi, "x"] - top_x - 1
+                    self.target.at[aoi, "y"] = self.aoi_df.at[aoi, "y"] - left_y - 1
+        # convert data into torch tensor
+        self._store = torch.tensor(self._store, dtype=torch.float32)
+        torch.save(self._store, os.path.join(self.path_to["dir"], "{}_data.pt".format(self.name)))
+        self.target.to_csv(os.path.join(self.path_to["dir"], "{}_target.csv".format(self.name)))
+        self.drift.to_csv(os.path.join(self.path_to["dir"], "{}_drift.csv".format(self.name)))
+        #print("aois were saved to {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
         # calculate integrated intensity
-        self.intensity = self._store.mean(dim=(2,3))
+        #self.intensity = self._store.mean(dim=(2,3))
         # calculate low and high percentiles for imaging
         self.vmin = np.percentile(self._store.cpu(), 5)
         self.vmax = np.percentile(self._store.cpu(), 99)
         data_sorted, _ = self._store.reshape(self.N,self.F,-1).sort(dim=2)
         self.background = data_sorted[...,self.D*2:self.D*4].mean(dim=2)
-        self.height = data_sorted[...,-self.D*4:-self.D*2].mean(dim=2) - self.background
+        #self.height = data_sorted[...,-self.D*4:-self.D*2].mean(dim=2) - self.background
         self.background -= self._store.min()
         #self.background -= 90
+        logging.info("Loaded data from glimpse files")
     
     def __len__(self):
         return len(self.target)
@@ -99,59 +214,3 @@ class GlimpseDataset(Dataset):
     def __repr__(self):
         return self.path
 
-def load_aois(path_glimpse, header, aoi_df, drift_df, aoi_list, frames_list):
-    smd = {}
-    smd["pixnum"] = int(aoi_df.loc[1,"pixnum"])
-    smd["height"] = int(header["vid"]["height"])
-    smd["width"] = int(header["vid"]["width"])
-    smd["info"] = {}
-    smd["aoi_center"] = {}
-    smd["aoi_border"] = {}
-    smd["data"] = {}
-    # get all frames
-    all_frames = set([f for sublist in frames_list for f in sublist])
-    
-    for aoi, frames in zip(aoi_list, frames_list):
-        xy_loc = aoi_df.loc[aoi, ["x", "y"]].values #+ drift_df.loc[frames, ["dx", "dy"]].mean().values
-        if smd["pixnum"] % 2:
-            xy_pixel = np.round(xy_loc)
-        else:
-            xy_pixel = np.floor(xy_loc) + 0.5
-        x1 = int(xy_pixel[0] - (smd["pixnum"] - 1)/2 - 1)
-        x2 = int(xy_pixel[0] + (smd["pixnum"] - 1)/2)
-        y1 = int(xy_pixel[1] - (smd["pixnum"] - 1)/2 - 1)
-        y2 = int(xy_pixel[1] + (smd["pixnum"] - 1)/2)
-        smd["aoi_center"][aoi] = xy_loc
-        smd["aoi_border"][aoi] = np.array([[x1, x2], [y1, y2]])
-        df = pd.DataFrame(data={"aoi": aoi, "frame": frames, "dx": drift_df.loc[frames, "dx"], "dy": drift_df.loc[frames, "dy"], "intensity": 0})
-        #print(df.loc[:,["dx", "dy"]].shape, drift_df.loc[frames, ["dx", "dy"]].shape)
-        #df["dx"] = drift_df.loc[frames, "dx"]
-        df = df.set_index("frame")
-        data = np.zeros((len(frames), smd["pixnum"], smd["pixnum"]))
-        smd["info"][aoi] = df
-        smd["data"][aoi] = data
-        
-    for frame in all_frames:
-        glimpse_number = header["vid"]["filenumber"][0][0][0][int(frame-1)]
-        with open(os.path.join(path_glimpse, "{}.glimpse".format(glimpse_number))) as fid:
-            fid.seek(header['vid']['offset'][0][0][0][int(frame-1)])
-            img = np.fromfile(fid, dtype='>i2', count=smd["height"]*smd["width"]).reshape(smd["height"],smd["width"])
-            img += 2**15
-            #img = img.astype(np.uint16)
-            
-            for aoi in smd["info"].keys():
-                if frame in smd["info"][aoi].index:
-                    x1 = int(smd["aoi_border"][aoi][0,0] + smd["info"][aoi].loc[frame, "dx"] // 1)
-                    x2 = int(smd["aoi_border"][aoi][0,1] + smd["info"][aoi].loc[frame, "dx"] // 1)
-                    y1 = int(smd["aoi_border"][aoi][1,0] + smd["info"][aoi].loc[frame, "dy"] // 1)
-                    y2 = int(smd["aoi_border"][aoi][1,1] + smd["info"][aoi].loc[frame, "dy"] // 1)
-                    smd["data"][aoi][smd["info"][aoi].index.get_loc(frame),:,:] = img[x1:x2,y1:y2]
-
-                    smd["info"][aoi].at[frame, "intensity"] = img[x1:x2,y1:y2].sum()
-                    smd["info"][aoi].loc[frame, "dx"] = smd["info"][aoi].loc[frame, "dx"] % 1
-                    smd["info"][aoi].loc[frame, "dy"] = smd["info"][aoi].loc[frame, "dy"] % 1
-               
-    for aoi in smd["data"].keys():
-        smd["data"][aoi] = torch.tensor(smd["data"][aoi], dtype=torch.float32)
-            
-    return smd
