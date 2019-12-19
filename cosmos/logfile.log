@@ -1,0 +1,29 @@
+12/19/2019 02:11:51 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:11:51 PM - Device: cuda:0
+12/19/2019 02:11:56 PM - Loaded data from glimpse files
+12/19/2019 02:14:44 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:14:44 PM - Device: cuda:0
+12/19/2019 02:14:49 PM - Loaded data from glimpse files
+12/19/2019 02:16:21 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:16:21 PM - Device: cuda:0
+12/19/2019 02:16:26 PM - Loaded data from glimpse files
+12/19/2019 02:17:05 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:17:05 PM - Device: cuda:0
+12/19/2019 02:29:18 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:29:18 PM - Device: cuda:0
+12/19/2019 02:30:12 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:30:12 PM - Device: cuda:0
+12/19/2019 02:31:08 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:31:08 PM - Device: cuda:0
+12/19/2019 02:31:08 PM - Adjusted target position from frame 4576.0 to frame 1 ... 
+12/19/2019 02:31:12 PM - Loaded data from glimpse files
+12/19/2019 02:31:18 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 02:31:18 PM - Device: cuda:0
+12/19/2019 02:31:21 PM - Loaded data from LarryCy3sigma54Short_data.pt, LarryCy3sigma54Short_target.csv, and LarryCy3sigma54Short_drift.csv files
+12/19/2019 03:08:10 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 03:08:10 PM - Device: cuda:0
+12/19/2019 03:08:13 PM - Loaded data from LarryCy3sigma54Short_data.pt, LarryCy3sigma54Short_target.csv, and LarryCy3sigma54Short_drift.csv files
+12/19/2019 03:08:13 PM - Model: features
+12/19/2019 03:13:29 PM - Dataset: LarryCy3sigma54Short
+12/19/2019 03:13:29 PM - Device: cuda:0
+12/19/2019 03:13:31 PM - Loaded data from LarryCy3sigma54Short_data.pt, LarryCy3sigma54Short_target.csv, and LarryCy3sigma54Short_drift.csv files

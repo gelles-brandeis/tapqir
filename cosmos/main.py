@@ -23,7 +23,6 @@ models["tracker"] = Tracker
 
 # setup and training
 def main(args):
-    logging.basicConfig(filename="example.log", format="%(asctime)s - %(message)s", level=logging.DEBUG)
 
     if args.device == "cuda0":
         device = torch.device("cuda:0")
@@ -35,7 +34,7 @@ def main(args):
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
     elif args.device == "cpu":
         device = torch.device("cpu")
-    logging.info("Using device: {}".format(args.device))
+    #logging.info("Using device: {}".format(args.device))
     #logging.info("Using device: cuda{}".format(torch.cuda.current_device()))
 
     data = ReadAoi(args.dataset, device)
@@ -44,6 +43,7 @@ def main(args):
     else:
         control = None
     model = models[args.model](data, control, K=2, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
+    data.log.info("Model: {}".format(args.model))
 
     if args.num_iter:
         model.load_checkpoint()
