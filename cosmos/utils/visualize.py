@@ -56,12 +56,12 @@ def view_glimpse(frame, aoi, aoi_df, drift_df, header, path_glimpse, selected_ao
         
     plt.show()
 
-def view_m_probs(aoi, data, f1, f2, m, z, labels):
+def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
     if m or z:
         k_probs = np.zeros((len(data.drift),2))
-        k_probs[:,0] = param("m_probs").squeeze().detach()[aoi,:,1] + param("m_probs").squeeze().detach()[aoi,:,3]
-        k_probs[:,1] = param("m_probs").squeeze().detach()[aoi,:,2] + param("m_probs").squeeze().detach()[aoi,:,3]
-    if z: z_probs = k_probs[:,0] * param("theta_probs").squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("theta_probs").squeeze().detach().numpy()[aoi,:,2]
+        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
+        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
+    if z: z_probs = k_probs[:,0] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,2]
 
     plt.figure(figsize=(25,5))
     if m:
@@ -80,11 +80,11 @@ def view_m_probs(aoi, data, f1, f2, m, z, labels):
     plt.tight_layout()
     plt.show()
 
-def view_parameters(aoi, data, f1, f2, m, params):
+def view_parameters(aoi, data, f1, f2, m, params, prefix):
     if m:
         k_probs = np.zeros((len(data.drift),2))
-        k_probs[:,0] = param("m_probs").squeeze().detach()[aoi,:,1] + param("m_probs").squeeze().detach()[aoi,:,3]
-        k_probs[:,1] = param("m_probs").squeeze().detach()[aoi,:,2] + param("m_probs").squeeze().detach()[aoi,:,3]
+        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
+        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
         m_colors = np.zeros((2,len(data.drift),4))
         m_colors[0] += to_rgba_array("C0")
         m_colors[0,:,3] = k_probs[:,0]
@@ -95,24 +95,28 @@ def view_parameters(aoi, data, f1, f2, m, params):
     for i, p in enumerate(params):
         plt.subplot(5,1,i+1)
         if p == "background":
-            hpd = hpdi(dist.Gamma(param("b_loc")[aoi].squeeze().detach() * param("b_beta").detach(), param("b_beta").detach()).sample((500,)), 0.95, dim=0)
-            mean = param("b_loc")[aoi].squeeze().detach()
+            hpd = hpdi(dist.Gamma(param("{}/b_loc".format(prefix))[aoi].squeeze().detach() * param("b_beta").detach(), param("b_beta").detach()).sample((500,)), 0.95, dim=0)
+            mean = param("{}/b_loc".format(prefix))[aoi].squeeze().detach()
             plt.ylim(0, hpd.max()+1)
         elif p == "intensity":
-            hpd = hpdi(dist.Gamma(param("h_loc")[aoi].squeeze().detach() * param("h_beta").detach(), param("h_beta").detach()).sample((500,)), 0.95, dim=0)
-            mean = param("h_loc")[aoi].squeeze().detach()
+            hpd = hpdi(dist.Gamma(param("{}/h_loc".format(prefix))[aoi].squeeze().detach() * param("h_beta").detach(), param("h_beta").detach()).sample((500,)), 0.95, dim=0)
+            mean = param("{}/h_loc".format(prefix))[aoi].squeeze().detach()
             plt.ylim(0, hpd.max()+10)
         elif p == "x":
-            hpd = hpdi(dist.Normal(param("x_mean")[aoi].squeeze().detach(), param("scale")[aoi].squeeze().detach()).sample((500,)), 0.95, dim=0)
-            mean = param("x_mean")[aoi].squeeze().detach()
+            hpd = hpdi(dist.Normal(param("{}/x_mean".format(prefix))[aoi].squeeze().detach(), param("{}/scale".format(prefix))[aoi].squeeze().detach()).sample((500,)), 0.95, dim=0)
+            mean = param("{}/x_mean".format(prefix))[aoi].squeeze().detach()
+            #hpd = hpdi(Location(param("x_mode")[aoi].squeeze().detach(), param("size")[aoi].squeeze().detach(), -(data.D+3)/2, data.D+3).sample((500,)), 0.95, dim=0)
+            #mean = param("x_mode")[aoi].squeeze().detach()
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "y":
-            hpd = hpdi(dist.Normal(param("y_mean")[aoi].squeeze().detach(), param("scale")[aoi].squeeze().detach()).sample((500,)), 0.95, dim=0)
-            mean = param("y_mean")[aoi].squeeze().detach()
+            hpd = hpdi(dist.Normal(param("{}/y_mean".format(prefix))[aoi].squeeze().detach(), param("{}/scale".format(prefix))[aoi].squeeze().detach()).sample((500,)), 0.95, dim=0)
+            mean = param("{}/y_mean".format(prefix))[aoi].squeeze().detach()
+            #hpd = hpdi(Location(param("y_mode")[aoi].squeeze().detach(), param("size")[aoi].squeeze().detach(), -(data.D+3)/2, data.D+3).sample((500,)), 0.95, dim=0)
+            #mean = param("y_mode")[aoi].squeeze().detach()
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "width":
-            hpd = hpdi(Location(param("w_mode")[aoi].squeeze().detach(), param("w_size")[aoi].squeeze().detach(), 0.5, 2.5).sample((500,)), 0.95, dim=0)
-            mean = param("w_mode")[aoi].squeeze().detach()
+            hpd = hpdi(Location(param("{}/w_mode".format(prefix))[aoi].squeeze().detach(), param("{}/w_size".format(prefix))[aoi].squeeze().detach(), 0.5, 2.5).sample((500,)), 0.95, dim=0)
+            mean = param("{}/w_mode".format(prefix))[aoi].squeeze().detach()
 
         if p == "background":
             plt.fill_between(data.drift.index.values[f1:f2+1], hpd[0][f1:f2+1], hpd[1][f1:f2+1], color="C0", alpha=0.2)

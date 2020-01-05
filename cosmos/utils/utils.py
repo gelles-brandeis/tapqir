@@ -27,9 +27,9 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer, feature=False, mc
     if mcc:
         mask = model.data.labels["spotpicker"].values < 2
         k_probs = torch.zeros(model.data.N,model.data.F,2)
-        k_probs[...,0] = pyro.param("m_probs").squeeze()[...,1] + pyro.param("m_probs").squeeze()[...,3]
-        k_probs[...,1] = pyro.param("m_probs").squeeze()[...,2] + pyro.param("m_probs").squeeze()[...,3]
-        z_probs = k_probs[...,0] * pyro.param("theta_probs").squeeze()[...,1] + k_probs[...,1] * pyro.param("theta_probs").squeeze()[...,2]
+        k_probs[...,0] = pyro.param("d/m_probs").squeeze()[...,1] + pyro.param("d/m_probs").squeeze()[...,3]
+        k_probs[...,1] = pyro.param("d/m_probs").squeeze()[...,2] + pyro.param("d/m_probs").squeeze()[...,3]
+        z_probs = k_probs[...,0] * pyro.param("d/theta_probs").squeeze()[...,1] + k_probs[...,1] * pyro.param("d/theta_probs").squeeze()[...,2]
         model.data.labels["probs"] = z_probs.reshape(-1).detach().cpu().numpy()
         model.data.labels["binary"] = model.data.labels["probs"] > 0.5
         writer.add_scalar("MCC", matthews_corrcoef(model.data.labels["spotpicker"].values[mask], model.data.labels["binary"].values[mask]), epoch_count)
@@ -43,7 +43,7 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer, feature=False, mc
                 writer.add_scalars("{}".format(p), scalars, epoch_count)
             else:
                 writer.add_histogram("{}".format(p), pyro.param(p).squeeze().detach(), epoch_count)
-        elif p in ["z_probs", "j_probs", "m_probs"]:
+        elif p in ["z_probs", "j_probs", "d/m_probs", "c/m_probs"]:
             for i in range(pyro.param(p).squeeze().size()[-1]):
                 writer.add_histogram("{}_{}".format(p,i), pyro.param(p).squeeze()[...,i].detach().reshape(-1), epoch_count)
         elif pyro.param(p).squeeze().dim() >= 2:
@@ -118,13 +118,13 @@ def view_probs(aoi, data, f1, f2, binder, junk, sp):
     plt.tight_layout()
     plt.show()
     
-def view_aoi(aoi, frame, data, target, z, m1, m2, labels):
+def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
     #fig = plt.figure(figsize=(30,1.5), dpi=600)
     if m1 or m2 or z:
         k_probs = np.zeros((len(data.drift),2))
-        k_probs[:,0] = param("m_probs").squeeze().detach()[aoi,:,1] + param("m_probs").squeeze().detach()[aoi,:,3]
-        k_probs[:,1] = param("m_probs").squeeze().detach()[aoi,:,2] + param("m_probs").squeeze().detach()[aoi,:,3]
-    if z: z_probs = k_probs[:,0] * param("theta_probs").squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("theta_probs").squeeze().detach().numpy()[aoi,:,2]
+        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
+        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
+    if z: z_probs = k_probs[:,0] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,2]
 
     fig = plt.figure(figsize=(15,3), dpi=600)
     for i in range(20):
@@ -134,9 +134,9 @@ def view_aoi(aoi, frame, data, target, z, m1, m2, labels):
         if target:
             plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5, data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5, "b+", markersize=10, mew=3, alpha=0.7)
         if m1:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("y_mean").squeeze().detach().numpy()[aoi,frame+i,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("x_mean").squeeze().detach().numpy()[aoi,frame+i,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
         if m2:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("y_mean").squeeze().detach().numpy()[aoi,frame+i,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("x_mean").squeeze().detach().numpy()[aoi,frame+i,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
         if z:
             z_color = to_rgba_array("C2", z_probs[frame+i])[0]
             plt.gca().add_patch(Rectangle((0, 0), data.D*z_probs[frame+i], 0.25, edgecolor=z_color, lw=4, facecolor="none"))

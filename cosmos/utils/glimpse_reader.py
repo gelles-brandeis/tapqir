@@ -30,9 +30,14 @@ class GlimpseDataset(Dataset):
         self.name = dataset 
         self.device = device
         self.read_cfg()
-        self.load_data()
+        self.read_mat()
+        self.read_glimpse()
+        #self.load_data()
 
     def read_cfg(self):
+        """
+        read header, aoiinfo, driftlist, and labels files
+        """
         config = configparser.ConfigParser(allow_no_value=True)
         config.read("datasets.cfg")
         files = ["dir", "header", "aoiinfo", "driftlist", "labels"]
@@ -59,18 +64,26 @@ class GlimpseDataset(Dataset):
         self.log.info("Device: {}".format(self.device))
 
     def load_data(self):
-        try:
-            self._store = torch.load(os.path.join(self.path, "{}_data.pt".format(self.name)), map_location=self.device)
-            self.N, self.F, self.D, _ = self._store.shape
+        #try:
+        #    self._store = torch.load(os.path.join(self.path, "{}_data.pt".format(self.name)), map_location=self.device)
+        #    self.N, self.F, self.D, _ = self._store.shape
             #assert (self.N, self.F, self.D, self.D) == self._store.shape
-            self.target = pd.read_csv(os.path.join(self.path, "{}_target.csv".format(self.name)), index_col="aoi")
-            self.drift = pd.read_csv(os.path.join(self.path, "{}_drift.csv".format(self.name)), index_col="frame")
-            self.log.info("Loaded data from {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
-        except:
-            self.read_mat()
-            self.read_glimpse()
+        #    self.target = pd.read_csv(os.path.join(self.path, "{}_target.csv".format(self.name)), index_col="aoi")
+        #    self.drift = pd.read_csv(os.path.join(self.path, "{}_drift.csv".format(self.name)), index_col="frame")
+        #    self.labels = pd.read_csv(os.path.join(self.path, "{}_labels.csv".format(self.name)), index_col="frame")
+        #    self.log.info("Loaded data from {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
+        #except:
+        self.read_mat()
+        self.read_glimpse()
 
     def read_mat(self):
+        """
+        convert header.mat into dict format
+        convert driftlist.mat into DataFrame format and calculate cumulative sum of the drift across frames
+        convert aoiinfo.mat into DataFrame and adjust target position to frame #1
+        convert labels.mat into MutliIndex DataFrame
+        select subset of frames and aois
+        """
         # convert header into dict format
         #self.log.info("reading header.mat file ... ")
         mat_header = loadmat(self.path_to["header"])
@@ -96,7 +109,7 @@ class GlimpseDataset(Dataset):
         #self.log.info("reading {} file ... ".format(aoi_filename))
         aoi_mat = loadmat(self.path_to["aoiinfo"])
         # convert aoiinfo into DataFrame
-        if self.name in ["Gracecy3"]:
+        if self.name in ["Gracecy3", "Gracecy3Supervised"]:
             self.aoi_df = pd.DataFrame(aoi_mat["aoifits"]["aoiinfo2"][0,0], columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
         else:
             self.aoi_df = pd.DataFrame(aoi_mat["aoiinfo2"], columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
@@ -107,7 +120,7 @@ class GlimpseDataset(Dataset):
         #self.log.info("done")
 
 
-        labels = None
+        self.labels = None
         if self.name in ["FL_1_1117_0OD", "FL_3339_4444_0p8OD"]:
             framelist = loadmat("/home/ordabayev/Documents/Datasets/Bayesian_test_files/B33p44a_FrameList_files.dat")
             f1 = framelist[dataset][0,2]
@@ -128,6 +141,24 @@ class GlimpseDataset(Dataset):
             self.aoi_df = self.aoi_df.loc[aoi_list]
             #print("reading labels ...", end="")
             #labels_mat = loadmat("/home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b27p131g_specific_Intervals.dat")
+        elif self.name in ["LarryCy3sigma54Supervised"]:
+            f1 = 600
+            f2 = 619 #4576
+            self.drift_df = self.drift_df.loc[f1:f2]
+            aoi_list = np.array([20,21,26])
+            self.aoi_df = self.aoi_df.loc[aoi_list]
+        elif self.name in ["Gracecy3Supervised"]:
+            f1 = 666
+            f2 = 675 #4576
+            self.drift_df = self.drift_df.loc[f1:f2]
+            aoi_list = np.array([223,230,268])
+            self.aoi_df = self.aoi_df.loc[aoi_list]
+        elif self.name in ["GraceArticlePol2Supervised"]:
+            f1 = 601
+            f2 = 620 #4576
+            self.drift_df = self.drift_df.loc[f1:f2]
+            aoi_list = np.array([210,235,240,245,318])
+            self.aoi_df = self.aoi_df.loc[aoi_list]
         elif self.name in ["Gracecy3Short"]:
             aoi_list = np.arange(160,240)
             self.aoi_df = self.aoi_df.loc[aoi_list]
@@ -136,25 +167,35 @@ class GlimpseDataset(Dataset):
             #print("reading {} file ... ".format(labels_filename), end="")
             labels_mat = loadmat(self.path_to["labels"])
             index = pd.MultiIndex.from_product([self.aoi_df.index.values, self.drift_df.index.values], names=["aoi", "frame"])
-            labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
+            self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
             spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0,0]
             for sp in spot_picker:
                 aoi = int(sp[-1])
                 start = int(sp[1])
                 end = int(sp[2])
                 if sp[0] in [-2., 0., 2.]:
-                    labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
+                    self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
                 elif sp[0] in [-3., 1., 3.]:
-                    labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
+                    self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
             #print("done")
 
         #print("\nsaving drift_df.csv, {}_aoi_df.csv, {}_labels.csv files ..., ".format(dataset,dataset), end="")
         #drift_df.to_csv(os.path.join(self.path_to["dir"], "drift_df.csv"))
         #aoi_df.to_csv(os.path.join(self.path_to["dir"], "{}_aoi_df.csv".format(self.name)))
-        if self.path_to["labels"]: labels.to_csv(os.path.join(self.path_to["dir"], "{}_labels.csv".format(self.name)))
+        if self.path_to["labels"]: self.labels.to_csv(os.path.join(self.path_to["dir"], "{}_labels.csv".format(self.name)))
         #print("done")
 
     def read_glimpse(self, D=14):
+        """
+        self.target DataFrame
+        aoi frame x y abs_x abs_y
+        
+        self.drfit DataFrame
+        frame dx dy abs_dx abs_dy
+        dx = dx % 1
+        top_x = int((x - D * 0.5) // 1 + dx // 1)
+        x = x - top_x - 1
+        """
         self.D, self.height, self.width = D, int(self.header["height"]), int(self.header["width"])
         self.N = len(self.aoi_df)
         self.F = len(self.drift_df)
@@ -189,9 +230,12 @@ class GlimpseDataset(Dataset):
                 # j-th frame, i-th aoi
                 self._store[j,i,:,:] += img[top_x:top_x+self.D, left_y:left_y+self.D]
                 # new target center for the first frame
-                if i == 0:
-                    self.target.at[aoi, "x"] = self.aoi_df.at[aoi, "x"] - top_x - 1
-                    self.target.at[aoi, "y"] = self.aoi_df.at[aoi, "y"] - left_y - 1
+                #if i == 0:
+                #    self.target.at[aoi, "x"] = self.aoi_df.at[aoi, "x"] - top_x - 1
+                #    self.target.at[aoi, "y"] = self.aoi_df.at[aoi, "y"] - left_y - 1
+        for j, aoi in enumerate(self.aoi_df.index):
+            self.target.at[aoi, "x"] = self.aoi_df.at[aoi, "x"] - int((self.aoi_df.at[aoi, "x"] - self.D * 0.5) // 1) - 1
+            self.target.at[aoi, "y"] = self.aoi_df.at[aoi, "y"] - int((self.aoi_df.at[aoi, "y"] - self.D * 0.5) // 1) - 1
         # convert data into torch tensor
         self._store = torch.tensor(self._store, dtype=torch.float32)
         torch.save(self._store, os.path.join(self.path_to["dir"], "{}_data.pt".format(self.name)))

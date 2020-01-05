@@ -13,6 +13,12 @@ from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.features import Features 
 from cosmos.models.detector import Detector
 from cosmos.models.tracker import Tracker
+from cosmos.models.marginaldetector import MarginalDetector
+from cosmos.models.blockeddetector import BlockedDetector
+from cosmos.models.marginaltracker import MarginalTracker 
+from cosmos.models.supervised import Supervised
+from cosmos.models.marginalsemisupervised import MarginalSemiSupervised
+from cosmos.models.semisupervised import SemiSupervised
 
 #log = logging.getLogger()
 
@@ -20,6 +26,12 @@ models = dict()
 models["features"] = Features
 models["detector"] = Detector
 models["tracker"] = Tracker
+models["marginal-detector"] = MarginalDetector 
+models["blocked-detector"] = BlockedDetector 
+models["marginal-tracker"] = MarginalTracker 
+models["supervised"] = Supervised
+models["marginal-semisupervised"] = MarginalSemiSupervised
+models["semisupervised"] = SemiSupervised
 
 # setup and training
 def main(args):
@@ -54,7 +66,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Bayesian analysis of single molecule image data",
                                      usage="python %(prog)s --model=Model --dataset=Dataset --negative-control=NegativeControl --num-iter=1000 --learning-rate=0.001 --n-batch=32 --device=cuda0",
                                      epilog="Good luck!")
-    parser.add_argument("-m", "--model", default="features", choices=["features", "detector", "tracker"], type=str)
+    parser.add_argument("-m", "--model", default="features", choices=models.keys(), type=str)
     parser.add_argument("-n", "--num-iter", type=int)
     parser.add_argument("-N", "--n-batch", default=32, type=int)
     parser.add_argument("-lr", "--learning-rate", default=0.001, type=float)
