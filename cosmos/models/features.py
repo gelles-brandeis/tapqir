@@ -91,7 +91,7 @@ class Features(Model):
         param("offset_v", offset_max-50, constraint=constraints.interval(0.,offset_max))
         param("gain_v", torch.tensor(5.), constraint=constraints.positive)
 
-        param("b_loc", torch.ones(self.data.N,self.data.F,1,1,1)*10., constraint=constraints.positive)
+        param("b_loc", torch.ones(self.data.N,self.data.F,1,1,1)*30., constraint=constraints.positive)
         param("b_beta", torch.ones(1)*30, constraint=constraints.positive)
         intensity = torch.ones(self.data.N,self.data.F,1,1,self.K)*10.
         intensity[...,1] = 30. # 30 is better than 100
@@ -105,7 +105,7 @@ class Features(Model):
         param("scale", scale, constraint=constraints.positive)
         
         if self.control:
-            param("c_b_loc", torch.ones(self.control.N,self.control.F,1,1,1)*10., constraint=constraints.positive)
+            param("c_b_loc", torch.ones(self.control.N,self.control.F,1,1,1)*30., constraint=constraints.positive)
             intensity = torch.ones(self.control.N,self.control.F,1,1,self.K)*10.
             intensity[...,1] = 30. # 30 is better than 100
             param("c_h_loc", intensity, constraint=constraints.positive)
