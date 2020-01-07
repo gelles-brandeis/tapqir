@@ -119,7 +119,7 @@ class Model:
 
     def sample(self, data=None, theta=True, prefix="d"):
         data = self.data
-        pyro.get_param_store().load(os.path.join(self.data.path, "runs", self.data.name, "tracker/K{}".format(self.K), "nojit/lr{}".format(self.lr), "params"))
+        pyro.get_param_store().load(os.path.join(self.data.path, "runs", self.data.name, "tracker/K{}".format(self.K), "jit/lr{}".format(self.lr), "params"))
         self.n_batch = None
 
         with scope(prefix=prefix):

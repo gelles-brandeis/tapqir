@@ -122,21 +122,7 @@ class GlimpseDataset(Dataset):
         #self.log.info("done")
 
 
-        self.labels = None
-        if self.name in ["FL_1_1117_0OD", "FL_3339_4444_0p8OD"]:
-            framelist = loadmat("/home/ordabayev/Documents/Datasets/Bayesian_test_files/B33p44a_FrameList_files.dat")
-            f1 = framelist[self.name][0,2]
-            f2 = framelist[self.name][-1,2]
-            self.drift_df = self.drift_df.loc[f1:f2]
-            aoi_list = np.unique(framelist[self.name][:,0])
-            self.aoi_df = self.aoi_df.loc[aoi_list]
-            #labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
-            index = pd.MultiIndex.from_arrays([framelist[self.name][:,0], framelist[self.name][:,2]], names=["aoi", "frame"])
-            self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
-            self.labels["spotpicker"] = framelist[self.name][:,1]
-            self.labels.loc[self.labels["spotpicker"] == 0, "spotpicker"] = 3
-            self.labels.loc[self.labels["spotpicker"] == 2, "spotpicker"] = 0
-        elif self.name in ["LarryCy3sigma54Short", "LarryCy3sigma54NegativeControlShort"]:
+        if self.name in ["LarryCy3sigma54Short", "LarryCy3sigma54NegativeControlShort"]:
             f1 = 170
             f2 = 1000 #4576
             self.drift_df = self.drift_df.loc[f1:f2]
@@ -167,27 +153,44 @@ class GlimpseDataset(Dataset):
             aoi_list = np.arange(160,240)
             self.aoi_df = self.aoi_df.loc[aoi_list]
 
+        self.labels = None
         if self.path_to["labels"]:
-            #print("reading {} file ... ".format(labels_filename), end="")
-            labels_mat = loadmat(self.path_to["labels"])
-            index = pd.MultiIndex.from_product([self.aoi_df.index.values, self.drift_df.index.values], names=["aoi", "frame"])
-            self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
-            spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0,0]
-            for sp in spot_picker:
-                aoi = int(sp[-1])
-                start = int(sp[1])
-                end = int(sp[2])
-                if sp[0] in [-2., 0., 2.]:
-                    self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
-                elif sp[0] in [-3., 1., 3.]:
-                    self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
-            #print("done")
+            if self.name in ["FL_1_1117_0OD", "FL_1118_2225_0p3OD", "FL_2226_3338_0p6OD", "FL_3339_4444_0p8OD", "FL_4445_5554_1p1OD", "FL_5555_6684_1p3OD",
+                "FL_1_1117_0OD_atten", "FL_1118_2225_0p3OD_atten", "FL_2226_3338_0p6OD_atten", "FL_3339_4444_0p8OD_atten", "FL_4445_5554_1p1OD_atten", "FL_5555_6684_1p3OD_atten"]:
+                framelist = loadmat(self.path_to["labels"])
+                #framelist = loadmat("/home/ordabayev/Documents/Datasets/Bayesian_test_files/B33p44a_FrameList_files.dat")
+                f1 = framelist[self.name][0,2]
+                f2 = framelist[self.name][-1,2]
+                self.drift_df = self.drift_df.loc[f1:f2]
+                aoi_list = np.unique(framelist[self.name][:,0])
+                self.aoi_df = self.aoi_df.loc[aoi_list]
+                #labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
+                index = pd.MultiIndex.from_arrays([framelist[self.name][:,0], framelist[self.name][:,2]], names=["aoi", "frame"])
+                self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
+                self.labels["spotpicker"] = framelist[self.name][:,1]
+                self.labels.loc[self.labels["spotpicker"] == 0, "spotpicker"] = 3
+                self.labels.loc[self.labels["spotpicker"] == 2, "spotpicker"] = 0
+            else:
+                #print("reading {} file ... ".format(labels_filename), end="")
+                labels_mat = loadmat(self.path_to["labels"])
+                index = pd.MultiIndex.from_product([self.aoi_df.index.values, self.drift_df.index.values], names=["aoi", "frame"])
+                self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
+                spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0,0]
+                for sp in spot_picker:
+                    aoi = int(sp[-1])
+                    start = int(sp[1])
+                    end = int(sp[2])
+                    if sp[0] in [-2., 0., 2.]:
+                        self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
+                    elif sp[0] in [-3., 1., 3.]:
+                        self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
+                #print("done")
 
-        #print("\nsaving drift_df.csv, {}_aoi_df.csv, {}_labels.csv files ..., ".format(dataset,dataset), end="")
-        #drift_df.to_csv(os.path.join(self.path_to["dir"], "drift_df.csv"))
-        #aoi_df.to_csv(os.path.join(self.path_to["dir"], "{}_aoi_df.csv".format(self.name)))
-        if self.path_to["labels"]: self.labels.to_csv(os.path.join(self.path_to["dir"], "{}_labels.csv".format(self.name)))
-        #print("done")
+            #print("\nsaving drift_df.csv, {}_aoi_df.csv, {}_labels.csv files ..., ".format(dataset,dataset), end="")
+            #drift_df.to_csv(os.path.join(self.path_to["dir"], "drift_df.csv"))
+            #aoi_df.to_csv(os.path.join(self.path_to["dir"], "{}_aoi_df.csv".format(self.name)))
+            self.labels.to_csv(os.path.join(self.path_to["dir"], "{}_labels.csv".format(self.name)))
+            #print("done")
 
     def read_glimpse(self, D=14):
         """
