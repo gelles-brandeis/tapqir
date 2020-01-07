@@ -31,11 +31,6 @@ def Location(mean, size, loc, scale):
     transforms =  [AffineTransform(loc=loc, scale=scale)]
     return dist.TransformedDistribution(base_distribution, transforms)
 
-def Location2(self, concentration0, concentration1, loc, scale):
-    base_distribution = dist.Beta(concentration1, concentration0)
-    transforms =  [AffineTransform(loc=loc, scale=scale)]
-    return dist.TransformedDistribution(base_distribution, transforms)
-
 def m_param(pi, lamda, K):
     bernoulli = lambda x: dist.Bernoulli(pi[1]).log_prob(torch.tensor([float(x)])).exp()
     poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()

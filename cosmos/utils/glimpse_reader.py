@@ -30,9 +30,9 @@ class GlimpseDataset(Dataset):
         self.name = dataset 
         self.device = device
         self.read_cfg()
-        self.read_mat()
-        self.read_glimpse()
-        #self.load_data()
+        #self.read_mat()
+        #self.read_glimpse()
+        self.load_data()
 
     def read_cfg(self):
         """
@@ -64,17 +64,19 @@ class GlimpseDataset(Dataset):
         self.log.info("Device: {}".format(self.device))
 
     def load_data(self):
-        #try:
-        #    self._store = torch.load(os.path.join(self.path, "{}_data.pt".format(self.name)), map_location=self.device)
-        #    self.N, self.F, self.D, _ = self._store.shape
+        try:
+            self._store = torch.load(os.path.join(self.path, "{}_data.pt".format(self.name)), map_location=self.device).detach()
+            self.N, self.F, self.D, _ = self._store.shape
+            self.vmin = np.percentile(self._store.cpu().numpy(), 5)
+            self.vmax = np.percentile(self._store.cpu().numpy(), 99)
             #assert (self.N, self.F, self.D, self.D) == self._store.shape
-        #    self.target = pd.read_csv(os.path.join(self.path, "{}_target.csv".format(self.name)), index_col="aoi")
-        #    self.drift = pd.read_csv(os.path.join(self.path, "{}_drift.csv".format(self.name)), index_col="frame")
-        #    self.labels = pd.read_csv(os.path.join(self.path, "{}_labels.csv".format(self.name)), index_col="frame")
-        #    self.log.info("Loaded data from {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
-        #except:
-        self.read_mat()
-        self.read_glimpse()
+            self.target = pd.read_csv(os.path.join(self.path, "{}_target.csv".format(self.name)), index_col="aoi")
+            self.drift = pd.read_csv(os.path.join(self.path, "{}_drift.csv".format(self.name)), index_col="frame")
+            self.labels = pd.read_csv(os.path.join(self.path, "{}_labels.csv".format(self.name)), index_col=["aoi", "frame"])
+            self.log.info("Loaded data from {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
+        except:
+            self.read_mat()
+            self.read_glimpse()
 
     def read_mat(self):
         """
@@ -123,15 +125,17 @@ class GlimpseDataset(Dataset):
         self.labels = None
         if self.name in ["FL_1_1117_0OD", "FL_3339_4444_0p8OD"]:
             framelist = loadmat("/home/ordabayev/Documents/Datasets/Bayesian_test_files/B33p44a_FrameList_files.dat")
-            f1 = framelist[dataset][0,2]
-            f2 = framelist[dataset][-1,2]
+            f1 = framelist[self.name][0,2]
+            f2 = framelist[self.name][-1,2]
             self.drift_df = self.drift_df.loc[f1:f2]
-            aoi_list = np.unique(framelist[dataset][:,0])
+            aoi_list = np.unique(framelist[self.name][:,0])
             self.aoi_df = self.aoi_df.loc[aoi_list]
             #labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
-            index = pd.MultiIndex.from_arrays([framelist[dataset][:,0], framelist[dataset][:,2]], names=["aoi", "frame"])
-            labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
-            labels["spotpicker"] = framelist[dataset][:,1]
+            index = pd.MultiIndex.from_arrays([framelist[self.name][:,0], framelist[self.name][:,2]], names=["aoi", "frame"])
+            self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
+            self.labels["spotpicker"] = framelist[self.name][:,1]
+            self.labels.loc[self.labels["spotpicker"] == 0, "spotpicker"] = 3
+            self.labels.loc[self.labels["spotpicker"] == 2, "spotpicker"] = 0
         elif self.name in ["LarryCy3sigma54Short", "LarryCy3sigma54NegativeControlShort"]:
             f1 = 170
             f2 = 1000 #4576

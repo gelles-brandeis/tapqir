@@ -14,6 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import math
 from cosmos.models.helper import Location, m_param, theta_param
+import pandas as pd
 
 class Model:
     """ Gaussian Spot Model """
@@ -29,6 +30,7 @@ class Model:
         self.CameraUnit = _noise_fn[noise]
         self.lr = lr
         self.n_batch = n_batch
+        #self.path = os.path.join(self.data.path,"runs", "{}".format(self.data.name), "{}".format(self.__name__), "K{}".format(self.K), "lr{}".format(self.lr))
         self.path = os.path.join(self.data.path,"runs", "{}".format(self.data.name), "{}".format(self.__name__), "K{}".format(self.K), "{}".format("jit" if jit else "nojit"), "lr{}".format(self.lr))
         self.writer = SummaryWriter(log_dir=self.path)
         
@@ -94,12 +96,13 @@ class Model:
                     locs = self.gaussian_spot(spot_locs, height, width, x0, y0) + background
                     with pyro.plate("x_plate", size=self.D, dim=-3):
                         with pyro.plate("y_plate", size=self.D, dim=-2):
-                            pyro.sample("data", self.CameraUnit(locs, param("gain"), param("offset")), obs=data[batch_idx].unsqueeze(dim=-1))
+                            images = pyro.sample("data", self.CameraUnit(locs, param("gain"), param("offset")), obs=data[batch_idx].unsqueeze(dim=-1))
 
     def spot_guide(self, data, theta, prefix):
         with scope(prefix=prefix):
             with pyro.plate("N_plate", data.N, subsample_size=self.n_batch, dim=-5) as batch_idx:
                 with pyro.plate("F_plate", data.F, dim=-4):
+
                     pyro.sample("background", dist.Gamma(param("{}/b_loc".format(prefix))[batch_idx] * param("b_beta"), param("b_beta")))
                     m = pyro.sample("m", dist.Categorical(param("{}/m_probs".format(prefix))[batch_idx]))
                     m = self.m_matrix[m.squeeze(dim=-1)] # N,F,1,1,K
@@ -113,6 +116,44 @@ class Model:
                             pyro.sample("y0", dist.Normal(param("{}/y_mean".format(prefix))[batch_idx], param("{}/scale".format(prefix))[batch_idx]))
                             #pyro.sample("x0", Location(param("x_mode")[batch_idx], param("size")[batch_idx], -(self.D+3)/2, self.D+3)) # N,F,1,1,M,K
                             #pyro.sample("y0", Location(param("y_mode")[batch_idx], param("size")[batch_idx], -(self.D+3)/2, self.D+3))
+
+    def sample(self, data=None, theta=True, prefix="d"):
+        data = self.data
+        pyro.get_param_store().load(os.path.join(self.data.path, "runs", self.data.name, "tracker/K{}".format(self.K), "nojit/lr{}".format(self.lr), "params"))
+        self.n_batch = None
+
+        with scope(prefix=prefix):
+            with pyro.plate("N_plate", data.N, subsample_size=self.n_batch, dim=-5) as batch_idx:
+                with pyro.plate("F_plate", data.F, dim=-4):
+
+                    background = pyro.sample("background", dist.Gamma(param("{}/b_loc".format(prefix))[batch_idx] * param("b_beta"), param("b_beta")))
+                    m = pyro.sample("m", dist.Categorical(param("{}/m_probs".format(prefix))[batch_idx]))
+                    m = self.m_matrix[m.squeeze(dim=-1)] # N,F,1,1,K
+                    if theta:
+                        theta = pyro.sample("theta", dist.Categorical(param("{}/theta_probs".format(prefix))[batch_idx])) # N,F,1,1
+                        theta = self.theta_matrix[theta.squeeze(dim=-1)]
+                    with pyro.plate("K_plate", self.K, dim=-1):
+                        with pyro.poutine.mask(mask=m.bool()):
+                            height = pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")))
+                            width = pyro.sample("width", Location(param("{}/w_mode".format(prefix))[batch_idx], param("{}/w_size".format(prefix))[batch_idx], 0.5, 2.5))
+                            x0 = pyro.sample("x0", dist.Normal(param("{}/x_mean".format(prefix))[batch_idx], param("{}/scale".format(prefix))[batch_idx]))
+                            y0 = pyro.sample("y0", dist.Normal(param("{}/y_mean".format(prefix))[batch_idx], param("{}/scale".format(prefix))[batch_idx]))
+                            #pyro.sample("x0", Location(param("x_mode")[batch_idx], param("size")[batch_idx], -(self.D+3)/2, self.D+3)) # N,F,1,1,M,K
+                            #pyro.sample("y0", Location(param("y_mode")[batch_idx], param("size")[batch_idx], -(self.D+3)/2, self.D+3))
+
+                    spot_locs = data.target_locs[batch_idx] # N,F,1,1,M,K,2 select target locs for given indices
+                    locs = self.gaussian_spot(spot_locs, height, width, x0, y0) + background
+                    with pyro.plate("x_plate", size=self.D, dim=-3):
+                        with pyro.plate("y_plate", size=self.D, dim=-2):
+                            images = pyro.sample("data", self.CameraUnit(locs, param("gain"), param("offset")))
+
+        torch.save(images.squeeze(dim=-1), os.path.join(self.data.path, "{}Sampled_data.pt".format(self.data.name)))
+        self.data.target.to_csv(os.path.join(self.data.path, "{}Sampled_target.csv".format(self.data.name)))
+        self.data.drift.to_csv(os.path.join(self.data.path, "{}Sampled_drift.csv".format(self.data.name)))
+        index = pd.MultiIndex.from_product([self.data.target.index.values, self.data.drift.index.values], names=["aoi", "frame"])
+        self.data.labels = pd.DataFrame(data={"spotpicker": theta.squeeze().sum(dim=-1).reshape(-1).cpu(), "probs": 0, "binary": 0}, index=index)
+        self.data.labels.to_csv(os.path.join(self.data.path, "{}Sampled_labels.csv".format(self.data.name)))
+        print("sample saved", self.data.path)
 
     def spot_parameters(self, data, theta, prefix):
         param("{}/m_probs".format(prefix), torch.ones(data.N,data.F,1,1,1,4), constraint=constraints.simplex)

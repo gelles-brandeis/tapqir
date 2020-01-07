@@ -14,6 +14,9 @@
 #python main.py --num-iter=50000 --model=semisupervised --n-batch=32 --learning-rate=0.003 --dataset=GraceArticlePol2Supervised --negative-control=GraceArticlePol2 --device=cuda1
 #python main.py --num-iter=30000 --model=tracker --n-batch=32 --learning-rate=0.003 --dataset=GraceArticlePol2Supervised --negative-control=GraceArticlePol2 --device=cuda1
 #python main.py --num-iter=50000 --model=tracker --n-batch=32 --learning-rate=0.002 --dataset=GraceArticlePol2 --device=cuda1
+##python main.py --num-iter=10000 --model=tracker --n-batch=32 --learning-rate=0.001 --dataset=FL_1_1117_0OD --device=cuda1
+#python main.py --num-iter=50000 --model=tracker --n-batch=32 --learning-rate=0.002 --dataset=GraceArticlePol2 --device=cuda1 --sample
+python main.py --num-iter=10000 --model=tracker --n-batch=64 --learning-rate=0.005 --dataset=GraceArticlePol2Sampled --device=cuda1 --jit
 
 # DanPol2
 #python main.py --num-iter=50000 --model=features --n-batch=32 --learning-rate=0.001 --dataset=DanPol2 --device=cuda0 --jit
@@ -56,7 +59,9 @@
 #python main.py --num-iter=150000 --model=marginal-semisupervised --n-batch=32 --learning-rate=0.003 --dataset=Gracecy3Supervised --negative-control=Gracecy3 --device=cuda0
 #python main.py --num-iter=30000 --model=semisupervised --n-batch=32 --learning-rate=0.003 --dataset=Gracecy3Supervised --negative-control=Gracecy3 --device=cuda0
 #python main.py --num-iter=30000 --model=tracker --n-batch=32 --learning-rate=0.003 --dataset=Gracecy3Supervised --negative-control=Gracecy3 --device=cuda0
-#python main.py --num-iter=15000 --model=tracker --n-batch=32 --learning-rate=0.003 --dataset=Gracecy3 --device=cuda0
-python main.py --num-iter=50000 --model=tracker --n-batch=32 --learning-rate=0.001 --dataset=DanPol2 --device=cuda0
+#python main.py --num-iter=50000 --model=tracker --n-batch=32 --learning-rate=0.001 --dataset=DanPol2 --device=cuda0
+#python main.py --num-iter=50000 --model=tracker --n-batch=16 --learning-rate=0.001 --dataset=LarryCy3sigma54 --device=cuda0 --sample
+##python main.py --num-iter=30000 --model=tracker --n-batch=16 --learning-rate=0.005 --dataset=LarryCy3sigma54 --device=cuda0 --jit
 #python main.py --num-iter=100000 --model=tracker --n-batch=16 --learning-rate=0.001 --dataset=LarryCy3sigma54 --negative-control=LarryCy3sigma54NegativeControl --device=cuda0
 #python main.py --num-iter=30000 --model=tracker --n-batch=16 --learning-rate=0.003 --dataset=LarryCy3sigma54Short --negative-control=LarryCy3sigma54NegativeControlShort --device=cuda0
+#python main.py --num-iter=100000 --model=tracker --n-batch=32 --learning-rate=0.001 --dataset=Gracecy3 --device=cuda0

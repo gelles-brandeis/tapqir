@@ -57,7 +57,10 @@ def main(args):
     model = models[args.model](data, control, K=2, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
     data.log.info("Model: {}".format(args.model))
 
-    if args.num_iter:
+    if args.sample:
+        model.sample()
+
+    if args.num_iter and not args.sample:
         model.load_checkpoint()
         model.train(args.num_iter) 
 
@@ -74,6 +77,7 @@ if __name__ == '__main__':
     parser.add_argument("-nc", "--negative-control", type=str)
     parser.add_argument("-dev", "--device", default="cuda0", choices=["cuda0", "cuda1", "cpu"], type=str)
     parser.add_argument('--jit', action='store_true')
+    parser.add_argument('--sample', action='store_true')
     args = parser.parse_args()
 
     main(args)
