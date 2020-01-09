@@ -69,7 +69,7 @@ class Model:
     def parameters(self):
         raise NotImplementedError
 
-    def spot_model(self, data, m_pi, theta_pi, prefix):
+    def spot_model(self, data, m_pi, theta_pi, prefix, width):
         with scope(prefix=prefix):
             with pyro.plate("N_plate", data.N, dim=-5) as batch_idx:
                 with pyro.plate("F_plate", data.F, dim=-4):
@@ -85,7 +85,8 @@ class Model:
                         with pyro.poutine.mask(mask=m.bool()):
                             height = pyro.sample("height", dist.Gamma(param("height_loc") * param("height_beta"), param("height_beta"))) # K,N,F,1,1
                             height = height.masked_fill(~m.bool(), 0.)
-                            width = pyro.sample("width", Location(1.3, self.width_size[theta], 0.5, 2.5))
+                            #width = pyro.sample("width", Location(param("width_mode")[theta], param("width_size")[theta], 0.5, 1.5))
+                            #width = pyro.sample("width", Location(1.3, self.width_size[theta], 0.5, 2.5))
                             x0 = pyro.sample("x0", dist.Normal(0., self.scale[theta]))
                             y0 = pyro.sample("y0", dist.Normal(0., self.scale[theta]))
                             #width = pyro.sample("width", Location(param("width_mode")[theta], param("width_size")[theta], 0.5, 2.5))
@@ -96,13 +97,12 @@ class Model:
                     locs = self.gaussian_spot(spot_locs, height, width, x0, y0) + background
                     with pyro.plate("x_plate", size=self.D, dim=-3):
                         with pyro.plate("y_plate", size=self.D, dim=-2):
-                            images = pyro.sample("data", self.CameraUnit(locs, param("gain"), param("offset")), obs=data[batch_idx].unsqueeze(dim=-1))
+                            pyro.sample("data", self.CameraUnit(locs, param("gain"), param("offset")), obs=data[batch_idx].unsqueeze(dim=-1))
 
     def spot_guide(self, data, theta, prefix):
         with scope(prefix=prefix):
             with pyro.plate("N_plate", data.N, subsample_size=self.n_batch, dim=-5) as batch_idx:
                 with pyro.plate("F_plate", data.F, dim=-4):
-
                     pyro.sample("background", dist.Gamma(param("{}/b_loc".format(prefix))[batch_idx] * param("b_beta"), param("b_beta")))
                     m = pyro.sample("m", dist.Categorical(param("{}/m_probs".format(prefix))[batch_idx]))
                     m = self.m_matrix[m.squeeze(dim=-1)] # N,F,1,1,K
@@ -111,7 +111,7 @@ class Model:
                     with pyro.plate("K_plate", self.K, dim=-1):
                         with pyro.poutine.mask(mask=m.bool()):
                             pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")))
-                            pyro.sample("width", Location(param("{}/w_mode".format(prefix))[batch_idx], param("{}/w_size".format(prefix))[batch_idx], 0.5, 2.5))
+                            #pyro.sample("width", Location(param("{}/w_mode".format(prefix))[batch_idx], param("{}/w_size".format(prefix))[batch_idx], 0.5, 1.5))
                             pyro.sample("x0", dist.Normal(param("{}/x_mean".format(prefix))[batch_idx], param("{}/scale".format(prefix))[batch_idx]))
                             pyro.sample("y0", dist.Normal(param("{}/y_mean".format(prefix))[batch_idx], param("{}/scale".format(prefix))[batch_idx]))
                             #pyro.sample("x0", Location(param("x_mode")[batch_idx], param("size")[batch_idx], -(self.D+3)/2, self.D+3)) # N,F,1,1,M,K
@@ -135,7 +135,7 @@ class Model:
                     with pyro.plate("K_plate", self.K, dim=-1):
                         with pyro.poutine.mask(mask=m.bool()):
                             height = pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")))
-                            width = pyro.sample("width", Location(param("{}/w_mode".format(prefix))[batch_idx], param("{}/w_size".format(prefix))[batch_idx], 0.5, 2.5))
+                            #width = pyro.sample("width", Location(param("{}/w_mode".format(prefix))[batch_idx], param("{}/w_size".format(prefix))[batch_idx], 0.5, 1.5))
                             x0 = pyro.sample("x0", dist.Normal(param("{}/x_mean".format(prefix))[batch_idx], param("{}/scale".format(prefix))[batch_idx]))
                             y0 = pyro.sample("y0", dist.Normal(param("{}/y_mean".format(prefix))[batch_idx], param("{}/scale".format(prefix))[batch_idx]))
                             #pyro.sample("x0", Location(param("x_mode")[batch_idx], param("size")[batch_idx], -(self.D+3)/2, self.D+3)) # N,F,1,1,M,K
@@ -161,8 +161,8 @@ class Model:
             param("{}/theta_probs".format(prefix), torch.ones(data.N,data.F,1,1,1,self.K+1), constraint=constraints.simplex)
         param("{}/b_loc".format(prefix), torch.ones(data.N,data.F,1,1,1)*30., constraint=constraints.positive)
         param("{}/h_loc".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1000., constraint=constraints.positive)
-        param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.35, constraint=constraints.interval(0.5,3.))
-        param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
+        #param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.5,2.))
+        #param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
         param("{}/x_mean".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
         param("{}/y_mean".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
         scale = torch.ones(data.N,data.F,1,1,self.K)*5.
@@ -181,8 +181,8 @@ class Model:
         spot_locs[...,1] += y0 # N,F,1,1,K,2
         spot = []
         for k in range(self.K):
-            #w = width.reshape(1,1,1,1)
-            w = width[...,k] # N,F,1,1   4,N,F,1,1
+            w = width
+            #w = width[...,k] # N,F,1,1   4,N,F,1,1
             rv = dist.MultivariateNormal(spot_locs[...,k,:], scale_tril=torch.eye(2) * w.view(w.size()+(1,1)))
             gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos)) # N,F,D,D
             spot.append(height[...,k] * gaussian_spot) # N,F,D,D

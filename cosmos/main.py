@@ -10,28 +10,12 @@ import logging
 import configparser
 
 from cosmos.utils.aoi_reader import ReadAoi
-from cosmos.models.features import Features 
-from cosmos.models.detector import Detector
 from cosmos.models.tracker import Tracker
-from cosmos.models.marginaldetector import MarginalDetector
-from cosmos.models.blockeddetector import BlockedDetector
-from cosmos.models.marginaltracker import MarginalTracker 
-from cosmos.models.supervised import Supervised
-from cosmos.models.marginalsemisupervised import MarginalSemiSupervised
-from cosmos.models.semisupervised import SemiSupervised
 
 #log = logging.getLogger()
 
 models = dict()
-models["features"] = Features
-models["detector"] = Detector
 models["tracker"] = Tracker
-models["marginal-detector"] = MarginalDetector 
-models["blocked-detector"] = BlockedDetector 
-models["marginal-tracker"] = MarginalTracker 
-models["supervised"] = Supervised
-models["marginal-semisupervised"] = MarginalSemiSupervised
-models["semisupervised"] = SemiSupervised
 
 # setup and training
 def main(args):

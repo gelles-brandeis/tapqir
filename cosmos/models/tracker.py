@@ -28,13 +28,15 @@ class Tracker(Model):
         control_m_pi = m_param(torch.tensor([1., 0.]), param("lamda"), self.K) # 2**K
         theta_pi = theta_param(param("pi"), param("lamda"), self.K) # 2**K,K+1
 
-        self.spot_model(self.data, data_m_pi, theta_pi, prefix="d")
+        width = pyro.sample("width", Location(1.3, 15., 0.5, 1.5))
+        self.spot_model(self.data, data_m_pi, theta_pi, prefix="d", width=width)
     
         if self.control:
-            self.spot_model(self.control, control_m_pi, None, prefix="c")
+            self.spot_model(self.control, control_m_pi, None, prefix="c", width=width)
 
     @config_enumerate
     def guide(self):
+        pyro.sample("width", Location(param("width_mode"), param("width_size"), 0.5, 1.5))
         self.spot_guide(self.data, theta=True, prefix="d")
 
         if self.control:
@@ -46,13 +48,12 @@ class Tracker(Model):
         param("background_beta", torch.tensor([1.]), constraint=constraints.positive)
         param("height_loc", torch.tensor([1000.]), constraint=constraints.positive)
         param("height_beta", torch.tensor([1.]), constraint=constraints.positive)
-        #param("width_mode", torch.tensor([1.3, 1.3]), constraint=constraints.interval(0.5,2.5))
-        #param("width_size", torch.tensor([3., 15.]), constraint=constraints.positive)
+        param("width_mode", torch.tensor([1.3]), constraint=constraints.interval(0.5,2.))
+        param("width_size", torch.tensor([15.]), constraint=constraints.positive)
         param("pi", torch.ones(2), constraint=constraints.simplex)
         param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
         param("h_beta", torch.ones(1), constraint=constraints.positive)
         param("b_beta", torch.ones(1)*30, constraint=constraints.positive)
-        #param("lamda_beta", torch.tensor([10.]), constraint=constraints.positive)
 
         if self.control:
             offset_max = torch.where(self.data._store.min() < self.control._store.min(), self.data._store.min() - 0.1, self.control._store.min() - 0.1) 
