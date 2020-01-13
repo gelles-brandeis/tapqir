@@ -23,7 +23,7 @@ from torch.distributions.transforms import AffineTransform
 
 def write_summary(epoch_count, epoch_loss, model, svi, writer, feature=False, mcc=False):
     
-    writer.add_scalar("ELBO", -epoch_loss, epoch_count)
+    writer.add_scalar("-ELBO", epoch_loss, epoch_count)
     if mcc:
         mask = model.data.labels["spotpicker"].values < 2
         k_probs = torch.zeros(model.data.N,model.data.F,2)
@@ -34,21 +34,36 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer, feature=False, mc
         model.data.labels["binary"] = model.data.labels["probs"] > 0.5
         writer.add_scalar("MCC", matthews_corrcoef(model.data.labels["spotpicker"].values[mask], model.data.labels["binary"].values[mask]), epoch_count)
     
-    for p in pyro.get_param_store().get_all_param_names():
+    for p, value in pyro.get_param_store().named_parameters():
         if pyro.param(p).squeeze().dim() == 0:
             writer.add_scalar(p, pyro.param(p).squeeze().item(), epoch_count)
+            #value.register_hook(lambda g, p=p: writer.add_scalar("{}.grad".format(p), g.squeeze().item(), epoch_count))
+            #if pyro.param(p).norm() is not None:
+                #writer.add_scalar("{}.grad".format(p), pyro.param(p).norm().squeeze().item(), epoch_count)
         elif pyro.param(p).squeeze().dim() == 1:
             if len(pyro.param(p).squeeze()) <= model.K:
                 scalars = {str(i): pyro.param(p).squeeze()[i].item() for i in range(pyro.param(p).squeeze().size()[-1])}
-                writer.add_scalars("{}".format(p), scalars, epoch_count)
+                #writer.add_scalars("{}".format(p), scalars, epoch_count)
+                #value.register_hook(lambda g, p=p: writer.add_scalar("{}.grad".format(p), g..item(), epoch_count))
+                #if pyro.param(p).norm() is not None:
+                    #grads = {str(i): pyro.param(p).norm().squeeze()[i].item() for i in range(pyro.param(p).norm().squeeze().size()[-1])}
+                    #writer.add_scalars("{}.grad".format(p), grads, epoch_count)
             else:
                 writer.add_histogram("{}".format(p), pyro.param(p).squeeze().detach(), epoch_count)
+                #value.register_hook(lambda g, p=p: writer.add_histogram("{}.grad".format(p), g.squeeze().detach(), epoch_count))
+                #if pyro.param(p).norm() is not None:
+                    #writer.add_histogram("{}.grad".format(p), pyro.param(p).norm().squeeze().detach(), epoch_count)
         elif p in ["z_probs", "j_probs", "d/m_probs", "c/m_probs"]:
             for i in range(pyro.param(p).squeeze().size()[-1]):
                 writer.add_histogram("{}_{}".format(p,i), pyro.param(p).squeeze()[...,i].detach().reshape(-1), epoch_count)
+                #value.register_hook(lambda g, p=p: writer.add_histogram("{}_{}.grad".format(p,i), g.squeeze()[...,i].detach().reshape(-1), epoch_count))                #if pyro.param(p).norm() is not None:
+                    #writer.add_histogram("{}_{}.grad".format(p,i), pyro.param(p).norm().squeeze()[...,i].detach().reshape(-1), epoch_count)
         elif pyro.param(p).squeeze().dim() >= 2:
             for i in range(pyro.param(p).squeeze().size()[0]):
                 writer.add_histogram("{}_{}".format(p,i), pyro.param(p).squeeze()[i,...].detach().reshape(-1), epoch_count)
+                #value.register_hook(lambda g, p=p: writer.add_histogram("{}_{}.grad".format(p,i), g.squeeze()[i,...].detach().reshape(-1), epoch_count))                #if pyro.param(p).norm() is not None:
+                #if pyro.param(p).norm() is not None:
+                    #writer.add_histogram("{}_{}.grad".format(p,i), pyro.param(p).norm().squeeze()[i,...].detach().reshape(-1), epoch_count)
 
     
 def get_offset(frames, header, path_glimpse):

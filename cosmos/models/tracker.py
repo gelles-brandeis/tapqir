@@ -28,15 +28,13 @@ class Tracker(Model):
         control_m_pi = m_param(torch.tensor([1., 0.]), param("lamda"), self.K) # 2**K
         theta_pi = theta_param(param("pi"), param("lamda"), self.K) # 2**K,K+1
 
-        width = pyro.sample("width", Location(1.3, 15., 0.5, 1.5))
-        self.spot_model(self.data, data_m_pi, theta_pi, prefix="d", width=width)
+        self.spot_model(self.data, data_m_pi, theta_pi, prefix="d")
     
         if self.control:
-            self.spot_model(self.control, control_m_pi, None, prefix="c", width=width)
+            self.spot_model(self.control, control_m_pi, None, prefix="c")
 
     @config_enumerate
     def guide(self):
-        pyro.sample("width", Location(param("width_mode"), param("width_size"), 0.5, 1.5))
         self.spot_guide(self.data, theta=True, prefix="d")
 
         if self.control:
@@ -48,8 +46,8 @@ class Tracker(Model):
         param("background_beta", torch.tensor([1.]), constraint=constraints.positive)
         param("height_loc", torch.tensor([1000.]), constraint=constraints.positive)
         param("height_beta", torch.tensor([1.]), constraint=constraints.positive)
-        param("width_mode", torch.tensor([1.3]), constraint=constraints.interval(0.5,2.))
-        param("width_size", torch.tensor([15.]), constraint=constraints.positive)
+        #param("width_mode", torch.tensor([1.3]), constraint=constraints.interval(0.5,2.))
+        #param("width_size", torch.tensor([15.]), constraint=constraints.positive)
         param("pi", torch.ones(2), constraint=constraints.simplex)
         param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
         param("h_beta", torch.ones(1), constraint=constraints.positive)
