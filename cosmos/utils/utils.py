@@ -149,9 +149,9 @@ def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
         if target:
             plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5, data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5, "b+", markersize=10, mew=3, alpha=0.7)
         if m1:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
         if m2:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mean".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
         if z:
             z_color = to_rgba_array("C2", z_probs[frame+i])[0]
             plt.gca().add_patch(Rectangle((0, 0), data.D*z_probs[frame+i], 0.25, edgecolor=z_color, lw=4, facecolor="none"))

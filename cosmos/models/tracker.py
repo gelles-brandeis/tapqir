@@ -42,7 +42,6 @@ class Tracker(Model):
 
     def parameters(self):
         # Global Parameters
-        param("background_loc", torch.tensor([100.]), constraint=constraints.positive)
         param("background_beta", torch.tensor([1.]), constraint=constraints.positive)
         param("height_loc", torch.tensor([1000.]), constraint=constraints.positive)
         param("height_beta", torch.tensor([1.]), constraint=constraints.positive)
