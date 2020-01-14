@@ -16,7 +16,7 @@ class Tracker(Model):
     """ Track on-target Spot """
     def __init__(self, data, control, K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "tracker"
-        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(max_plate_nesting=5)
+        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(max_plate_nesting=5, ignore_jit_warnings=True)
         if data.name == "Gracecy3":
             self.mcc = False
         else:

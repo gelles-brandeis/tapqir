@@ -26,6 +26,8 @@ class GlimpseDataset(Dataset):
     
     #def __init__(self, name, D, aoi_df, drift_df, header, path, device, labels=None):
     def __init__(self, dataset, device):
+        # create logger
+        self.logger = logging.getLogger(__name__)
         # store metadata
         self.name = dataset 
         self.device = device
@@ -45,7 +47,9 @@ class GlimpseDataset(Dataset):
         if self.name in config:
             for FILE in files:
                 self.path_to[FILE] = config[self.name][FILE]
+            self.logger.debug("Read filenames from dataset.cfg")
         else:
+            self.logger.debug("Input filenames")
             config.add_section(self.name)
             for FILE in files:
                 self.path_to[FILE] = input("{}: ".format(FILE))
@@ -53,15 +57,6 @@ class GlimpseDataset(Dataset):
             with open("datasets.cfg", "w") as configfile:
                 config.write(configfile)
         self.path = self.path_to["dir"]
-        logging.basicConfig(filename="logfile.log",
-                            datefmt="%m/%d/%Y %I:%M:%S %p")
-        self.log = logging.getLogger()
-        formatter = logging.Formatter("%(asctime)s - %(message)s")
-        log_sh = logging.StreamHandler(sys.stdout)
-        log_sh.setLevel(logging.DEBUG)
-        self.log.addHandler(log_sh)
-        self.log.info("Dataset: {}".format(self.name))
-        self.log.info("Device: {}".format(self.device))
 
     def load_data(self):
         try:
@@ -72,8 +67,9 @@ class GlimpseDataset(Dataset):
             #assert (self.N, self.F, self.D, self.D) == self._store.shape
             self.target = pd.read_csv(os.path.join(self.path, "{}_target.csv".format(self.name)), index_col="aoi")
             self.drift = pd.read_csv(os.path.join(self.path, "{}_drift.csv".format(self.name)), index_col="frame")
-            self.labels = pd.read_csv(os.path.join(self.path, "{}_labels.csv".format(self.name)), index_col=["aoi", "frame"])
-            self.log.info("Loaded data from {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
+            if self.path_to["labels"]:
+                self.labels = pd.read_csv(os.path.join(self.path, "{}_labels.csv".format(self.name)), index_col=["aoi", "frame"])
+            self.logger.debug("Loaded data from {}_data.pt, {}_target.csv, and {}_drift.csv files".format(self.name,self.name,self.name))
         except:
             self.read_mat()
             self.read_glimpse()
@@ -87,28 +83,26 @@ class GlimpseDataset(Dataset):
         select subset of frames and aois
         """
         # convert header into dict format
-        #self.log.info("reading header.mat file ... ")
+        self.logger.debug("Reading header.mat file ... ")
         mat_header = loadmat(self.path_to["header"])
         self.header = dict()
         for i, dt in  enumerate(mat_header["vid"].dtype.names):
             self.header[dt] = np.squeeze(mat_header["vid"][0,0][i])
-        #self.log.info("done")
 
         # load driftlist mat file
-        #self.log.info("reading {} file ... ".format(drift_filename))
+        self.logger.debug("Reading {} file ... ".format(self.path_to["driftlist"]))
         drift_mat = loadmat(self.path_to["driftlist"])
         # calculate the cumulative sum of dx and dy
-        #self.log.info("calculating cumulative drift ... ")
+        self.logger.debug("calculating cumulative drift ... ")
         drift_mat["driftlist"][:, 1:3] = np.cumsum(
             drift_mat["driftlist"][:, 1:3], axis=0)
         # convert driftlist into DataFrame
         self.drift_df = pd.DataFrame(drift_mat["driftlist"][:,:3], columns=["frame", "dx", "dy"])
         #drift_df = pd.DataFrame(drift_mat["driftlist"], columns=["frame", "dx", "dy", "timestamp"])
         self.drift_df = self.drift_df.astype({"frame": int}).set_index("frame")
-        #self.log.info("done")
 
         # load aoiinfo mat file
-        #self.log.info("reading {} file ... ".format(aoi_filename))
+        self.logger.debug("Reading {} file ... ".format(self.path_to["aoiinfo"]))
         aoi_mat = loadmat(self.path_to["aoiinfo"])
         # convert aoiinfo into DataFrame
         if self.name in ["Gracecy3", "Gracecy3Supervised"]:
@@ -118,9 +112,7 @@ class GlimpseDataset(Dataset):
         self.aoi_df = self.aoi_df.astype({"aoi": int}).set_index("aoi")
         self.aoi_df["x"] = self.aoi_df["x"] - self.drift_df.at[int(self.aoi_df.at[1, "frame"]), "dx"]
         self.aoi_df["y"] = self.aoi_df["y"] - self.drift_df.at[int(self.aoi_df.at[1, "frame"]), "dy"]
-        self.log.info("Adjusted target position from frame {} to frame 1 ... ".format(self.aoi_df.at[1, "frame"]))
-        #self.log.info("done")
-
+        self.logger.debug("Adjusted target position from frame {} to frame 1 ... ".format(self.aoi_df.at[1, "frame"]))
 
         if self.name in ["LarryCy3sigma54Short", "LarryCy3sigma54NegativeControlShort"]:
             f1 = 170
@@ -155,10 +147,10 @@ class GlimpseDataset(Dataset):
 
         self.labels = None
         if self.path_to["labels"]:
+            self.logger.debug("Reading {} file ... ".format(self.path_to["labels"]))
             if self.name in ["FL_1_1117_0OD", "FL_1118_2225_0p3OD", "FL_2226_3338_0p6OD", "FL_3339_4444_0p8OD", "FL_4445_5554_1p1OD", "FL_5555_6684_1p3OD",
                 "FL_1_1117_0OD_atten", "FL_1118_2225_0p3OD_atten", "FL_2226_3338_0p6OD_atten", "FL_3339_4444_0p8OD_atten", "FL_4445_5554_1p1OD_atten", "FL_5555_6684_1p3OD_atten"]:
                 framelist = loadmat(self.path_to["labels"])
-                #framelist = loadmat("/home/ordabayev/Documents/Datasets/Bayesian_test_files/B33p44a_FrameList_files.dat")
                 f1 = framelist[self.name][0,2]
                 f2 = framelist[self.name][-1,2]
                 self.drift_df = self.drift_df.loc[f1:f2]
@@ -171,7 +163,6 @@ class GlimpseDataset(Dataset):
                 self.labels.loc[self.labels["spotpicker"] == 0, "spotpicker"] = 3
                 self.labels.loc[self.labels["spotpicker"] == 2, "spotpicker"] = 0
             else:
-                #print("reading {} file ... ".format(labels_filename), end="")
                 labels_mat = loadmat(self.path_to["labels"])
                 index = pd.MultiIndex.from_product([self.aoi_df.index.values, self.drift_df.index.values], names=["aoi", "frame"])
                 self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
@@ -184,13 +175,11 @@ class GlimpseDataset(Dataset):
                         self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 0
                     elif sp[0] in [-3., 1., 3.]:
                         self.labels.loc[(aoi,start):(aoi,end), "spotpicker"] = 1
-                #print("done")
 
             #print("\nsaving drift_df.csv, {}_aoi_df.csv, {}_labels.csv files ..., ".format(dataset,dataset), end="")
             #drift_df.to_csv(os.path.join(self.path_to["dir"], "drift_df.csv"))
             #aoi_df.to_csv(os.path.join(self.path_to["dir"], "{}_aoi_df.csv".format(self.name)))
             self.labels.to_csv(os.path.join(self.path_to["dir"], "{}_labels.csv".format(self.name)))
-            #print("done")
 
     def read_glimpse(self, D=14):
         """
@@ -259,7 +248,7 @@ class GlimpseDataset(Dataset):
         #self.height = data_sorted[...,-self.D*4:-self.D*2].mean(dim=2) - self.background
         self.background -= self._store.min()
         #self.background -= 90
-        self.log.info("Loaded data from glimpse files")
+        self.logger.debug("Loaded data from glimpse files")
     
     def __len__(self):
         return len(self.target)

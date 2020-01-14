@@ -15,6 +15,7 @@ from tqdm import tqdm
 import math
 from cosmos.models.helper import Location, m_param, theta_param
 import pandas as pd
+import logging
 
 class Model:
     """ Gaussian Spot Model """
@@ -22,6 +23,7 @@ class Model:
         # D - number of pixel along axis
         # K - number of states
         # data - number of frames, y axis, x axis
+        self.logger = logging.getLogger(__name__)
         self.data = data
         self.control = control 
         self.K = K
@@ -55,6 +57,14 @@ class Model:
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+        self.logger.debug("N - {}".format(self.data.N))
+        self.logger.debug("F - {}".format(self.data.F))
+        self.logger.debug("D - {}".format(self.D))
+        self.logger.debug("K - {}".format(self.K))
+        self.logger.debug("Optimizer - {}".format(self.optim_fn.__name__))
+        self.logger.debug("Learning rate - {}".format(self.lr))
+        self.logger.debug("Batch size - {}".format(self.n_batch))
+        self.logger.debug("{}".format("jit" if jit else "nojit"))
 
         self.m_matrix = torch.tensor([[0, 0], [1,0], [0,1], [1,1]])
         self.theta_matrix = torch.tensor([[0,0], [1,0], [0,1]]) # K+1,K
@@ -209,22 +219,20 @@ class Model:
             epoch_loss = self.svi.step()
             if not (self.epoch_count % 1000):    
                 write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer, feature=False, mcc=self.mcc)
-                self.save_checkpoint(verbose=False)
+                self.save_checkpoint()
             self.epoch_count += 1
-        #self.save_checkpoint()
 
-    def save_checkpoint(self, verbose=True):
+    def save_checkpoint(self):
         self.optim.save(os.path.join(self.path, "optimizer"))
         pyro.get_param_store().save(os.path.join(self.path, "params"))
         np.savetxt(os.path.join(self.path, "epoch_count"), np.array([self.epoch_count]))
-        if verbose:
-            print("done saving model and optimizer checkpoints in {}...".format(self.path))
+        self.logger.debug("Step #{}. Saved model params and optimizer state in {}".format(self.epoch_count, self.path))
 
     def load_checkpoint(self):
         try:
             self.epoch_count = int(np.loadtxt(os.path.join(self.path, "epoch_count")))
             self.optim.load(os.path.join(self.path, "optimizer"))
             pyro.get_param_store().load(os.path.join(self.path, "params"))
-            print("done loading model and optimizer states from {}".format(self.path))
+            self.logger.info("Step #{}. Loaded model params and optimizer state from {}".format(self.epoch_count, self.path))
         except:
             pass
