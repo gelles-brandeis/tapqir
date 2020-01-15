@@ -45,17 +45,17 @@ class Tracker(Model):
         param("background_beta", torch.tensor([1.]), constraint=constraints.positive)
         param("height_loc", torch.tensor([1000.]), constraint=constraints.positive)
         param("height_beta", torch.tensor([1.]), constraint=constraints.positive)
-        #param("width_mode", torch.tensor([1.3]), constraint=constraints.interval(0.5,2.))
-        #param("width_size", torch.tensor([15.]), constraint=constraints.positive)
+        param("width_mode", torch.tensor([1.3, 1.3]), constraint=constraints.interval(0.5,3.))
+        param("width_size", torch.tensor([3., 15.]), constraint=constraints.positive)
         param("pi", torch.ones(2), constraint=constraints.simplex)
         param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
         param("h_beta", torch.ones(1), constraint=constraints.positive)
         param("b_beta", torch.ones(1)*30, constraint=constraints.positive)
 
         if self.control:
-            offset_max = torch.where(self.data._store.min() < self.control._store.min(), self.data._store.min() - 0.1, self.control._store.min() - 0.1) 
+            offset_max = torch.where(self.data[:].min() < self.control[:].min(), self.data[:].min() - 0.1, self.control[:].min() - 0.1) 
         else:
-            offset_max = self.data._store.min() - 0.1 
+            offset_max = self.data[:].min() - 0.1 
         param("offset", offset_max-50, constraint=constraints.interval(0.,offset_max))
         param("gain", torch.tensor(5.), constraint=constraints.positive)
 

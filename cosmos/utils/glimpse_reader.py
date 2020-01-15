@@ -64,6 +64,7 @@ class GlimpseDataset(Dataset):
             self.N, self.F, self.D, _ = self._store.shape
             self.vmin = np.percentile(self._store.cpu().numpy(), 5)
             self.vmax = np.percentile(self._store.cpu().numpy(), 99)
+            #self._store = self._store.cpu()
             #assert (self.N, self.F, self.D, self.D) == self._store.shape
             self.target = pd.read_csv(os.path.join(self.path, "{}_target.csv".format(self.name)), index_col="aoi")
             self.drift = pd.read_csv(os.path.join(self.path, "{}_drift.csv".format(self.name)), index_col="frame")
@@ -257,7 +258,7 @@ class GlimpseDataset(Dataset):
         #idx = self.target.index.get_loc(aoi)
         #return AoIDataset(aoi, self._store[idx], self.drift, self.D, self.intensity.loc[:, aoi], self.vmin, self.vmax), aoi
         #return self._store[idx]
-        return self._store[idx]
+        return self._store[idx].to(self.device)
     
     def __repr__(self):
         return self.path

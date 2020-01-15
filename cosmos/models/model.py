@@ -73,7 +73,8 @@ class Model:
         self.size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
 
         self.path = os.path.join(self.data.path,"runs", "{}".format(self.data.name), "{}".format(self.__name__), "K{}".format(self.K), "{}".format("jit" if jit else "nojit"), "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__), "{}".format(self.n_batch))
-        self.writer = SummaryWriter(log_dir=self.path)
+        self.writer_scalar = SummaryWriter(log_dir=os.path.join(self.path, "scalar"))
+        self.writer_hist = SummaryWriter(log_dir=os.path.join(self.path, "hist"))
 
     def model(self):
         raise NotImplementedError
@@ -100,12 +101,13 @@ class Model:
                         with pyro.poutine.mask(mask=m.bool()):
                             height = pyro.sample("height", dist.Gamma(param("height_loc") * param("height_beta"), param("height_beta"))) # K,N,F,1,1
                             height = height.masked_fill(~m.bool(), 0.)
-                            w_mode = 1.3 / 2.5 - 0.2
-                            w_size = self.width_size[theta]
+                            #w_mode = 1.3 / 2.5 - 0.2
+                            #w_size = self.width_size[theta]
+                            w_mode = param("width_mode")[theta] / 2.5 - 0.2
+                            w_size = param("width_size")[theta]
                             w_c1 = w_mode * w_size
                             w_c0 = (1 - w_mode) * w_size
                             width = (pyro.sample("width", dist.Beta(w_c1, w_c0)) + 0.2) * 2.5
-                            #width = pyro.sample("width", Location(param("width_mode")[theta], param("width_size")[theta], 0.5, 2.5))
                             x_mode = 0. / (self.D+3) + 0.5
                             y_mode = 0. / (self.D+3) + 0.5
                             size = self.size[theta]
@@ -193,9 +195,9 @@ class Model:
         param("{}/h_loc".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1000., constraint=constraints.positive)
         param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.5,3.))
         param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
-        param("{}/x_mode".format(prefix), torch.zeros(self.data.N,self.data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        param("{}/y_mode".format(prefix), torch.zeros(self.data.N,self.data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        size = torch.ones(self.data.N,self.data.F,1,1,self.K)*5.
+        param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+        param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+        size = torch.ones(data.N,data.F,1,1,self.K)*5.
         size[...,1] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
         param("{}/size".format(prefix), size, constraint=constraints.greater_than(2.))
 
@@ -213,12 +215,12 @@ class Model:
             spot.append(height[...,k] * gaussian_spot) # N,F,D,D
         return torch.stack(spot, dim=-1).sum(dim=-1, keepdim=True)
 
-    def train(self, num_epochs):
-        for epoch in tqdm(range(num_epochs)):
+    def train(self, num_steps):
+        for epoch in tqdm(range(num_steps)):
             #with torch.autograd.detect_anomaly():
             epoch_loss = self.svi.step()
-            if not (self.epoch_count % 1000):    
-                write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer, feature=False, mcc=self.mcc)
+            if (self.epoch_count > 0) and not (self.epoch_count % 1000):    
+                write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer_scalar, self.writer_hist, feature=False, mcc=self.mcc)
                 self.save_checkpoint()
             self.epoch_count += 1
 

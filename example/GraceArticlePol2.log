@@ -1,0 +1,83 @@
+01/14/2020 06:56:26 PM - cosmos - INFO - Created logfile: GraceArticlePol2.log
+01/14/2020 06:56:26 PM - cosmos - INFO - Using device: cuda1
+01/14/2020 06:56:26 PM - cosmos - INFO - Loading dataset: GraceArticlePol2
+01/14/2020 06:56:26 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 06:56:31 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2_data.pt, GraceArticlePol2_target.csv, and GraceArticlePol2_drift.csv files
+01/14/2020 06:56:31 PM - cosmos - INFO - Loading dataset: GraceArticlePol2NegativeControl
+01/14/2020 06:56:31 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 06:56:33 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2NegativeControl_data.pt, GraceArticlePol2NegativeControl_target.csv, and GraceArticlePol2NegativeControl_drift.csv files
+01/14/2020 06:56:33 PM - cosmos - INFO - Model: tracker
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - N - 331
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - F - 862
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - Batch size - 64
+01/14/2020 06:56:33 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 06:57:00 PM - cosmos - INFO - Created logfile: GraceArticlePol2.log
+01/14/2020 06:57:00 PM - cosmos - INFO - Using device: cuda1
+01/14/2020 06:57:00 PM - cosmos - INFO - Loading dataset: GraceArticlePol2
+01/14/2020 06:57:00 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 06:57:05 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2_data.pt, GraceArticlePol2_target.csv, and GraceArticlePol2_drift.csv files
+01/14/2020 06:57:05 PM - cosmos - INFO - Loading dataset: GraceArticlePol2NegativeControl
+01/14/2020 06:57:05 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 06:57:07 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2NegativeControl_data.pt, GraceArticlePol2NegativeControl_target.csv, and GraceArticlePol2NegativeControl_drift.csv files
+01/14/2020 06:57:07 PM - cosmos - INFO - Model: tracker
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - N - 331
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - F - 862
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - Batch size - 32
+01/14/2020 06:57:07 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 07:10:56 PM - cosmos.models.model - DEBUG - Step #1000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 07:24:27 PM - cosmos.models.model - DEBUG - Step #2000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 07:37:55 PM - cosmos.models.model - DEBUG - Step #3000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 07:51:23 PM - cosmos.models.model - DEBUG - Step #4000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 08:04:53 PM - cosmos.models.model - DEBUG - Step #5000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 08:18:21 PM - cosmos.models.model - DEBUG - Step #6000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 08:31:51 PM - cosmos.models.model - DEBUG - Step #7000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 08:45:20 PM - cosmos.models.model - DEBUG - Step #8000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 08:58:51 PM - cosmos.models.model - DEBUG - Step #9000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 09:12:22 PM - cosmos.models.model - DEBUG - Step #10000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 09:25:53 PM - cosmos.models.model - DEBUG - Step #11000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 09:39:24 PM - cosmos.models.model - DEBUG - Step #12000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 09:40:32 PM - cosmos - INFO - Created logfile: GraceArticlePol2.log
+01/14/2020 09:40:32 PM - cosmos - INFO - Using device: cuda1
+01/14/2020 09:40:32 PM - cosmos - INFO - Loading dataset: GraceArticlePol2
+01/14/2020 09:40:32 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:40:38 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2_data.pt, GraceArticlePol2_target.csv, and GraceArticlePol2_drift.csv files
+01/14/2020 09:40:38 PM - cosmos - INFO - Loading dataset: GraceArticlePol2NegativeControl
+01/14/2020 09:40:38 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:40:39 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2NegativeControl_data.pt, GraceArticlePol2NegativeControl_target.csv, and GraceArticlePol2NegativeControl_drift.csv files
+01/14/2020 09:40:39 PM - cosmos - INFO - Model: tracker
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - N - 331
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - F - 862
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - Batch size - 32
+01/14/2020 09:40:39 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 09:40:39 PM - cosmos.models.model - INFO - Step #12000. Loaded model params and optimizer state from /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 09:43:09 PM - cosmos - INFO - Created logfile: GraceArticlePol2.log
+01/14/2020 09:43:09 PM - cosmos - INFO - Using device: cuda1
+01/14/2020 09:43:09 PM - cosmos - INFO - Loading dataset: GraceArticlePol2
+01/14/2020 09:43:09 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:43:14 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2_data.pt, GraceArticlePol2_target.csv, and GraceArticlePol2_drift.csv files
+01/14/2020 09:43:14 PM - cosmos - INFO - Loading dataset: GraceArticlePol2NegativeControl
+01/14/2020 09:43:14 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:43:16 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from GraceArticlePol2NegativeControl_data.pt, GraceArticlePol2NegativeControl_target.csv, and GraceArticlePol2NegativeControl_drift.csv files
+01/14/2020 09:43:16 PM - cosmos - INFO - Model: tracker
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - N - 331
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - F - 862
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - Batch size - 32
+01/14/2020 09:43:16 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 09:43:16 PM - cosmos.models.model - INFO - Step #12000. Loaded model params and optimizer state from /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32
+01/14/2020 09:43:46 PM - cosmos.models.model - DEBUG - Step #12000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267/runs/GraceArticlePol2/tracker/K2/jit/lr0.005/Adam/32

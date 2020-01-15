@@ -1,0 +1,61 @@
+01/14/2020 06:58:54 PM - cosmos - INFO - Created logfile: LarryCy3sigma54.log
+01/14/2020 06:58:54 PM - cosmos - INFO - Using device: cuda0
+01/14/2020 06:58:54 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54
+01/14/2020 06:58:54 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 06:59:00 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54_data.pt, LarryCy3sigma54_target.csv, and LarryCy3sigma54_drift.csv files
+01/14/2020 06:59:00 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54NegativeControl
+01/14/2020 06:59:00 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 06:59:03 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54NegativeControl_data.pt, LarryCy3sigma54NegativeControl_target.csv, and LarryCy3sigma54NegativeControl_drift.csv files
+01/14/2020 06:59:03 PM - cosmos - INFO - Model: tracker
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - N - 102
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - F - 4669
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - Batch size - 10
+01/14/2020 06:59:03 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 07:21:13 PM - cosmos.models.model - DEBUG - Step #1000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 07:43:07 PM - cosmos.models.model - DEBUG - Step #2000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 08:05:01 PM - cosmos.models.model - DEBUG - Step #3000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 08:26:55 PM - cosmos.models.model - DEBUG - Step #4000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 08:48:48 PM - cosmos.models.model - DEBUG - Step #5000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 09:10:44 PM - cosmos.models.model - DEBUG - Step #6000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 09:32:40 PM - cosmos.models.model - DEBUG - Step #7000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 09:41:14 PM - cosmos - INFO - Created logfile: LarryCy3sigma54.log
+01/14/2020 09:41:14 PM - cosmos - INFO - Using device: cuda0
+01/14/2020 09:41:14 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54
+01/14/2020 09:41:14 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:41:20 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54_data.pt, LarryCy3sigma54_target.csv, and LarryCy3sigma54_drift.csv files
+01/14/2020 09:41:20 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54NegativeControl
+01/14/2020 09:41:20 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:41:23 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54NegativeControl_data.pt, LarryCy3sigma54NegativeControl_target.csv, and LarryCy3sigma54NegativeControl_drift.csv files
+01/14/2020 09:41:23 PM - cosmos - INFO - Model: tracker
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - N - 102
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - F - 4669
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - Batch size - 10
+01/14/2020 09:41:23 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 09:41:23 PM - cosmos.models.model - INFO - Step #7000. Loaded model params and optimizer state from /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 09:42:18 PM - cosmos - INFO - Created logfile: LarryCy3sigma54.log
+01/14/2020 09:42:18 PM - cosmos - INFO - Using device: cuda0
+01/14/2020 09:42:18 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54
+01/14/2020 09:42:18 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:42:24 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54_data.pt, LarryCy3sigma54_target.csv, and LarryCy3sigma54_drift.csv files
+01/14/2020 09:42:24 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54NegativeControl
+01/14/2020 09:42:24 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 09:42:27 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54NegativeControl_data.pt, LarryCy3sigma54NegativeControl_target.csv, and LarryCy3sigma54NegativeControl_drift.csv files
+01/14/2020 09:42:27 PM - cosmos - INFO - Model: tracker
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - N - 102
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - F - 4669
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - Batch size - 10
+01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 09:42:27 PM - cosmos.models.model - INFO - Step #7000. Loaded model params and optimizer state from /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 09:42:49 PM - cosmos.models.model - DEBUG - Step #7000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
