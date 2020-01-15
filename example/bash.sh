@@ -80,6 +80,6 @@
 #python main.py --num-steps=30000 --model=tracker --n-batch=16 --learning-rate=0.0051 --dataset=LarryCy3sigma54Short --device=cuda0
 #python main.py --num-steps=15000 --model=tracker --n-batch=10 --learning-rate=0.005 --dataset=LarryCy3sigma54 --device=cuda0
 #python main.py --num-steps=20000 --model=tracker --n-batch=16 --learning-rate=0.005 --dataset=GraceArticlePol2NegativeControl --device=cuda1
-python main.py --num-steps=5000 --model=tracker --n-batch=32 --learning-rate=0.005 --dataset=GraceArticlePol2 --negative-control=GraceArticlePol2NegativeControl --device=cuda1 --jit
+python main.py --num-steps=25000 --model=tracker --n-batch=32 --learning-rate=0.004 --dataset=GraceArticlePol2 --negative-control=GraceArticlePol2NegativeControl --device=cuda0 --jit
 #python main.py --num-steps=10000 --model=tracker --n-batch=10 --learning-rate=0.005 --dataset=LarryCy3sigma54 --negative-control=LarryCy3sigma54NegativeControl --device=cuda0 --jit
 #python main.py --num-steps=5000 --model=tracker --n-batch=32 --learning-rate=0.003 --dataset=FL_1118_2225_0p3OD --device=cuda0

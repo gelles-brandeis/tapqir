@@ -40,6 +40,7 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer_scalar, writer_his
         elif pyro.param(p).squeeze().dim() == 1:
             if len(pyro.param(p).squeeze()) <= model.K:
                 scalars = {str(i): pyro.param(p).squeeze()[i].item() for i in range(pyro.param(p).squeeze().size()[-1])}
+                writer_scalar.add_scalars("{}".format(p), scalars, epoch_count)
             else:
                 writer_hist.add_histogram("{}".format(p), pyro.param(p).squeeze().detach(), epoch_count)
         elif p in ["z_probs", "j_probs", "d/m_probs", "c/m_probs"]:

@@ -59,3 +59,31 @@
 01/14/2020 09:42:27 PM - cosmos.models.model - DEBUG - jit
 01/14/2020 09:42:27 PM - cosmos.models.model - INFO - Step #7000. Loaded model params and optimizer state from /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
 01/14/2020 09:42:49 PM - cosmos.models.model - DEBUG - Step #7000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 10:26:40 PM - cosmos - INFO - Created logfile: LarryCy3sigma54.log
+01/14/2020 10:26:40 PM - cosmos - INFO - Using device: cuda0
+01/14/2020 10:26:40 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54
+01/14/2020 10:26:40 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 10:26:46 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54_data.pt, LarryCy3sigma54_target.csv, and LarryCy3sigma54_drift.csv files
+01/14/2020 10:26:46 PM - cosmos - INFO - Loading dataset: LarryCy3sigma54NegativeControl
+01/14/2020 10:26:46 PM - cosmos.utils.glimpse_reader - DEBUG - Read filenames from dataset.cfg
+01/14/2020 10:26:49 PM - cosmos.utils.glimpse_reader - DEBUG - Loaded data from LarryCy3sigma54NegativeControl_data.pt, LarryCy3sigma54NegativeControl_target.csv, and LarryCy3sigma54NegativeControl_drift.csv files
+01/14/2020 10:26:49 PM - cosmos - INFO - Model: tracker
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - N - 102
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - F - 4669
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - D - 14
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - K - 2
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - Optimizer - Adam
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - Learning rate - 0.005
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - Batch size - 10
+01/14/2020 10:26:49 PM - cosmos.models.model - DEBUG - jit
+01/14/2020 10:26:49 PM - cosmos.models.model - INFO - Step #9000. Loaded model params and optimizer state from /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 10:27:12 PM - cosmos.models.model - DEBUG - Step #9000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 10:48:58 PM - cosmos.models.model - DEBUG - Step #10000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 11:10:45 PM - cosmos.models.model - DEBUG - Step #11000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 11:32:32 PM - cosmos.models.model - DEBUG - Step #12000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/14/2020 11:54:18 PM - cosmos.models.model - DEBUG - Step #13000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/15/2020 12:16:04 AM - cosmos.models.model - DEBUG - Step #14000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/15/2020 12:37:51 AM - cosmos.models.model - DEBUG - Step #15000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/15/2020 12:59:37 AM - cosmos.models.model - DEBUG - Step #16000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/15/2020 01:21:23 AM - cosmos.models.model - DEBUG - Step #17000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10
+01/15/2020 01:43:09 AM - cosmos.models.model - DEBUG - Step #18000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.005/Adam/10

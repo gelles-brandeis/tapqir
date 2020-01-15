@@ -57,10 +57,13 @@ class Model:
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-        self.logger.debug("N - {}".format(self.data.N))
-        self.logger.debug("F - {}".format(self.data.F))
         self.logger.debug("D - {}".format(self.D))
         self.logger.debug("K - {}".format(self.K))
+        self.logger.debug("data.N - {}".format(self.data.N))
+        self.logger.debug("data.F - {}".format(self.data.F))
+        if self.control:
+            self.logger.debug("control.N - {}".format(self.control.N))
+            self.logger.debug("control.F - {}".format(self.control.F))
         self.logger.debug("Optimizer - {}".format(self.optim_fn.__name__))
         self.logger.debug("Learning rate - {}".format(self.lr))
         self.logger.debug("Batch size - {}".format(self.n_batch))
@@ -68,9 +71,9 @@ class Model:
 
         self.m_matrix = torch.tensor([[0, 0], [1,0], [0,1], [1,1]])
         self.theta_matrix = torch.tensor([[0,0], [1,0], [0,1]]) # K+1,K
-        self.scale = torch.tensor([10., 0.5])
-        self.width_size = torch.tensor([3., 15.])
-        self.size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
+        #self.scale = torch.tensor([10., 0.5])
+        #self.width_size = torch.tensor([3., 15.])
+        #self.size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
 
         self.path = os.path.join(self.data.path,"runs", "{}".format(self.data.name), "{}".format(self.__name__), "K{}".format(self.K), "{}".format("jit" if jit else "nojit"), "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__), "{}".format(self.n_batch))
         self.writer_scalar = SummaryWriter(log_dir=os.path.join(self.path, "scalar"))
@@ -86,6 +89,7 @@ class Model:
         raise NotImplementedError
 
     def spot_model(self, data, m_pi, theta_pi, prefix):
+        self.size = torch.cat((torch.tensor([2.]), param("proximity")), 0)
         with scope(prefix=prefix):
             with pyro.plate("N_plate", data.N, dim=-5) as batch_idx:
                 with pyro.plate("F_plate", data.F, dim=-4):
