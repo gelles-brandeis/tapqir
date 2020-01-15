@@ -8,7 +8,7 @@ Bayesian analysis of the co-localization single-molecule microscopy image data.
 
 ### Installing a stable cosmos release
 
-** Install from source:**
+**Install from source:**
 ```sh
 git clone https://github.com/ordabayevy/cosmos.git
 cd cosmos
@@ -17,7 +17,7 @@ pip install .
 
 ### Installing a cosmos dev branch
 
-** Install from source:**
+**Install from source:**
 ```sh
 git clone https://github.com/ordabayevy/cosmos.git
 cd cosmos
