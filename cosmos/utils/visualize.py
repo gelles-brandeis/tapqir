@@ -61,7 +61,7 @@ def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
         k_probs = np.zeros((len(data.drift),2))
         k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
         k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
-    if z: z_probs = k_probs[:,0] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,2]
+    if z: z_probs = (pyro.param("d/m_probs").squeeze()[aoi] * pyro.param("d/theta_probs").squeeze()[aoi,...,1:].sum(dim=-1)).sum(dim=-1).detach()
 
     plt.figure(figsize=(25,5))
     if m:
@@ -138,7 +138,7 @@ def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
         k_probs = np.zeros((len(data.drift),2))
         k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
         k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
-    if z: z_probs = k_probs[:,0] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,1] + k_probs[:,1] * param("{}/theta_probs".format(prefix)).squeeze().detach().numpy()[aoi,:,2]
+    if z: z_probs = (pyro.param("d/m_probs").squeeze()[aoi] * pyro.param("d/theta_probs").squeeze()[aoi,...,1:].sum(dim=-1)).sum(dim=-1).detach()
 
     fig = plt.figure(figsize=(15,3), dpi=600)
     for i in range(20):

@@ -16,6 +16,7 @@ import math
 from cosmos.models.helper import Location, m_param, theta_param
 import pandas as pd
 import logging
+from pyro.ops.indexing import Vindex
 
 class Model:
     """ Gaussian Spot Model """
@@ -134,9 +135,9 @@ class Model:
                 with pyro.plate("F_plate", data.F, dim=-4):
                     pyro.sample("background", dist.Gamma(param("{}/b_loc".format(prefix))[batch_idx] * param("b_beta"), param("b_beta")))
                     m = pyro.sample("m", dist.Categorical(param("{}/m_probs".format(prefix))[batch_idx]))
-                    m = self.m_matrix[m.squeeze(dim=-1)] # N,F,1,1,K
                     if theta:
-                        pyro.sample("theta", dist.Categorical(param("{}/theta_probs".format(prefix))[batch_idx])) # N,F,1,1
+                        pyro.sample("theta", dist.Categorical(Vindex(param("{}/theta_probs".format(prefix))[batch_idx])[...,m,:])) # N,F,1,1
+                    m = self.m_matrix[m.squeeze(dim=-1)] # N,F,1,1,K
                     with pyro.plate("K_plate", self.K, dim=-1):
                         with pyro.poutine.mask(mask=m.bool()):
                             pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")))
@@ -194,7 +195,11 @@ class Model:
         param("{}/background_loc".format(prefix), torch.ones(data.N,1,1,1,1)*100., constraint=constraints.positive)
         param("{}/m_probs".format(prefix), torch.ones(data.N,data.F,1,1,1,4), constraint=constraints.simplex)
         if theta:
-            param("{}/theta_probs".format(prefix), torch.ones(data.N,data.F,1,1,1,self.K+1), constraint=constraints.simplex)
+            theta_probs = torch.ones(data.N,data.F,1,1,1,4,self.K+1)
+            theta_probs[...,0,1:] = 0
+            theta_probs[...,1,2] = 0
+            theta_probs[...,2,1] = 0
+            param("{}/theta_probs".format(prefix), theta_probs, constraint=constraints.simplex)
         param("{}/b_loc".format(prefix), torch.ones(data.N,data.F,1,1,1)*30., constraint=constraints.positive)
         param("{}/h_loc".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1000., constraint=constraints.positive)
         param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.5,3.))
@@ -223,16 +228,19 @@ class Model:
         for epoch in tqdm(range(num_steps)):
             #with torch.autograd.detect_anomaly():
             epoch_loss = self.svi.step()
-            if (self.epoch_count > 0) and not (self.epoch_count % 1000):    
+            if (self.epoch_count > 0) and not (self.epoch_count % 100):    
                 write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer_scalar, self.writer_hist, feature=False, mcc=self.mcc)
                 self.save_checkpoint()
             self.epoch_count += 1
 
     def save_checkpoint(self):
-        self.optim.save(os.path.join(self.path, "optimizer"))
-        pyro.get_param_store().save(os.path.join(self.path, "params"))
-        np.savetxt(os.path.join(self.path, "epoch_count"), np.array([self.epoch_count]))
-        self.logger.debug("Step #{}. Saved model params and optimizer state in {}".format(self.epoch_count, self.path))
+        if not any([torch.isnan(v).any() for v in pyro.get_param_store().values()]):
+            self.optim.save(os.path.join(self.path, "optimizer"))
+            pyro.get_param_store().save(os.path.join(self.path, "params"))
+            np.savetxt(os.path.join(self.path, "epoch_count"), np.array([self.epoch_count]))
+            self.logger.debug("Step #{}. Saved model params and optimizer state in {}".format(self.epoch_count, self.path))
+        else:
+            self.logger.warning("Step #{}. Detected NaN values in parameters")
 
     def load_checkpoint(self):
         try:

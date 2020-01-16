@@ -12,6 +12,7 @@ log
 old/
 bashrun.sh
 cosmos.egg-info/
+example/*.log
 
 singmol_mex.mexmaci64
 

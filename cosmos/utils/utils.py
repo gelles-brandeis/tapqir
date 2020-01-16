@@ -26,10 +26,7 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer_scalar, writer_his
     writer_scalar.add_scalar("-ELBO", epoch_loss, epoch_count)
     if mcc:
         mask = model.data.labels["spotpicker"].values < 2
-        k_probs = torch.zeros(model.data.N,model.data.F,2)
-        k_probs[...,0] = pyro.param("d/m_probs").squeeze()[...,1] + pyro.param("d/m_probs").squeeze()[...,3]
-        k_probs[...,1] = pyro.param("d/m_probs").squeeze()[...,2] + pyro.param("d/m_probs").squeeze()[...,3]
-        z_probs = k_probs[...,0] * pyro.param("d/theta_probs").squeeze()[...,1] + k_probs[...,1] * pyro.param("d/theta_probs").squeeze()[...,2]
+        z_probs = (pyro.param("d/m_probs").squeeze() * pyro.param("d/theta_probs").squeeze()[...,1:].sum(dim=-1)).sum(dim=-1)
         model.data.labels["probs"] = z_probs.reshape(-1).detach().cpu().numpy()
         model.data.labels["binary"] = model.data.labels["probs"] > 0.5
         writer_scalar.add_scalar("MCC", matthews_corrcoef(model.data.labels["spotpicker"].values[mask], model.data.labels["binary"].values[mask]), epoch_count)
@@ -37,18 +34,11 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer_scalar, writer_his
     for p, value in pyro.get_param_store().named_parameters():
         if pyro.param(p).squeeze().dim() == 0:
             writer_scalar.add_scalar(p, pyro.param(p).squeeze().item(), epoch_count)
-        elif pyro.param(p).squeeze().dim() == 1:
-            if len(pyro.param(p).squeeze()) <= model.K:
-                scalars = {str(i): pyro.param(p).squeeze()[i].item() for i in range(pyro.param(p).squeeze().size()[-1])}
-                writer_scalar.add_scalars("{}".format(p), scalars, epoch_count)
-            else:
-                writer_hist.add_histogram("{}".format(p), pyro.param(p).squeeze().detach(), epoch_count)
-        elif p in ["z_probs", "j_probs", "d/m_probs", "c/m_probs"]:
-            for i in range(pyro.param(p).squeeze().size()[-1]):
-                writer_hist.add_histogram("{}_{}".format(p,i), pyro.param(p).squeeze()[...,i].detach().reshape(-1), epoch_count)
-        elif pyro.param(p).squeeze().dim() >= 2:
-            for i in range(pyro.param(p).squeeze().size()[0]):
-                writer_hist.add_histogram("{}_{}".format(p,i), pyro.param(p).squeeze()[i,...].detach().reshape(-1), epoch_count)
+        elif pyro.param(p).squeeze().dim() == 1 and pyro.param(p).squeeze().shape[0] <= model.K:
+            scalars = {str(i): pyro.param(p).squeeze()[i].item() for i in range(pyro.param(p).squeeze().size()[-1])}
+            writer_scalar.add_scalars("{}".format(p), scalars, epoch_count)
+        elif pyro.param(p).squeeze().dim() >= 1 and not (epoch_count % 2000):
+            writer_hist.add_histogram("{}".format(p), pyro.param(p).squeeze().detach().reshape(-1), epoch_count)
 
     
 def get_offset(frames, header, path_glimpse):

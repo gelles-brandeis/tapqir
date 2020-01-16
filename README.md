@@ -15,7 +15,7 @@ cd cosmos
 pip install .
 ```
 
-### Installing a cosmos dev branch
+### Installing cosmos dev branch
 
 **Install from source:**
 ```sh
