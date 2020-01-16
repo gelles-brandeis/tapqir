@@ -205,3 +205,4 @@
 01/16/2020 11:59:32 AM - cosmos.models.model - DEBUG - Step #7800. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.0045/Adam/8
 01/16/2020 12:01:25 PM - cosmos.models.model - DEBUG - Step #7900. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.0045/Adam/8
 01/16/2020 12:03:20 PM - cosmos.models.model - DEBUG - Step #8000. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.0045/Adam/8
+01/16/2020 12:05:13 PM - cosmos.models.model - DEBUG - Step #8100. Saved model params and optimizer state in /home/ordabayev/Documents/Datasets/Larry-Cy3-sigma54/b24p143a_328/runs/LarryCy3sigma54/tracker/K2/jit/lr0.0045/Adam/8
