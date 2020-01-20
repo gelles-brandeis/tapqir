@@ -46,12 +46,12 @@ class Model:
             self.control.target_locs = torch.tensor((self.control.drift[["dx", "dy"]].values.reshape(1,self.control.F,1,1,1,2) + self.control.target[["x", "y"]].values.reshape(self.control.N,1,1,1,1,2)))
         
         pyro.clear_param_store()
-        self.parameters()
         self.epoch_count = 0
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+        self.svi = SVI(pyro.poutine.block(self.model, hide=["width_mode", "width_size"]), self.guide, self.optim, loss=self.elbo)
+        #self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
         self.logger.debug("D - {}".format(self.D))
         self.logger.debug("K - {}".format(self.K))
         self.logger.debug("data.N - {}".format(self.data.N))
@@ -78,9 +78,6 @@ class Model:
     def guide(self):
         raise NotImplementedError
 
-    def parameters(self):
-        raise NotImplementedError
-
     def spot_model(self, data, m_pi, theta_pi, prefix):
         #self.size = torch.cat((torch.tensor([2.]), param("proximity")), 0)
         with scope(prefix=prefix):
@@ -96,7 +93,7 @@ class Model:
                     m = self.m_matrix[m.squeeze(dim=-1)].bool() # 4,1,1,1,1,K
                     with pyro.plate("K_plate", self.K, dim=-1):
                         with pyro.poutine.mask(mask=m):
-                            height = pyro.sample("height", dist.Gamma(param("height_loc")[theta] * param("height_beta")[theta], param("height_beta")[theta])) # 4,K,N,F,1,1
+                            height = pyro.sample("height", dist.Gamma(param("height_loc") * param("height_beta"), param("height_beta"))) # 4,K,N,F,1,1
                             height = height.masked_fill(~m, 0.)
                             w_mode = (param("width_mode")[theta] - 0.75) / 1.5
                             w_size = param("width_size")[theta]

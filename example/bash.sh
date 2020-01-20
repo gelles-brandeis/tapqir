@@ -90,5 +90,5 @@
 #python main.py --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.004 --dataset=FL_1_1117_0OD --negative-control=FL_1_1117_0OD.NegativeControl --device=cuda1 --jit
 #python main.py --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.0035 --dataset=FL_1118_2225_0p3OD --negative-control=FL_1118_2225_0p3OD.NegativeControl --device=cuda0 --jit
 #python main.py --num-steps=20000 --model=tracker --n-batch=16 --learning-rate=0.004 --dataset=LarryCy3sigma54Short --negative-control=LarryCy3sigma54NegativeControlShort --device=cuda1
-python main.py --num-steps=25000 --model=tracker --n-batch=32 --learning-rate=0.006 --dataset=GraceArticleSpt5 --negative-control=GraceArticleSpt5NegativeControl --device=cuda1 --jit
-#python main.py --num-steps=25000 --model=tracker --n-batch=32 --learning-rate=0.006 --dataset=GraceArticlePol2 --negative-control=GraceArticlePol2NegativeControl --device=cuda0 --jit
+python main.py --num-steps=25000 --model=tracker --n-batch=32 --learning-rate=0.0055 --dataset=GraceArticleSpt5 --negative-control=GraceArticleSpt5NegativeControl --device=cuda1
+#python main.py --num-steps=25000 --model=tracker --n-batch=32 --learning-rate=0.0055 --dataset=GraceArticlePol2 --negative-control=GraceArticlePol2NegativeControl --device=cuda0
