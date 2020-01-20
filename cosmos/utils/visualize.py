@@ -21,7 +21,6 @@ from pyro.ops.stats import hpdi
 from matplotlib.colors import to_rgba_array
 import torch.distributions as dist
 from torch.distributions.transforms import AffineTransform
-from cosmos.models.helper import Location
 
 
 def view_glimpse(frame, aoi, aoi_df, drift_df, header, path_glimpse, selected_aoi, all_aois, label, offset):
@@ -103,19 +102,27 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix):
             mean = param("{}/h_loc".format(prefix))[aoi].squeeze().detach()
             plt.ylim(0, hpd.max()+10)
         elif p == "x":
-            #hpd = hpdi(dist.Normal(param("{}/x_mean".format(prefix))[aoi].squeeze().detach(), param("{}/scale".format(prefix))[aoi].squeeze().detach()).sample((500,)), 0.95, dim=0)
-            #mean = param("{}/x_mean".format(prefix))[aoi].squeeze().detach()
-            hpd = hpdi(Location(param("{}/x_mode".format(prefix))[aoi].squeeze().detach(), param("{}/size".format(prefix))[aoi].squeeze().detach(), -(data.D+3)/2, data.D+3).sample((500,)), 0.95, dim=0)
+            x_mode = param("{}/x_mode".format(prefix))[aoi].squeeze().detach() / (data.D+3) + 0.5
+            size = param("{}/size".format(prefix))[aoi].squeeze().detach()
+            x_c1 = x_mode * size
+            x_c0 = (1 - x_mode) * size
+            hpd = (hpdi(dist.Beta(x_c1, x_c0).sample((500,)), 0.95, dim=0) - 0.5) * (data.D+3)
             mean = param("{}/x_mode".format(prefix))[aoi].squeeze().detach()
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "y":
-            #hpd = hpdi(dist.Normal(param("{}/y_mean".format(prefix))[aoi].squeeze().detach(), param("{}/scale".format(prefix))[aoi].squeeze().detach()).sample((500,)), 0.95, dim=0)
-            #mean = param("{}/y_mean".format(prefix))[aoi].squeeze().detach()
-            hpd = hpdi(Location(param("{}/y_mode".format(prefix))[aoi].squeeze().detach(), param("{}/size".format(prefix))[aoi].squeeze().detach(), -(data.D+3)/2, data.D+3).sample((500,)), 0.95, dim=0)
+            y_mode = param("{}/y_mode".format(prefix))[aoi].squeeze().detach() / (data.D+3) + 0.5
+            size = param("{}/size".format(prefix))[aoi].squeeze().detach()
+            y_c1 = y_mode * size
+            y_c0 = (1 - y_mode) * size
+            hpd = (hpdi(dist.Beta(y_c1, y_c0).sample((500,)), 0.95, dim=0) - 0.5) * (data.D+3)
             mean = param("{}/y_mode".format(prefix))[aoi].squeeze().detach()
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "width":
-            hpd = hpdi(Location(param("{}/w_mode".format(prefix))[aoi].squeeze().detach(), param("{}/w_size".format(prefix))[aoi].squeeze().detach(), 0.5, 2.5).sample((500,)), 0.95, dim=0)
+            w_mode = (param("{}/w_mode".format(prefix))[aoi].squeeze().detach() - 0.75) / 1.5
+            w_size = param("{}/w_size".format(prefix))[aoi].squeeze().detach()
+            w_c1 = w_mode * w_size
+            w_c0 = (1 - w_mode) * w_size
+            hpd = hpdi(dist.Beta(w_c1, w_c0).sample((500,)), 0.95, dim=0) * 1.5 + 0.75
             mean = param("{}/w_mode".format(prefix))[aoi].squeeze().detach()
 
         if p == "background":

@@ -18,6 +18,7 @@ import pandas as pd
 import logging
 from pyro.ops.indexing import Vindex
 from pyro.distributions.util import broadcast_shape
+from itertools import product
 
 class Model:
     """ Gaussian Spot Model """
@@ -64,8 +65,8 @@ class Model:
         self.logger.debug("Batch size - {}".format(self.n_batch))
         self.logger.debug("{}".format("jit" if jit else "nojit"))
 
-        self.m_matrix = torch.tensor([[0, 0], [1,0], [0,1], [1,1]])
-        self.theta_matrix = torch.tensor([[0,0], [1,0], [0,1]]) # K+1,K
+        self.m_matrix = torch.tensor([p for p in product((0,1), repeat=self.K)]) # K**2,K
+        self.theta_matrix = torch.eye(self.K+1)[:,1:] # K+1,K
         self.size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
 
         self.path = os.path.join(self.data.path,"runs", "{}".format(self.data.name), "{}".format(self.__name__), "K{}".format(self.K), "{}".format("jit" if jit else "nojit"), "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__), "{}".format(self.n_batch))

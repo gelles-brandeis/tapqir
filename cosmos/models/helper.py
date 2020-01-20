@@ -13,24 +13,6 @@ from tqdm import tqdm
 import math
 
 
-def Location(mean, size, loc, scale):
-    """
-    Location(mode, size, loc, scale) = loc + scale * Beta((mode - loc) / scale, size)
-    mode(Location) = mode
-    var(Location) = <Location ** 2> - <Location> ** 2
-    <Location> = loc + scale * <Beta>
-    <Location> ** 2 = loc ** 2 + (scale ** 2) * (<Beta> ** 2) + 2 * loc * scale * <Beta>
-    Location ** 2 = loc ** 2 + (scale ** 2) * (Beta ** 2) + 2 * loc * scale * Beta
-    <Location ** 2> = loc ** 2 + (scale ** 2) * <Beta ** 2> + 2 * loc * scale * <Beta>
-    var(Location) = (scale ** 2) * (<Beta ** 2> - <Beta> ** 2)
-    """ 
-    mean = (mean - loc) / scale
-    concentration1 = mean * size
-    concentration0 = (1 - mean) * size
-    base_distribution = dist.Beta(concentration1, concentration0)
-    transforms =  [AffineTransform(loc=loc, scale=scale)]
-    return dist.TransformedDistribution(base_distribution, transforms)
-
 def m_param(pi, lamda, K):
     bernoulli = lambda x: dist.Bernoulli(pi[1]).log_prob(torch.tensor([float(x)])).exp()
     poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
@@ -50,10 +32,11 @@ def theta_param(pi, lamda, K):
     theta_pi = torch.zeros(2**K,K+1)
     theta_pi[0,0] = 1
     theta_pi[1,0] = bernoulli(0) * poisson(1) / (m_param(pi, lamda, K)[1] * 2)
-    theta_pi[1,1] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[1] * 2)
     theta_pi[2,0] = bernoulli(0) * poisson(1) / (m_param(pi, lamda, K)[2] * 2)
-    theta_pi[2,2] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[2] * 2)
     theta_pi[3,0] = bernoulli(0) * poisson(2) / m_param(pi, lamda, K)[3]
+
+    theta_pi[1,1] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[1] * 2)
+    theta_pi[2,2] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[2] * 2)
     theta_pi[3,1] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
     theta_pi[3,2] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
     return theta_pi
