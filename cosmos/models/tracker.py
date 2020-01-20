@@ -42,14 +42,16 @@ class Tracker(Model):
 
     def parameters(self):
         # Global Parameters
-        param("proximity", torch.tensor([(((self.D+3)/(2*0.5))**2 - 1)]), constraint=constraints.greater_than(2.))
+        #param("proximity", torch.tensor([(((self.D+3)/(2*0.5))**2 - 1)]), constraint=constraints.greater_than(30.))
         param("background_beta", torch.tensor([1.]), constraint=constraints.positive)
-        param("height_loc", torch.tensor([1000.]), constraint=constraints.positive)
-        param("height_beta", torch.tensor([1.]), constraint=constraints.positive)
-        param("width_mode", torch.tensor([1.3, 1.3]), constraint=constraints.interval(0.5,3.))
+        param("height_loc", torch.tensor([1000., 1000.]), constraint=constraints.positive)
+        param("height_beta", torch.tensor([1., 1.]), constraint=constraints.positive)
+        param("width_mode", torch.tensor([1.3, 1.3]), constraint=constraints.interval(0.75,2.25))
         param("width_size", torch.tensor([3., 15.]), constraint=constraints.positive)
+        #param("width_mode", torch.tensor([1.3]), constraint=constraints.interval(0.5,3.))
+        #param("width_size", torch.tensor([10.]), constraint=constraints.positive)
         param("pi", torch.ones(2), constraint=constraints.simplex)
-        param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
+        param("lamda", torch.tensor([0.1]), constraint=constraints.interval(0.,2.))
         param("h_beta", torch.ones(1), constraint=constraints.positive)
         param("b_beta", torch.ones(1)*30, constraint=constraints.positive)
 
