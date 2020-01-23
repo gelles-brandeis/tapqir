@@ -1,26 +1,17 @@
 import math
-
 import os
-import pickle
-
-#import qgrid
-import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import pandas as pd
-from ipywidgets import interact
 from matplotlib.patches import Rectangle
 from sklearn.metrics import matthews_corrcoef
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import pyro
 from pyro import param
 from pyro.ops.stats import hpdi
 from matplotlib.colors import to_rgba_array
 import torch.distributions as dist
-from torch.distributions.transforms import AffineTransform
 
 
 def view_glimpse(frame, aoi, aoi_df, drift_df, header, path_glimpse, selected_aoi, all_aois, label, offset):
@@ -58,9 +49,9 @@ def view_glimpse(frame, aoi, aoi_df, drift_df, header, path_glimpse, selected_ao
 def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
     if m or z:
         k_probs = np.zeros((len(data.drift),2))
-        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
-        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
-    if z: z_probs = (pyro.param("d/m_probs").squeeze()[aoi] * pyro.param("d/theta_probs").squeeze()[aoi,...,1:].sum(dim=-1)).sum(dim=-1).detach()
+        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,3]
+        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,3]
+    if z: z_probs = (pyro.param("d/m_probs").squeeze()[aoi] * pyro.param("d/theta_probs").squeeze()[aoi,...,1:].sum(dim=-1)).sum(dim=-1).data
 
     plt.figure(figsize=(25,5))
     if m:
@@ -79,52 +70,57 @@ def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
     plt.tight_layout()
     plt.show()
 
-def view_parameters(aoi, data, f1, f2, m, params, prefix):
+def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
     if m:
-        k_probs = np.zeros((len(data.drift),2))
-        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
-        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
+        k_probs = torch.zeros(len(data.drift),1,1,1,2)
+        k_probs[...,0] = param("{}/m_probs".format(prefix)).data[aoi,...,1] + param("{}/m_probs".format(prefix)).data[aoi,...,3]
+        k_probs[...,1] = param("{}/m_probs".format(prefix)).data[aoi,...,2] + param("{}/m_probs".format(prefix)).data[aoi,...,3]
+        k_probs = k_probs.squeeze().numpy()
         m_colors = np.zeros((2,len(data.drift),4))
         m_colors[0] += to_rgba_array("C0")
         m_colors[0,:,3] = k_probs[:,0]
         m_colors[1] += to_rgba_array("C1")
         m_colors[1,:,3] = k_probs[:,1]
     
+    theta_idx = (pyro.param("{}/theta_probs".format(prefix)).data[aoi] * pyro.param("{}/m_probs".format(prefix)).unsqueeze(dim=-1).data[aoi]).sum(dim=-2).argmax(dim=-1)
+    theta_idx = theta_idx.squeeze()
     fig = plt.figure(figsize=(15, 3 * len(params)))
     for i, p in enumerate(params):
         plt.subplot(5,1,i+1)
         if p == "background":
-            hpd = hpdi(dist.Gamma(param("{}/b_loc".format(prefix))[aoi].squeeze().detach() * param("b_beta").detach(), param("b_beta").detach()).sample((500,)), 0.95, dim=0)
-            mean = param("{}/b_loc".format(prefix))[aoi].squeeze().detach()
+            hpd = hpdi(dist.Gamma(param("{}/b_loc".format(prefix))[aoi].data * param("b_beta").data, param("b_beta").data).sample((500,)), 0.95, dim=0)
+            mean = param("{}/b_loc".format(prefix))[aoi].data
             plt.ylim(0, hpd.max()+1)
         elif p == "intensity":
-            hpd = hpdi(dist.Gamma(param("{}/h_loc".format(prefix))[aoi].squeeze().detach() * param("h_beta").detach(), param("h_beta").detach()).sample((500,)), 0.95, dim=0)
-            mean = param("{}/h_loc".format(prefix))[aoi].squeeze().detach()
+            hpd = hpdi(dist.Gamma(param("{}/h_loc".format(prefix))[aoi].data * param("h_beta").data, param("h_beta").data).sample((500,)), 0.95, dim=0)
+            mean = param("{}/h_loc".format(prefix))[aoi].data
             plt.ylim(0, hpd.max()+10)
         elif p == "x":
-            x_mode = param("{}/x_mode".format(prefix))[aoi].squeeze().detach() / (data.D+3) + 0.5
-            size = param("{}/size".format(prefix))[aoi].squeeze().detach()
+            x_mode = param("{}/x_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:] / (data.D+3) + 0.5
+            size = param("{}/size".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
             x_c1 = x_mode * size
             x_c0 = (1 - x_mode) * size
             hpd = (hpdi(dist.Beta(x_c1, x_c0).sample((500,)), 0.95, dim=0) - 0.5) * (data.D+3)
-            mean = param("{}/x_mode".format(prefix))[aoi].squeeze().detach()
+            mean = param("{}/x_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "y":
-            y_mode = param("{}/y_mode".format(prefix))[aoi].squeeze().detach() / (data.D+3) + 0.5
-            size = param("{}/size".format(prefix))[aoi].squeeze().detach()
+            y_mode = param("{}/y_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:] / (data.D+3) + 0.5
+            size = param("{}/size".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
             y_c1 = y_mode * size
             y_c0 = (1 - y_mode) * size
             hpd = (hpdi(dist.Beta(y_c1, y_c0).sample((500,)), 0.95, dim=0) - 0.5) * (data.D+3)
-            mean = param("{}/y_mode".format(prefix))[aoi].squeeze().detach()
+            mean = param("{}/y_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "width":
-            w_mode = (param("{}/w_mode".format(prefix))[aoi].squeeze().detach() - 0.75) / 1.5
-            w_size = param("{}/w_size".format(prefix))[aoi].squeeze().detach()
+            w_mode = (param("{}/w_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:] - 0.75) / 1.5
+            w_size = param("{}/w_size".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
             w_c1 = w_mode * w_size
             w_c0 = (1 - w_mode) * w_size
             hpd = hpdi(dist.Beta(w_c1, w_c0).sample((500,)), 0.95, dim=0) * 1.5 + 0.75
-            mean = param("{}/w_mode".format(prefix))[aoi].squeeze().detach()
+            mean = param("{}/w_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
 
+        hpd = hpd.squeeze()
+        mean = mean.squeeze()
         if p == "background":
             plt.fill_between(data.drift.index.values[f1:f2+1], hpd[0][f1:f2+1], hpd[1][f1:f2+1], color="C0", alpha=0.2)
             plt.scatter(data.drift.index.values[f1:f2+1], mean[f1:f2+1], s=10, color="C0", label="K")
@@ -143,9 +139,9 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix):
 def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
     if m1 or m2 or z:
         k_probs = np.zeros((len(data.drift),2))
-        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
-        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().detach()[aoi,:,3]
-    if z: z_probs = (pyro.param("d/m_probs").squeeze()[aoi] * pyro.param("d/theta_probs").squeeze()[aoi,...,1:].sum(dim=-1)).sum(dim=-1).detach()
+        k_probs[:,0] = param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,1] + param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,3]
+        k_probs[:,1] = param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,2] + param("{}/m_probs".format(prefix)).squeeze().data[aoi,:,3]
+    if z: z_probs = (pyro.param("d/m_probs").squeeze()[aoi] * pyro.param("d/theta_probs").squeeze()[aoi,...,1:].sum(dim=-1)).sum(dim=-1).data
 
     fig = plt.figure(figsize=(15,3), dpi=600)
     for i in range(20):
@@ -155,9 +151,9 @@ def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
         if target:
             plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5, data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5, "b+", markersize=10, mew=3, alpha=0.7)
         if m1:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mode".format(prefix)).squeeze().data[aoi,frame+i,0], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mode".format(prefix)).squeeze().data[aoi,frame+i,0], "C0+", markersize=10, mew=3, alpha=k_probs[frame+i,0])
         if m2:
-            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mode".format(prefix)).squeeze().detach().numpy()[aoi,frame+i,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
+            plt.plot(data.target.iloc[aoi, 2] + data.drift.iloc[frame+i, 1] + 0.5 + param("{}/y_mode".format(prefix)).squeeze().data[aoi,frame+i,1], data.target.iloc[aoi, 1] + data.drift.iloc[frame+i, 0] + 0.5 + param("{}/x_mode".format(prefix)).squeeze().data[aoi,frame+i,1], "C1+", markersize=10, mew=3, alpha=k_probs[frame+i,1])
         if z:
             z_color = to_rgba_array("C2", z_probs[frame+i])[0]
             plt.gca().add_patch(Rectangle((0, 0), data.D*z_probs[frame+i], 0.25, edgecolor=z_color, lw=4, facecolor="none"))

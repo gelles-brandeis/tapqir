@@ -10,7 +10,7 @@ from pyro import param
 
 from cosmos.models.noise import _noise, _noise_fn
 from cosmos.models.model import Model
-from cosmos.models.helper import Location, m_param, theta_param
+from cosmos.models.helper import m_param, theta_param
 
 class Tracker(Model):
     """ Track on-target Spot """

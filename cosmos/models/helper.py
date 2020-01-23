@@ -14,6 +14,9 @@ import math
 
 
 def m_param(pi, lamda, K):
+    """
+    p(m) = p(z+j=m) = p(z=1) * p(j=m-1) + p(z=0) * p(j=m)
+    """
     bernoulli = lambda x: dist.Bernoulli(pi[1]).log_prob(torch.tensor([float(x)])).exp()
     poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
     m_pi = torch.zeros(2**K)
@@ -35,8 +38,8 @@ def theta_param(pi, lamda, K):
     theta_pi[2,0] = bernoulli(0) * poisson(1) / (m_param(pi, lamda, K)[2] * 2)
     theta_pi[3,0] = bernoulli(0) * poisson(2) / m_param(pi, lamda, K)[3]
 
-    theta_pi[1,1] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[1] * 2)
-    theta_pi[2,2] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[2] * 2)
+    theta_pi[1,2] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[1] * 2)
+    theta_pi[2,1] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[2] * 2)
     theta_pi[3,1] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
     theta_pi[3,2] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
     return theta_pi

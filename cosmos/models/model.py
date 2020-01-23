@@ -13,7 +13,7 @@ from cosmos.utils.utils import write_summary
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import math
-from cosmos.models.helper import Location, m_param, theta_param
+from cosmos.models.helper import m_param, theta_param
 import pandas as pd
 import logging
 from pyro.ops.indexing import Vindex
@@ -51,8 +51,8 @@ class Model:
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        self.svi = SVI(pyro.poutine.block(self.model, hide=["width_mode", "width_size"]), self.guide, self.optim, loss=self.elbo)
-        #self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+        #self.svi = SVI(pyro.poutine.block(self.model, hide=["width_mode", "width_size"]), self.guide, self.optim, loss=self.elbo)
+        self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
         self.logger.debug("D - {}".format(self.D))
         self.logger.debug("K - {}".format(self.K))
         self.logger.debug("data.N - {}".format(self.data.N))
@@ -65,8 +65,20 @@ class Model:
         self.logger.debug("Batch size - {}".format(self.n_batch))
         self.logger.debug("{}".format("jit" if jit else "nojit"))
 
-        self.m_matrix = torch.tensor([p for p in product((0,1), repeat=self.K)]) # K**2,K
-        self.theta_matrix = torch.eye(self.K+1)[:,1:] # K+1,K
+        """
+        m_matrix
+        tensor([[0, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1]])
+
+        theta_matrix:
+        tensor([[0, 0],
+        [1, 0],
+        [0, 1]])
+        """
+        self.m_matrix = torch.tensor([p for p in product((0,1), repeat=self.K)]).long() # K**2,K
+        self.theta_matrix = torch.eye(self.K+1)[:,1:].long() # K+1,K
         self.size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
 
         self.path = os.path.join(self.data.path,"runs", "{}".format(self.data.name), "{}".format(self.__name__), "K{}".format(self.K), "{}".format("jit" if jit else "nojit"), "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__), "{}".format(self.n_batch))
@@ -87,23 +99,24 @@ class Model:
                     background = pyro.sample("background", dist.Gamma(param("{}/background_loc".format(prefix))[batch_idx] * param("background_beta"), param("background_beta")))
                     m = pyro.sample("m", dist.Categorical(m_pi)) # 4,1,1,1,1,1
                     if theta_pi is not None:
-                        theta = pyro.sample("theta", dist.Categorical(theta_pi[m])) # 3,1,1,1,1,1,1
-                        theta = self.theta_matrix[theta.squeeze(dim=-1)] # 3,1,1,1,1,K
+                        theta = pyro.sample("theta", dist.Categorical(theta_pi[m])).squeeze(dim=-1) # 3,1,1,1,1,1,1
+                        theta_mask = self.theta_matrix[theta] # 3,1,1,1,1,K
                     else:
-                        theta = 0 # N,F,1,1,K   K+1,1,1,1,1,1
-                    m = self.m_matrix[m.squeeze(dim=-1)].bool() # 4,1,1,1,1,K
+                        theta = torch.tensor([0]).long() # N,F,1,1,K   K+1,1,1,1,1,1
+                        theta_mask = torch.tensor([0]).long() # N,F,1,1,K   K+1,1,1,1,1,1
+                    m_mask = self.m_matrix[m.squeeze(dim=-1)].bool() # 4,1,1,1,1,K
                     with pyro.plate("K_plate", self.K, dim=-1):
-                        with pyro.poutine.mask(mask=m):
+                        with pyro.poutine.mask(mask=m_mask):
                             height = pyro.sample("height", dist.Gamma(param("height_loc") * param("height_beta"), param("height_beta"))) # 4,K,N,F,1,1
-                            height = height.masked_fill(~m, 0.)
-                            w_mode = (param("width_mode")[theta] - 0.75) / 1.5
-                            w_size = param("width_size")[theta]
+                            height = height.masked_fill(~m_mask, 0.)
+                            w_mode = (param("width_mode")[theta_mask] - 0.75) / 1.5
+                            w_size = param("width_size")[theta_mask]
                             w_c1 = w_mode * w_size
                             w_c0 = (1 - w_mode) * w_size
                             width = pyro.sample("width", dist.Beta(w_c1, w_c0)) * 1.5 + 0.75
                             x_mode = 0. / (self.D+3) + 0.5
                             y_mode = 0. / (self.D+3) + 0.5
-                            size = self.size[theta]
+                            size = self.size[theta_mask]
                             x_c1 = x_mode * size
                             x_c0 = (1 - x_mode) * size
                             y_c1 = y_mode * size
@@ -122,48 +135,67 @@ class Model:
             with pyro.plate("N_plate", data.N, subsample_size=self.n_batch, dim=-5) as batch_idx:
                 with pyro.plate("F_plate", data.F, dim=-4):
                     pyro.sample("background", dist.Gamma(param("{}/b_loc".format(prefix))[batch_idx] * param("b_beta"), param("b_beta")))
-                    m = pyro.sample("m", dist.Categorical(param("{}/m_probs".format(prefix))[batch_idx]))
+                    m = pyro.sample("m", dist.Categorical(param("{}/m_probs".format(prefix))[batch_idx])) # 4,1,1,1,1,1
                     if theta:
-                        theta = pyro.sample("theta", dist.Categorical(Vindex(param("{}/theta_probs".format(prefix))[batch_idx])[...,m,:])) # N,F,1,1
-                        theta = self.theta_matrix[theta.squeeze(dim=-1)] # 3,1,1,1,1,K
-                    m = self.m_matrix[m.squeeze(dim=-1)].bool() # N,F,1,1,K
+                        theta = pyro.sample("theta", dist.Categorical(Vindex(param("{}/theta_probs".format(prefix))[batch_idx])[...,m,:])).squeeze(dim=-1) # N,F,1,1
+                        theta_mask = self.theta_matrix[theta] # 3,1,1,1,1,K
+                    else:
+                        theta = torch.tensor([0]).long()
+                        theta_mask = torch.tensor([0]).long()
+                    m_mask = self.m_matrix[m.squeeze(dim=-1)].bool() # N,F,1,1,K
                     with pyro.plate("K_plate", self.K, dim=-1):
-                        with pyro.poutine.mask(mask=m):
-                            batch_shape = broadcast_shape(m.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
-                            pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")).expand(batch_shape))
-                            w_mode = (param("{}/w_mode".format(prefix))[batch_idx] - 0.75) / 1.5
-                            w_size = param("{}/w_size".format(prefix))[batch_idx]
+                        with pyro.poutine.mask(mask=m_mask):
+                            m_shape = broadcast_shape(m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
+                            theta_shape = broadcast_shape(theta_mask.shape, m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
+                            pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")).expand(m_shape))
+                            w_mode = (Vindex(param("{}/w_mode".format(prefix))[batch_idx])[...,theta,:] - 0.75) / 1.5
+                            w_size = Vindex(param("{}/w_size".format(prefix))[batch_idx])[...,theta,:]
                             w_c1 = w_mode * w_size
                             w_c0 = (1 - w_mode) * w_size
-                            pyro.sample("width", dist.Beta(w_c1, w_c0).expand(batch_shape))
-                            x_mode = param("{}/x_mode".format(prefix))[batch_idx] / (self.D+3) + 0.5
-                            y_mode = param("{}/y_mode".format(prefix))[batch_idx] / (self.D+3) + 0.5
-                            size = param("{}/size".format(prefix))[batch_idx]
+                            w = pyro.sample("width", dist.Beta(w_c1, w_c0).expand(theta_shape))
+                            x_mode = Vindex(param("{}/x_mode".format(prefix))[batch_idx])[...,theta,:] / (self.D+3) + 0.5
+                            y_mode = Vindex(param("{}/y_mode".format(prefix))[batch_idx])[...,theta,:] / (self.D+3) + 0.5
+                            size = Vindex(param("{}/size".format(prefix))[batch_idx])[...,theta,:]
                             x_c1 = x_mode * size
                             x_c0 = (1 - x_mode) * size
                             y_c1 = y_mode * size
                             y_c0 = (1 - y_mode) * size
-                            pyro.sample("x0", dist.Beta(x_c1, x_c0).expand(batch_shape)) # N,F,1,1,M,K
-                            pyro.sample("y0", dist.Beta(y_c1, y_c0).expand(batch_shape))
+                            pyro.sample("x0", dist.Beta(x_c1, x_c0).expand(theta_shape)) # N,F,1,1,M,K
+                            pyro.sample("y0", dist.Beta(y_c1, y_c0).expand(theta_shape))
 
     def spot_parameters(self, data, theta, prefix):
         param("{}/background_loc".format(prefix), torch.ones(data.N,1,1,1,1)*100., constraint=constraints.positive)
-        param("{}/m_probs".format(prefix), torch.ones(data.N,data.F,1,1,1,4), constraint=constraints.simplex)
-        if theta:
-            theta_probs = torch.ones(data.N,data.F,1,1,1,4,self.K+1)
-            theta_probs[...,0,1:] = 0
-            theta_probs[...,1,2] = 0
-            theta_probs[...,2,1] = 0
-            param("{}/theta_probs".format(prefix), theta_probs, constraint=constraints.simplex)
+        param("{}/m_probs".format(prefix), torch.ones(data.N,data.F,1,1,1,2**self.K), constraint=constraints.simplex)
         param("{}/b_loc".format(prefix), torch.ones(data.N,data.F,1,1,1)*30., constraint=constraints.positive)
-        param("{}/h_loc".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1000., constraint=constraints.positive)
-        param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.75,2.25))
-        param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
-        param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-        size = torch.ones(data.N,data.F,1,1,self.K)*5.
-        size[...,1] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
-        param("{}/size".format(prefix), size, constraint=constraints.greater_than(2.))
+        height = torch.ones(data.N,data.F,1,1,self.K)*1000.
+        #height[...,1] = 10.
+        param("{}/h_loc".format(prefix), height, constraint=constraints.positive)
+        if theta:
+            theta_probs = torch.ones(data.N,data.F,1,1,1,2**self.K,self.K+1)
+            theta_probs[...,0,1:] = 0.
+            theta_probs[...,1,1] = 0.
+            theta_probs[...,2,2] = 0.
+            #theta_probs[...,3,1] = 1.5
+            #theta_probs[...,3,2] = 0.5
+            param("{}/theta_probs".format(prefix), theta_probs, constraint=constraints.simplex)
+
+            param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K+1,self.K)*1.3, constraint=constraints.interval(0.75,2.25))
+            param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K+1,self.K)*100., constraint=constraints.greater_than(2.))
+            param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K+1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K+1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            size = torch.ones(data.N,data.F,1,1,self.K+1,self.K)*5.
+            size[...,0,0] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
+            size[...,1,0] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
+            size[...,2,1] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
+            param("{}/size".format(prefix), size, constraint=constraints.greater_than(2.))
+        else:
+            param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,1,self.K)*1.3, constraint=constraints.interval(0.75,2.25))
+            param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,1,self.K)*100., constraint=constraints.greater_than(2.))
+            param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            size = torch.ones(data.N,data.F,1,1,1,self.K)*5.
+            size[...,0] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
+            param("{}/size".format(prefix), size, constraint=constraints.greater_than(2.))
 
     # Ideal 2D gaussian spot
     def gaussian_spot(self, target_locs, height, width, x0, y0):
@@ -183,7 +215,7 @@ class Model:
         for epoch in tqdm(range(num_steps)):
             #with torch.autograd.detect_anomaly():
             epoch_loss = self.svi.step()
-            if (self.epoch_count > 0) and not (self.epoch_count % 100):    
+            if not self.epoch_count % 100:    
                 write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer_scalar, self.writer_hist, feature=False, mcc=self.mcc)
                 self.save_checkpoint()
             self.epoch_count += 1
