@@ -12,6 +12,11 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import math
 
+def ScaledBeta(mode, size, loc, scale):
+    mode = (mode - loc) / scale 
+    concentration1 = mode * size
+    concentration0 = (1 - mode) * size
+    return dist.Beta(concentration1, concentration0)
 
 def m_param(pi, lamda, K):
     """

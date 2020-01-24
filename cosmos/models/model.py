@@ -13,7 +13,7 @@ from cosmos.utils.utils import write_summary
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import math
-from cosmos.models.helper import m_param, theta_param
+from cosmos.models.helper import m_param, theta_param, ScaledBeta
 import pandas as pd
 import logging
 from pyro.ops.indexing import Vindex
@@ -51,8 +51,8 @@ class Model:
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        #self.svi = SVI(pyro.poutine.block(self.model, hide=["width_mode", "width_size"]), self.guide, self.optim, loss=self.elbo)
-        self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+        self.svi = SVI(pyro.poutine.block(self.model, hide=["width_mode", "width_size"]), self.guide, self.optim, loss=self.elbo)
+        #self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
         self.logger.debug("D - {}".format(self.D))
         self.logger.debug("K - {}".format(self.K))
         self.logger.debug("data.N - {}".format(self.data.N))
@@ -60,10 +60,10 @@ class Model:
         if self.control:
             self.logger.debug("control.N - {}".format(self.control.N))
             self.logger.debug("control.F - {}".format(self.control.F))
-        self.logger.debug("Optimizer - {}".format(self.optim_fn.__name__))
-        self.logger.debug("Learning rate - {}".format(self.lr))
-        self.logger.debug("Batch size - {}".format(self.n_batch))
-        self.logger.debug("{}".format("jit" if jit else "nojit"))
+        self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
+        self.logger.info("Learning rate - {}".format(self.lr))
+        self.logger.info("Batch size - {}".format(self.n_batch))
+        self.logger.info("{}".format("jit" if jit else "nojit"))
 
         """
         m_matrix
@@ -92,6 +92,19 @@ class Model:
         raise NotImplementedError
 
     def spot_model(self, data, m_pi, theta_pi, prefix):
+        """
+        N plate:
+        F plate:
+            background      (N,F,1,1,1) (N,F,1,1,1)
+            m (enum)        (N,F,1,1,1) (2^K,1,1,1,1,1)
+            theta (enum)    (N,F,1,1,1) (K+1,1,1,1,1,1,1)
+            m_mask          (2^K,1,1,1,1,K)
+            theta_mask      (K+1,1,1,1,1,1,K)
+        K plate: 
+            height          (N,F,1,1,K) (K+1,2^K,N,F,1,1,K)
+            width           (N,F,1,1,K) (K+1,2^K,N,F,1,1,K)
+            x               (N,F,1,1,K) (K+1,2^K,N,F,1,1,K)
+        """
         #self.size = torch.cat((torch.tensor([2.]), param("proximity")), 0)
         with scope(prefix=prefix):
             with pyro.plate("N_plate", data.N, dim=-5) as batch_idx:
@@ -107,22 +120,13 @@ class Model:
                     m_mask = self.m_matrix[m.squeeze(dim=-1)].bool() # 4,1,1,1,1,K
                     with pyro.plate("K_plate", self.K, dim=-1):
                         with pyro.poutine.mask(mask=m_mask):
+                            #height = pyro.sample("height", dist.Gamma(param("height_loc")[theta_mask] * param("height_beta")[theta_mask], param("height_beta")[theta_mask])) # 4,K,N,F,1,1
                             height = pyro.sample("height", dist.Gamma(param("height_loc") * param("height_beta"), param("height_beta"))) # 4,K,N,F,1,1
                             height = height.masked_fill(~m_mask, 0.)
-                            w_mode = (param("width_mode")[theta_mask] - 0.75) / 1.5
-                            w_size = param("width_size")[theta_mask]
-                            w_c1 = w_mode * w_size
-                            w_c0 = (1 - w_mode) * w_size
-                            width = pyro.sample("width", dist.Beta(w_c1, w_c0)) * 1.5 + 0.75
-                            x_mode = 0. / (self.D+3) + 0.5
-                            y_mode = 0. / (self.D+3) + 0.5
-                            size = self.size[theta_mask]
-                            x_c1 = x_mode * size
-                            x_c0 = (1 - x_mode) * size
-                            y_c1 = y_mode * size
-                            y_c0 = (1 - y_mode) * size
-                            x0 = (pyro.sample("x0", dist.Beta(x_c1, x_c0)) - 0.5) * (self.D+3)
-                            y0 = (pyro.sample("y0", dist.Beta(y_c1, y_c0)) - 0.5) * (self.D+3)
+                            #width = pyro.sample("width", ScaledBeta(param("width_mode")[theta_mask], param("width_size")[theta_mask], 0.75, 1.5)) * 1.5 + 0.75
+                            width = pyro.sample("width", ScaledBeta(param("width_mode"), param("width_size"), 0.75, 1.)) * 1. + 0.75
+                            x0 = pyro.sample("x0", ScaledBeta(0., self.size[theta_mask], -(self.D+3)/2, self.D+3)) * (self.D+3) - (self.D+3)/2
+                            y0 = pyro.sample("y0", ScaledBeta(0., self.size[theta_mask], -(self.D+3)/2, self.D+3)) * (self.D+3) - (self.D+3)/2
 
                     target_locs = data.target_locs[batch_idx] # N,F,1,1,M,K,2 select target locs for given indices
                     locs = self.gaussian_spot(target_locs, height, width, x0, y0) + background
@@ -131,6 +135,39 @@ class Model:
                             pyro.sample("data", self.CameraUnit(locs, param("gain"), param("offset")), obs=data[batch_idx].unsqueeze(dim=-1))
 
     def spot_guide(self, data, theta, prefix):
+        """
+        ixij = Vindex(x)[i, :, j]
+        batch_shape = broadcast_shape(i.shape, j.shape)
+        event_shape = (x.size(1),)
+        assert xij.shape == batch_shape + event_shape
+
+        N plate:
+        F plate:
+            background      (N,F,1,1,1)               (N,F,1,1,1)
+            m (enum)        (N,F,1,1,1,2^K)       (2^K,1,1,1,1,1)
+            theta (enum)    (N,F,1,1,1,2^K,K+1) (K+1,1,1,1,1,1,1) batch_shape = (2^K,N,F,1,1,1); event_shape = (K+1,)
+            m_mask          (2^K,K)               (2^K,1,1,1,1,K)
+            theta_mask      (K+1,K)             (K+1,1,1,1,1,1,K)
+        K plate: 
+            height          (N,F,1,1,K+1,K)   (K+1,2^K,N,F,1,1,K) batch_shape = (K+1,1,N,F,1,1); event_shape = (K,)
+            width           (N,F,1,1,K+1,K)   (K+1,2^K,N,F,1,1,K) batch_shape = (K+1,1,N,F,1,1); event_shape = (K,)
+            x               (N,F,1,1,K+1,K)   (K+1,2^K,N,F,1,1,K) batch_shape = (K+1,1,N,F,1,1); event_shape = (K,)
+
+        N plate:
+        F plate:
+            background      (N,F,1,1,1)               (N,F,1,1,1)
+            m (enum)        (N,F,1,1,1,2^K)       (2^K,1,1,1,1,1)
+            m (enum)        (N,F,1,1,K,2)         (2^K,1,1,1,1,1)
+            theta (enum)    (N,F,1,1,1,2^K,K+1) (K+1,1,1,1,1,1,1) batch_shape = (2^K,N,F,1,1,1); event_shape = (K+1,)
+            theta (enum)    (N,F,1,1,K,2) (K+1,1,1,1,1,1,1) batch_shape = (2^K,N,F,1,1,1); event_shape = (K+1,)
+            m_mask          (2^K,K)               (2^K,1,1,1,1,K)
+            theta_mask      (K+1,K)             (K+1,1,1,1,1,1,K)
+        K plate: 
+            height          (N,F,1,1,K,2)   (K+1,2^K,N,F,1,1,K) batch_shape = (K+1,1,N,F,1,1,K); event_shape = (,)
+            width           (N,F,1,1,K,2)   (K+1,2^K,N,F,1,1,K) batch_shape = (K+1,1,N,F,1,1,K); event_shape = (,)
+            x               (N,F,1,1,K,2)   (K+1,2^K,N,F,1,1,K) batch_shape = (K+1,1,N,F,1,1,K); event_shape = (,)
+            Vindex(height[batch_idx])[...,theta]
+        """
         with scope(prefix=prefix):
             with pyro.plate("N_plate", data.N, subsample_size=self.n_batch, dim=-5) as batch_idx:
                 with pyro.plate("F_plate", data.F, dim=-4):
@@ -145,28 +182,23 @@ class Model:
                     m_mask = self.m_matrix[m.squeeze(dim=-1)].bool() # N,F,1,1,K
                     with pyro.plate("K_plate", self.K, dim=-1):
                         with pyro.poutine.mask(mask=m_mask):
-                            m_shape = broadcast_shape(m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
                             theta_shape = broadcast_shape(theta_mask.shape, m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
+                            m_shape = broadcast_shape(m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
+                            #pyro.sample("height", dist.Gamma(Vindex(param("{}/h_loc".format(prefix))[batch_idx])[...,theta_mask] * param("h_beta"), param("h_beta")).expand(theta_shape))
+                            #pyro.sample("width", ScaledBeta(Vindex(param("{}/w_mode".format(prefix))[batch_idx])[...,theta_mask],
                             pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")).expand(m_shape))
-                            w_mode = (Vindex(param("{}/w_mode".format(prefix))[batch_idx])[...,theta,:] - 0.75) / 1.5
-                            w_size = Vindex(param("{}/w_size".format(prefix))[batch_idx])[...,theta,:]
-                            w_c1 = w_mode * w_size
-                            w_c0 = (1 - w_mode) * w_size
-                            w = pyro.sample("width", dist.Beta(w_c1, w_c0).expand(theta_shape))
-                            x_mode = Vindex(param("{}/x_mode".format(prefix))[batch_idx])[...,theta,:] / (self.D+3) + 0.5
-                            y_mode = Vindex(param("{}/y_mode".format(prefix))[batch_idx])[...,theta,:] / (self.D+3) + 0.5
-                            size = Vindex(param("{}/size".format(prefix))[batch_idx])[...,theta,:]
-                            x_c1 = x_mode * size
-                            x_c0 = (1 - x_mode) * size
-                            y_c1 = y_mode * size
-                            y_c0 = (1 - y_mode) * size
-                            pyro.sample("x0", dist.Beta(x_c1, x_c0).expand(theta_shape)) # N,F,1,1,M,K
-                            pyro.sample("y0", dist.Beta(y_c1, y_c0).expand(theta_shape))
+                            pyro.sample("width", ScaledBeta(param("{}/w_mode".format(prefix))[batch_idx],
+                                                            param("{}/w_size".format(prefix))[batch_idx], 0.75, 1.).expand(m_shape)) * 1. + 0.75
+                            pyro.sample("x0", ScaledBeta(Vindex(param("{}/x_mode".format(prefix))[batch_idx])[...,theta_mask],
+                                                         Vindex(param("{}/size".format(prefix))[batch_idx])[...,theta_mask], -(self.D+3)/2, self.D+3).expand(theta_shape)) * (self.D+3) - (self.D+3)/2
+                            pyro.sample("y0", ScaledBeta(Vindex(param("{}/y_mode".format(prefix))[batch_idx])[...,theta_mask],
+                                                         Vindex(param("{}/size".format(prefix))[batch_idx])[...,theta_mask], -(self.D+3)/2, self.D+3).expand(theta_shape)) * (self.D+3) - (self.D+3)/2
 
     def spot_parameters(self, data, theta, prefix):
         param("{}/background_loc".format(prefix), torch.ones(data.N,1,1,1,1)*100., constraint=constraints.positive)
         param("{}/m_probs".format(prefix), torch.ones(data.N,data.F,1,1,1,2**self.K), constraint=constraints.simplex)
         param("{}/b_loc".format(prefix), torch.ones(data.N,data.F,1,1,1)*30., constraint=constraints.positive)
+        #height = torch.ones(data.N,data.F,1,1,self.K,2)*1000.
         height = torch.ones(data.N,data.F,1,1,self.K)*1000.
         #height[...,1] = 10.
         param("{}/h_loc".format(prefix), height, constraint=constraints.positive)
@@ -178,23 +210,24 @@ class Model:
             #theta_probs[...,3,1] = 1.5
             #theta_probs[...,3,2] = 0.5
             param("{}/theta_probs".format(prefix), theta_probs, constraint=constraints.simplex)
-
-            param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K+1,self.K)*1.3, constraint=constraints.interval(0.75,2.25))
-            param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K+1,self.K)*100., constraint=constraints.greater_than(2.))
-            param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K+1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-            param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K+1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-            size = torch.ones(data.N,data.F,1,1,self.K+1,self.K)*5.
-            size[...,0,0] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
-            size[...,1,0] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
-            size[...,2,1] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
+            #param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K,2)*1.3, constraint=constraints.interval(0.75,2.25))
+            #param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K,2)*100., constraint=constraints.greater_than(2.))
+            param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.75,1.75))
+            param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
+            param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K,2), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K,2), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            size = torch.ones(data.N,data.F,1,1,self.K,2)*5.
+            size[...,1] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
             param("{}/size".format(prefix), size, constraint=constraints.greater_than(2.))
         else:
-            param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,1,self.K)*1.3, constraint=constraints.interval(0.75,2.25))
-            param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,1,self.K)*100., constraint=constraints.greater_than(2.))
-            param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-            param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
-            size = torch.ones(data.N,data.F,1,1,1,self.K)*5.
-            size[...,0] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
+            #param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K,1)*1.3, constraint=constraints.interval(0.75,2.25))
+            #param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K,1)*100., constraint=constraints.greater_than(2.))
+            param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.75,1.75))
+            param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
+            param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K,1), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
+            size = torch.ones(data.N,data.F,1,1,self.K,1)*5.
+            size[...,1,:] = (((self.D+3)/(2*0.5))**2 - 1) # 30 is better than 100
             param("{}/size".format(prefix), size, constraint=constraints.greater_than(2.))
 
     # Ideal 2D gaussian spot
@@ -213,8 +246,8 @@ class Model:
 
     def train(self, num_steps):
         for epoch in tqdm(range(num_steps)):
-            #with torch.autograd.detect_anomaly():
-            epoch_loss = self.svi.step()
+            with torch.autograd.detect_anomaly():
+                epoch_loss = self.svi.step()
             if not self.epoch_count % 100:    
                 write_summary(self.epoch_count, epoch_loss, self, self.svi, self.writer_scalar, self.writer_hist, feature=False, mcc=self.mcc)
                 self.save_checkpoint()
@@ -233,7 +266,7 @@ class Model:
         try:
             self.epoch_count = int(np.loadtxt(os.path.join(self.path, "epoch_count")))
             self.optim.load(os.path.join(self.path, "optimizer"))
-            pyro.get_param_store().load(os.path.join(self.path, "params"))
+            pyro.get_param_store().load(os.path.join(self.path, "params"), map_location=self.data.device)
             self.logger.info("Step #{}. Loaded model params and optimizer state from {}".format(self.epoch_count, self.path))
         except:
             pass
