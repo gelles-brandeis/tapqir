@@ -149,18 +149,17 @@ class GlimpseDataset(Dataset):
         self.labels = None
         if self.path_to["labels"]:
             self.logger.debug("Reading {} file ... ".format(self.path_to["labels"]))
-            if self.name in ["FL_1_1117_0OD", "FL_1118_2225_0p3OD", "FL_2226_3338_0p6OD", "FL_3339_4444_0p8OD", "FL_4445_5554_1p1OD", "FL_5555_6684_1p3OD",
-                "FL_1_1117_0OD_atten", "FL_1118_2225_0p3OD_atten", "FL_2226_3338_0p6OD_atten", "FL_3339_4444_0p8OD_atten", "FL_4445_5554_1p1OD_atten", "FL_5555_6684_1p3OD_atten"]:
+            if self.name.startswith("FL"):
                 framelist = loadmat(self.path_to["labels"])
-                f1 = framelist[self.name][0,2]
-                f2 = framelist[self.name][-1,2]
+                f1 = framelist[self.name.split(".")[0]][0,2]
+                f2 = framelist[self.name.split(".")[0]][-1,2]
                 self.drift_df = self.drift_df.loc[f1:f2]
-                aoi_list = np.unique(framelist[self.name][:,0])
+                aoi_list = np.unique(framelist[self.name.split(".")[0]][:,0])
                 self.aoi_df = self.aoi_df.loc[aoi_list]
                 #labels = pd.DataFrame(data=framelist[dataset], columns=["aoi", "detected", "frame"])
-                index = pd.MultiIndex.from_arrays([framelist[self.name][:,0], framelist[self.name][:,2]], names=["aoi", "frame"])
+                index = pd.MultiIndex.from_arrays([framelist[self.name.split(".")[0]][:,0], framelist[self.name.split(".")[0]][:,2]], names=["aoi", "frame"])
                 self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)
-                self.labels["spotpicker"] = framelist[self.name][:,1]
+                self.labels["spotpicker"] = framelist[self.name.split(".")[0]][:,1]
                 self.labels.loc[self.labels["spotpicker"] == 0, "spotpicker"] = 3
                 self.labels.loc[self.labels["spotpicker"] == 2, "spotpicker"] = 0
             else:

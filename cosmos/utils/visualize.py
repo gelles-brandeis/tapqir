@@ -73,8 +73,8 @@ def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
 def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
     if m:
         k_probs = torch.zeros(len(data.drift),1,1,1,2)
-        k_probs[...,0] = param("{}/m_probs".format(prefix)).data[aoi,...,1] + param("{}/m_probs".format(prefix)).data[aoi,...,3]
-        k_probs[...,1] = param("{}/m_probs".format(prefix)).data[aoi,...,2] + param("{}/m_probs".format(prefix)).data[aoi,...,3]
+        k_probs[...,0] = param("{}/m_probs".format(prefix)).data[aoi,...,2] + param("{}/m_probs".format(prefix)).data[aoi,...,3]
+        k_probs[...,1] = param("{}/m_probs".format(prefix)).data[aoi,...,1] + param("{}/m_probs".format(prefix)).data[aoi,...,3]
         k_probs = k_probs.squeeze().numpy()
         m_colors = np.zeros((2,len(data.drift),4))
         m_colors[0] += to_rgba_array("C0")
@@ -96,28 +96,28 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
             mean = param("{}/h_loc".format(prefix))[aoi].data
             plt.ylim(0, hpd.max()+10)
         elif p == "x":
-            x_mode = param("{}/x_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:] / (data.D+3) + 0.5
-            size = param("{}/size".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
+            x_mode = param("{}/x_mode".format(prefix)).squeeze().data[aoi] / (data.D+3) + 0.5
+            size = param("{}/size".format(prefix)).squeeze().data[aoi]
             x_c1 = x_mode * size
             x_c0 = (1 - x_mode) * size
             hpd = (hpdi(dist.Beta(x_c1, x_c0).sample((500,)), 0.95, dim=0) - 0.5) * (data.D+3)
-            mean = param("{}/x_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
+            mean = param("{}/x_mode".format(prefix)).squeeze().data[aoi]
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "y":
-            y_mode = param("{}/y_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:] / (data.D+3) + 0.5
-            size = param("{}/size".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
+            y_mode = param("{}/y_mode".format(prefix)).squeeze().data[aoi] / (data.D+3) + 0.5
+            size = param("{}/size".format(prefix)).squeeze().data[aoi]
             y_c1 = y_mode * size
             y_c0 = (1 - y_mode) * size
             hpd = (hpdi(dist.Beta(y_c1, y_c0).sample((500,)), 0.95, dim=0) - 0.5) * (data.D+3)
-            mean = param("{}/y_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
+            mean = param("{}/y_mode".format(prefix)).squeeze().data[aoi]
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "width":
-            w_mode = (param("{}/w_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:] - 0.75) / 1.5
-            w_size = param("{}/w_size".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
+            w_mode = (param("{}/w_mode".format(prefix)).squeeze().data[aoi] - 0.75) / 1.5
+            w_size = param("{}/w_size".format(prefix)).squeeze().data[aoi]
             w_c1 = w_mode * w_size
             w_c0 = (1 - w_mode) * w_size
             hpd = hpdi(dist.Beta(w_c1, w_c0).sample((500,)), 0.95, dim=0) * 1.5 + 0.75
-            mean = param("{}/w_mode".format(prefix)).squeeze().data[aoi][torch.arange(data.F),theta_idx,:]
+            mean = param("{}/w_mode".format(prefix)).squeeze().data[aoi]
 
         hpd = hpd.squeeze()
         mean = mean.squeeze()

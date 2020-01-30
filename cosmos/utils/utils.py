@@ -37,7 +37,7 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer_scalar, writer_his
         elif pyro.param(p).squeeze().dim() == 1 and pyro.param(p).squeeze().shape[0] <= model.K:
             scalars = {str(i): pyro.param(p).squeeze()[i].item() for i in range(pyro.param(p).squeeze().size()[-1])}
             writer_scalar.add_scalars("{}".format(p), scalars, epoch_count)
-        elif pyro.param(p).squeeze().dim() >= 1 and not (epoch_count % 2000):
+        elif pyro.param(p).squeeze().dim() >= 1 and not (model.epoch_count % 2000):
             writer_hist.add_histogram("{}".format(p), pyro.param(p).squeeze().detach().reshape(-1), epoch_count)
 
     

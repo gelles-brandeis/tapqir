@@ -12,17 +12,18 @@ from cosmos.models.noise import _noise, _noise_fn
 from cosmos.models.model import Model
 from cosmos.models.helper import m_param, theta_param
 
-class Tracker(Model):
+class Marginal(Model):
     """ Track on-target Spot """
     def __init__(self, data, control, K, lr, n_batch, jit, noise="GammaOffset"):
-        self.__name__ = "tracker"
+        self.__name__ = "marginal"
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(max_plate_nesting=5, ignore_jit_warnings=True)
         if data.name == "Gracecy3":
             self.mcc = False
         else:
-            self.mcc = True 
+            self.mcc = False 
         super().__init__(data, control, K, lr, n_batch, jit, noise="GammaOffset")
         
+    @config_enumerate
     def model(self):
         self.model_parameters()
         data_m_pi = m_param(param("pi"), param("lamda"), self.K) # 2**K
@@ -34,25 +35,24 @@ class Tracker(Model):
         if self.control:
             self.spot_model(self.control, control_m_pi, None, prefix="c")
 
-    @config_enumerate
     def guide(self):
         self.guide_parameters()
-        self.spot_guide(self.data, theta=True, m=True, prefix="d")
+        self.spot_guide(self.data, theta=False, m=False, prefix="d")
         if self.control:
-            self.spot_guide(self.control, theta=False, m=True, prefix="c")
+            self.spot_guide(self.control, theta=False, m=False, prefix="c")
 
     def model_parameters(self):
         # Global Parameters
         #param("proximity", torch.tensor([(((self.D+3)/(2*0.5))**2 - 1)]), constraint=constraints.greater_than(30.))
         param("background_beta", torch.tensor([1.]), constraint=constraints.positive)
-        #param("height_loc", torch.tensor([1000., 1000.]), constraint=constraints.positive)
-        #param("height_beta", torch.tensor([1., 1.]), constraint=constraints.positive)
-        #param("width_mode", torch.tensor([1.3, 1.3]), constraint=constraints.interval(0.75,1.75))
-        #param("width_size", torch.tensor([3., 15.]), constraint=constraints.positive)
-        param("height_loc", torch.tensor([1000.]), constraint=constraints.positive)
-        param("height_beta", torch.tensor([1.]), constraint=constraints.positive)
-        param("width_mode", torch.tensor([1.25]), constraint=constraints.interval(0.75,2.25))
-        param("width_size", torch.tensor([5.]), constraint=constraints.positive)
+        param("height_loc", torch.tensor([1000., 1000.]), constraint=constraints.positive)
+        param("height_beta", torch.tensor([1., 1.]), constraint=constraints.positive)
+        param("width_mode", torch.tensor([1.3, 1.3]), constraint=constraints.interval(0.5,3.))
+        param("width_size", torch.tensor([3., 15.]), constraint=constraints.positive)
+        #param("height_loc", torch.tensor([1000.]), constraint=constraints.positive)
+        #param("height_beta", torch.tensor([1.]), constraint=constraints.positive)
+        #param("width_mode", torch.tensor([1.25]), constraint=constraints.interval(0.75,1.75))
+        #param("width_size", torch.tensor([5.]), constraint=constraints.positive)
         param("pi", torch.ones(2), constraint=constraints.simplex)
         param("lamda", torch.tensor([0.1]), constraint=constraints.interval(0.,2.))
 
@@ -67,6 +67,6 @@ class Tracker(Model):
         # Local Parameters
         param("h_beta", torch.ones(1), constraint=constraints.positive)
         param("b_beta", torch.ones(1)*30, constraint=constraints.positive)
-        self.spot_parameters(self.data, theta=True, m=True, prefix="d")
+        self.spot_parameters(self.data, theta=False, m=False, prefix="d")
         if self.control:
-            self.spot_parameters(self.control, theta=False, m=True, prefix="c")
+            self.spot_parameters(self.control, theta=False, m=False, prefix="c")

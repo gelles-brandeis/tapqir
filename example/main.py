@@ -11,10 +11,12 @@ import configparser
 
 from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.tracker import Tracker
+from cosmos.models.marginal import Marginal
 
 
 models = dict()
 models["tracker"] = Tracker
+models["marginal"] = Marginal
 
 # setup and training
 def main(args):
@@ -59,8 +61,16 @@ def main(args):
     logger.info("Model: {}".format(args.model))
     model = models[args.model](data, control, K=2, lr=args.learning_rate, n_batch=args.n_batch, jit=args.jit) # change here
 
-    if args.sample:
-        model.sample()
+    if args.print_shapes:
+        first_available_dim = -6
+        guide_trace = pyro.poutine.trace(model.guide).get_trace()
+        #model_trace = pyro.poutine.trace(pyro.poutine.replay(pyro.poutine.enum(model.model, first_available_dim), guide_trace)).get_trace()
+        model_trace = pyro.poutine.trace(pyro.poutine.enum(model.guide, first_available_dim)).get_trace()
+        #model_trace = pyro.poutine.trace(pyro.poutine.replay(model.model, guide_trace)).get_trace()
+        print(model_trace.format_shapes())
+        print("")
+        print(guide_trace.format_shapes())
+        return
 
     if args.num_steps and not args.sample:
         model.load_checkpoint()
@@ -78,8 +88,9 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--dataset", type=str)
     parser.add_argument("-nc", "--negative-control", type=str)
     parser.add_argument("-dev", "--device", default="cuda0", choices=["cuda0", "cuda1", "cpu"], type=str)
-    parser.add_argument('--jit', action='store_true')
-    parser.add_argument('--sample', action='store_true')
+    parser.add_argument("--jit", action="store_true")
+    parser.add_argument("-p", "--print-shapes", action="store_true")
+    parser.add_argument("--sample", action="store_true")
     args = parser.parse_args()
 
     main(args)
