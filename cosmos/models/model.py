@@ -51,8 +51,8 @@ class Model:
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        self.svi = SVI(pyro.poutine.block(self.model, hide=["width_mode", "width_size"]), self.guide, self.optim, loss=self.elbo)
-        #self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+        #self.svi = SVI(pyro.poutine.block(self.model, hide=["width_loc", "width_beta"]), self.guide, self.optim, loss=self.elbo)
+        self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
         self.logger.debug("D - {}".format(self.D))
         self.logger.debug("K - {}".format(self.K))
         self.logger.debug("data.N - {}".format(self.data.N))
@@ -122,11 +122,11 @@ class Model:
                         with pyro.poutine.mask(mask=m_mask):
                             m_shape = broadcast_shape(m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
                             theta_shape = broadcast_shape(m_mask.shape, theta_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
-                            #height = pyro.sample("height", dist.Gamma(param("height_loc")[theta_mask] * param("height_beta")[theta_mask], param("height_beta")[theta_mask]).mask(m_mask)) # 4,K,N,F,1,1
-                            height = pyro.sample("height", dist.Gamma(param("height_loc") * param("height_beta"), param("height_beta")).expand(m_shape)) # 4,K,N,F,1,1
+                            height = pyro.sample("height", dist.Gamma(param("height_loc")[theta_mask] * param("height_beta")[theta_mask], param("height_beta")[theta_mask]).expand(theta_shape)) # 4,K,N,F,1,1
+                            #height = pyro.sample("height", dist.Gamma(param("height_loc") * param("height_beta"), param("height_beta")).expand(m_shape)) # 4,K,N,F,1,1
                             height = height.masked_fill(~m_mask, 0.)
-                            #width = pyro.sample("width", ScaledBeta(param("width_mode")[theta_mask], param("width_size")[theta_mask], 0.75, 1.5).mask(m_mask)) * 1.5 + 0.75
-                            width = pyro.sample("width", ScaledBeta(param("width_mode"), param("width_size"), 0.75, 1.5).expand(m_shape)) * 1.5 + 0.75
+                            #width = pyro.sample("width", dist.Gamma(param("width_loc") * param("width_beta"), param("width_beta")).expand(m_shape))
+                            width = pyro.sample("width", dist.Gamma(param("width_loc")[theta_mask] * param("width_beta")[theta_mask], param("width_beta")[theta_mask]).expand(theta_shape))
                             x0 = pyro.sample("x0", ScaledBeta(0., self.size[theta_mask], -(self.D+3)/2, self.D+3).expand(theta_shape)) * (self.D+3) - (self.D+3)/2
                             y0 = pyro.sample("y0", ScaledBeta(0., self.size[theta_mask], -(self.D+3)/2, self.D+3).expand(theta_shape)) * (self.D+3) - (self.D+3)/2
 
@@ -188,10 +188,10 @@ class Model:
                             #theta_shape = broadcast_shape(theta_mask.shape, m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
                             #m_shape = broadcast_shape(m_mask.shape, param("{}/h_loc".format(prefix))[batch_idx].shape)
                             #pyro.sample("height", dist.Gamma(Vindex(param("{}/h_loc".format(prefix))[batch_idx])[...,theta_mask] * param("h_beta"), param("h_beta")).expand(theta_shape))
-                            #pyro.sample("width", ScaledBeta(Vindex(param("{}/w_mode".format(prefix))[batch_idx])[...,theta_mask],
                             pyro.sample("height", dist.Gamma(param("{}/h_loc".format(prefix))[batch_idx] * param("h_beta"), param("h_beta")))
-                            pyro.sample("width", ScaledBeta(param("{}/w_mode".format(prefix))[batch_idx],
-                                                            param("{}/w_size".format(prefix))[batch_idx], 0.75, 1.5)) * 1.5 + 0.75
+                            pyro.sample("width", dist.Gamma(param("{}/w_loc".format(prefix))[batch_idx] * param("{}/w_beta".format(prefix))[batch_idx], param("{}/w_beta".format(prefix))[batch_idx]))
+                            #pyro.sample("width", ScaledBeta(param("{}/w_mode".format(prefix))[batch_idx],
+                            #                                param("{}/w_size".format(prefix))[batch_idx], 0.75, 1.5)) * 1.5 + 0.75
                             pyro.sample("x0", ScaledBeta(param("{}/x_mode".format(prefix))[batch_idx],
                                                          param("{}/size".format(prefix))[batch_idx], -(self.D+3)/2, self.D+3)) * (self.D+3) - (self.D+3)/2
                             pyro.sample("y0", ScaledBeta(param("{}/y_mode".format(prefix))[batch_idx],
@@ -202,7 +202,7 @@ class Model:
         param("{}/background_loc".format(prefix), torch.ones(data.N,1,1,1,1)*100., constraint=constraints.positive)
         param("{}/b_loc".format(prefix), torch.ones(data.N,data.F,1,1,1)*30., constraint=constraints.positive)
         #height = torch.ones(data.N,data.F,1,1,self.K,2)*1000.
-        height = torch.ones(data.N,data.F,1,1,self.K)*1000.
+        height = torch.ones(data.N,data.F,1,1,self.K)*100.
         #height[...,1] = 10.
         param("{}/h_loc".format(prefix), height, constraint=constraints.positive)
         if m:
@@ -213,10 +213,10 @@ class Model:
             theta_probs[...,1,1] = 0.
             theta_probs[...,2,2] = 0.
             param("{}/theta_probs".format(prefix), theta_probs, constraint=constraints.simplex)
-        #param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K,2)*1.3, constraint=constraints.interval(0.75,2.25))
-        #param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K,2)*100., constraint=constraints.greater_than(2.))
-        param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.75,2.25))
-        param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
+        param("{}/w_loc".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.positive)
+        param("{}/w_beta".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.positive)
+        #param("{}/w_mode".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*1.3, constraint=constraints.interval(0.75,2.25))
+        #param("{}/w_size".format(prefix), torch.ones(data.N,data.F,1,1,self.K)*100., constraint=constraints.greater_than(2.))
         param("{}/x_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
         param("{}/y_mode".format(prefix), torch.zeros(data.N,data.F,1,1,self.K), constraint=constraints.interval(-(self.D+3)/2,(self.D+3)/2))
         size = torch.ones(data.N,data.F,1,1,self.K)*5.

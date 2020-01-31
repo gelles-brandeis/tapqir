@@ -93,7 +93,7 @@
 #python main.py --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.005 --dataset=FL_2226_3338_0p6OD --negative-control=FL_2226_3338_0p6OD.NegativeControl --device=cuda0
 #python main.py --num-steps=20000 --model=tracker --n-batch=10 --learning-rate=0.005 --dataset=LarryCy3sigma54 --negative-control=LarryCy3sigma54NegativeControl --device=cuda1
 #python main.py --num-steps=20000 --model=tracker --n-batch=16 --learning-rate=0.0043 --dataset=GraceArticleSpt5 --negative-control=GraceArticleSpt5NegativeControl --device=cuda0
-#python main.py --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.006 --dataset=GraceArticlePol2 --negative-control=GraceArticlePol2NegativeControl --device=cuda1
+python main.py --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.0045 --dataset=GraceArticlePol2 --negative-control=GraceArticlePol2NegativeControl --device=cuda1
 #python main.py --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.005 --dataset=FL_3339_4444_0p8OD --negative-control=FL_3339_4444_0p8OD.NegativeControl --device=cuda1
-python main.py --num-steps=30000 --model=tracker --n-batch=16 --learning-rate=0.005 --dataset=LarryCy3sigma54Short --negative-control=LarryCy3sigma54NegativeControlShort --device=cuda0
+#python main.py --num-steps=30000 --model=tracker --n-batch=16 --learning-rate=0.005 --dataset=LarryCy3sigma54Short --negative-control=LarryCy3sigma54NegativeControlShort --device=cuda0
 #python main.py --num-steps=5000 --model=marginal --n-batch=16 --learning-rate=0.005 --dataset=LarryCy3sigma54Short --negative-control=LarryCy3sigma54NegativeControlShort --device=cuda1
