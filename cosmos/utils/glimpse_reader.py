@@ -142,6 +142,10 @@ class GlimpseDataset(Dataset):
             self.drift_df = self.drift_df.loc[f1:f2]
             aoi_list = np.array([210,235,240,245,318])
             self.aoi_df = self.aoi_df.loc[aoi_list]
+        elif self.name in ["GraceArticlePol2NegativeControl1"]:
+            self.aoi_df = self.aoi_df.loc[:263]
+        elif self.name in ["GraceArticlePol2NegativeControl2"]:
+            self.aoi_df = self.aoi_df.loc[264:]
         elif self.name in ["Gracecy3Short"]:
             aoi_list = np.arange(160,240)
             self.aoi_df = self.aoi_df.loc[aoi_list]
@@ -163,6 +167,7 @@ class GlimpseDataset(Dataset):
                 self.labels.loc[self.labels["spotpicker"] == 0, "spotpicker"] = 3
                 self.labels.loc[self.labels["spotpicker"] == 2, "spotpicker"] = 0
             else:
+                #import pdb; pdb.set_trace()
                 labels_mat = loadmat(self.path_to["labels"])
                 index = pd.MultiIndex.from_product([self.aoi_df.index.values, self.drift_df.index.values], names=["aoi", "frame"])
                 self.labels = pd.DataFrame(data=np.zeros((len(self.aoi_df)*len(self.drift_df),3)), columns=["spotpicker", "probs", "binary"], index=index)

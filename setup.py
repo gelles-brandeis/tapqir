@@ -27,6 +27,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "jupyter", "future", "configparser",
+        "torch",
+        "pyro-ppl", "tb-nightly",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import pandas as pd
 from matplotlib.patches import Rectangle
-from sklearn.metrics import matthews_corrcoef
+from sklearn.metrics import matthews_corrcoef, confusion_matrix
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -26,9 +26,9 @@ def write_summary(epoch_count, epoch_loss, model, svi, writer_scalar, writer_his
     writer_scalar.add_scalar("-ELBO", epoch_loss, epoch_count)
     if mcc:
         mask = model.data.labels["spotpicker"].values < 2
-        z_probs = (pyro.param("d/m_probs").squeeze() * pyro.param("d/theta_probs").squeeze()[...,1:].sum(dim=-1)).sum(dim=-1)
-        model.data.labels["probs"] = z_probs.reshape(-1).detach().cpu().numpy()
-        model.data.labels["binary"] = model.data.labels["probs"] > 0.5
+        scalars = {key: value for key, value in zip(["TN","FP", "FN", "TP"], confusion_matrix(model.data.labels["spotpicker"].values[mask], model.data.labels["binary"].values[mask]).ravel())}
+        writer_scalar.add_scalars("POSITIVES", {k: scalars[k] for k in ("FN", "TP")}, epoch_count)
+        writer_scalar.add_scalars("NEGATIVES", {k: scalars[k] for k in ("TN", "FP")}, epoch_count)
         writer_scalar.add_scalar("MCC", matthews_corrcoef(model.data.labels["spotpicker"].values[mask], model.data.labels["binary"].values[mask]), epoch_count)
     
     for p, value in pyro.get_param_store().named_parameters():
