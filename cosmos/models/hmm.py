@@ -136,38 +136,39 @@ class Model:
     def spot_model(self, data, m_pi, theta_pi, data_mask, prefix):
         with scope(prefix=prefix):
             N_plate = pyro.plate("N_plate", data.N, dim=-5)
-            F_plate = pyro.plate("F_plate", data.F, dim=-4)
+            F_plate = pyro.markov("F_plate", data.F, dim=-4)
             X_plate = pyro.plate("X_plate", self.D, dim=-3)
             Y_plate = pyro.plate("Y_plate", self.D, dim=-2)
             K_plate = pyro.plate("K_plate", self.K, dim=-1)
-            with N_plate as batch_idx, F_plate:
-                with poutine.mask(mask=data_mask[batch_idx]):
+            with N_plate as batch_idx:
+                theta = 0
+                for f in F_plate:
                     background = pyro.sample(
-                        "background", dist.Gamma(
+                        "background_{}".format(f), dist.Gamma(
                             param("{}/background_loc".format(prefix))[batch_idx]
                             * param("background_beta"), param("background_beta")))
-                    m = pyro.sample("m", dist.Categorical(m_pi))
+                    m = pyro.sample("m_{}".format(f), dist.Categorical(m_pi))
                     m_mask = self.M_MATRIX[m.squeeze(dim=-1)].bool()
                     if theta_pi is not None:
                         theta = pyro.sample(
-                            "theta", dist.Categorical(theta_pi[m])).squeeze(dim=-1)
+                            "theta_{}".format(f), dist.Categorical(theta_pi[m])).squeeze(dim=-1)
                     else:
                         theta = torch.tensor([0]).long()
                     theta_mask = self.THETA_MATRIX[theta]
 
                     with K_plate:
                         height = pyro.sample(
-                            "height", dist.Gamma(
+                            "height_{}".format(f), dist.Gamma(
                                 param("height_loc") * param("height_beta"),
                                 param("height_beta")))
                         width = pyro.sample(
-                            "width", ScaledBeta(
+                            "width_{}".format(f), ScaledBeta(
                                 param("width_mode"), param("width_size"), 0.5, 2.))
                         x0 = pyro.sample(
-                            "x0", ScaledBeta(
+                            "x0_{}".format(f), ScaledBeta(
                                 0, self.size[theta_mask], -(self.D+3)/2, self.D+3))
                         y0 = pyro.sample(
-                            "y0", ScaledBeta(
+                            "y0_{}".format(f), ScaledBeta(
                                 0, self.size[theta_mask], -(self.D+3)/2, self.D+3))
 
                     height = height.masked_fill(~m_mask, 0.)
@@ -180,10 +181,9 @@ class Model:
                         + background
                     with X_plate, Y_plate:
                         pyro.sample(
-                            "data", self.CameraUnit(
+                            "data_{}".format(f), self.CameraUnit(
                                 locs, param("gain"), param("offset")),
-                            obs=data[batch_idx].unsqueeze(dim=-1))
-        return theta
+                            obs=data[batch_idx,f].unsqueeze(dim=-1))
 
     def spot_guide(self, data, n_batch, theta, m, data_mask, prefix):
         """
@@ -194,44 +194,35 @@ class Model:
         """
         with scope(prefix=prefix):
             N_plate = pyro.plate("N_plate", data.N,
-                                 subsample_size=n_batch, dim=-5)
-            F_plate = pyro.plate("F_plate", data.F, dim=-4)
+                                 subsample_size=self.n_batch, dim=-5)
+            F_plate = pyro.markov("F_plate", data.F, dim=-4)
             K_plate = pyro.plate("K_plate", self.K, dim=-1)
-            with N_plate as batch_idx, F_plate:
-                with poutine.mask(mask=data_mask[batch_idx]):
+            with N_plate as batch_idx:
+                for f in F_plate:
                     self.batch_idx = batch_idx
                     pyro.sample(
-                        "background", dist.Gamma(
-                            param("{}/b_loc".format(prefix))[batch_idx]
+                        "background_{}".format(f), dist.Gamma(
+                            param("{}/b_loc".format(prefix))[batch_idx,f]
                             * param("b_beta"), param("b_beta")))
-                    if m:
-                        m = pyro.sample(
-                            "m", dist.Categorical(
-                                param("{}/m_probs".format(prefix))[batch_idx]))
-                    if theta:
-                        pyro.sample(
-                            "theta", dist.Categorical(
-                                Vindex(param("{}/theta_probs"
-                                       .format(prefix))[batch_idx])[..., m, :]))
                     with K_plate:
                         pyro.sample(
-                            "height", dist.Gamma(
-                                param("{}/h_loc".format(prefix))[batch_idx]
+                            "height_{}".format(f), dist.Gamma(
+                                param("{}/h_loc".format(prefix))[batch_idx,f]
                                 * param("h_beta"), param("h_beta")))
                         pyro.sample(
-                            "width", ScaledBeta(
-                                param("{}/w_mode".format(prefix))[batch_idx],
-                                param("{}/w_size".format(prefix))[batch_idx],
+                            "width_{}".format(f), ScaledBeta(
+                                param("{}/w_mode".format(prefix))[batch_idx,f],
+                                param("{}/w_size".format(prefix))[batch_idx,f],
                                 0.5, 2.))
                         pyro.sample(
-                            "x0", ScaledBeta(
-                                param("{}/x_mode".format(prefix))[batch_idx],
-                                param("{}/size".format(prefix))[batch_idx],
+                            "x0_{}".format(f), ScaledBeta(
+                                param("{}/x_mode".format(prefix))[batch_idx,f],
+                                param("{}/size".format(prefix))[batch_idx,f],
                                 -(self.D+3)/2, self.D+3))
                         pyro.sample(
-                            "y0", ScaledBeta(
-                                param("{}/y_mode".format(prefix))[batch_idx],
-                                param("{}/size".format(prefix))[batch_idx],
+                            "y0_{}".format(f), ScaledBeta(
+                                param("{}/y_mode".format(prefix))[batch_idx,f],
+                                param("{}/size".format(prefix))[batch_idx,f],
                                 -(self.D+3)/2, self.D+3))
 
     def spot_parameters(self, data, theta, m, prefix):

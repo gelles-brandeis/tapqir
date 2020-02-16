@@ -12,7 +12,7 @@ class Marginal(Model):
     def __init__(self, data, control,
                  K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "marginal"
-        self.mcc = False
+        self.mcc = True
         super().__init__(data, control,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
@@ -26,11 +26,12 @@ class Marginal(Model):
         else:
             self.data_mask = torch.ones(
                 self.data.N, self.data.F, 1, 1, 1).bool()
-            self.control_mask = torch.ones(
-                self.control.N, self.control.F, 1, 1, 1).bool()
+            if self.control:
+                self.control_mask = torch.ones(
+                    self.control.N, self.control.F, 1, 1, 1).bool()
 
     @config_enumerate
-    def model(self):
+    def model(self, n_batch):
         self.model_parameters()
         data_m_pi = m_param(param("pi"), param("lamda"), self.K)  # 2**K
         control_m_pi = m_param(
@@ -47,14 +48,14 @@ class Marginal(Model):
                 self.control, control_m_pi, None,
                 self.control_mask, prefix="c")
 
-    def guide(self):
+    def guide(self, n_batch):
         self.guide_parameters()
         self.spot_guide(
-            self.data, theta=False, m=False,
+            self.data, n_batch, theta=False, m=False,
             data_mask=self.data_mask, prefix="d")
         if self.control:
             self.spot_guide(
-                self.control, theta=False, m=False,
+                self.control, n_batch, theta=False, m=False,
                 data_mask=self.control_mask, prefix="c")
 
     def model_parameters(self):
@@ -65,7 +66,7 @@ class Marginal(Model):
               constraint=constraints.positive)
         param("height_loc", torch.tensor([1000.]),
               constraint=constraints.positive)
-        param("height_beta", torch.tensor([1.]),
+        param("height_beta", torch.tensor([0.01]),
               constraint=constraints.positive)
         param("width_mode", torch.tensor([1.25]),
               constraint=constraints.interval(0.5, 2.5))

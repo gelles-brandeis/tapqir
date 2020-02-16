@@ -8,6 +8,8 @@ from tqdm import tqdm
 import argparse
 import logging
 import configparser
+from pyro.infer import infer_discrete
+from pyro import poutine
 
 from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.tracker import Tracker
@@ -74,6 +76,12 @@ def main(args):
 
     if args.num_steps and not args.sample:
         model.load_checkpoint()
+        #guide_trace = poutine.trace(model.guide).get_trace()
+        #trained_model = poutine.replay(poutine.enum(model.model), trace=guide_trace)
+        #inferred_model = infer_discrete(trained_model, temperature=0,
+        #                                first_available_dim=-6)
+        #model_trace = poutine.trace(trained_model).get_trace()
+        #trace = poutine.trace(inferred_model).get_trace()
         model.train(args.num_steps) 
 
 # parse command-line arguments and execute the main method
