@@ -18,20 +18,29 @@ def poisson(x, lamda):
     return dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
 
 
-def m_param(pi, lamda, K):
+def j_param(pi, K):
     """
     p(m) = p(z+j=m) = p(z=1) * p(j=m-1) + p(z=0) * p(j=m)
     """
-    m_pi = torch.zeros(2**K)
-    m_pi[0] = bernoulli(0., pi) * poisson(0., lamda)
-    k = 1
-    for m in range(1, K+1):
-        r = int(math.factorial(K)/(math.factorial(K-m)*math.factorial(m)))
-        for _ in range(r):
-            m_pi[k] = (
-                bernoulli(1, pi) * poisson(m-1, lamda)
-                + bernoulli(0, pi) * poisson(m, lamda)) / r
-            k += 1
+    j_pi = torch.zeros(2,2)
+    j_pi[0] = pi
+    j_pi[1] = torch.tensor([1., 0.])
+    #j_pi[0,2] = poisson(2, lamda)
+    #j_pi[1,0] = poisson(0, lamda)
+    #j_pi[1,1] = poisson(1, lamda)
+    return j_pi
+
+
+def m_param(lamda, K):
+    """
+    p(m) = p(z+j=m) = p(z=1) * p(j=m-1) + p(z=0) * p(j=m)
+    """
+    m_pi = torch.zeros(2,K+1)
+    m_pi[0,0] = poisson(0, lamda)
+    m_pi[0,1] = poisson(1, lamda)
+    m_pi[0,2] = 1 - m_pi[0].sum()
+    m_pi[1,1] = poisson(0, lamda)
+    m_pi[1,2] = 1 - m_pi[1].sum()
     return m_pi
 
 

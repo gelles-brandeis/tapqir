@@ -21,7 +21,7 @@ from itertools import product
 from pyro import poutine
 
 
-class Model:
+class HMM:
     """ Gaussian Spot Model """
     def __init__(self, data, control,
                  K, lr, n_batch, jit,
@@ -61,7 +61,7 @@ class Model:
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO) \
-            (max_plate_nesting=5, ignore_jit_warnings=True)
+            (max_plate_nesting=4, ignore_jit_warnings=True)
         #self.param_path = os.path.join(
         #    self.data.path, "runs", "{}".format(self.data.name),
         #    "marginalfixed", "K{}".format(self.K),
@@ -79,13 +79,13 @@ class Model:
         #        self.guide,
         #        hide=[param for param in pyro.get_param_store().keys()]),
         #    self.optim, loss=self.elbo)
-        #self.svi = SVI(
-        #    poutine.block(
-        #        self.model,
-        #        hide=["width_mode", "width_size", "height_loc", "height_beta"]),
+        self.svi = SVI(
+            poutine.block(
+                self.model,
+                hide=["width_mode", "width_size", "height_loc", "height_beta"]),
         #        hide=["width_mode", "width_size"]),
-        #    self.guide, self.optim, loss=self.elbo)
-        self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+            self.guide, self.optim, loss=self.elbo)
+        #self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
         self.logger.debug("D - {}".format(self.D))
         self.logger.debug("K - {}".format(self.K))
         self.logger.debug("data.N - {}".format(self.data.N))
@@ -98,27 +98,13 @@ class Model:
         self.logger.info("Batch size - {}".format(self.n_batch))
         self.logger.info("{}".format("jit" if jit else "nojit"))
 
-        """
-        M_MATRIX
-        tensor([[0, 0],
-        [0, 1],
-        [1, 0],
-        [1, 1]])
-
-        THETA_MATRIX:
-        tensor([[0, 0],
-        [1, 0],
-        [0, 1]])
-        """
-        self.M_MATRIX = torch.tensor(
-            [p for p in product((0, 1), repeat=self.K)]).long()  # 2**K,K
-        self.THETA_MATRIX = torch.eye(
-            self.K+1)[:, 1:].long()  # K+1,K
+        self.J_MATRIX = torch.tensor([[0, 0], [0, 1], [1, 1]])
+        self.Z_MATRIX = torch.tensor([[0, 0], [1, 0]])
         self.size = torch.tensor([2., (((self.D+3)/(2*0.5))**2 - 1)])
 
         self.path = os.path.join(
             self.data.path, "runs", "{}".format(self.data.name),
-            "{}fixed".format(self.__name__), "K{}".format(self.K),
+            "{}hmm".format(self.__name__), "K{}".format(self.K),
             "{}".format("jit" if jit else "nojit"),
             "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
             "{}".format(self.n_batch))
@@ -133,101 +119,95 @@ class Model:
     def guide(self):
         raise NotImplementedError
 
-    def spot_model(self, data, m_pi, theta_pi, data_mask, prefix):
-        with scope(prefix=prefix):
-            N_plate = pyro.plate("N_plate", data.N, dim=-5)
-            F_plate = pyro.markov("F_plate", data.F, dim=-4)
-            X_plate = pyro.plate("X_plate", self.D, dim=-3)
-            Y_plate = pyro.plate("Y_plate", self.D, dim=-2)
-            K_plate = pyro.plate("K_plate", self.K, dim=-1)
-            with N_plate as batch_idx:
-                theta = 0
-                for f in F_plate:
-                    background = pyro.sample(
-                        "background_{}".format(f), dist.Gamma(
-                            param("{}/background_loc".format(prefix))[batch_idx]
-                            * param("background_beta"), param("background_beta")))
-                    m = pyro.sample("m_{}".format(f), dist.Categorical(m_pi))
-                    m_mask = self.M_MATRIX[m.squeeze(dim=-1)].bool()
-                    if theta_pi is not None:
-                        theta = pyro.sample(
-                            "theta_{}".format(f), dist.Categorical(theta_pi[m])).squeeze(dim=-1)
-                    else:
-                        theta = torch.tensor([0]).long()
-                    theta_mask = self.THETA_MATRIX[theta]
+    def spot_model(self, data, z, j_pi, data_mask, prefix):
+        #with scope(prefix=prefix):
+        N_plate = pyro.plate("N_plate", data.N, dim=-4)
+        X_plate = pyro.plate("X_plate", self.D, dim=-3)
+        Y_plate = pyro.plate("Y_plate", self.D, dim=-2)
+        K_plate = pyro.plate("K_plate", self.K, dim=-1)
+        with N_plate as batch_idx:
+            for f in pyro.markov(range(data.F)):
+                z = 0
+                background = pyro.sample(
+                    "background_{}".format(f), dist.Gamma(
+                        param("{}/background_loc".format(prefix))[batch_idx]
+                        * param("background_beta"), param("background_beta")))
+                if z:
+                    z = pyro.sample("z_{}".format(f), dist.Categorical(param("A")[z]),
+                                    infer={"enumerate": "parallel"})
+                else:
+                    z = torch.tensor([0]).long()
+                j = pyro.sample("j_{}".format(f), dist.Categorical(j_pi[z]),
+                                infer={"enumerate": "parallel"})
+                z_mask = self.Z_MATRIX[z.squeeze(dim=-1)]
+                j_mask = self.J_MATRIX[j.squeeze(dim=-1)]
+                m_mask = (z_mask + j_mask).bool()
 
-                    with K_plate:
-                        height = pyro.sample(
-                            "height_{}".format(f), dist.Gamma(
-                                param("height_loc") * param("height_beta"),
-                                param("height_beta")))
-                        width = pyro.sample(
-                            "width_{}".format(f), ScaledBeta(
-                                param("width_mode"), param("width_size"), 0.5, 2.))
-                        x0 = pyro.sample(
-                            "x0_{}".format(f), ScaledBeta(
-                                0, self.size[theta_mask], -(self.D+3)/2, self.D+3))
-                        y0 = pyro.sample(
-                            "y0_{}".format(f), ScaledBeta(
-                                0, self.size[theta_mask], -(self.D+3)/2, self.D+3))
+                with K_plate:
+                    height = pyro.sample(
+                        "height_{}".format(f), dist.Gamma(
+                            param("height_loc") * param("height_beta"),
+                            param("height_beta")))
+                    width = pyro.sample(
+                        "width_{}".format(f), ScaledBeta(
+                            param("width_mode"), param("width_size"), 0.5, 2.))
+                    x0 = pyro.sample(
+                        "x0_{}".format(f), ScaledBeta(
+                            0, self.size[z_mask], -(self.D+3)/2, self.D+3))
+                    y0 = pyro.sample(
+                        "y0_{}".format(f), ScaledBeta(
+                            0, self.size[z_mask], -(self.D+3)/2, self.D+3))
 
-                    height = height.masked_fill(~m_mask, 0.)
-                    width = width * 2. + 0.5
-                    x0 = x0 * (self.D+3) - (self.D+3)/2
-                    y0 = y0 * (self.D+3) - (self.D+3)/2
+                height = height.masked_fill(~m_mask, 0.)
+                width = width * 2. + 0.5
+                x0 = x0 * (self.D+3) - (self.D+3)/2
+                y0 = y0 * (self.D+3) - (self.D+3)/2
 
-                    target_locs = data.target_locs[batch_idx]
-                    locs = self.gaussian_spot(target_locs, height, width, x0, y0) \
-                        + background
-                    with X_plate, Y_plate:
-                        pyro.sample(
-                            "data_{}".format(f), self.CameraUnit(
-                                locs, param("gain"), param("offset")),
-                            obs=data[batch_idx,f].unsqueeze(dim=-1))
-
-    def spot_guide(self, data, n_batch, theta, m, data_mask, prefix):
-        """
-        ixij = Vindex(x)[i, :, j]
-        batch_shape = broadcast_shape(i.shape, j.shape)
-        event_shape = (x.size(1),)
-        assert xij.shape == batch_shape + event_shape
-        """
-        with scope(prefix=prefix):
-            N_plate = pyro.plate("N_plate", data.N,
-                                 subsample_size=self.n_batch, dim=-5)
-            F_plate = pyro.markov("F_plate", data.F, dim=-4)
-            K_plate = pyro.plate("K_plate", self.K, dim=-1)
-            with N_plate as batch_idx:
-                for f in F_plate:
-                    self.batch_idx = batch_idx
+                target_locs = data.target_locs[batch_idx,f]
+                locs = self.gaussian_spot(target_locs, height, width, x0, y0) \
+                    + background
+                with X_plate, Y_plate:
                     pyro.sample(
-                        "background_{}".format(f), dist.Gamma(
-                            param("{}/b_loc".format(prefix))[batch_idx,f]
-                            * param("b_beta"), param("b_beta")))
-                    with K_plate:
-                        pyro.sample(
-                            "height_{}".format(f), dist.Gamma(
-                                param("{}/h_loc".format(prefix))[batch_idx,f]
-                                * param("h_beta"), param("h_beta")))
-                        pyro.sample(
-                            "width_{}".format(f), ScaledBeta(
-                                param("{}/w_mode".format(prefix))[batch_idx,f],
-                                param("{}/w_size".format(prefix))[batch_idx,f],
-                                0.5, 2.))
-                        pyro.sample(
-                            "x0_{}".format(f), ScaledBeta(
-                                param("{}/x_mode".format(prefix))[batch_idx,f],
-                                param("{}/size".format(prefix))[batch_idx,f],
-                                -(self.D+3)/2, self.D+3))
-                        pyro.sample(
-                            "y0_{}".format(f), ScaledBeta(
-                                param("{}/y_mode".format(prefix))[batch_idx,f],
-                                param("{}/size".format(prefix))[batch_idx,f],
-                                -(self.D+3)/2, self.D+3))
+                        "data_{}".format(f), self.CameraUnit(
+                            locs, param("gain"), param("offset")),
+                        obs=data[batch_idx, f].unsqueeze(dim=-1))
 
-    def spot_parameters(self, data, theta, m, prefix):
+    def spot_guide(self, data, data_mask, prefix):
+        #with scope(prefix=prefix):
+        N_plate = pyro.plate("N_plate", data.N,
+                             subsample_size=self.n_batch, dim=-4)
+        K_plate = pyro.plate("K_plate", self.K, dim=-1)
+        with N_plate as batch_idx:
+            for f in pyro.markov(range(data.F)):
+                self.batch_idx = batch_idx
+                pyro.sample(
+                    "background_{}".format(f), dist.Gamma(
+                        param("{}/b_loc".format(prefix))[batch_idx, f]
+                        * param("b_beta"), param("b_beta")))
+                with K_plate:
+                    pyro.sample(
+                        "height_{}".format(f), dist.Gamma(
+                            param("{}/h_loc".format(prefix))[batch_idx, f]
+                            * param("h_beta"), param("h_beta")))
+                    pyro.sample(
+                        "width_{}".format(f), ScaledBeta(
+                            param("{}/w_mode".format(prefix))[batch_idx, f],
+                            param("{}/w_size".format(prefix))[batch_idx, f],
+                            0.5, 2.))
+                    pyro.sample(
+                        "x0_{}".format(f), ScaledBeta(
+                            param("{}/x_mode".format(prefix))[batch_idx, f],
+                            param("{}/size".format(prefix))[batch_idx, f],
+                            -(self.D+3)/2, self.D+3))
+                    pyro.sample(
+                        "y0_{}".format(f), ScaledBeta(
+                            param("{}/y_mode".format(prefix))[batch_idx, f],
+                            param("{}/size".format(prefix))[batch_idx, f],
+                            -(self.D+3)/2, self.D+3))
+
+    def spot_parameters(self, data, prefix):
         param("{}/background_loc".format(prefix),
-              torch.ones(data.N, 1, 1, 1, 1) * 100.,
+              torch.ones(data.N, 1, 1, 1) * 100.,
               constraint=constraints.positive)
         param("{}/b_loc".format(prefix),
               torch.ones(data.N, data.F, 1, 1, 1) * 30.,
@@ -235,18 +215,6 @@ class Model:
         param("{}/h_loc".format(prefix),
               torch.ones(data.N, data.F, 1, 1, self.K) * 1000.,
               constraint=constraints.positive)
-        if m:
-            param("{}/m_probs".format(prefix),
-                  torch.ones(data.N, data.F, 1, 1, 1, 2**self.K),
-                  constraint=constraints.simplex)
-        if theta:
-            theta_probs = torch.ones(
-                data.N, data.F, 1, 1, 1, 2**self.K, self.K+1)
-            theta_probs[..., 0, 1:] = 0.
-            theta_probs[..., 1, 1] = 0.
-            theta_probs[..., 2, 2] = 0.
-            param("{}/theta_probs".format(prefix),
-                  theta_probs, constraint=constraints.simplex)
         param("{}/w_mode".format(prefix),
               torch.ones(data.N, data.F, 1, 1, self.K) * 1.3,
               constraint=constraints.interval(0.5, 2.5))
@@ -260,7 +228,7 @@ class Model:
               torch.zeros(data.N, data.F, 1, 1, self.K),
               constraint=constraints.interval(-(self.D+3)/2, (self.D+3)/2))
         size = torch.ones(data.N, data.F, 1, 1, self.K)*5.
-        size[..., 1] = ((self.D+3) / (2*0.5)) ** 2 - 1
+        size[..., 0] = ((self.D+3) / (2*0.5)) ** 2 - 1
         param("{}/size".format(prefix),
               size, constraint=constraints.greater_than(2.))
 
@@ -288,7 +256,7 @@ class Model:
         for epoch in tqdm(range(num_steps)):
             # with torch.autograd.detect_anomaly():
             #import pdb; pdb.set_trace()
-            self.epoch_loss = self.svi.step(self.n_batch)
+            self.epoch_loss = self.svi.step()
             if not self.epoch_count % 100:
                 #write_summary(self.epoch_count, epoch_loss,
                 #              self, self.svi, self.writer_scalar,
@@ -313,17 +281,20 @@ class Model:
                     self.writer_scalar.add_scalars("{}".format(p), scalars, self.epoch_count)
             if self.mcc:
                 #import pdb; pdb.set_trace()
-                guide_trace = poutine.trace(self.guide).get_trace(self.n_batch)
+                guide_trace = poutine.trace(self.guide).get_trace()
                 trained_model = poutine.replay(poutine.enum(self.model), trace=guide_trace)
                 inferred_model = infer_discrete(trained_model, temperature=0,
                                                 first_available_dim=-6)
-                trace = poutine.trace(inferred_model).get_trace(self.n_batch)
-                predictions = (trace.nodes["d/theta"]["value"] > 0).cpu().reshape(-1)
+                trace = poutine.trace(inferred_model).get_trace()
+                predictions = trace.nodes["d/z"]["value"].cpu().reshape(-1)
                 true_labels = self.data.labels["spotpicker"].values.reshape(self.data.N,self.data.F)[self.batch_idx.cpu()].reshape(-1)
-                self.writer_scalar.add_scalar("MCC", matthews_corrcoef(true_labels, predictions), self.epoch_count)
-                scalars = {key: value for key, value in zip(["TN","FP", "FN", "TP"], confusion_matrix(true_labels, predictions).ravel())}
-                self.writer_scalar.add_scalars("POSITIVES", {k: scalars[k] for k in ("FN", "TP")}, self.epoch_count)
-                self.writer_scalar.add_scalars("NEGATIVES", {k: scalars[k] for k in ("TN", "FP")}, self.epoch_count)
+                mcc = matthews_corrcoef(true_labels, predictions)
+                tn, fp, fn, tp = confusion_matrix(true_labels, predictions).ravel()
+                scalars = {}
+                scalars["MCC"] = mcc
+                scalars["TNR"] = tn / (tn + fp)
+                scalars["TPR"] = tp / (tp + fn)
+                self.writer_scalar.add_scalars("ACCURACY", scalars, self.epoch_count)
                 #z_probs = torch.sum(
                 #    param("d/m_probs").squeeze()
                 #    * param("d/theta_probs").squeeze()[..., 1:].sum(dim=-1),

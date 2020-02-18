@@ -74,6 +74,9 @@ def main(args):
         print(guide_trace.format_shapes())
         return
 
+    if args.mcmc:
+        model.mcmc()
+
     if args.num_steps and not args.sample:
         model.load_checkpoint()
         #guide_trace = poutine.trace(model.guide).get_trace()
@@ -99,6 +102,7 @@ if __name__ == '__main__':
     parser.add_argument("--jit", action="store_true")
     parser.add_argument("-p", "--print-shapes", action="store_true")
     parser.add_argument("--sample", action="store_true")
+    parser.add_argument("--mcmc", action="store_true")
     args = parser.parse_args()
 
     main(args)

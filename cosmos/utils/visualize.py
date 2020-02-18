@@ -50,16 +50,14 @@ def view_glimpse(frame, aoi, aoi_df, drift_df, header,
 
 
 def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
-    if m or z:
+    if m:
         k_probs = np.zeros((len(data.drift), 2))
         k_probs[:, 0] = param("{}/m_probs".format(prefix)).squeeze().data[aoi, :, 2] \
             + param("{}/m_probs".format(prefix)).squeeze().data[aoi, :, 3]
         k_probs[:, 1] = param("{}/m_probs".format(prefix)).squeeze().data[aoi, :, 1] \
             + param("{}/m_probs".format(prefix)).squeeze().data[aoi, :, 3]
     if z:
-        z_probs = (pyro.param("d/m_probs").squeeze()[aoi]
-                   * pyro.param("d/theta_probs").squeeze()[aoi, ..., 1:]
-                   .sum(dim=-1)).sum(dim=-1).data
+        z_probs = pyro.param("d/z_probs").squeeze().data[aoi, ..., 1]
 
     plt.figure(figsize=(25, 5))
     if m:
@@ -92,7 +90,6 @@ def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
 
 def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
     if m:
-        k_probs = torch.zeros(len(data.drift), 1, 1, 1, 2)
         k_probs[..., 0] = param("{}/m_probs".format(prefix)).data[aoi, ..., 2] \
             + param("{}/m_probs".format(prefix)).data[aoi, ..., 3]
         k_probs[..., 1] = param("{}/m_probs".format(prefix)).data[aoi, ..., 1] \
@@ -103,6 +100,7 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
         m_colors[0, :, 3] = k_probs[:, 0]
         m_colors[1] += to_rgba_array("C1")
         m_colors[1, :, 3] = k_probs[:, 1]
+    k_probs = torch.zeros(len(data.drift), 1, 1, 1, 2)
 
     plt.figure(figsize=(15, 3 * len(params)))
     for i, p in enumerate(params):
@@ -110,14 +108,16 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
         if p == "background":
             hpd = hpdi(dist.Gamma(
                 param("{}/b_loc".format(prefix))[aoi].data
-                * param("b_beta").data, param("b_beta").data)
+                * param("{}/b_beta".format(prefix))[aoi].data,
+                param("{}/b_beta".format(prefix))[aoi].data)
                 .sample((500,)), 0.95, dim=0)
             mean = param("{}/b_loc".format(prefix))[aoi].data
             plt.ylim(0, hpd.max()+1)
         elif p == "intensity":
             hpd = hpdi(dist.Gamma(
                 param("{}/h_loc".format(prefix))[aoi].data
-                * param("h_beta").data, param("h_beta").data)
+                * param("{}/h_beta".format(prefix))[aoi].data,
+                param("{}/h_beta".format(prefix))[aoi].data)
                 .sample((500,)), 0.95, dim=0)
             mean = param("{}/h_loc".format(prefix))[aoi].data
             plt.ylim(0, hpd.max()+10)
