@@ -73,3 +73,11 @@ def theta_param(pi, lamda, K):
     theta_pi[3,1] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
     theta_pi[3,2] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
     return theta_pi
+
+def z_probs_calc(m_probs, theta_probs):
+    return (m_probs * theta_probs[..., 1:].sum(dim=-1)).sum(dim=-1).cpu().data
+
+def k_probs_calc(m_probs):
+    return torch.stack((m_probs[..., 1] + m_probs[..., 3],
+                        m_probs[..., 2] + m_probs[..., 3]),
+                        dim=-1).squeeze(dim=-2).cpu().data
