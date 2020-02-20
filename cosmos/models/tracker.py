@@ -7,7 +7,7 @@ import os
 import pyro
 
 from cosmos.models.model import Model
-from cosmos.models.helper import j_param
+from cosmos.models.helper import m_param, theta_param
 
 
 class Tracker(Model):
@@ -36,45 +36,65 @@ class Tracker(Model):
                 self.control_mask = torch.ones(
                     self.control.N, self.control.F, 1, 1, 1).bool()
 
-        self.param_path = os.path.join(
-            self.data.path, "runs", "{}".format(self.data.name),
-            "marginalnn", "K{}".format(self.K),
-            "{}".format("jit" if jit else "nojit"),
-            "lr0.005", "{}".format(self.optim_fn.__name__),
-            "{}".format(self.n_batch))
-        pyro.get_param_store().load(
-            os.path.join(self.param_path, "params"),
-            map_location=self.data.device)
+        #self.param_path = os.path.join(
+        #    self.data.path, "runs", "{}".format(self.data.name),
+        #    "marginalnn", "K{}".format(self.K),
+        #    "{}".format("jit" if jit else "nojit"),
+        #    "lr0.005", "{}".format(self.optim_fn.__name__),
+        #    "{}".format(self.n_batch))
+        #pyro.get_param_store().load(
+        #    os.path.join(self.param_path, "params"),
+        #    map_location=self.data.device)
 
-    @poutine.block(hide_types=["param"])
+    @poutine.block(hide=["width_mode", "width_size"])
     def model(self):
         self.model_parameters()
-        j_pi = j_param(param("lamda"), self.K)  # 2**K
+        data_m_pi = m_param(param("pi"), param("lamda"), self.K) # 2**K
+        control_m_pi = m_param(torch.tensor([1., 0.]), param("lamda"), self.K) # 2**K
+        theta_pi = theta_param(param("pi"), param("lamda"), self.K) # 2**K,K+1
 
-        self.spot_model(
-            self.data, True, j_pi,
-            self.data_mask, prefix="d")
-
+        self.spot_model(self.data, data_m_pi, theta_pi, self.data_mask, prefix="d")
+    
         if self.control:
-            self.spot_model(
-                self.control, False, j_pi,
-                self.control_mask, prefix="c")
+            self.spot_model(self.control, control_m_pi, None, self.control_mask, prefix="c")
 
-    @poutine.block(expose_types=["sample"], expose=["d/z_probs", "d/j_probs", "c/j_probs"])
     @config_enumerate
     def guide(self):
         self.guide_parameters()
-        self.spot_guide(
-            self.data, True, True,
-            data_mask=self.data_mask, prefix="d")
+        self.spot_guide(self.data, True, self.data_mask, prefix="d")
+
         if self.control:
-            self.spot_guide(
-                self.control, False, True,
-                data_mask=self.control_mask, prefix="c")
+            self.spot_guide(self.control, False, self.control_mask, prefix="c")
+
+    #@poutine.block(hide_types=["param"])
+    #def model(self):
+    #    self.model_parameters()
+    #    j_pi = j_param(param("lamda"), self.K)  # 2**K
+
+    #    self.spot_model(
+    #        self.data, m_pi, theta_pi,
+    #        self.data_mask, prefix="d")
+
+    #    if self.control:
+    #        self.spot_model(
+    #            self.control, False, j_pi,
+    #            self.control_mask, prefix="c")
+
+    #@poutine.block(expose_types=["sample"], expose=["d/z_probs", "d/j_probs", "c/j_probs"])
+    #@config_enumerate
+    #def guide(self):
+     #   self.guide_parameters()
+     #   self.spot_guide(
+     #       self.data, True, True,
+     #       data_mask=self.data_mask, prefix="d")
+     #   if self.control:
+     #       self.spot_guide(
+     #           self.control, False, True,
+     #           data_mask=self.control_mask, prefix="c")
 
     def guide_parameters(self):
         # Local Parameters
         self.spot_parameters(self.data, True, True, prefix="d")
         if self.control:
             self.spot_parameters(
-                self.control, False, True, prefix="c")
+                self.control, True, False, prefix="c")

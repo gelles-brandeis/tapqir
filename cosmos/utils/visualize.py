@@ -8,6 +8,7 @@ from pyro import param
 from pyro.ops.stats import hpdi
 from matplotlib.colors import to_rgba_array
 import torch.distributions as dist
+from cosmos.models.model import GaussianSpot
 
 
 def view_glimpse(frame, aoi, aoi_df, drift_df, header,
@@ -56,8 +57,14 @@ def view_m_probs(aoi, data, f1, f2, m, z, labels, prefix):
             + param("{}/m_probs".format(prefix)).squeeze().data[aoi, :, 3]
         k_probs[:, 1] = param("{}/m_probs".format(prefix)).squeeze().data[aoi, :, 1] \
             + param("{}/m_probs".format(prefix)).squeeze().data[aoi, :, 3]
+    #if z:
+        #z_probs = pyro.param("d/z_probs").squeeze().data[aoi, ..., 1]
+    #    z_probs = (pyro.param("d/m_probs").squeeze() * pyro.param("d/theta_probs").squeeze()[...,1:].sum(dim=-1)).sum(dim=-1).data[aoi]
     if z:
-        z_probs = pyro.param("d/z_probs").squeeze().data[aoi, ..., 1]
+        z_probs = (
+            pyro.param("d/m_probs").squeeze()[aoi]
+            * pyro.param("d/theta_probs").squeeze()[aoi, ..., 1:].sum(dim=-1))\
+            .sum(dim=-1).data
 
     plt.figure(figsize=(25, 5))
     if m:
@@ -143,12 +150,12 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
             plt.ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "width":
             w_mode = (param("{}/w_mode".format(prefix))
-                      .squeeze().data[aoi] - 0.75) / 1.5
+                      .squeeze().data[aoi] - 0.5) / 2.5
             w_size = param("{}/w_size".format(prefix)).squeeze().data[aoi]
             w_c1 = w_mode * w_size
             w_c0 = (1 - w_mode) * w_size
             hpd = hpdi(
-                dist.Beta(w_c1, w_c0).sample((500,)), 0.95, dim=0) * 1.5 + 0.75
+                dist.Beta(w_c1, w_c0).sample((500,)), 0.95, dim=0) * 2.5 + 0.5
             mean = param("{}/w_mode".format(prefix)).squeeze().data[aoi]
 
         hpd = hpd.squeeze()
@@ -182,7 +189,7 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
 
 
 def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
-    if m1 or m2 or z:
+    if m1 or m2:
         k_probs = np.zeros((len(data.drift), 2))
         k_probs[:, 0] = param(
             "{}/m_probs".format(prefix)).squeeze().data[aoi, :, 1] \
@@ -197,7 +204,7 @@ def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
             .sum(dim=-1).data
 
     fig = plt.figure(figsize=(15, 3), dpi=600)
-    for i in range(20):
+    for i in range(10):
         fig.add_subplot(2, 10, i+1)
         plt.title("f #{:d}".format(data.drift.index[frame+i]), fontsize=15)
         plt.imshow(
@@ -232,6 +239,21 @@ def view_aoi(aoi, frame, data, target, z, m1, m2, labels, prefix):
                 plt.gca().add_patch(
                     Rectangle((0, data.D-1), data.D, 0.25,
                               edgecolor="C3", lw=4, facecolor="none"))
+
+    m_matrix = torch.tensor([[0, 0], [1,0], [0,1], [1,1]])
+    m = m_matrix[param("d/m_probs")[aoi].argmax(dim=-1).squeeze(dim=-1)]
+    height = param("{}/h_loc".format(prefix))[aoi].masked_fill(~m.bool(), 0)
+    ideal_spot = GaussianSpot(data, 2)
+    ideal_data = ideal_spot(
+                    aoi, height,
+                    param("{}/w_mode".format(prefix))[aoi], param("{}/x_mode".format(prefix))[aoi],
+                    param("{}/y_mode".format(prefix))[aoi], param("{}/b_loc".format(prefix))[aoi]) \
+                    + param("offset")
+    for i in range(10):
+        fig.add_subplot(2, 10, i+11)
+        plt.imshow(
+            ideal_data.data[frame+i, :, :, 0].cpu(),
+            cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
         plt.gca().axes.get_xaxis().set_ticks([])
         plt.gca().axes.get_yaxis().set_ticks([])
     plt.show()
