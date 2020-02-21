@@ -181,7 +181,7 @@ def view_parameters(aoi, data, f1, f2, m, params, prefix, theta):
     plt.show()
 
 
-def view_aoi(aoi, frame, data, target, z, labels, prefix):
+def view_aoi(aoi, frame, data, target, z, labels, acc, prefix):
     if z:
         z_probs = z_probs_calc(
             pyro.param("d/m_probs")[aoi],
@@ -196,6 +196,25 @@ def view_aoi(aoi, frame, data, target, z, labels, prefix):
                     param("{}/x_mode".format(prefix))[aoi],
                     param("{}/y_mode".format(prefix))[aoi],
                     param("{}/b_loc".format(prefix))[aoi]) + param("offset")
+
+    if acc == "tpr":
+        tp = data.labels[(data.labels["spotpicker"] == 1) & (data.labels["binary"] == 1)]
+        ai, fi = ((data.labels["spotpicker"].values.reshape(data.N, data.F) == 1) &
+               (data.labels["binary"].values.reshape(data.N, data.F) == 1)).nonzero()
+    elif acc == "tnr":
+        tp = data.labels[(data.labels["spotpicker"] == 0) & (data.labels["binary"] == 0)]
+        ai, fi = ((data.labels["spotpicker"].values.reshape(data.N, data.F) == 0) &
+               (data.labels["binary"].values.reshape(data.N, data.F) == 0)).nonzero()
+    elif acc == "fnr":
+        tp = data.labels[(data.labels["spotpicker"] == 1) & (data.labels["binary"] == 0)]
+
+        ai, fi = ((data.labels["spotpicker"].values.reshape(data.N, data.F) == 1) &
+               (data.labels["binary"].values.reshape(data.N, data.F) == 0)).nonzero()
+    elif acc == "fpr":
+        tp = data.labels[(data.labels["spotpicker"] == 0) & (data.labels["binary"] == 1)]
+
+        ai, fi = ((data.labels["spotpicker"].values.reshape(data.N, data.F) == 0) &
+               (data.labels["binary"].values.reshape(data.N, data.F) == 1)).nonzero()
 
     f, frames = frame
     fig = plt.figure(figsize=(15, 3), dpi=600)

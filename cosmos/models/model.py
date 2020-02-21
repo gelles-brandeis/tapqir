@@ -114,8 +114,8 @@ class Model(nn.Module):
                         param("height_beta")))
                 width = pyro.sample(
                     "width", ScaledBeta(
-                        param("width_mode")[theta_mask],
-                        param("width_size")[theta_mask], 0.5, 2.5))
+                        param("width_mode"),
+                        param("width_size"), 0.5, 2.5))
                 x0 = pyro.sample(
                     "x0", ScaledBeta(
                         0, self.size[theta_mask], -(data.D+3)/2, data.D+3))
@@ -234,10 +234,10 @@ class Model(nn.Module):
               constraint=constraints.positive)
         param("height_beta", torch.tensor([0.01]),
               constraint=constraints.positive)
-        param("width_mode", torch.tensor([1.3, 1.3]),
+        param("width_mode", torch.tensor([1.3]),
               constraint=constraints.interval(0.5, 3.))
         param("width_size",
-              torch.tensor([3., 15.]), constraint=constraints.positive)
+              torch.tensor([10.]), constraint=constraints.positive)
         param("pi", torch.ones(2), constraint=constraints.simplex)
         param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
 
