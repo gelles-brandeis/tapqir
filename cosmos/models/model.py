@@ -17,6 +17,8 @@ import logging
 from pyro.ops.indexing import Vindex
 from pyro import poutine
 from cosmos.models.helper import z_probs_calc
+import cosmos
+from git import Repo
 
 
 class GaussianSpot(nn.Module):
@@ -262,6 +264,8 @@ class Model(nn.Module):
             self.epoch_count += 1
 
     def log(self):
+        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+        version = repo.git.describe()
         self.logger = logging.getLogger(__name__)
         self.logger.debug("D - {}".format(self.data.D))
         self.logger.debug("K - {}".format(self.K))
@@ -276,8 +280,8 @@ class Model(nn.Module):
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
         self.path = os.path.join(
-            self.data.path, "runs", "{}".format(self.data.name),
-            "{}final".format(self.__name__), "K{}".format(self.K),
+            self.data.path, "runs", "{}".format(version),
+            "{}".format(self.data.name), "{}".format(self.__name__),
             "{}".format("jit" if self.jit else "nojit"),
             "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
             "{}".format(self.n_batch))
