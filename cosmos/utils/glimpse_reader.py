@@ -23,14 +23,51 @@ class Sampler(Dataset):
 class GlimpseDataset(Dataset):
     """ CoSMoS Dataset """
 
-    def __init__(self, dataset, device):
+    def __init__(self, dataset=None, experiment=None, device=None, path=None):
         # create logger
         self.logger = logging.getLogger(__name__)
         # store metadata
         self.name = dataset
-        self.device = device
-        self.read_cfg()
+        self.xp = experiment
+        if path is not None:
+            self.path = path
+        else:
+            self.path = os.path.join(os.getcwd(), self.name)
+        if not os.path.isdir(self.path):
+            os.mkdir(self.path)
+        if device is not None:
+            self.device = device
+        else:
+            self.device = torch.device("cpu")
         self.load_data()
+
+    def load_data(self):
+        try:
+            self._store = torch.load(os.path.join(
+                self.path, "{}.pt".format(self.xp)),
+                map_location=self.device).detach()
+            self.N, self.F, self.D, _ = self._store.shape
+            self.vmin = np.percentile(self._store.cpu().numpy(), 5)
+            self.vmax = np.percentile(self._store.cpu().numpy(), 99)
+            # self._store = self._store.cpu()
+            # assert (self.N, self.F, self.D, self.D) == self._store.shape
+            self.target = pd.read_csv(os.path.join(
+                self.path, "{}_target.csv".format(self.xp)),
+                index_col="aoi")
+            self.drift = pd.read_csv(os.path.join(
+                self.path, "{}_drift.csv".format(self.xp)),
+                index_col="frame")
+            if os.path.isfile(os.path.join(self.path, "{}_labels.csv".format(self.xp))):
+                self.labels = pd.read_csv(os.path.join(
+                    self.path, "{}_labels.csv".format(self.xp)),
+                    index_col=["aoi", "frame"])
+            self.logger.debug(
+                "Loaded data from data.pt, \
+                 target.csv, and drift.csv files")
+        except:
+            self.read_cfg()
+            self.read_mat()
+            self.read_glimpse()
 
     def read_cfg(self):
         """
@@ -52,35 +89,6 @@ class GlimpseDataset(Dataset):
                 config.set(self.name, FILE, self.path_to[FILE])
             with open("datasets.cfg", "w") as configfile:
                 config.write(configfile)
-        self.path = self.path_to["dir"]
-
-    def load_data(self):
-        try:
-            self._store = torch.load(os.path.join(
-                self.path, "{}_data.pt".format(self.name)),
-                map_location=self.device).detach()
-            self.N, self.F, self.D, _ = self._store.shape
-            self.vmin = np.percentile(self._store.cpu().numpy(), 5)
-            self.vmax = np.percentile(self._store.cpu().numpy(), 99)
-            # self._store = self._store.cpu()
-            # assert (self.N, self.F, self.D, self.D) == self._store.shape
-            self.target = pd.read_csv(os.path.join(
-                self.path, "{}_target.csv".format(self.name)),
-                index_col="aoi")
-            self.drift = pd.read_csv(os.path.join(
-                self.path, "{}_drift.csv".format(self.name)),
-                index_col="frame")
-            if self.path_to["labels"]:
-                self.labels = pd.read_csv(os.path.join(
-                    self.path, "{}_labels.csv".format(self.name)),
-                    index_col=["aoi", "frame"])
-            self.logger.debug(
-                "Loaded data from {}_data.pt, \
-                 {}_target.csv, and {}_drift.csv files"
-                .format(self.name, self.name, self.name))
-        except:
-            self.read_mat()
-            self.read_glimpse()
 
     def read_mat(self):
         """
@@ -196,7 +204,7 @@ class GlimpseDataset(Dataset):
                             .loc[(aoi, start):(aoi, end), "spotpicker"] = 1
 
             self.labels.to_csv(os.path.join(
-                self.path_to["dir"], "{}_labels.csv".format(self.name)))
+                self.path, "{}_labels.csv".format(self.xp)))
 
     def read_glimpse(self, D=14):
         """
@@ -264,11 +272,11 @@ class GlimpseDataset(Dataset):
         # convert data into torch tensor
         self._store = torch.tensor(self._store, dtype=torch.float32)
         torch.save(self._store, os.path.join(
-            self.path_to["dir"], "{}_data.pt".format(self.name)))
+            self.path, "{}.pt".format(self.xp)))
         self.target.to_csv(os.path.join(
-            self.path_to["dir"], "{}_target.csv".format(self.name)))
+            self.path, "{}_target.csv".format(self.xp)))
         self.drift.to_csv(os.path.join(
-            self.path_to["dir"], "{}_drift.csv".format(self.name)))
+            self.path, "{}_drift.csv".format(self.xp)))
         # calculate low and high percentiles for imaging
         self.vmin = np.percentile(self._store.cpu(), 5)
         self.vmax = np.percentile(self._store.cpu(), 99)

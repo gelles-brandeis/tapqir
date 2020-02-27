@@ -87,7 +87,7 @@ class Model(nn.Module):
     def guide(self):
         raise NotImplementedError
 
-    def spot_model(self, data, m_pi, theta_pi, data_mask, prefix):
+    def spot_model(self, data, m_pi, theta_pi, prefix):
         N_plate = pyro.plate("N_plate", data.N, dim=-5)
         F_plate = pyro.plate("F_plate", data.F, dim=-4)
         X_plate = pyro.plate("X_plate", data.D, dim=-3)
@@ -95,7 +95,6 @@ class Model(nn.Module):
         K_plate = pyro.plate("K_plate", self.K, dim=-1)
 
         with N_plate as batch_idx, F_plate:
-            #with poutine.mask(mask=data_mask[batch_idx]):
             background = pyro.sample(
                 "background", dist.Gamma(
                     param(f"{prefix}/background_loc")[batch_idx]
@@ -137,14 +136,13 @@ class Model(nn.Module):
                         locs, param("gain"), param("offset")),
                     obs=data[batch_idx].unsqueeze(dim=-1))
 
-    def spot_guide(self, data, theta, data_mask, prefix):
+    def spot_guide(self, data, theta, prefix):
         N_plate = pyro.plate("N_plate", data.N,
                              subsample_size=self.n_batch, dim=-5)
         F_plate = pyro.plate("F_plate", data.F, dim=-4)
         K_plate = pyro.plate("K_plate", self.K, dim=-1)
 
         with N_plate as batch_idx, F_plate:
-            #with poutine.mask(mask=data_mask[batch_idx]):
             self.batch_idx = batch_idx.cpu()
             pyro.sample(
                 "background", dist.Gamma(
@@ -211,7 +209,7 @@ class Model(nn.Module):
               constraint=constraints.positive)
         param(f"{prefix}/w_mode",
               torch.ones(data.N, data.F, 1, 1, self.K) * 1.3,
-              constraint=constraints.interval(0.5, 2.5))
+              constraint=constraints.interval(0.5, 3.))
         param(f"{prefix}/w_size",
               torch.ones(data.N, data.F, 1, 1, self.K) * 100.,
               constraint=constraints.greater_than(2.))
@@ -264,8 +262,6 @@ class Model(nn.Module):
             self.epoch_count += 1
 
     def log(self):
-        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-        version = repo.git.describe()
         self.logger = logging.getLogger(__name__)
         self.logger.debug("D - {}".format(self.data.D))
         self.logger.debug("K - {}".format(self.K))
@@ -279,9 +275,11 @@ class Model(nn.Module):
         self.logger.info("Batch size - {}".format(self.n_batch))
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
+        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+        version = repo.git.describe()
         self.path = os.path.join(
-            self.data.path, "runs", "{}".format(version),
-            "{}".format(self.data.name), "{}".format(self.__name__),
+            self.data.path, "runs",
+            "{}{}".format(self.__name__, version),
             "{}".format("jit" if self.jit else "nojit"),
             "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
             "{}".format(self.n_batch))
@@ -342,7 +340,7 @@ class Model(nn.Module):
                 scalars["TPR"] = tp / (tp + fn)
                 self.writer_scalar.add_scalars(
                     "ACCURACY", scalars, self.epoch_count)
-                self.data.labels.to_csv(os.path.join(self.path, "labels.csv"))
+                self.data.labels.to_csv(os.path.join(self.path, "predictions.csv"))
                 if self.data.name.startswith("FL") and \
                         self.data.name.endswith("OD"):
                     atten_labels = self.data.labels.copy()

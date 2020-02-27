@@ -81,3 +81,9 @@ def k_probs_calc(m_probs):
     return torch.stack((m_probs[..., 1] + m_probs[..., 3],
                         m_probs[..., 2] + m_probs[..., 3]),
                         dim=-1).squeeze(dim=-2).cpu().data
+
+def theta_probs_calc(m_probs, theta_probs):
+    return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
+
+def j_probs_calc(m_probs, theta_probs):
+    return (m_probs.unsqueeze(dim=-1) * (torch.tensor([[0., 0.], [1., 0.], [0., 1.], [1., 1.]]) - theta_probs[..., 1:])).sum(dim=-2).cpu().data
