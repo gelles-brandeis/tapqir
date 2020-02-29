@@ -37,24 +37,23 @@ args = parser.parse_args()
 
 # setup and training
 def main(args=args):
-    print(os.getcwd())
     # create logger with args.log
     logger = logging.getLogger("cosmos")
     logger.setLevel(logging.DEBUG)
     # create file handler which logs even debug messages
-    fh = logging.FileHandler("{}.log".format(args.dataset))
-    fh.setLevel(logging.DEBUG)
+    #fh = logging.FileHandler("{}.log".format(args.dataset))
+    #fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     # create formatter and add it to the handlers
     formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p")
-    fh.setFormatter(formatter)
+    #fh.setFormatter(formatter)
     ch.setFormatter(formatter)
     # add the handlers to the logger
-    logger.addHandler(fh)
+    #logger.addHandler(fh)
     logger.addHandler(ch)
-    logger.info("Created logfile: {}.log".format(args.dataset))
+    #logger.info("Created logfile: {}.log".format(args.dataset))
 
     if args.device == "cuda0":
         device = torch.device("cuda:0")

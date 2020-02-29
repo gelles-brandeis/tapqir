@@ -298,7 +298,7 @@ def view_single_aoi(data, aoi, frame, z, labels, target, acc, prefix):
         ideal_data.data[f, :, :, 0].cpu(),
         cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
     if target:
-        ax[0, 1].plot(
+        ax[1].plot(
             data.target.iloc[n, 2] + data.drift.iloc[f, 1] + 0.5,
             data.target.iloc[n, 1] + data.drift.iloc[f, 0] + 0.5,
             "b+", markersize=10, mew=3, alpha=0.7)
@@ -307,7 +307,7 @@ def view_single_aoi(data, aoi, frame, z, labels, target, acc, prefix):
 
     plt.show()
 
-def view_globals(z, j):
+def view_globals(z, j, data):
     theta_probs = theta_probs_calc(
         param("d/m_probs"),
         param("d/theta_probs")).squeeze()
@@ -319,23 +319,71 @@ def view_globals(z, j):
     fig, ax = plt.subplots(2, 2, figsize=(12.5,10))
 
     if z:
-        h = ax[0,0].hist(param("d/h_loc").squeeze().data[theta_probs > 0.5], density=True, bins=100, label="z", alpha=0.3)
-        w = ax[0,1].hist(param("d/w_mode").squeeze().data[theta_probs > 0.5], density=True, bins=100, label="z", alpha=0.3)
-        x = ax[1,0].hist(param("d/x_mode").squeeze().data[theta_probs > 0.5], density=True, bins=100, label="z", alpha=0.3)
-        y = ax[1,1].hist(param("d/y_mode").squeeze().data[theta_probs > 0.5], density=True, bins=100, label="z", alpha=0.3)
+        h = ax[0,0].hist(
+                param("d/h_loc").squeeze().data.reshape(-1),
+                weights=theta_probs.reshape(-1), density=True,
+                bins=100, label="z", alpha=0.3)
+        ax[0,1].hist(
+                param("d/w_mode").squeeze().data.reshape(-1),
+                weights=theta_probs.reshape(-1), density=True,
+                bins=100, label="z", alpha=0.3)
+        ax[1,0].hist(
+                param("d/x_mode").squeeze().data.reshape(-1),
+                weights=theta_probs.reshape(-1), density=True,
+                bins=100, label="z", alpha=0.3)
+        ax[1,1].hist(
+                param("d/y_mode").squeeze().data.reshape(-1),
+                weights=theta_probs.reshape(-1), density=True,
+                bins=100, label="z", alpha=0.3)
     if j:
-        h = ax[0,0].hist(param("d/h_loc").squeeze().data[j_probs > 0.5], density=True, bins=100, label="j", alpha=0.3)
-        w = ax[0,1].hist(param("d/w_mode").squeeze().data[j_probs > 0.5], density=True, bins=100, label="j", alpha=0.3)
-        x = ax[1,0].hist(param("d/x_mode").squeeze().data[j_probs > 0.5], density=True, bins=100, label="j", alpha=0.3)
-        y = ax[1,1].hist(param("d/y_mode").squeeze().data[j_probs > 0.5], density=True, bins=100, label="j", alpha=0.3)
+        h = ax[0,0].hist(
+                param("d/h_loc").squeeze().data.reshape(-1),
+                weights=j_probs.reshape(-1), density=True,
+                bins=100, label="j", alpha=0.3)
+        ax[0,1].hist(
+                param("d/w_mode").squeeze().data.reshape(-1),
+                weights=j_probs.reshape(-1), density=True,
+                bins=100, label="j", alpha=0.3)
+        ax[1,0].hist(
+                param("d/x_mode").squeeze().data.reshape(-1),
+                weights=j_probs.reshape(-1), density=True,
+                bins=100, label="j", alpha=0.3)
+        ax[1,1].hist(
+                param("d/y_mode").squeeze().data.reshape(-1),
+                weights=j_probs.reshape(-1), density=True,
+                bins=100, label="j", alpha=0.3)
+
+    w = torch.linspace(0.5, 3., 100)
+    x = torch.linspace(-(data.D+3)/2, (data.D+3)/2, 100)
     ax[0,0].plot(h[1],
             dist.Gamma(
                 param("height_loc").item() * param("height_beta").item(),
                 param("height_beta").item()).log_prob(h[1]).exp())
-    ax[0,1].plot(w[1],
+    ax[0,1].plot(w,
             ScaledBeta(
                 param("width_mode").item(),
-                param("width_size").item(), 0.5, 2.5).log_prob(torch.tensor(w[1] - 0.5)/2.5).exp())
+                param("width_size").item(), 0.5, 2.5).log_prob(torch.tensor(w - 0.5)/2.5).exp()/2.5)
+    ax[1,0].plot(x,
+            ScaledBeta(
+                0.,
+                ((data.D+3) / (2*0.5)) ** 2 - 1,
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+    ax[1,0].plot(x,
+            ScaledBeta(
+                0.,
+                2.,
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+    ax[1,1].plot(x,
+            ScaledBeta(
+                0.,
+                ((data.D+3) / (2*0.5)) ** 2 - 1,
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+    ax[1,1].plot(x,
+            ScaledBeta(
+                0.,
+                2.,
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+
     ax[0,0].set_xlabel("height")
     ax[0,1].set_xlabel("width")
     ax[1,0].set_xlabel("x")

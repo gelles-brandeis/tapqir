@@ -36,6 +36,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
+    scripts=["cosmos/cosmos_gui"],
     entry_points={
         "console_scripts": ["cosmos=cosmos.cli:main"],
     }

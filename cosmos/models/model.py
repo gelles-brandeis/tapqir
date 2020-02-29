@@ -262,19 +262,6 @@ class Model(nn.Module):
             self.epoch_count += 1
 
     def log(self):
-        self.logger = logging.getLogger(__name__)
-        self.logger.debug("D - {}".format(self.data.D))
-        self.logger.debug("K - {}".format(self.K))
-        self.logger.debug("data.N - {}".format(self.data.N))
-        self.logger.debug("data.F - {}".format(self.data.F))
-        if self.control:
-            self.logger.debug("control.N - {}".format(self.control.N))
-            self.logger.debug("control.F - {}".format(self.control.F))
-        self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
-        self.logger.info("Learning rate - {}".format(self.lr))
-        self.logger.info("Batch size - {}".format(self.n_batch))
-        self.logger.info("{}".format("jit" if self.jit else "nojit"))
-
         repo = Repo(cosmos.__path__[0], search_parent_directories=True)
         version = repo.git.describe()
         self.path = os.path.join(
@@ -287,6 +274,27 @@ class Model(nn.Module):
             log_dir=os.path.join(self.path, "scalar"))
         self.writer_hist = SummaryWriter(
             log_dir=os.path.join(self.path, "hist"))
+
+        self.logger = logging.getLogger(__name__)
+        fh = logging.FileHandler(os.path.join(
+            self.path, "run.log"))
+        fh.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%m/%d/%Y %I:%M:%S %p")
+        fh.setFormatter(formatter)
+        self.logger.addHandler(fh)
+        self.logger.debug("D - {}".format(self.data.D))
+        self.logger.debug("K - {}".format(self.K))
+        self.logger.debug("data.N - {}".format(self.data.N))
+        self.logger.debug("data.F - {}".format(self.data.F))
+        if self.control:
+            self.logger.debug("control.N - {}".format(self.control.N))
+            self.logger.debug("control.F - {}".format(self.control.F))
+        self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
+        self.logger.info("Learning rate - {}".format(self.lr))
+        self.logger.info("Batch size - {}".format(self.n_batch))
+        self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def save_checkpoint(self):
         if not any([torch.isnan(v).any()
@@ -325,26 +333,38 @@ class Model(nn.Module):
                 elif self.__name__ == "tracker":
                     z_probs = z_probs_calc(
                         pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
-                    self.data.labels["probs"] = z_probs.reshape(-1)
-                    self.data.labels["binary"] = \
-                        self.data.labels["probs"] > 0.5
+                    self.data.predictions = self.data.labels.copy()
+                    self.data.predictions["probs"] = z_probs.reshape(-1)
+                    self.data.predictions["binary"] = \
+                        self.data.predictions["probs"] > 0.5
                     mask = self.data.labels["spotpicker"].values < 2
-                    predictions = self.data.labels["binary"].values[mask]
+                    predictions = self.data.predictions["binary"].values[mask]
                     true_labels = self.data.labels["spotpicker"].values[mask]
                 mcc = matthews_corrcoef(true_labels, predictions)
                 tn, fp, fn, tp = confusion_matrix(
                     true_labels, predictions).ravel()
-                scalars = {}
-                scalars["MCC"] = mcc
-                scalars["TNR"] = tn / (tn + fp)
-                scalars["TPR"] = tp / (tp + fn)
+                #scalars = {}
+                #scalars["MCC"] = mcc
+                #scalars["TPR"] = tp / (tp + fn)
+                negatives = {}
+                negatives["TN"] = tn
+                negatives["FP"] = fp
+                positives = {}
+                positives["TP"] = tp
+                positives["FN"] = fn
+                self.writer_scalar.add_scalar(
+                    "MCC", mcc, self.epoch_count)
                 self.writer_scalar.add_scalars(
-                    "ACCURACY", scalars, self.epoch_count)
-                self.data.labels.to_csv(os.path.join(self.path, "predictions.csv"))
+                    "NEGATIVES", negatives, self.epoch_count)
+                self.writer_scalar.add_scalars(
+                    "POSITIVES", positives, self.epoch_count)
+                self.data.predictions.to_csv(os.path.join(self.path, "predictions.csv"))
                 if self.data.name.startswith("FL") and \
                         self.data.name.endswith("OD"):
-                    atten_labels = self.data.labels.copy()
-                    atten_labels["spotpicker"] = self.data.labels["binary"]
+                    atten_labels = self.data.predictions.copy()
+                    atten_labels.loc[
+                        self.data.labels["spotpicker"] != self.data.predictions["binary"],
+                        "spotpicker"] = 2
                     atten_labels["probs"] = 0
                     atten_labels["binary"] = 0
                     atten_labels.to_csv(os.path.join(self.path, "atten_labels.csv"))

@@ -35,6 +35,12 @@ class GlimpseDataset(Dataset):
             self.path = os.path.join(os.getcwd(), self.name)
         if not os.path.isdir(self.path):
             os.mkdir(self.path)
+        fh = logging.FileHandler(os.path.join(
+            self.path, "load_data.log"))
+        fh.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p")
+        fh.setFormatter(formatter)
+        self.logger.addHandler(fh)
         if device is not None:
             self.device = device
         else:
@@ -61,9 +67,9 @@ class GlimpseDataset(Dataset):
                 self.labels = pd.read_csv(os.path.join(
                     self.path, "{}_labels.csv".format(self.xp)),
                     index_col=["aoi", "frame"])
-            self.logger.debug(
-                "Loaded data from data.pt, \
-                 target.csv, and drift.csv files")
+            #self.logger.debug(
+            #    "Loaded data from data.pt, \
+            #     target.csv, and drift.csv files")
         except:
             self.read_cfg()
             self.read_mat()
@@ -150,6 +156,10 @@ class GlimpseDataset(Dataset):
             self.drift_df = self.drift_df.loc[f1:f2]
             aoi_list = np.arange(1, 33)
             self.aoi_df = self.aoi_df.loc[aoi_list]
+        elif self.name in ["LarryCy3sigma54NegativeControl1"]:
+            self.aoi_df = self.aoi_df.loc[:64]
+        elif self.name in ["LarryCy3sigma54NegativeControl2"]:
+            self.aoi_df = self.aoi_df.loc[65:]
         elif self.name in ["GraceArticlePol2NegativeControl1"]:
             self.aoi_df = self.aoi_df.loc[:263]
         elif self.name in ["GraceArticlePol2NegativeControl2"]:
