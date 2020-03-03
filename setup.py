@@ -1,5 +1,6 @@
 import os
 import setuptools
+from git import Repo
 
 PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 VERSION = """
@@ -8,9 +9,11 @@ __version__ = '{}'
 """
 
 # Find cosmos version.
-for line in open(os.path.join(PROJECT_PATH, 'cosmos', '__init__.py')):
-    if line.startswith('version_prefix = '):
-        version = line.strip().split()[2][1:-1]
+repo = Repo(".", search_parent_directories=True)
+version = repo.git.describe()
+# for line in open(os.path.join(PROJECT_PATH, 'cosmos', '__init__.py')):
+#     if line.startswith('version_prefix = '):
+#         version = line.strip().split()[2][1:-1]
 
 with open("README.md", "r") as fh:
     long_description = fh.read()

@@ -20,7 +20,7 @@ class Tracker(Model):
         super().__init__(data, control,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
-    @poutine.block(hide=["width_mode", "width_size"])
+    # @poutine.block(hide=["width_mode", "width_size"])
     def model(self):
         self.model_parameters()
         data_m_pi = m_param(param("pi"), param("lamda"), self.K)
