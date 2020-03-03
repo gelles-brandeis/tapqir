@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.distributions.constraints as constraints
 import numpy as np
+import pandas as pd
 import os
 import pyro
 import pyro.distributions as dist
@@ -65,6 +66,13 @@ class Model(nn.Module):
         self.size = torch.tensor([2., (((data.D+3) / (2*0.5)) ** 2 - 1)])
         self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]])
         self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]])
+
+        index = pd.MultiIndex.from_product(
+            [data.target.index.values, data.drift.index.values],
+            names=["aoi", "frame"])
+        self.data.predictions = pd.DataFrame(
+            data=np.zeros((data.N*data.F, 2)),
+            columns=["probs", "binary"], index=index)
 
         self.data.loc = GaussianSpot(self.data, self.K)
         if self.control:
@@ -327,33 +335,33 @@ class Model(nn.Module):
                     predictions = (
                         trace.nodes["d/theta"]["value"] > 0) \
                         .cpu().reshape(-1)
-                    true_labels = self.data.labels["spotpicker"].values \
+                    true_labels = self.data.labels["label"].values \
                         .reshape(self.data.N, self.data.F)[self.batch_idx] \
                         .reshape(-1)
                 elif self.__name__ == "tracker":
                     z_probs = z_probs_calc(
                         pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
-                    self.data.predictions = self.data.labels.copy()
                     self.data.predictions["probs"] = z_probs.reshape(-1)
                     self.data.predictions["binary"] = \
                         self.data.predictions["probs"] > 0.5
-                    mask = self.data.labels["spotpicker"].values < 2
+                    mask = self.data.labels["label"].values < 2
                     predictions = self.data.predictions["binary"].values[mask]
-                    true_labels = self.data.labels["spotpicker"].values[mask]
+                    true_labels = self.data.labels["label"].values[mask]
                 mcc = matthews_corrcoef(true_labels, predictions)
                 tn, fp, fn, tp = confusion_matrix(
                     true_labels, predictions).ravel()
-                #scalars = {}
-                #scalars["MCC"] = mcc
-                #scalars["TPR"] = tp / (tp + fn)
+                scalars = {}
+                scalars["MCC"] = mcc
+                scalars["TPR"] = tp / (tp + fn)
+                scalars["TNR"] = tn / (tn + fp)
                 negatives = {}
                 negatives["TN"] = tn
                 negatives["FP"] = fp
                 positives = {}
                 positives["TP"] = tp
                 positives["FN"] = fn
-                self.writer_scalar.add_scalar(
-                    "MCC", mcc, self.epoch_count)
+                self.writer_scalar.add_scalars(
+                    "ACCURACY", scalars, self.epoch_count)
                 self.writer_scalar.add_scalars(
                     "NEGATIVES", negatives, self.epoch_count)
                 self.writer_scalar.add_scalars(
@@ -361,12 +369,11 @@ class Model(nn.Module):
                 self.data.predictions.to_csv(os.path.join(self.path, "predictions.csv"))
                 if self.data.name.startswith("FL") and \
                         self.data.name.endswith("OD"):
-                    atten_labels = self.data.predictions.copy()
+                    atten_labels = self.data.labels.copy()
                     atten_labels.loc[
                         self.data.labels["spotpicker"] != self.data.predictions["binary"],
-                        "spotpicker"] = 2
-                    atten_labels["probs"] = 0
-                    atten_labels["binary"] = 0
+                        "label"] = 2
+                    atten_labels["spotpicker"] = 0
                     atten_labels.to_csv(os.path.join(self.path, "atten_labels.csv"))
 
             self.logger.debug(

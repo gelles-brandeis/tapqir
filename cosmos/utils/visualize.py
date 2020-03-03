@@ -58,7 +58,7 @@ def view_glimpse(frame, aoi, aoi_df, drift_df, header,
     plt.show()
 
 
-def view_m_probs(aoi, data, frames, m, z, labels, prefix):
+def view_m_probs(aoi, data, frames, m, z, sp, labels, prefix):
     fig, ax = plt.subplots(figsize=(15,3)) 
     #ax.clear()
     n = data.target.index.get_loc(aoi)
@@ -82,11 +82,19 @@ def view_m_probs(aoi, data, frames, m, z, labels, prefix):
         ax.plot(
             data.drift.index.values[f1:f2+1], z_probs[f1:f2+1],
             marker="o", ms=5, color="C2", label="z")
+
     if labels:
         ax.plot(
             data.drift.index.values[f1:f2+1],
-            data.labels.iloc[n*data.F+f1:n*data.F+f2+1, 0],
-            marker="o", ms=5, color="C3", label="spotpicker")
+            data.labels["label"].iloc[n*data.F+f1:n*data.F+f2+1],
+            marker="o", ms=5, color="C3", label="label")
+
+    if sp:
+        ax.plot(
+            data.drift.index.values[f1:f2+1],
+            data.labels["spotpicker"].iloc[n*data.F+f1:n*data.F+f2+1],
+            marker="o", ms=5, color="C4", label="spotpicker")
+
     ax.set_ylim(-0.02,)
     ax.set_xlim(
         data.drift.index.values[f1:f2+1].min()-0.1,
@@ -190,7 +198,7 @@ def view_parameters(aoi, data, frames, m, params, prefix):
     plt.show()
 
 
-def view_aoi(data, aoi, frame, z, labels, target, prefix):
+def view_aoi(data, aoi, frame, z, sp, labels, target, prefix):
     fig, ax = plt.subplots(2, 10, figsize=(15,3)) 
     n = data.target.index.get_loc(aoi)
     f = data.drift.index.get_loc(frame)
@@ -226,10 +234,16 @@ def view_aoi(data, aoi, frame, z, labels, target, prefix):
                     Rectangle((0, 0), data.D*z_probs[f+i], 0.25,
                               edgecolor=z_color, lw=4, facecolor="none"))
             if labels:
-                if data.labels.iloc[n*data.F+f+i, 0] == 1:
+                if data.labels["label"].iloc[n*data.F+f+i] == 1:
                     ax[0][i].add_patch(
                         Rectangle((0, data.D-1), data.D, 0.25,
                                   edgecolor="C3", lw=4, facecolor="none"))
+
+            if sp:
+                if data.labels["spotpicker"].iloc[n*data.F+f+i] == 1:
+                    ax[0][i].add_patch(
+                        Rectangle((0, data.D-2), data.D, 0.25,
+                                  edgecolor="C4", lw=4, facecolor="none"))
             ax[0, i].axes.get_xaxis().set_ticks([])
             ax[0, i].axes.get_yaxis().set_ticks([])
         except:
@@ -253,7 +267,7 @@ def view_aoi(data, aoi, frame, z, labels, target, prefix):
     plt.show()
 
 
-def view_single_aoi(data, aoi, frame, z, labels, target, acc, prefix):
+def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
     fig, ax = plt.subplots(1, 2, figsize=(6,3)) 
     n = data.target.index.get_loc(aoi)
     f = data.drift.index.get_loc(frame)
@@ -287,10 +301,15 @@ def view_single_aoi(data, aoi, frame, z, labels, target, acc, prefix):
             Rectangle((0, 0), data.D*z_probs, 0.25,
                       edgecolor=z_color, lw=4, facecolor="none"))
     if labels:
-        if data.labels.iloc[n*data.F+f, 0] == 1:
+        if data.labels["label"].iloc[n*data.F+f] == 1:
             ax[0].add_patch(
                 Rectangle((0, data.D-1), data.D, 0.25,
                           edgecolor="C3", lw=4, facecolor="none"))
+    if sp:
+        if data.labels["spotpicker"].iloc[n*data.F+f] == 1:
+            ax[0].add_patch(
+                Rectangle((0, data.D-2), data.D, 0.25,
+                          edgecolor="C4", lw=4, facecolor="none"))
     ax[0].axes.get_xaxis().set_ticks([])
     ax[0].axes.get_yaxis().set_ticks([])
 
@@ -384,10 +403,10 @@ def view_globals(z, j, data):
                 2.,
                 -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
 
-    ax[0,0].set_xlabel("height")
-    ax[0,1].set_xlabel("width")
-    ax[1,0].set_xlabel("x")
-    ax[1,1].set_xlabel("y")
+    ax[0,0].set_xlabel("height", fontsize=20)
+    ax[0,1].set_xlabel("width", fontsize=20)
+    ax[1,0].set_xlabel("x", fontsize=20)
+    ax[1,1].set_xlabel("y", fontsize=20)
     ax[0,0].legend()
     ax[0,1].legend()
     ax[1,0].legend()

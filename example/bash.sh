@@ -9,5 +9,6 @@
 #cosmos --num-steps=25000 --model=tracker --n-batch=32 --learning-rate=0.005 --dataset=GraceArticlePol2 --negative-control=GraceArticlePol2NegativeControl --device=cuda1
 #python main.py --num-steps=30000 --model=tracker --n-batch=16 --learning-rate=0.005 --dataset=LarryCy3sigma54Short --negative-control=LarryCy3sigma54NegativeControlShort --device=cuda1
 #cosmos --num-steps=20000 --model=tracker --n-batch=16 --learning-rate=0.005 --dataset=LarryCy3sigma54Short --device=cuda1
-cosmos --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.005 --dataset=GraceArticlePol2NegativeControl1 --negative-control=GraceArticlePol2NegativeControl2 --device=cuda1
-#cosmos --num-steps=30000 --model=tracker --n-batch=10 --learning-rate=0.005 --dataset=LarryCy3sigma54NegativeControl1 --negative-control=LarryCy3sigma54NegativeControl2 --device=cuda0
+#cosmos --num-steps=30000 --model=tracker --n-batch=32 --learning-rate=0.005 --dataset=GraceArticlePol2NegativeControl1 --negative-control=GraceArticlePol2NegativeControl2 --device=cuda1
+cosmos --num-steps=20000 --model=tracker --n-batch=10 --learning-rate=0.005 --dataset=LarryCy3sigma54NegativeControl1 --negative-control=LarryCy3sigma54NegativeControl2 --device=cuda0
+#cosmos --num-steps=30000 --model=tracker --n-batch=10 --learning-rate=0.005 --dataset=LarryCy3sigma54NegativeControl2 --negative-control=LarryCy3sigma54NegativeControl1 --device=cuda1

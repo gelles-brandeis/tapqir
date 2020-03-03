@@ -13,8 +13,6 @@ old/
 bashrun.sh
 cosmos.egg-info/
 example/
-example/*.log
-example/log
 cosmos/.app*
 
 singmol_mex.mexmaci64

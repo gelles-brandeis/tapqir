@@ -46,6 +46,7 @@ class GlimpseDataset(Dataset):
         else:
             self.device = torch.device("cpu")
         self.load_data()
+        #self.script()
 
     def load_data(self):
         try:
@@ -185,7 +186,7 @@ class GlimpseDataset(Dataset):
                     names=["aoi", "frame"])
                 self.labels = pd.DataFrame(
                     data=np.zeros((len(self.aoi_df)*len(self.drift_df), 3)),
-                    columns=["spotpicker", "probs", "binary"], index=index)
+                    columns=["label", "spotpicker"], index=index)
                 self.labels["spotpicker"] = \
                     framelist[self.name.split(".")[0]][:, 1]
                 self.labels.loc[self.labels["spotpicker"] == 0,
@@ -213,6 +214,7 @@ class GlimpseDataset(Dataset):
                         self.labels \
                             .loc[(aoi, start):(aoi, end), "spotpicker"] = 1
 
+            self.labels["label"] = self.labels["spotpicker"]
             self.labels.to_csv(os.path.join(
                 self.path, "{}_labels.csv".format(self.xp)))
 
@@ -301,3 +303,61 @@ class GlimpseDataset(Dataset):
 
     def __repr__(self):
         return self.path
+
+    def script(self):
+        self.read_cfg()
+        # convert header into dict format
+        mat_header = loadmat(self.path_to["header"])
+        self.header = dict()
+        for i, dt in enumerate(mat_header["vid"].dtype.names):
+            self.header[dt] = np.squeeze(mat_header["vid"][0, 0][i])
+
+        # load driftlist mat file
+        drift_mat = loadmat(self.path_to["driftlist"])
+        # calculate the cumulative sum of dx and dy
+        drift_mat["driftlist"][:, 1:3] = np.cumsum(
+            drift_mat["driftlist"][:, 1:3], axis=0)
+        # convert driftlist into DataFrame
+        self.drift_df = pd.DataFrame(
+            drift_mat["driftlist"][:, :3],
+            columns=["frame", "dx", "dy"])
+        self.drift_df = self.drift_df.astype({"frame": int}).set_index("frame")
+
+        # load aoiinfo mat file
+        aoi_mat = loadmat(self.path_to["aoiinfo"])
+        # convert aoiinfo into DataFrame
+        self.aoi_df = pd.DataFrame(
+            aoi_mat["aoiinfo2"],
+            columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+        self.aoi_df = self.aoi_df.astype({"aoi": int}).set_index("aoi")
+        self.aoi_df["x"] = self.aoi_df["x"] \
+            - self.drift_df.at[int(self.aoi_df.at[1, "frame"]), "dx"]
+        self.aoi_df["y"] = self.aoi_df["y"] \
+            - self.drift_df.at[int(self.aoi_df.at[1, "frame"]), "dy"]
+
+
+        self.labels = None
+        if self.path_to["labels"]:
+            if self.name.startswith("FL"):
+                framelist = loadmat(self.path_to["labels"])
+                f1 = framelist[self.name.split(".")[0]][0, 2]
+                f2 = framelist[self.name.split(".")[0]][-1, 2]
+                self.drift_df = self.drift_df.loc[f1:f2]
+                aoi_list = np.unique(framelist[self.name.split(".")[0]][:, 0])
+                self.aoi_df = self.aoi_df.loc[aoi_list]
+                index = pd.MultiIndex.from_arrays(
+                    [framelist[self.name.split(".")[0]][:, 0],
+                     framelist[self.name.split(".")[0]][:, 2]],
+                    names=["aoi", "frame"])
+                self.labels = pd.DataFrame(
+                    data=np.zeros((len(self.aoi_df)*len(self.drift_df), 3)),
+                    columns=["spotpicker", "probs", "binary"], index=index)
+                self.labels["spotpicker"] = \
+                    framelist[self.name.split(".")[0]][:, 1]
+                self.labels.loc[self.labels["spotpicker"] == 0,
+                                "spotpicker"] = 3
+                self.labels.loc[self.labels["spotpicker"] == 2,
+                                "spotpicker"] = 0
+
+            self.labels.to_csv(os.path.join(
+                self.path, "spotpicker_labels.csv"))
