@@ -340,75 +340,120 @@ def view_globals(z, j, data):
     if z:
         h = ax[0,0].hist(
                 param("d/h_loc").squeeze().data.reshape(-1),
-                weights=theta_probs.reshape(-1), density=True,
+                weights=theta_probs.reshape(-1),
                 bins=100, label="z", alpha=0.3)
         ax[0,1].hist(
                 param("d/w_mode").squeeze().data.reshape(-1),
-                weights=theta_probs.reshape(-1), density=True,
+                weights=theta_probs.reshape(-1),
                 bins=100, label="z", alpha=0.3)
         ax[1,0].hist(
                 param("d/x_mode").squeeze().data.reshape(-1),
-                weights=theta_probs.reshape(-1), density=True,
+                weights=theta_probs.reshape(-1),
                 bins=100, label="z", alpha=0.3)
         ax[1,1].hist(
                 param("d/y_mode").squeeze().data.reshape(-1),
-                weights=theta_probs.reshape(-1), density=True,
+                weights=theta_probs.reshape(-1),
                 bins=100, label="z", alpha=0.3)
     if j:
         h = ax[0,0].hist(
                 param("d/h_loc").squeeze().data.reshape(-1),
-                weights=j_probs.reshape(-1), density=True,
+                weights=j_probs.reshape(-1),
                 bins=100, label="j", alpha=0.3)
         ax[0,1].hist(
                 param("d/w_mode").squeeze().data.reshape(-1),
-                weights=j_probs.reshape(-1), density=True,
+                weights=j_probs.reshape(-1),
                 bins=100, label="j", alpha=0.3)
         ax[1,0].hist(
                 param("d/x_mode").squeeze().data.reshape(-1),
-                weights=j_probs.reshape(-1), density=True,
+                weights=j_probs.reshape(-1),
                 bins=100, label="j", alpha=0.3)
         ax[1,1].hist(
                 param("d/y_mode").squeeze().data.reshape(-1),
-                weights=j_probs.reshape(-1), density=True,
+                weights=j_probs.reshape(-1),
                 bins=100, label="j", alpha=0.3)
+    ax[0,0].hist(
+            param("d/h_loc").squeeze().data.reshape(-1),
+            weights=(1 - j_probs.reshape(-1) - theta_probs.reshape(-1)),
+            bins=100, label="0", alpha=0.3)
 
     w = torch.linspace(0.5, 3., 100)
     x = torch.linspace(-(data.D+3)/2, (data.D+3)/2, 100)
+    #ax[0,0].plot(h[1],
+    #        dist.Gamma(
+    #            param("height_loc").item() * param("height_beta").item(),
+    #            param("height_beta").item()).log_prob(h[1]).exp()
+    #            * (theta_probs.sum() + j_probs.sum())
+    #            * (h[1].max() - h[1].min()) / 100)
     ax[0,0].plot(h[1],
             dist.Gamma(
-                param("height_loc").item() * param("height_beta").item(),
-                param("height_beta").item()).log_prob(h[1]).exp())
+                param("height_loc")[0].item() * param("height_beta")[0].item(),
+                param("height_beta")[0].item()).log_prob(h[1]).exp()
+                * (theta_probs.sum() + j_probs.sum())
+                * (h[1].max() - h[1].min()) / 100
+                * param("pi_k")[0].item())
+    ax[0,0].plot(h[1],
+            dist.Gamma(
+                param("height_loc")[1].item() * param("height_beta")[1].item(),
+                param("height_beta")[1].item()).log_prob(h[1]).exp()
+                * (theta_probs.sum() + j_probs.sum())
+                * (h[1].max() - h[1].min()) / 100
+                * param("pi_k")[1].item())
     ax[0,1].plot(w,
             ScaledBeta(
                 param("width_mode").item(),
-                param("width_size").item(), 0.5, 2.5).log_prob(torch.tensor(w - 0.5)/2.5).exp()/2.5)
+                param("width_size").item(), 0.5, 2.5).log_prob(torch.tensor(w - 0.5)/2.5).exp()/2.5
+                * (theta_probs.sum() + j_probs.sum())
+                * (w.max() - w.min()) / 100)
+    #ax[0,1].plot(w,
+    #        ScaledBeta(
+    #            param("width_mode")[0].item(),
+    #            param("width_size")[0].item(), 0.5, 2.5).log_prob(torch.tensor(w - 0.5)/2.5).exp()/2.5
+    #            * (theta_probs.sum() + j_probs.sum())
+    #            * (w.max() - w.min()) / 100
+    #            * param("pi_k")[0].item())
+    #ax[0,1].plot(w,
+    #        ScaledBeta(
+    #            param("width_mode")[1].item(),
+    #            param("width_size")[1].item(), 0.5, 2.5).log_prob(torch.tensor(w - 0.5)/2.5).exp()/2.5
+    #            * (theta_probs.sum() + j_probs.sum())
+    #            * (w.max() - w.min()) / 100
+    #            * param("pi_k")[1].item())
     ax[1,0].plot(x,
             ScaledBeta(
                 0.,
                 ((data.D+3) / (2*0.5)) ** 2 - 1,
-                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
+                * theta_probs.sum()
+                * (x.max() - x.min()) / 100)
     ax[1,0].plot(x,
             ScaledBeta(
                 0.,
                 2.,
-                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
+                * j_probs.sum()
+                * (x.max() - x.min()) / 100)
     ax[1,1].plot(x,
             ScaledBeta(
                 0.,
                 ((data.D+3) / (2*0.5)) ** 2 - 1,
-                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
+                * theta_probs.sum()
+                * (x.max() - x.min()) / 100)
     ax[1,1].plot(x,
             ScaledBeta(
                 0.,
                 2.,
-                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3))
+                -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
+                * j_probs.sum()
+                * (x.max() - x.min()) / 100)
 
-    ax[0,0].set_xlabel("height", fontsize=20)
-    ax[0,1].set_xlabel("width", fontsize=20)
-    ax[1,0].set_xlabel("x", fontsize=20)
-    ax[1,1].set_xlabel("y", fontsize=20)
-    ax[0,0].legend()
-    ax[0,1].legend()
-    ax[1,0].legend()
-    ax[1,1].legend()
+    ax[0, 0].set_xlim(0, 7000)
+    ax[0, 0].set_xlabel("height", fontsize=20)
+    ax[0, 1].set_xlabel("width", fontsize=20)
+    ax[1, 0].set_xlabel("x", fontsize=20)
+    ax[1, 1].set_xlabel("y", fontsize=20)
+    ax[0, 0].legend()
+    ax[0, 1].legend()
+    ax[1, 0].legend()
+    ax[1, 1].legend()
     plt.show()

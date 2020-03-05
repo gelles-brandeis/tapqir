@@ -51,27 +51,24 @@ def m_param(pi, lamda, K):
     bernoulli = lambda x: dist.Bernoulli(pi[1]).log_prob(torch.tensor([float(x)])).exp()
     poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
     m_pi = torch.zeros(2**K)
-    m_pi[0] = bernoulli(0.) * poisson(0.)
-    k = 1
-    for m in range(1,K+1):
-        r = int(math.factorial(K)/(math.factorial(K-m)*math.factorial(m)))
-        for _ in range(r):
-            m_pi[k] = (bernoulli(1) * poisson(m-1) + bernoulli(0) * poisson(m)) / r
-            k += 1
+    m_pi[0] = bernoulli(0) * poisson(0)
+    m_pi[1] = (bernoulli(1) * poisson(0) + bernoulli(0) * poisson(1)) / 2
+    m_pi[2] = (bernoulli(1) * poisson(0) + bernoulli(0) * poisson(1)) / 2
+    m_pi[3] = bernoulli(1) * poisson(1) + bernoulli(0) * poisson(2)
     return m_pi
 
 def theta_param(pi, lamda, K):
     bernoulli = lambda x: dist.Bernoulli(pi[1]).log_prob(torch.tensor([float(x)])).exp()
     poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
     theta_pi = torch.zeros(2**K,K+1)
-    theta_pi[0,0] = 1
-    theta_pi[1,0] = bernoulli(0) * poisson(1) / (m_param(pi, lamda, K)[1] * 2)
-    theta_pi[1,1] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[1] * 2)
-    theta_pi[2,0] = bernoulli(0) * poisson(1) / (m_param(pi, lamda, K)[2] * 2)
-    theta_pi[2,2] = bernoulli(1) * poisson(0) / (m_param(pi, lamda, K)[2] * 2)
-    theta_pi[3,0] = bernoulli(0) * poisson(2) / m_param(pi, lamda, K)[3]
-    theta_pi[3,1] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
-    theta_pi[3,2] = bernoulli(1) * poisson(1) / (m_param(pi, lamda, K)[3] * 2)
+    theta_pi[0, 0] = 1
+    theta_pi[1, 0] = bernoulli(0) * poisson(1)
+    theta_pi[1, 1] = bernoulli(1) * poisson(0)
+    theta_pi[2, 0] = bernoulli(0) * poisson(1)
+    theta_pi[2, 2] = bernoulli(1) * poisson(0)
+    theta_pi[3, 0] = bernoulli(0) * poisson(2)
+    theta_pi[3, 1] = bernoulli(1) * poisson(1) / 2
+    theta_pi[3, 2] = bernoulli(1) * poisson(1) / 2
     return theta_pi
 
 def z_probs_calc(m_probs, theta_probs):
