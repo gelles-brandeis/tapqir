@@ -58,7 +58,7 @@ def view_glimpse(frame, aoi, aoi_df, drift_df, header,
     plt.show()
 
 
-def view_m_probs(aoi, data, frames, m, z, sp, labels, prefix):
+def view_m_probs(aoi, data, frames, m, z, sp, labels, predictions, prefix):
     fig, ax = plt.subplots(figsize=(15,3)) 
     #ax.clear()
     n = data.target.index.get_loc(aoi)
@@ -67,32 +67,36 @@ def view_m_probs(aoi, data, frames, m, z, sp, labels, prefix):
     if m:
         k_probs = k_probs_calc(
             param(f"{prefix}/m_probs")[n]).squeeze()
+        for k in range(2):
+            ax.plot(
+                data.drift.index.values[f1:f2+1], k_probs[f1:f2+1, k],
+                marker="o", ms=5, color="C{}".format(k), label="m{}".format(k))
 
     if z:
         z_probs = z_probs_calc(
             pyro.param("d/m_probs")[n],
             pyro.param("d/theta_probs")[n]).squeeze()
-
-    if m:
-        for k in range(2):
-            ax.plot(
-                data.drift.index.values[f1:f2+1], k_probs[f1:f2+1, k],
-                marker="o", ms=5, color="C{}".format(k), label="m{}".format(k))
-    if z:
         ax.plot(
-            data.drift.index.values[f1:f2+1], z_probs[f1:f2+1],
+            data.drift.index.values[f1:f2+1],
+            data.predictions["z_prob"][n, f1:f2+1],
             marker="o", ms=5, color="C2", label="z")
+
+    if predictions:
+        ax.plot(
+            data.drift.index.values[f1:f2+1],
+            data.predictions["z"][n, f1:f2+1],
+            marker="o", ms=5, color="C8", label="predictions")
 
     if labels:
         ax.plot(
             data.drift.index.values[f1:f2+1],
-            data.labels["label"].iloc[n*data.F+f1:n*data.F+f2+1],
+            data.labels["z"][n, f1:f2+1],
             marker="o", ms=5, color="C3", label="label")
 
     if sp:
         ax.plot(
             data.drift.index.values[f1:f2+1],
-            data.labels["spotpicker"].iloc[n*data.F+f1:n*data.F+f2+1],
+            data.labels["spotpicker"][n, f1:f2+1],
             marker="o", ms=5, color="C4", label="spotpicker")
 
     ax.set_ylim(-0.02,)
@@ -198,7 +202,7 @@ def view_parameters(aoi, data, frames, m, params, prefix):
     plt.show()
 
 
-def view_aoi(data, aoi, frame, z, sp, labels, target, prefix):
+def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
     fig, ax = plt.subplots(2, 10, figsize=(15,3)) 
     n = data.target.index.get_loc(aoi)
     f = data.drift.index.get_loc(frame)
@@ -207,9 +211,12 @@ def view_aoi(data, aoi, frame, z, sp, labels, target, prefix):
             pyro.param("d/m_probs")[n],
             pyro.param("d/theta_probs")[n]).squeeze()
 
-    m_mask = k_probs_calc(
-        param(f"{prefix}/m_probs")[n]) > 0.5
-    ideal_spot = GaussianSpot(data, 2)
+    #m_mask = k_probs_calc(
+    #    param(f"{prefix}/m_probs")[n]) > 0.5
+    #m_mask = torch.tensor(1).bool()
+    m_mask = np.stack((data.predictions["m0"][n], data.predictions["m1"][n]), axis=-1)
+    m_mask = torch.tensor(m_mask).reshape(data.F, 1, 1, 2).bool()
+    ideal_spot = GaussianSpot(data.target, data.drift, data.D, 2)
     ideal_data = ideal_spot(
                     n, m_mask, param("{}/h_loc".format(prefix))[n],
                     param("{}/w_mode".format(prefix))[n],
@@ -221,26 +228,31 @@ def view_aoi(data, aoi, frame, z, sp, labels, target, prefix):
         try:
             ax[0, i].set_title("f #{:d}".format(data.drift.index[f+i]), fontsize=15)
             ax[0, i].imshow(
-                data._store[n, f+i].cpu(),
+                data[n, f+i].cpu(),
                 cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
             if target:
                 ax[0, i].plot(
-                    data.target.iloc[n, 2] + data.drift.iloc[f+i, 1] + 0.5,
-                    data.target.iloc[n, 1] + data.drift.iloc[f+i, 0] + 0.5,
+                    data.target["x"].iloc[n] + data.drift["dx"].iloc[f+i] + 0.5,
+                    data.target["y"].iloc[n] + data.drift["dy"].iloc[f+i] + 0.5,
                     "b+", markersize=10, mew=3, alpha=0.7)
             if z:
                 z_color = to_rgba_array("C2", z_probs[f+i])[0]
                 ax[0, i].add_patch(
                     Rectangle((0, 0), data.D*z_probs[f+i], 0.25,
                               edgecolor=z_color, lw=4, facecolor="none"))
+            if predictions:
+                if data.predictions["z"][n, f+i] == 1:
+                    ax[0][i].add_patch(
+                        Rectangle((0, 1), data.D, 0.25,
+                                  edgecolor="C8", lw=4, facecolor="none"))
             if labels:
-                if data.labels["label"].iloc[n*data.F+f+i] == 1:
+                if data.labels["z"][n, f+i] == 1:
                     ax[0][i].add_patch(
                         Rectangle((0, data.D-1), data.D, 0.25,
                                   edgecolor="C3", lw=4, facecolor="none"))
 
             if sp:
-                if data.labels["spotpicker"].iloc[n*data.F+f+i] == 1:
+                if data.labels["spotpicker"][n, f+i] == 1:
                     ax[0][i].add_patch(
                         Rectangle((0, data.D-2), data.D, 0.25,
                                   edgecolor="C4", lw=4, facecolor="none"))
@@ -256,8 +268,8 @@ def view_aoi(data, aoi, frame, z, sp, labels, target, prefix):
                 cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
             if target:
                 ax[1, i].plot(
-                    data.target.iloc[n, 2] + data.drift.iloc[f+i, 1] + 0.5,
-                    data.target.iloc[n, 1] + data.drift.iloc[f+i, 0] + 0.5,
+                    data.target["x"].iloc[n] + data.drift["dx"].iloc[f+i] + 0.5,
+                    data.target["y"].iloc[n] + data.drift["dy"].iloc[f+i] + 0.5,
                     "b+", markersize=10, mew=3, alpha=0.7)
             ax[1, i].axes.get_xaxis().set_ticks([])
             ax[1, i].axes.get_yaxis().set_ticks([])
@@ -276,9 +288,11 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
             param("d/m_probs")[n, f],
             param("d/theta_probs")[n, f]).squeeze()
 
-    m_mask = k_probs_calc(
-        param(f"{prefix}/m_probs")[n,f]) > 0.5
-    ideal_spot = GaussianSpot(data, 2)
+    #m_mask = k_probs_calc(
+    #    param(f"{prefix}/m_probs")[n,f]) > 0.5
+    m_mask = np.stack((data.predictions["m0"][n, f], data.predictions["m1"][n, f]), axis=-1)
+    m_mask = torch.tensor(m_mask).bool()
+    ideal_spot = GaussianSpot(data.target, data.drift, data.D, 2)
     ideal_data = ideal_spot(
                     n, m_mask, param("{}/h_loc".format(prefix))[n],
                     param("{}/w_mode".format(prefix))[n],
@@ -288,12 +302,12 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
 
     ax[0].set_title("f #{:d}".format(data.drift.index[f]), fontsize=15)
     ax[0].imshow(
-        data._store[n, f].cpu(),
+        data[n, f].cpu(),
         cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
     if target:
         ax[0].plot(
-            data.target.iloc[n, 2] + data.drift.iloc[f, 1] + 0.5,
-            data.target.iloc[n, 1] + data.drift.iloc[f, 0] + 0.5,
+            data.target["x"].iloc[n] + data.drift["dx"].iloc[f] + 0.5,
+            data.target["y"].iloc[n] + data.drift["dy"].iloc[f] + 0.5,
             "b+", markersize=10, mew=3, alpha=0.7)
     if z:
         z_color = to_rgba_array("C2", z_probs)[0]
@@ -301,12 +315,12 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
             Rectangle((0, 0), data.D*z_probs, 0.25,
                       edgecolor=z_color, lw=4, facecolor="none"))
     if labels:
-        if data.labels["label"].iloc[n*data.F+f] == 1:
+        if data.labels["z"][n, f] == 1:
             ax[0].add_patch(
                 Rectangle((0, data.D-1), data.D, 0.25,
                           edgecolor="C3", lw=4, facecolor="none"))
     if sp:
-        if data.labels["spotpicker"].iloc[n*data.F+f] == 1:
+        if data.labels["spotpicker"][n, f] == 1:
             ax[0].add_patch(
                 Rectangle((0, data.D-2), data.D, 0.25,
                           edgecolor="C4", lw=4, facecolor="none"))
@@ -318,8 +332,8 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
         cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
     if target:
         ax[1].plot(
-            data.target.iloc[n, 2] + data.drift.iloc[f, 1] + 0.5,
-            data.target.iloc[n, 1] + data.drift.iloc[f, 0] + 0.5,
+            data.target["x"].iloc[n] + data.drift["dx"].iloc[f] + 0.5,
+            data.target["y"].iloc[n] + data.drift["dy"].iloc[f] + 0.5,
             "b+", markersize=10, mew=3, alpha=0.7)
     ax[1].axes.get_xaxis().set_ticks([])
     ax[1].axes.get_yaxis().set_ticks([])
@@ -371,33 +385,33 @@ def view_globals(z, j, data):
                 param("d/y_mode").squeeze().data.reshape(-1),
                 weights=j_probs.reshape(-1),
                 bins=100, label="j", alpha=0.3)
-    ax[0,0].hist(
-            param("d/h_loc").squeeze().data.reshape(-1),
-            weights=(1 - j_probs.reshape(-1) - theta_probs.reshape(-1)),
-            bins=100, label="0", alpha=0.3)
+    #ax[0,0].hist(
+    #        param("d/h_loc").squeeze().data.reshape(-1),
+    #        weights=(1 - j_probs.reshape(-1) - theta_probs.reshape(-1)),
+    #        bins=100, label="0", alpha=0.3)
 
     w = torch.linspace(0.5, 3., 100)
     x = torch.linspace(-(data.D+3)/2, (data.D+3)/2, 100)
+    ax[0,0].plot(h[1],
+            dist.Gamma(
+                param("height_loc").item() * param("height_beta").item(),
+                param("height_beta").item()).log_prob(h[1]).exp()
+                * (theta_probs.sum() + j_probs.sum())
+                * (h[1].max() - h[1].min()) / 100)
     #ax[0,0].plot(h[1],
     #        dist.Gamma(
-    #            param("height_loc").item() * param("height_beta").item(),
-    #            param("height_beta").item()).log_prob(h[1]).exp()
+    #            param("height_loc")[0].item() * param("height_beta")[0].item(),
+    #            param("height_beta")[0].item()).log_prob(h[1]).exp()
     #            * (theta_probs.sum() + j_probs.sum())
-    #            * (h[1].max() - h[1].min()) / 100)
-    ax[0,0].plot(h[1],
-            dist.Gamma(
-                param("height_loc")[0].item() * param("height_beta")[0].item(),
-                param("height_beta")[0].item()).log_prob(h[1]).exp()
-                * (theta_probs.sum() + j_probs.sum())
-                * (h[1].max() - h[1].min()) / 100
-                * param("pi_k")[0].item())
-    ax[0,0].plot(h[1],
-            dist.Gamma(
-                param("height_loc")[1].item() * param("height_beta")[1].item(),
-                param("height_beta")[1].item()).log_prob(h[1]).exp()
-                * (theta_probs.sum() + j_probs.sum())
-                * (h[1].max() - h[1].min()) / 100
-                * param("pi_k")[1].item())
+    #            * (h[1].max() - h[1].min()) / 100
+    #            * param("pi_k")[0].item())
+    #ax[0,0].plot(h[1],
+    #        dist.Gamma(
+    #            param("height_loc")[1].item() * param("height_beta")[1].item(),
+    #            param("height_beta")[1].item()).log_prob(h[1]).exp()
+    #            * (theta_probs.sum() + j_probs.sum())
+    #            * (h[1].max() - h[1].min()) / 100
+    #            * param("pi_k")[1].item())
     ax[0,1].plot(w,
             ScaledBeta(
                 param("width_mode").item(),
@@ -447,7 +461,7 @@ def view_globals(z, j, data):
                 * j_probs.sum()
                 * (x.max() - x.min()) / 100)
 
-    ax[0, 0].set_xlim(0, 7000)
+    #ax[0, 0].set_xlim(0, 7000)
     ax[0, 0].set_xlabel("height", fontsize=20)
     ax[0, 1].set_xlabel("width", fontsize=20)
     ax[1, 0].set_xlabel("x", fontsize=20)

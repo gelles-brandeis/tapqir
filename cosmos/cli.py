@@ -6,12 +6,14 @@ import logging
 from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.tracker import Tracker
 from cosmos.models.marginal import Marginal
+from cosmos.models.hmm import HMM
 
 pyro.enable_validation(True)
 
 models = dict()
 models["tracker"] = Tracker
 models["marginal"] = Marginal
+models["hmm"] = HMM
 
 # parse command-line arguments and execute the main method
 parser = argparse.ArgumentParser(
@@ -69,7 +71,7 @@ def main(args=args):
 
     logger.info("Model: {}".format(args.model))
     model = models[args.model](
-            data, control, K=2, lr=args.learning_rate,
+            data, control, path=args.dataset, K=2, lr=args.learning_rate,
             n_batch=args.n_batch, jit=args.jit)
 
     if args.num_steps and not args.sample:
