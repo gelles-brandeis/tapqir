@@ -21,7 +21,9 @@ class Tracker(Model):
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
-    @poutine.block(hide=["width_mode", "width_size"])
+    #@poutine.block(hide=["width_mode", "width_size"])
+    #@poutine.block(hide=["height_loc", "height_beta", "width_mode", "width_size"])
+    @poutine.block(hide_types=["param"])
     def model(self):
         self.model_parameters()
         data_pi_m = pi_m_calc(param("pi"), param("lamda"), self.K)
@@ -35,6 +37,7 @@ class Tracker(Model):
             with scope(prefix="c"):
                 self.spot_model(self.control, control_pi_m, None, prefix="c")
 
+    @poutine.block(expose_types=["sample"], expose=["d/theta_probs", "d/m_probs"])
     @config_enumerate
     def guide(self):
         self.guide_parameters()
@@ -74,6 +77,7 @@ class Tracker(Model):
             m_mask = self.m_matrix[m.squeeze(dim=-1)].bool()
 
             with K_plate, pyro.poutine.mask(mask=m_mask):
+            #with K_plate:
                 height = pyro.sample(
                     "height", dist.Gamma(
                         param("height_loc") * param("height_beta"),
@@ -110,8 +114,6 @@ class Tracker(Model):
         with N_plate as batch_idx, F_plate:
             self.batch_idx = batch_idx.cpu()
             pyro.sample(
-                #"background", dist.Delta(
-                #    param(f"{prefix}/b_loc")[batch_idx]))
                 "background", dist.Gamma(
                     param(f"{prefix}/b_loc")[batch_idx]
                     * param(f"{prefix}/b_beta")[batch_idx],
@@ -124,10 +126,9 @@ class Tracker(Model):
                         f"{prefix}/theta_probs")[batch_idx])[..., m, :]))
             m_mask = self.m_matrix[m.squeeze(dim=-1)].bool()
 
-            with K_plate, pyro.poutine.mask(mask=m_mask):
+            #with K_plate, pyro.poutine.mask(mask=m_mask):
+            with K_plate:
                 pyro.sample(
-                    #"height", dist.Delta(
-                    #    param(f"{prefix}/h_loc")[batch_idx]))
                     "height", dist.Gamma(
                         param(f"{prefix}/h_loc")[batch_idx]
                         * param(f"{prefix}/h_beta")[batch_idx],
@@ -170,8 +171,10 @@ class Tracker(Model):
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F, 1, 1, 1) * 30,
               constraint=constraints.positive)
+        intensity = torch.ones(data.N, data.F, 1, 1, self.K) * 5.
+        intensity[..., 0] = 50.
         param(f"{prefix}/h_loc",
-              torch.ones(data.N, data.F, 1, 1, self.K) * 1000.,
+              intensity,
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(data.N, data.F, 1, 1, self.K),
@@ -189,7 +192,7 @@ class Tracker(Model):
               torch.zeros(data.N, data.F, 1, 1, self.K),
               constraint=constraints.interval(-(data.D+3)/2, (data.D+3)/2))
         size = torch.ones(data.N, data.F, 1, 1, self.K) * 5.
-        size[..., 0] = ((data.D+3) / (2*0.5)) ** 2 - 1
+        #size[..., 0] = ((data.D+3) / (2*0.5)) ** 2 - 1
         param(f"{prefix}/size",
               size, constraint=constraints.greater_than(2.))
 

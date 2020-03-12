@@ -73,7 +73,8 @@ class Marginal(Model):
                 theta_mask = 0
             m_mask = self.m_matrix[m.squeeze(dim=-1)].bool()
 
-            with pyro.poutine.mask(mask=m_mask), K_plate:
+            #with pyro.poutine.mask(mask=m_mask), K_plate:
+            with K_plate:
                 height = pyro.sample(
                     "height", dist.Gamma(
                         param("height_loc") * param("height_beta"),
@@ -84,14 +85,14 @@ class Marginal(Model):
                         param("width_size"), 0.5, 2.5))
                 x0 = pyro.sample(
                     "x0", ScaledBeta(
-                        0, self.size[theta_mask], -(data.D+3)/2, data.D+3))
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
                 y0 = pyro.sample(
                     "y0", ScaledBeta(
-                        0, self.size[theta_mask], -(data.D+3)/2, data.D+3))
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
             width = width * 2.5 + 0.5
-            x0 = x0 * (data.D+3) - (data.D+3)/2
-            y0 = y0 * (data.D+3) - (data.D+3)/2
+            x0 = x0 * (data.D+1) - (data.D+1)/2
+            y0 = y0 * (data.D+1) - (data.D+1)/2
 
             locs = data.loc(batch_idx, m_mask,
                             height, width, x0, y0, background)
@@ -110,20 +111,20 @@ class Marginal(Model):
         with N_plate as batch_idx, F_plate:
             self.batch_idx = batch_idx.cpu()
             pyro.sample(
-                "background", dist.Delta(
-                    param(f"{prefix}/b_loc")[batch_idx]))
-                #"background", dist.Gamma(
-                #    param(f"{prefix}/b_loc")[batch_idx]
-                #    * param(f"{prefix}/b_beta")[batch_idx],
-                #    param(f"{prefix}/b_beta")[batch_idx]))
+                #"background", dist.Delta(
+                #    param(f"{prefix}/b_loc")[batch_idx]))
+                "background", dist.Gamma(
+                    param(f"{prefix}/b_loc")[batch_idx]
+                    * param(f"{prefix}/b_beta")[batch_idx],
+                    param(f"{prefix}/b_beta")[batch_idx]))
             with K_plate:
                 pyro.sample(
-                    "height", dist.Delta(
-                        param(f"{prefix}/h_loc")[batch_idx]))
-                    #"height", dist.Gamma(
-                    #    param(f"{prefix}/h_loc")[batch_idx]
-                    #    * param(f"{prefix}/h_beta")[batch_idx],
-                    #    param(f"{prefix}/h_beta")[batch_idx]))
+                    #"height", dist.Delta(
+                    #    param(f"{prefix}/h_loc")[batch_idx]))
+                    "height", dist.Gamma(
+                        param(f"{prefix}/h_loc")[batch_idx]
+                        * param(f"{prefix}/h_beta")[batch_idx],
+                        param(f"{prefix}/h_beta")[batch_idx]))
                 pyro.sample(
                     "width", ScaledBeta(
                         param(f"{prefix}/w_mode")[batch_idx],
@@ -133,12 +134,12 @@ class Marginal(Model):
                     "x0", ScaledBeta(
                         param(f"{prefix}/x_mode")[batch_idx],
                         param(f"{prefix}/size")[batch_idx],
-                        -(data.D+3)/2, data.D+3))
+                        -(data.D+1)/2, data.D+1))
                 pyro.sample(
                     "y0", ScaledBeta(
                         param(f"{prefix}/y_mode")[batch_idx],
                         param(f"{prefix}/size")[batch_idx],
-                        -(data.D+3)/2, data.D+3))
+                        -(data.D+1)/2, data.D+1))
 
     def spot_parameters(self, data, prefix):
         param(f"{prefix}/background_loc",
@@ -164,18 +165,18 @@ class Marginal(Model):
               constraint=constraints.greater_than(2.))
         param(f"{prefix}/x_mode",
               torch.zeros(data.N, data.F, 1, 1, self.K),
-              constraint=constraints.interval(-(data.D+3)/2, (data.D+3)/2))
+              constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
         param(f"{prefix}/y_mode",
               torch.zeros(data.N, data.F, 1, 1, self.K),
-              constraint=constraints.interval(-(data.D+3)/2, (data.D+3)/2))
+              constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
         size = torch.ones(data.N, data.F, 1, 1, self.K) * 5.
-        size[..., 0] = ((data.D+3) / (2*0.5)) ** 2 - 1
+        size[..., 0] = ((data.D+1) / (2*0.5)) ** 2 - 1
         param(f"{prefix}/size",
               size, constraint=constraints.greater_than(2.))
 
     def model_parameters(self):
         # Global Parameters
-        # param("proximity", torch.tensor([(((self.D+3)/(2*0.5))**2 - 1)]),
+        # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
         param("background_beta", torch.tensor([1.]),
               constraint=constraints.positive)

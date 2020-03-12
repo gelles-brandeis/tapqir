@@ -62,16 +62,16 @@ class Model(nn.Module):
         self.n_batch = n_batch
         self.jit = jit
 
-        self.size = torch.tensor([2., (((data.D+3) / (2*0.5)) ** 2 - 1)])
+        self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
         self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]])
         self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]])
 
-        self.data.predictions = np.zeros(
+        self.predictions = np.zeros(
             (data.N, data.F),
             dtype=[("aoi", int), ("frame", int), ("z", bool), ("z_prob", float),
-                   ("m0", bool), ("m1", bool), ("m0_prob", float), ("m1_prob", float)])
-        self.data.predictions["aoi"] = data.target.index.values.reshape(-1, 1)
-        self.data.predictions["frame"] = data.drift.index.values
+                   ("m", bool, (2,)), ("m_prob", float, (2,))])
+        self.predictions["aoi"] = data.target.index.values.reshape(-1, 1)
+        self.predictions["frame"] = data.drift.index.values
 
 
         self.data.loc = GaussianSpot(
@@ -90,6 +90,18 @@ class Model(nn.Module):
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
             max_plate_nesting=5, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+
+        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+        version = repo.git.describe()
+        param_path = os.path.join(
+            path, "runs",
+            "{}{}".format("marginal", version),
+            "{}".format("jit" if self.jit else "nojit"),
+            "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
+            "{}".format(self.n_batch))
+        pyro.get_param_store().load(
+            os.path.join(param_path, "params"),
+            map_location=self.data.device)
 
         self.log()
 
@@ -154,26 +166,22 @@ class Model(nn.Module):
             inferred_model = infer_discrete(
                 trained_model, temperature=0, first_available_dim=-6)
             trace = poutine.trace(inferred_model).get_trace()
-            self.data.predictions["z"][self.batch_idx] = (
+            self.predictions["z"][self.batch_idx] = (
                 trace.nodes["d/theta"]["value"] > 0) \
                 .cpu().data.squeeze()
-            self.data.predictions["m0"][self.batch_idx] = \
-                self.m_matrix[trace.nodes["d/m"]["value"]].squeeze().cpu().data[..., 0]
-            self.data.predictions["m1"][self.batch_idx] = \
-                self.m_matrix[trace.nodes["d/m"]["value"]].squeeze().cpu().data[..., 1]
+            self.predictions["m"][self.batch_idx] = \
+                self.m_matrix[trace.nodes["d/m"]["value"]].squeeze().cpu().data
         elif self.__name__ == "tracker":
             z_probs = z_probs_calc(
                 pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
             k_probs = k_probs_calc(pyro.param("d/m_probs"))
-            self.data.predictions["z_prob"] = z_probs.squeeze()
-            self.data.predictions["z"] = \
-                self.data.predictions["z_prob"] > 0.5
-            self.data.predictions["m0_prob"] = k_probs.squeeze()[..., 0]
-            self.data.predictions["m1_prob"] = k_probs.squeeze()[..., 1]
-            self.data.predictions["m0"] = self.data.predictions["m0_prob"] > 0.5
-            self.data.predictions["m1"] = self.data.predictions["m1_prob"] > 0.5
+            self.predictions["z_prob"] = z_probs.squeeze()
+            self.predictions["z"] = \
+                self.predictions["z_prob"] > 0.5
+            self.predictions["m_prob"] = k_probs.squeeze()
+            self.predictions["m"] = self.predictions["m_prob"] > 0.5
         np.save(os.path.join(self.path, "predictions.npy"),
-                self.data.predictions)
+                self.predictions)
 
     def save_checkpoint(self):
         if not any([torch.isnan(v).any()
@@ -197,7 +205,7 @@ class Model(nn.Module):
                         "{}".format(p), scalars, self.epoch_count)
             if self.data.labels is not None:
                 mask = self.data.labels["z"] < 2
-                predictions = self.data.predictions["z"][mask]
+                predictions = self.predictions["z"][mask]
                 true_labels = self.data.labels["z"][mask]
                 mcc = matthews_corrcoef(true_labels, predictions)
                 tn, fp, fn, tp = confusion_matrix(

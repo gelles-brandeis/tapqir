@@ -214,8 +214,7 @@ def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
     #m_mask = k_probs_calc(
     #    param(f"{prefix}/m_probs")[n]) > 0.5
     #m_mask = torch.tensor(1).bool()
-    m_mask = np.stack((data.predictions["m0"][n], data.predictions["m1"][n]), axis=-1)
-    m_mask = torch.tensor(m_mask).reshape(data.F, 1, 1, 2).bool()
+    m_mask = torch.tensor(data.predictions["m"][n]).reshape(data.F, 1, 1, 2).bool()
     ideal_spot = GaussianSpot(data.target, data.drift, data.D, 2)
     ideal_data = ideal_spot(
                     n, m_mask, param("{}/h_loc".format(prefix))[n],
@@ -290,8 +289,7 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
 
     #m_mask = k_probs_calc(
     #    param(f"{prefix}/m_probs")[n,f]) > 0.5
-    m_mask = np.stack((data.predictions["m0"][n, f], data.predictions["m1"][n, f]), axis=-1)
-    m_mask = torch.tensor(m_mask).bool()
+    m_mask = torch.tensor(data.predictions["m"][n]).reshape(data.F, 1, 1, 2).bool()
     ideal_spot = GaussianSpot(data.target, data.drift, data.D, 2)
     ideal_data = ideal_spot(
                     n, m_mask, param("{}/h_loc".format(prefix))[n],
@@ -341,17 +339,13 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
     plt.show()
 
 def view_globals(z, j, data):
-    theta_probs = theta_probs_calc(
-        param("d/m_probs"),
-        param("d/theta_probs")).squeeze()
-
-    j_probs = j_probs_calc(
-        param("d/m_probs"),
-        param("d/theta_probs")).squeeze()
 
     fig, ax = plt.subplots(2, 2, figsize=(12.5,10))
 
     if z:
+        theta_probs = theta_probs_calc(
+            param("d/m_probs"),
+            param("d/theta_probs")).squeeze()
         h = ax[0,0].hist(
                 param("d/h_loc").squeeze().data.reshape(-1),
                 weights=theta_probs.reshape(-1),
@@ -369,6 +363,9 @@ def view_globals(z, j, data):
                 weights=theta_probs.reshape(-1),
                 bins=100, label="z", alpha=0.3)
     if j:
+        j_probs = j_probs_calc(
+            param("d/m_probs"),
+            param("d/theta_probs")).squeeze()
         h = ax[0,0].hist(
                 param("d/h_loc").squeeze().data.reshape(-1),
                 weights=j_probs.reshape(-1),
@@ -390,14 +387,15 @@ def view_globals(z, j, data):
     #        weights=(1 - j_probs.reshape(-1) - theta_probs.reshape(-1)),
     #        bins=100, label="0", alpha=0.3)
 
+    h = torch.linspace(param("d/h_loc").min().item(), param("d/h_loc").max().item(), 100)
     w = torch.linspace(0.5, 3., 100)
     x = torch.linspace(-(data.D+3)/2, (data.D+3)/2, 100)
-    ax[0,0].plot(h[1],
+    ax[0,0].plot(h,
             dist.Gamma(
                 param("height_loc").item() * param("height_beta").item(),
-                param("height_beta").item()).log_prob(h[1]).exp()
-                * (theta_probs.sum() + j_probs.sum())
-                * (h[1].max() - h[1].min()) / 100)
+                param("height_beta").item()).log_prob(h).exp()
+                #* (theta_probs.sum() + j_probs.sum())
+                * (h.max() - h.min()) / 100)
     #ax[0,0].plot(h[1],
     #        dist.Gamma(
     #            param("height_loc")[0].item() * param("height_beta")[0].item(),
@@ -416,7 +414,7 @@ def view_globals(z, j, data):
             ScaledBeta(
                 param("width_mode").item(),
                 param("width_size").item(), 0.5, 2.5).log_prob(torch.tensor(w - 0.5)/2.5).exp()/2.5
-                * (theta_probs.sum() + j_probs.sum())
+                #* (theta_probs.sum() + j_probs.sum())
                 * (w.max() - w.min()) / 100)
     #ax[0,1].plot(w,
     #        ScaledBeta(
@@ -437,28 +435,28 @@ def view_globals(z, j, data):
                 0.,
                 ((data.D+3) / (2*0.5)) ** 2 - 1,
                 -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
-                * theta_probs.sum()
+                #* theta_probs.sum()
                 * (x.max() - x.min()) / 100)
     ax[1,0].plot(x,
             ScaledBeta(
                 0.,
                 2.,
                 -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
-                * j_probs.sum()
+                #* j_probs.sum()
                 * (x.max() - x.min()) / 100)
     ax[1,1].plot(x,
             ScaledBeta(
                 0.,
                 ((data.D+3) / (2*0.5)) ** 2 - 1,
                 -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
-                * theta_probs.sum()
+                #* theta_probs.sum()
                 * (x.max() - x.min()) / 100)
     ax[1,1].plot(x,
             ScaledBeta(
                 0.,
                 2.,
                 -(data.D+3)/2, data.D+3).log_prob(torch.tensor(x + (data.D+3)/2)/(data.D+3)).exp()/(data.D+3)
-                * j_probs.sum()
+                #* j_probs.sum()
                 * (x.max() - x.min()) / 100)
 
     #ax[0, 0].set_xlim(0, 7000)

@@ -166,9 +166,9 @@ def read_glimpse(name, D, dtype, device=None):
             aoi_df = aoi_df.loc[aoi_list]
             labels = np.zeros(
                 (len(aoi_df), len(drift_df)),
-                dtype=[("aoi", int), ("frame", int), ("z", bool), ("spotpicker", float)])
-            labels["aoi"] = framelist[name.split(".")[0]][:, 0].reshape(-1, 1)
-            labels["frame"] = framelist[name.split(".")[0]][:, 2]
+                dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)])
+            labels["aoi"] = framelist[name.split(".")[0]][:, 0].reshape(len(aoi_df), len(drift_df))
+            labels["frame"] = framelist[name.split(".")[0]][:, 2].reshape(len(aoi_df), len(drift_df))
             labels["spotpicker"] = framelist[name.split(".")[0]][:, 1] \
                                    .reshape(len(aoi_df), len(drift_df))
             labels["spotpicker"][labels["spotpicker"] == 0] = 3
