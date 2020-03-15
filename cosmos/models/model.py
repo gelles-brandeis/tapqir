@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import pandas as pd
 import os
 import pyro
 import pyro.distributions as dist
 from pyro.infer import SVI, infer_discrete
-from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
+from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO, Trace_ELBO
 from pyro import param
 from cosmos.models.noise import _noise_fn
 from torch.utils.tensorboard import SummaryWriter
@@ -20,30 +19,29 @@ from git import Repo
 
 
 class GaussianSpot(nn.Module):
-    def __init__(self, target, drift, D, K):
+    def __init__(self, target, drift, D):
         super().__init__()
-        self.K = K
         # create meshgrid of DxD pixel positions
-        x_pixel, y_pixel, _ = torch.meshgrid(
-            torch.arange(D), torch.arange(D), torch.arange(1))
-        self.pixel_pos = torch.stack((x_pixel, y_pixel), dim=-1).float()
+        i_pixel, j_pixel = torch.meshgrid(
+            torch.arange(D), torch.arange(D))
+        self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1).float()
 
         # drift locs for 2D gaussian spot
-        N, F = len(target), len(drift)
         self.target_locs = torch.tensor(
-            drift[["dx", "dy"]].values.reshape(F, 1, 1, 1, 2)
-            + target[["x", "y"]].values.reshape(N, 1, 1, 1, 1, 2)) \
+            drift[["dx", "dy"]].values.reshape(-1, 1, 2)
+            + target[["x", "y"]].values.reshape(-1, 1, 1, 2)) \
             .float()
 
     # Ideal 2D gaussian spots
-    def forward(self, batch_idx, m_mask, height, width, x0, y0, background):
-        height = height.masked_fill(~m_mask, 0.)
-        spot_locs = self.target_locs[batch_idx] + torch.stack((x0, y0), dim=-1)
+    def forward(self, height, width, x, y, background, n_idx):
+        m_mask = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.bool()
+        height = height[..., None].masked_fill(~m_mask, 0.)
+        spot_locs = self.target_locs[n_idx] + torch.stack((x, y), dim=-1)
         rv = dist.MultivariateNormal(
-            spot_locs,
-            scale_tril=torch.eye(2) * width[..., None, None])
-        gaussian_spot = torch.exp(rv.log_prob(self.pixel_pos))  # N,F,D,D
-        return (height * gaussian_spot).sum(dim=-1, keepdim=True) + background
+            spot_locs[..., None, None, None, :],
+            scale_tril=torch.eye(2) * width[..., None, None, None, None, None])
+        gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
+        return (height[..., None, None] * gaussian_spot).sum(dim=-4) + background[..., None, None, None]
 
 
 class Model(nn.Module):
@@ -51,8 +49,9 @@ class Model(nn.Module):
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit,
                  noise="GammaOffset"):
-        # D - number of pixel along axis
-        # K - number of states
+        super().__init__()
+        # D - number of pixels along axis
+        # K - max number of spots
         self.data = data
         self.control = control
         self.path = path
@@ -62,7 +61,10 @@ class Model(nn.Module):
         self.n_batch = n_batch
         self.jit = jit
 
-        self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
+        #self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
+        self.size = torch.tensor([[2., 2.],
+                                  [(((data.D+1) / (2*0.5)) ** 2 - 1), 2.],
+                                  [2., (((data.D+1) / (2*0.5)) ** 2 - 1)]])
         self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]])
         self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]])
 
@@ -73,35 +75,36 @@ class Model(nn.Module):
         self.predictions["aoi"] = data.target.index.values.reshape(-1, 1)
         self.predictions["frame"] = data.drift.index.values
 
-
         self.data.loc = GaussianSpot(
-                self.data.target, self.data.drift,
-                self.data.D, self.K)
+            self.data.target, self.data.drift,
+            self.data.D)
         if self.control:
             self.control.loc = GaussianSpot(
-                    self.control.target, self.control.drift,
-                    self.control.D, self.K)
+                self.control.target, self.control.drift,
+                self.control.D)
 
         pyro.clear_param_store()
         self.epoch_count = 0
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
-            max_plate_nesting=5, ignore_jit_warnings=True)
+        self.elbo = Trace_ELBO()
+        #self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+        #    max_plate_nesting=5, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
-        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-        version = repo.git.describe()
-        param_path = os.path.join(
-            path, "runs",
-            "{}{}".format("marginal", version),
-            "{}".format("jit" if self.jit else "nojit"),
-            "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
-            "{}".format(self.n_batch))
-        pyro.get_param_store().load(
-            os.path.join(param_path, "params"),
-            map_location=self.data.device)
+        if self.__name__ in ["tracker", "hmm"]:
+            repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+            version = repo.git.describe()
+            param_path = os.path.join(
+                path, "runs",
+                "{}{}".format("marginal", version),
+                "{}".format("jit" if self.jit else "nojit"),
+                "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
+                "{}".format(self.n_batch))
+            pyro.get_param_store().load(
+                os.path.join(param_path, "params"),
+                map_location=self.data.device)
 
         self.log()
 
@@ -157,9 +160,7 @@ class Model(nn.Module):
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def infer(self):
-        if self.__name__ == "marginal":
-            #n_batch_save = self.n_batch
-            #self.n_batch = self.data.N
+        if self.__name__ in ["marginal"]:
             guide_trace = poutine.trace(self.guide).get_trace()
             trained_model = poutine.replay(
                 poutine.enum(self.model), trace=guide_trace)
@@ -203,6 +204,16 @@ class Model(nn.Module):
                                for i, p in enumerate(param(p).squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}".format(p), scalars, self.epoch_count)
+                elif param(p).squeeze().dim() == 2 and \
+                        len(param(p).squeeze()) <= self.K:
+                    scalars = {str(i): p
+                               for i, p in enumerate(param(p)[0].squeeze())}
+                    self.writer_scalar.add_scalars(
+                        "{}_0".format(p), scalars, self.epoch_count)
+                    scalars = {str(i): p
+                               for i, p in enumerate(param(p)[1].squeeze())}
+                    self.writer_scalar.add_scalars(
+                        "{}_1".format(p), scalars, self.epoch_count)
             if self.data.labels is not None:
                 mask = self.data.labels["z"] < 2
                 predictions = self.predictions["z"][mask]

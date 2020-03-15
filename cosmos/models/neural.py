@@ -26,7 +26,7 @@ class Encoder(nn.Module):
     def forward(self, x):
         # define the forward computation on the image x
         # first shape the mini-batch to have pixels in the rightmost dimension
-        x = x.reshape(x.shape[0]. x.shape[1], 1, 1, 196)
+        x = x.reshape(x.shape[0], x.shape[1], 1, 1, 196)
         # then compute the hidden units
         hidden = self.softplus(self.fc1(x))
         # then return a mean vector and a (positive) square root covariance
@@ -35,13 +35,14 @@ class Encoder(nn.Module):
         z_scale = torch.exp(self.fc22(hidden))
         return z_loc, z_scale
 
-class Marginal(Model):
+class Neural(Model):
     """ Track on-target Spot """
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit, noise="GammaOffset"):
-        self.__name__ = "marginal"
+        self.__name__ = "neural"
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
+        self.encoder = Encoder(2, 200)
 
     @poutine.block(hide=["width_mode", "width_size"])
     @config_enumerate
@@ -60,7 +61,6 @@ class Marginal(Model):
 
     def guide(self):
         self.guide_parameters()
-        self.encoder = Encoder(2, 200)
         with scope(prefix="d"):
             self.spot_guide(self.data, prefix="d")
 
@@ -116,8 +116,9 @@ class Marginal(Model):
             x0 = x0 * (data.D+1) - (data.D+1)/2
             y0 = y0 * (data.D+1) - (data.D+1)/2
 
-            locs = data.loc(batch_idx, m_mask,
-                            height, width, x0, y0, background)
+            print(height.shape, m_mask.shape)
+            locs = data.loc(m_mask,
+                            height, width, x0, y0, background, batch_idx)
             with I_plate, J_plate:
                 pyro.sample(
                     "data", self.CameraUnit(
@@ -138,9 +139,12 @@ class Marginal(Model):
                     * param(f"{prefix}/b_beta")[batch_idx],
                     param(f"{prefix}/b_beta")[batch_idx]))
             with K_plate:
-                h_loc, h_beta = self.encoder(data[batch_idx])
+                h_loc, h_beta = self.encoder.forward(data[batch_idx])
+                h_loc = h_loc
+                #print(h_loc.min())
                 pyro.sample("height", dist.Gamma(
-                    h_loc * h_beta, h_beta))
+                    h_loc * h_beta + 1e-3, h_beta))
+                
                 #pyro.sample(
                 #    "height", dist.Gamma(
                 #        param(f"{prefix}/h_loc")[batch_idx]

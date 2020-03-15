@@ -7,6 +7,7 @@ from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.tracker import Tracker
 from cosmos.models.marginal import Marginal
 from cosmos.models.hmm import HMM
+from cosmos.models.neural import Neural
 
 pyro.enable_validation(True)
 
@@ -14,6 +15,7 @@ models = dict()
 models["tracker"] = Tracker
 models["marginal"] = Marginal
 models["hmm"] = HMM
+models["neural"] = Neural
 
 # parse command-line arguments and execute the main method
 parser = argparse.ArgumentParser(
