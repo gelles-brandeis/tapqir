@@ -1,7 +1,7 @@
 import torch
 import pyro
 import pyro.distributions as dist
-from pyro.infer import config_enumerate
+from pyro.infer import config_enumerate, infer_discrete
 from pyro import param
 from pyro import poutine
 from pyro.contrib.autoname import scope
@@ -10,7 +10,7 @@ from cosmos.models.helper import ScaledBeta
 import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
-from cosmos.models.helper import pi_m_calc, pi_theta_calc, A_m_calc, A_theta_calc
+from cosmos.models.helper import pi_m_calc, pi_theta_calc, trans_calc, init_calc
 
 
 class HMM(Model):
@@ -22,185 +22,139 @@ class HMM(Model):
                          K, lr, n_batch, jit, noise="GammaOffset")
 
     @poutine.block(hide=["width_mode", "width_size"])
-    @config_enumerate
     def model(self):
-        self.model_parameters()
-        data_A_m = A_m_calc(param("A"), param("lamda"), self.K)
-        control_pi_m = pi_m_calc(torch.tensor([1., 0.]), param("lamda"), self.K)
-        control_A_m = control_pi_m.unsqueeze(dim=0)
-        A_theta = A_theta_calc(param("A"), param("lamda"), self.K)
+        self.model_parameters(self.data)
 
-        #with scope(prefix="d"):
-        self.spot_model(self.data, data_A_m, A_theta, prefix="d")
+        self.spot_model(self.data)
 
         if self.control:
-            #with scope(prefix="c"):
-            self.spot_model(self.control, control_A_m, None, prefix="c")
+            self.spot_model(self.control)
 
     def guide(self):
         self.guide_parameters()
-        #with scope(prefix="d"):
-        self.spot_guide(self.data, False, prefix="d")
+        self.spot_guide(self.data)
 
         if self.control:
-            #with scope(prefix="c"):
-            self.spot_guide(self.control, False, prefix="c")
+            self.spot_guide(self.control)
 
     def guide_parameters(self):
-        self.spot_parameters(self.data, True, True, prefix="d")
+        self.spot_parameters(self.data)
         if self.control:
-            self.spot_parameters(
-                self.control, True, False, prefix="c")
+            self.spot_parameters(self.control)
 
 
-    def spot_model(self, data, A_m, A_theta, prefix):
-        N_plate = pyro.plate("N_plate", data.N, dim=-4)
-        I_plate = pyro.plate("I_plate", data.D, dim=-3)
-        J_plate = pyro.plate("J_plate", data.D, dim=-2)
-        K_plate = pyro.plate("K_plate", self.K, dim=-1)
-
-
+    def spot_model(self, data):
+        N_plate = pyro.plate("N_plate", data.N, dim=-1)
         with N_plate as batch_idx:
-            theta = 0
-            for f in pyro.markov(range(data.F)):
-                background = pyro.sample(
-                    f"background_{f}", dist.Gamma(
-                        param(f"{prefix}/background_loc")[batch_idx]
-                        * param("background_beta"), param("background_beta")))
+            background = pyro.sample(
+                "background", dist.Gamma(
+                    param("background_loc")[batch_idx]
+                    * param("background_beta"), param("background_beta")).expand([len(batch_idx), data.F]).to_event(1))
+            height = pyro.sample(
+                "height", dist.Gamma(
+                    param("height_loc") * param("height_beta"),
+                    param("height_beta")).expand([data.F, self.K]).to_event(2))
+            width = pyro.sample(
+                "width", ScaledBeta(
+                    param("width_mode"),
+                    param("width_size"), 0.5, 2.5).expand([data.F, self.K]).to_event(2))
 
-                m = pyro.sample(f"m_{f}", dist.Categorical(
-                    Vindex(A_m)[theta, :]))
-                if A_theta is not None:
-                    theta = pyro.sample(f"theta_{f}", dist.Categorical(
-                        Vindex(A_theta)[theta, m]))
-                    theta_mask = self.theta_matrix[theta.squeeze(dim=-1)]
-                else:
-                    theta_mask = 0
-                m_mask = self.m_matrix[m.squeeze(dim=-1)].bool()
+            #xy_dist = ScaledBeta(
+            #        0, self.size, -(data.D+1)/2, data.D+1).expand([data.F, 8, self.K]).to_event(1)
+            x = pyro.sample(
+                "x", ScaledBeta(
+                    0, self.size, -(data.D+1)/2, data.D+1).expand([data.F, self.K, 3]).to_event(3))
+            y = pyro.sample(
+                "y", ScaledBeta(
+                    0, self.size, -(data.D+1)/2, data.D+1).expand([data.F, self.K, 3]).to_event(3))
 
-                with K_plate:
-                    height = pyro.sample(
-                        f"height_{f}", dist.Gamma(
-                            param("height_loc") * param("height_beta"),
-                            param("height_beta")))
-                    width = pyro.sample(
-                        f"width_{f}", ScaledBeta(
-                            param("width_mode"),
-                            param("width_size"), 0.5, 2.5))
-                    x = pyro.sample(
-                        f"x_{f}", ScaledBeta(
-                            0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
-                    y = pyro.sample(
-                        f"y_{f}", ScaledBeta(
-                            0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+            width = width * 2.5 + 0.5
+            x = x * (data.D+1) - (data.D+1)/2
+            y = y * (data.D+1) - (data.D+1)/2
+            x = x[..., [0, 0, 1, 0, 2, 0, 1, 2]].permute(3, 0, 1, 2)
+            y = y[..., [0, 0, 1, 0, 2, 0, 1, 2]].permute(3, 0, 1, 2)
+            m_mask = self.m_matrix.bool().reshape(8, 1, 1, self.K)
 
-                width = width * 2.5 + 0.5
-                x = x * (data.D+1) - (data.D+1)/2
-                y = y * (data.D+1) - (data.D+1)/2
+            locs = data.loc(height, width, x, y, background, batch_idx, m_mask).permute(1, 2, 0, 3, 4)
+            d_dist = self.CameraUnit(
+                            locs, param("gain"), param("offset")).to_event(2)
+            init = init_calc(param("pi"), param("lamda"), self.K)
+            trans = trans_calc(param("A"), param("lamda"), self.K)
+            pyro.sample(
+                "data", dist.DiscreteHMM(init, trans, d_dist),
+                obs=data[batch_idx])
 
-                locs = data.loc(m_mask, height, width,
-                                x, y, background, batch_idx, f)
-                with I_plate, J_plate:
-                    pyro.sample(
-                        f"data_{f}", self.CameraUnit(
-                            locs, param("gain"), param("offset")),
-                        obs=data[batch_idx, f].unsqueeze(dim=-1))
-
-    def spot_guide(self, data, theta, prefix):
+    def spot_guide(self, data):
         N_plate = pyro.plate("N_plate", data.N,
-                             subsample_size=self.n_batch, dim=-4)
-        K_plate = pyro.plate("K_plate", self.K, dim=-1)
+                             subsample_size=self.n_batch, dim=-1)
 
         with N_plate as batch_idx:
-            self.batch_idx = batch_idx.cpu()
-            #m = torch.zeros(len(batch_idx), data.F, 1, 1, 1).long()
-            #theta = torch.zeros(len(batch_idx), data.F, 1, 1, 1).long()
-            #t = theta[:, 0:1]
-            for f in pyro.markov(range(data.F)):
-                pyro.sample(
-                    f"background_{f}", dist.Gamma(
-                        param(f"{prefix}/b_loc")[batch_idx, f]
-                        * param(f"{prefix}/b_beta")[batch_idx, f],
-                        param(f"{prefix}/b_beta")[batch_idx, f]))
-                #m[:, f:f+1] = pyro.sample(f"m_{f}", dist.Categorical(
-                #    Vindex(param(f"{prefix}/m_probs")[batch_idx, f:f+1])
-                #    [..., t, :]))
-                #if theta:
-                #    pyro.sample(f"theta_{f}", dist.Categorical(
-                #        Vindex(param(
-                #            f"{prefix}/theta_probs")[batch_idx, f:f+1])[..., t, m[:, f:f+1], :]))
+            self.batch_idx = batch_idx
+            pyro.sample(
+                "background", dist.Gamma(
+                    param("b_loc")[batch_idx]
+                    * param("b_beta")[batch_idx],
+                    param("b_beta")[batch_idx]).to_event(1))
 
-                with K_plate:
-                    pyro.sample(
-                        f"height_{f}", dist.Gamma(
-                            param(f"{prefix}/h_loc")[batch_idx, f]
-                            * param(f"{prefix}/h_beta")[batch_idx, f],
-                            param(f"{prefix}/h_beta")[batch_idx, f]))
-                    pyro.sample(
-                        f"width_{f}", ScaledBeta(
-                            param(f"{prefix}/w_mode")[batch_idx, f],
-                            param(f"{prefix}/w_size")[batch_idx, f],
-                            0.5, 2.5))
-                    pyro.sample(
-                        f"x_{f}", ScaledBeta(
-                            param(f"{prefix}/x_mode")[batch_idx, f],
-                            param(f"{prefix}/size")[batch_idx, f],
-                            -(data.D+1)/2, data.D+1))
-                    pyro.sample(
-                        f"y_{f}", ScaledBeta(
-                            param(f"{prefix}/y_mode")[batch_idx, f],
-                            param(f"{prefix}/size")[batch_idx, f],
-                            -(data.D+1)/2, data.D+1))
+            pyro.sample(
+                "height", dist.Gamma(
+                    param("h_loc")[batch_idx]
+                    * param("h_beta")[batch_idx],
+                    param("h_beta")[batch_idx]).to_event(2))
+            pyro.sample(
+                "width", ScaledBeta(
+                    param("w_mode")[batch_idx],
+                    param("w_size")[batch_idx],
+                    0.5, 2.5).to_event(2))
+            pyro.sample(
+                "x", ScaledBeta(
+                    param("x_mode")[batch_idx],
+                    param("size")[batch_idx],
+                    -(data.D+1)/2, data.D+1).to_event(3))
+            pyro.sample(
+                "y", ScaledBeta(
+                    param("y_mode")[batch_idx],
+                    param("size")[batch_idx],
+                    -(data.D+1)/2, data.D+1).to_event(3))
 
-    def spot_parameters(self, data, m, theta, prefix):
-        param(f"{prefix}/background_loc",
-              torch.ones(data.N, 1, 1, 1) * 50.,
+    def spot_parameters(self, data):
+        param("b_loc",
+              torch.ones(data.N, data.F) * 50.,
               constraint=constraints.positive)
-        if m:
-            m_probs = torch.ones(data.N, data.F, 1, 1, 1, self.K+1, 2**self.K)
-            param(f"{prefix}/m_probs", m_probs,
-                  constraint=constraints.simplex)
-        if theta:
-            theta_probs = torch.ones(
-                data.N, data.F, 1, 1, 1, self.K+1, 2**self.K, self.K+1)
-            theta_probs[..., 0, 1:] = 0
-            theta_probs[..., 1, 2] = 0
-            theta_probs[..., 2, 1] = 0
-            param(f"{prefix}/theta_probs", theta_probs,
-                  constraint=constraints.simplex)
-        param(f"{prefix}/b_loc",
-              torch.ones(data.N, data.F, 1, 1, 1) * 50.,
+        param("b_beta",
+              torch.ones(data.N, data.F) * 30,
               constraint=constraints.positive)
-        param(f"{prefix}/b_beta",
-              torch.ones(data.N, data.F, 1, 1, 1) * 30,
+        param("h_loc",
+              torch.ones(data.N, data.F, self.K) * 1000.,
               constraint=constraints.positive)
-        param(f"{prefix}/h_loc",
-              torch.ones(data.N, data.F, 1, 1, self.K) * 1000.,
+        param("h_beta",
+              torch.ones(data.N, data.F, self.K),
               constraint=constraints.positive)
-        param(f"{prefix}/h_beta",
-              torch.ones(data.N, data.F, 1, 1, self.K),
-              constraint=constraints.positive)
-        param(f"{prefix}/w_mode",
-              torch.ones(data.N, data.F, 1, 1, self.K) * 1.3,
+        param("w_mode",
+              torch.ones(data.N, data.F, self.K) * 1.3,
               constraint=constraints.interval(0.5, 3.))
-        param(f"{prefix}/w_size",
-              torch.ones(data.N, data.F, 1, 1, self.K) * 100.,
+        param("w_size",
+              torch.ones(data.N, data.F, self.K) * 100.,
               constraint=constraints.greater_than(2.))
-        param(f"{prefix}/x_mode",
-              torch.zeros(data.N, data.F, 1, 1, self.K),
+        param("x_mode",
+              torch.zeros(data.N, data.F, self.K, 3),
               constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        param(f"{prefix}/y_mode",
-              torch.zeros(data.N, data.F, 1, 1, self.K),
+        param("y_mode",
+              torch.zeros(data.N, data.F, self.K, 3),
               constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        size = torch.ones(data.N, data.F, 1, 1, self.K) * 5.
-        size[..., 0] = ((data.D+1) / (2*0.5)) ** 2 - 1
-        param(f"{prefix}/size",
+        size = torch.ones(data.N, data.F, self.K, 3) * 5.
+        size[..., 0, 1] = ((data.D+1) / (2*0.5)) ** 2 - 1
+        size[..., 1, 2] = ((data.D+1) / (2*0.5)) ** 2 - 1
+        param("size",
               size, constraint=constraints.greater_than(2.))
 
-    def model_parameters(self):
+    def model_parameters(self, data):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
+        param("background_loc",
+              torch.ones(data.N, 1) * 50.,
+              constraint=constraints.positive)
         param("background_beta", torch.tensor([1.]),
               constraint=constraints.positive)
         param("height_loc", torch.tensor([1000.]),
@@ -211,6 +165,7 @@ class HMM(Model):
               constraint=constraints.interval(0.5, 3.))
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
+        param("pi", torch.ones(2), constraint=constraints.simplex)
         param("A", torch.ones(2, 2), constraint=constraints.simplex)
         param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
 
@@ -224,3 +179,61 @@ class HMM(Model):
         param("offset", self.offset_max-50,
               constraint=constraints.interval(0, self.offset_max))
         param("gain", torch.tensor(5.), constraint=constraints.positive)
+
+
+    #@infer_discrete(first_available_dim=-2, temperature=0)
+    @config_enumerate
+    def viterbi_decoder(self, data):
+        N_plate = pyro.plate("N_plate", data.N, dim=-1)
+        init = init_calc(param("pi"), param("lamda"), self.K)
+        trans = trans_calc(param("A"), param("lamda"), self.K)
+        with N_plate as batch_idx:
+            state = 0
+            states = []
+            for f in pyro.markov(range(data.F)):
+                background = pyro.sample(
+                    f"background_{f}", dist.Gamma(
+                        param("b_loc")[batch_idx, f]
+                        * param("b_beta")[batch_idx, f],
+                        param("b_beta")[batch_idx, f]))
+
+                height = pyro.sample(
+                    f"height_{f}", dist.Gamma(
+                        param("h_loc")[batch_idx, f]
+                        * param("h_beta")[batch_idx, f],
+                        param("h_beta")[batch_idx, f]).to_event(1))
+                width = pyro.sample(
+                    f"width_{f}", ScaledBeta(
+                        param("w_mode")[batch_idx, f],
+                        param("w_size")[batch_idx, f],
+                        0.5, 2.5).to_event(1))
+                x = pyro.sample(
+                    f"x_{f}", ScaledBeta(
+                        param("x_mode")[batch_idx, f],
+                        param("size")[batch_idx, f],
+                        -(data.D+1)/2, data.D+1).to_event(2))
+                y = pyro.sample(
+                    f"y_{f}", ScaledBeta(
+                        param("y_mode")[batch_idx, f],
+                        param("size")[batch_idx, f],
+                        -(data.D+1)/2, data.D+1).to_event(2))
+
+                state = pyro.sample(
+                    f"state_{f}", dist.Categorical(Vindex(trans)[state, :]))
+
+                width = width * 2.5 + 0.5
+                x = x * (data.D+1) - (data.D+1)/2
+                y = y * (data.D+1) - (data.D+1)/2
+                x = x[..., [0, 0, 1, 0, 2, 0, 1, 2]]
+                y = y[..., [0, 0, 1, 0, 2, 0, 1, 2]]
+                y = Vindex(y)[..., :, state]
+                x = Vindex(x)[..., :, state]
+                m_mask = Vindex(self.m_matrix)[state, :].bool()
+
+                locs = data.loc(height, width, x, y, background, batch_idx, m_mask, f)
+                d_dist = self.CameraUnit(
+                                locs, param("gain"), param("offset")).to_event(2)
+                pyro.sample(
+                    f"data_{f}", d_dist, obs=data[batch_idx, f])
+                states.append(state)
+        return states

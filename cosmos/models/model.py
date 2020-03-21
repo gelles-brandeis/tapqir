@@ -33,15 +33,17 @@ class GaussianSpot(nn.Module):
             .float()
 
     # Ideal 2D gaussian spots
-    def forward(self, height, width, x, y, background, n_idx):
-        m_mask = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.bool()
-        height = height[..., None].masked_fill(~m_mask, 0.)
-        spot_locs = self.target_locs[n_idx] + torch.stack((x, y), dim=-1)
+    def forward(self, height, width, x, y, background, n_idx, m_mask, f=None):
+        height = height.masked_fill(~m_mask, 0.)
+        if f is not None:
+            spot_locs = self.target_locs[n_idx, f] + torch.stack((x, y), dim=-1)
+        else:
+            spot_locs = self.target_locs[n_idx] + torch.stack((x, y), dim=-1)
         rv = dist.MultivariateNormal(
-            spot_locs[..., None, None, None, :],
-            scale_tril=torch.eye(2) * width[..., None, None, None, None, None])
+            spot_locs[..., None, None, :],
+            scale_tril=torch.eye(2) * width[..., None, None, None, None])
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
-        return (height[..., None, None] * gaussian_spot).sum(dim=-4) + background[..., None, None, None]
+        return (height[..., None, None] * gaussian_spot).sum(dim=-3) + background[..., None, None]
 
 
 class Model(nn.Module):
@@ -61,17 +63,22 @@ class Model(nn.Module):
         self.n_batch = n_batch
         self.jit = jit
 
-        #self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
-        self.size = torch.tensor([[2., 2.],
-                                  [(((data.D+1) / (2*0.5)) ** 2 - 1), 2.],
-                                  [2., (((data.D+1) / (2*0.5)) ** 2 - 1)]])
+        self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
+        #self.size = torch.tensor([[2., 2.],
+        #                          [(((data.D+1) / (2*0.5)) ** 2 - 1), 2.],
+        #                          [2., (((data.D+1) / (2*0.5)) ** 2 - 1)]]).T
         self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]])
-        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]])
+        self.theta_matrix = torch.tensor([[0, 0], [1, 0]])
+        #self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]])
+        #self.z_matrix = torch.tensor([0, 0, 1, 0, 1, 0, 1, 1])
+        #self.theta_matrix = torch.tensor([0, 0, 1, 0, 2, 0, 1, 2])
+        #self.theta_matrix = torch.tensor([[0, 0], [0, 0], [1, 0], [0, 0], [0, 1], [0, 0], [1, 0], [0, 1]])
+        #self.m_matrix = torch.tensor([[0, 0], [1, 0], [1, 0], [0, 1], [0, 1], [1, 1], [1, 1], [1, 1]])
 
         self.predictions = np.zeros(
             (data.N, data.F),
             dtype=[("aoi", int), ("frame", int), ("z", bool), ("z_prob", float),
-                   ("m", bool, (2,)), ("m_prob", float, (2,))])
+                   ("m", bool, (2,)), ("m_prob", float, (2,)), ("theta", int)])
         self.predictions["aoi"] = data.target.index.values.reshape(-1, 1)
         self.predictions["frame"] = data.drift.index.values
 
@@ -88,12 +95,12 @@ class Model(nn.Module):
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        self.elbo = Trace_ELBO()
-        #self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
-        #    max_plate_nesting=5, ignore_jit_warnings=True)
+        #self.elbo = Trace_ELBO()
+        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+            max_plate_nesting=2, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
-        if self.__name__ in ["tracker", "hmm"]:
+        if self.__name__ in ["tracker"]:
             repo = Repo(cosmos.__path__[0], search_parent_directories=True)
             version = repo.git.describe()
             param_path = os.path.join(
@@ -165,7 +172,7 @@ class Model(nn.Module):
             trained_model = poutine.replay(
                 poutine.enum(self.model), trace=guide_trace)
             inferred_model = infer_discrete(
-                trained_model, temperature=0, first_available_dim=-6)
+                trained_model, temperature=0, first_available_dim=-3)
             trace = poutine.trace(inferred_model).get_trace()
             self.predictions["z"][self.batch_idx] = (
                 trace.nodes["d/theta"]["value"] > 0) \
@@ -181,6 +188,13 @@ class Model(nn.Module):
                 self.predictions["z_prob"] > 0.5
             self.predictions["m_prob"] = k_probs.squeeze()
             self.predictions["m"] = self.predictions["m_prob"] > 0.5
+        elif self.__name__ == "hmm":
+            states = infer_discrete(self.viterbi_decoder, first_available_dim=-2, temperature=0)(data=self.data)
+            
+            states = torch.stack(states, dim=-1)
+            self.predictions["m"] = self.m_matrix[states].cpu().data
+            self.predictions["z"] = self.z_matrix[states].cpu().data
+            self.predictions["theta"] = self.theta_matrix[states].cpu().data
         np.save(os.path.join(self.path, "predictions.npy"),
                 self.predictions)
 

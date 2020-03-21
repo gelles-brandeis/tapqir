@@ -6,6 +6,7 @@ from matplotlib.patches import Rectangle
 import pyro
 from pyro import param
 from pyro.ops.stats import hpdi
+from pyro.ops.indexing import Vindex
 from matplotlib.colors import to_rgba_array
 import torch.distributions as dist
 from cosmos.models.model import GaussianSpot
@@ -132,45 +133,45 @@ def view_parameters(aoi, data, frames, m, params, prefix):
     for i, p in enumerate(params):
         if p == "background":
             hpd = hpdi(dist.Gamma(
-                param(f"{prefix}/b_loc").data[n]
-                * param(f"{prefix}/b_beta").data[n],
-                param(f"{prefix}/b_beta").data[n])
+                param("b_loc").data[n]
+                * param("b_beta").data[n],
+                param("b_beta").data[n])
                 .sample((500,)), 0.95, dim=0)
-            mean = param(f"{prefix}/b_loc").data[n]
+            mean = param("b_loc").data[n]
             ax[i].set_ylim(0, hpd.max()+1)
         elif p == "intensity":
             hpd = hpdi(dist.Gamma(
-                param(f"{prefix}/h_loc").data[n]
-                * param(f"{prefix}/h_beta").data[n],
-                param(f"{prefix}/h_beta").data[n])
+                param("h_loc").data[n]
+                * param("h_beta").data[n],
+                param("h_beta").data[n])
                 .sample((500,)), 0.95, dim=0)
-            mean = param(f"{prefix}/h_loc").data[n]
+            mean = param("h_loc").data[n]
             ax[i].set_ylim(0, hpd.max()+10)
         elif p == "x":
             hpd = hpdi(ScaledBeta(
-                param(f"{prefix}/x_mode").data[n],
-                param(f"{prefix}/size").data[n],
+                Vindex(param("x_mode").data[n])[..., :, torch.from_numpy(data.predictions["theta"][n].copy())],
+                Vindex(param("size").data[n])[..., :, torch.from_numpy(data.predictions["theta"][n].copy())],
                 -(data.D+3)/2, data.D+3)
                 .sample((500,)), 0.95, dim=0)
             hpd = hpd * (data.D+3) - (data.D+3)/2
-            mean = param(f"{prefix}/x_mode").data[n]
+            mean = Vindex(param("x_mode").data[n])[..., :, torch.from_numpy(data.predictions["theta"][n].copy())]
             ax[i].set_ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "y":
             hpd = hpdi(ScaledBeta(
-                param(f"{prefix}/y_mode").data[n],
-                param(f"{prefix}/size").data[n],
+                param("y_mode").data[n],
+                param("size").data[n],
                 -(data.D+3)/2, data.D+3)
                 .sample((500,)), 0.95, dim=0)
             hpd = hpd * (data.D+3) - (data.D+3)/2
-            mean = param(f"{prefix}/y_mode").data[n]
+            mean = param("y_mode").data[n]
             ax[i].set_ylim(-(data.D+3)/2, (data.D+3)/2)
         elif p == "width":
             hpd = hpdi(ScaledBeta(
-                param(f"{prefix}/w_mode").data[n],
-                param(f"{prefix}/w_size").data[n], 0.5, 2.5)
+                param("w_mode").data[n],
+                param("w_size").data[n], 0.5, 2.5)
                 .sample((500,)), 0.95, dim=0)
             hpd = hpd * 2.5 + 0.5
-            mean = param(f"{prefix}/w_mode").data[n]
+            mean = param("w_mode").data[n]
 
         hpd = hpd.squeeze()
         mean = mean.squeeze()
@@ -215,13 +216,13 @@ def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
     #    param(f"{prefix}/m_probs")[n]) > 0.5
     #m_mask = torch.tensor(1).bool()
     m_mask = torch.tensor(data.predictions["m"][n]).reshape(data.F, 1, 1, 2).bool()
-    ideal_spot = GaussianSpot(data.target, data.drift, data.D, 2)
+    ideal_spot = GaussianSpot(data.target, data.drift, data.D)
     ideal_data = ideal_spot(
-                    n, m_mask, param("{}/h_loc".format(prefix))[n],
-                    param("{}/w_mode".format(prefix))[n],
-                    param("{}/x_mode".format(prefix))[n],
-                    param("{}/y_mode".format(prefix))[n],
-                    param("{}/b_loc".format(prefix))[n]) + param("offset")
+                    param("h_loc".format(prefix))[n],
+                    param("w_mode".format(prefix))[n],
+                    param("x_mode".format(prefix))[n],
+                    param("y_mode".format(prefix))[n],
+                    param("b_loc".format(prefix))[n], n) + param("offset")
 
     for i in range(10):
         try:
