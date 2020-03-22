@@ -74,7 +74,7 @@ class Marginal(Model):
             height = pyro.sample(
                 "height", dist.Gamma(
                     param("height_loc")[theta_mask] * param("height_beta")[theta_mask],
-                    param("height_beta")[theta_mask]).expand([self.K]).to_event(1))
+                    param("height_beta")[theta_mask]).to_event(1))
             width = pyro.sample(
                 "width", ScaledBeta(
                     param("width_mode"),
