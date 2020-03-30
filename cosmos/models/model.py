@@ -28,13 +28,14 @@ class GaussianSpot(nn.Module):
 
         # drift locs for 2D gaussian spot
         self.target_locs = torch.tensor(
-            drift[["dx", "dy"]].values.reshape(-1, 1, 2)
-            + target[["x", "y"]].values.reshape(-1, 1, 1, 2)) \
+            drift[["dx", "dy"]].values.reshape(-1, 2)
+            + target[["x", "y"]].values.reshape(-1, 1, 2)) \
             .float()
 
     # Ideal 2D gaussian spots
-    def forward(self, height, width, x, y, background, n_idx, m_mask, f=None):
-        height = height.masked_fill(~m_mask, 0.)
+    def forward(self, height, width, x, y, background, n_idx, m_mask=None, f=None):
+        if m_mask is not None:
+            height = height.masked_fill(~m_mask, 0.)
         if f is not None:
             spot_locs = self.target_locs[n_idx, f] + torch.stack((x, y), dim=-1)
         else:
@@ -43,7 +44,7 @@ class GaussianSpot(nn.Module):
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2) * width[..., None, None, None, None])
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
-        return (height[..., None, None] * gaussian_spot).sum(dim=-3) + background[..., None, None]
+        return (height[..., None, None] * gaussian_spot).sum(dim=0) + background[..., None, None]
 
 
 class Model(nn.Module):
@@ -58,6 +59,7 @@ class Model(nn.Module):
         self.control = control
         self.path = path
         self.K = K
+        self.S = 1
         self.CameraUnit = _noise_fn[noise]
         self.lr = lr
         self.n_batch = n_batch
@@ -67,13 +69,14 @@ class Model(nn.Module):
         #self.size = torch.tensor([[2., 2.],
         #                          [(((data.D+1) / (2*0.5)) ** 2 - 1), 2.],
         #                          [2., (((data.D+1) / (2*0.5)) ** 2 - 1)]]).T
-        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]])
-        self.theta_matrix = torch.tensor([[0, 0], [1, 0]])
-        #self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]])
+        #self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 4)
+        #self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 5)
+        #self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [2, 0], [0, 2]]).T.reshape(2, 1, 1, 5)
+        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
+        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
+        self.m_state = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1], [1, 0], [1, 1], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 8)
+        self.theta_state = torch.tensor([[0, 0], [0, 0], [0, 0], [0, 0], [1, 0], [1, 0], [0, 1], [0, 1]]).T.reshape(2, 1, 1, 8)
         #self.z_matrix = torch.tensor([0, 0, 1, 0, 1, 0, 1, 1])
-        #self.theta_matrix = torch.tensor([0, 0, 1, 0, 2, 0, 1, 2])
-        #self.theta_matrix = torch.tensor([[0, 0], [0, 0], [1, 0], [0, 0], [0, 1], [0, 0], [1, 0], [0, 1]])
-        #self.m_matrix = torch.tensor([[0, 0], [1, 0], [1, 0], [0, 1], [0, 1], [1, 1], [1, 1], [1, 1]])
 
         self.predictions = np.zeros(
             (data.N, data.F),
@@ -95,9 +98,9 @@ class Model(nn.Module):
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        #self.elbo = Trace_ELBO()
-        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
-            max_plate_nesting=2, ignore_jit_warnings=True)
+        self.elbo = Trace_ELBO()
+        #self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+        #    max_plate_nesting=3, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
         if self.__name__ in ["tracker"]:
@@ -106,6 +109,18 @@ class Model(nn.Module):
             param_path = os.path.join(
                 path, "runs",
                 "{}{}".format("marginal", version),
+                "{}".format("jit" if self.jit else "nojit"),
+                "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
+                "{}".format(self.n_batch))
+            pyro.get_param_store().load(
+                os.path.join(param_path, "params"),
+                map_location=self.data.device)
+        elif self.__name__ in ["marginal", "hmm"]:
+            repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+            version = repo.git.describe()
+            param_path = os.path.join(
+                path, "runs",
+                "{}{}".format("feature", version),
                 "{}".format("jit" if self.jit else "nojit"),
                 "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
                 "{}".format(self.n_batch))
@@ -124,7 +139,7 @@ class Model(nn.Module):
     def train(self, num_steps):
         for epoch in tqdm(range(num_steps)):
             # with torch.autograd.detect_anomaly():
-            # import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
             self.epoch_loss = self.svi.step()
             if not self.epoch_count % 100:
                 self.infer()
@@ -167,7 +182,7 @@ class Model(nn.Module):
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def infer(self):
-        if self.__name__ in ["marginal"]:
+        if self.__name__ in ["mmarginal"]:
             guide_trace = poutine.trace(self.guide).get_trace()
             trained_model = poutine.replay(
                 poutine.enum(self.model), trace=guide_trace)
@@ -182,19 +197,36 @@ class Model(nn.Module):
         elif self.__name__ == "tracker":
             z_probs = z_probs_calc(
                 pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
-            k_probs = k_probs_calc(pyro.param("d/m_probs"))
+            #k_probs = k_probs_calc(pyro.param("d/m_probs"))
             self.predictions["z_prob"] = z_probs.squeeze()
             self.predictions["z"] = \
                 self.predictions["z_prob"] > 0.5
-            self.predictions["m_prob"] = k_probs.squeeze()
-            self.predictions["m"] = self.predictions["m_prob"] > 0.5
+            #self.predictions["m_prob"] = k_probs.squeeze()
+            #self.predictions["m"] = self.predictions["m_prob"] > 0.5
         elif self.__name__ == "hmm":
-            states = infer_discrete(self.viterbi_decoder, first_available_dim=-2, temperature=0)(data=self.data)
-            
-            states = torch.stack(states, dim=-1)
-            self.predictions["m"] = self.m_matrix[states].cpu().data
-            self.predictions["z"] = self.z_matrix[states].cpu().data
-            self.predictions["theta"] = self.theta_matrix[states].cpu().data
+            guide_trace = poutine.trace(self.viterbi_guide).get_trace(self.data)
+            trained_model = poutine.replay(
+                self.viterbi_model, trace=guide_trace)
+                #poutine.enum(self.viterbi_model), trace=guide_trace)
+            thetas = infer_discrete(
+                #self.viterbi_model, temperature=0, first_available_dim=-3)(data=self.data)
+                trained_model, temperature=0, first_available_dim=-3)(data=self.data)
+            thetas = torch.stack(thetas, dim=-1)
+            self.predictions["z"] = (thetas > 0).cpu().data
+            #trace = poutine.trace(inferred_model).get_trace()
+            #self.predictions["z"][self.batch_idx] = (
+            #    trace.nodes["d/theta"]["value"] > 0) \
+            #    .cpu().data.squeeze()
+            #z_probs = z_probs_calc(
+            #    pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
+            #self.predictions["z_prob"] = z_probs.squeeze()
+            #self.predictions["z"] = \
+            #    self.predictions["z_prob"] > 0.5
+            #states = infer_discrete(self.viterbi_decoder, first_available_dim=-2, temperature=0)(data=self.data)
+            #states = torch.stack(states, dim=-1)
+            #self.predictions["m"] = self.m_matrix[states].cpu().data
+            #self.predictions["z"] = self.z_matrix[states].cpu().data
+            #self.predictions["theta"] = self.theta_matrix[states].cpu().data
         np.save(os.path.join(self.path, "predictions.npy"),
                 self.predictions)
 
@@ -213,13 +245,13 @@ class Model(nn.Module):
                     self.writer_scalar.add_scalar(
                         p, pyro.param(p).squeeze().item(), self.epoch_count)
                 elif param(p).squeeze().dim() == 1 and \
-                        len(param(p).squeeze()) <= self.K:
+                        len(param(p).squeeze()) <= self.S+1:
                     scalars = {str(i): p
                                for i, p in enumerate(param(p).squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}".format(p), scalars, self.epoch_count)
                 elif param(p).squeeze().dim() == 2 and \
-                        len(param(p).squeeze()) <= self.K:
+                        len(param(p).squeeze()) <= self.S+1:
                     scalars = {str(i): p
                                for i, p in enumerate(param(p)[0].squeeze())}
                     self.writer_scalar.add_scalars(

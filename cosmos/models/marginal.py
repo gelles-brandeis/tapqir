@@ -8,10 +8,70 @@ from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from cosmos.models.helper import ScaledBeta
 import torch.distributions.constraints as constraints
+from pyro.distributions import TorchDistribution
 
 from cosmos.models.model import Model
-from cosmos.models.helper import pi_m_calc, pi_theta_calc
+from cosmos.models.helper import pi_m_calc, pi_theta_calc, theta_trans_calc
 import torch.nn as nn
+
+
+class CatDistribution(TorchDistribution):
+    """
+    Concatenate multiple heterogeneous distributions.
+
+    This is useful when multiple heterogeneous distributions
+    depend on the same hidden state in DiscreteHMM.
+
+    Example::
+
+    :param
+    """
+    arg_constraints = {}  # nothing to be constrained
+
+    def __init__(self, *dists):
+        self.dists = dists
+        batch_shape = self.dists[0].batch_shape
+        event_shape = self.dists[0].event_shape + (len(self.dists),)
+        super().__init__(batch_shape, event_shape)
+
+    @property
+    def has_rsample(self):
+        return all(dist.has_rsample for dist in self.dists)
+
+    def expand(self, batch_shape):
+        dists = (dist.expand(batch_shape) for dist in self.dists)
+        return type(self)(*dists)
+
+    def sample(self, sample_shape=torch.Size()):
+        result = tuple(dist.sample(sample_shape) for dist in self.dists)
+        return torch.stack(result, dim=-1)
+
+    def rsample(self, sample_shape=torch.Size()):
+        result = tuple(dist.rsample(sample_shape) for dist in self.dists)
+        return torch.stack(result, dim=-1)
+
+    def log_prob(self, value):
+        values = torch.unbind(value, dim=-1)
+        log_probs = tuple(dist.log_prob(value) for dist, value in zip(self.dists, values))
+        result = torch.sum(torch.stack(log_probs, -1), -1)
+        return result
+
+class EnumDistribution(TorchDistribution):
+    arg_constraints = {}  # nothing to be constrained
+
+    def __init__(self, dist, emission_logits):
+        self.dist = dist
+        self.emission_logits = emission_logits
+        batch_shape = self.dist.batch_shape
+        event_shape = self.dist.event_shape
+        super().__init__(batch_shape, event_shape)
+
+    def log_prob(self, value):
+        value = value.unsqueeze(-1 - self.observation_dist.event_dim)
+        obs_logits = self.dist.log_prob(value)
+        result = obs_logits.unsqueeze(dim=-2) + self.emission_logits
+        result = torch.logsumexp(result, -1)
+        return result
 
 class Marginal(Model):
     """ Track on-target Spot """
@@ -25,9 +85,9 @@ class Marginal(Model):
     @config_enumerate
     def model(self):
         self.model_parameters()
-        data_pi_m = pi_m_calc(param("pi"), param("lamda"), self.K)
-        control_pi_m = pi_m_calc(torch.tensor([1., 0.]), param("lamda"), self.K)
-        pi_theta = pi_theta_calc(param("pi"), param("lamda"), self.K)
+        data_pi_m = pi_m_calc(param("lamda"), self.S)
+        control_pi_m = pi_m_calc(param("lamda"), self.S)
+        pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
 
         with scope(prefix="d"):
             self.spot_model(self.data, data_pi_m, pi_theta, prefix="d")
@@ -53,6 +113,7 @@ class Marginal(Model):
 
 
     def spot_model(self, data, pi_m, pi_theta, prefix):
+        K_plate = pyro.plate("K_plate", self.K, dim=-3)
         N_plate = pyro.plate("N_plate", data.N, dim=-2)
         F_plate = pyro.plate("F_plate", data.F, dim=-1)
 
@@ -62,41 +123,50 @@ class Marginal(Model):
                     param(f"{prefix}/background_loc")[batch_idx]
                     * param("background_beta"), param("background_beta")))
 
-            m = pyro.sample("m", dist.Categorical(pi_m))
 
-            if pi_theta is not None:
-                theta = pyro.sample("theta", dist.Categorical(pi_theta[m]))
-                theta_mask = Vindex(self.theta_matrix)[theta]
-            else:
-                theta_mask = 0
-            m_mask = Vindex(self.m_matrix)[m, :].bool()
+            theta = pyro.sample("theta", dist.Categorical(pi_theta))
+            theta_mask = Vindex(self.theta_matrix)[..., theta]
+            m_mask = Vindex(self.m_matrix)[..., theta]
 
-            height = pyro.sample(
-                "height", dist.Gamma(
-                    param("height_loc")[theta_mask] * param("height_beta")[theta_mask],
-                    param("height_beta")[theta_mask]).to_event(1))
-            width = pyro.sample(
-                "width", ScaledBeta(
-                    param("width_mode"),
-                    param("width_size"), 0.5, 2.5).expand([self.K]).to_event(1))
-            x = pyro.sample(
-                "x", ScaledBeta(
-                    0, self.size[theta_mask], -(data.D+1)/2, data.D+1).to_event(1))
-            y = pyro.sample(
-                "y", ScaledBeta(
-                    0, self.size[theta_mask], -(data.D+1)/2, data.D+1).to_event(1))
+            with K_plate:
+                m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[m_mask]))
+                height = pyro.sample(
+                    "height", dist.Gamma(
+                        param("height_loc")[m_mask] * param("height_beta")[m_mask],
+                        param("height_beta")[m_mask]))
+                width = pyro.sample(
+                    "width", ScaledBeta(
+                        param("width_mode"),
+                        param("width_size"), 0.5, 2.5))
+                #x = pyro.sample(
+                #    "x", ScaledBeta(
+                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+                #y = pyro.sample(
+                #    "y", ScaledBeta(
+                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+                #xy = pyro.sample(
+                #    "xy", ScaledBeta(
+                #        0, torch.stack([self.size[theta_mask], self.size[theta_mask]], dim=-1), -(data.D+1)/2, data.D+1).to_event(1))
+                x_dist = ScaledBeta(
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
+                y_dist = ScaledBeta(
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
+                xy_dist = CatDistribution(x_dist, y_dist)
+                xy = pyro.sample("xy", xy_dist)
+                x, y = torch.unbind(xy, dim=-1)
 
             width = width * 2.5 + 0.5
             x = x * (data.D+1) - (data.D+1)/2
             y = y * (data.D+1) - (data.D+1)/2
 
-            locs = data.loc(height, width, x, y, background, batch_idx, m_mask)
+            locs = data.loc(height, width, x, y, background, batch_idx)
             pyro.sample(
                 "data", self.CameraUnit(
                     locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
 
     def spot_guide(self, data, prefix):
+        K_plate = pyro.plate("K_plate", self.K, dim=-3)
         N_plate = pyro.plate("N_plate", data.N,
                              subsample_size=self.n_batch, dim=-2)
         F_plate = pyro.plate("F_plate", data.F, dim=-1)
@@ -108,84 +178,53 @@ class Marginal(Model):
                     param(f"{prefix}/b_loc")[batch_idx]
                     * param(f"{prefix}/b_beta")[batch_idx],
                     param(f"{prefix}/b_beta")[batch_idx]))
-            pyro.sample(
-                "height", dist.Gamma(
-                    param(f"{prefix}/h_loc")[batch_idx]
-                    * param(f"{prefix}/h_beta")[batch_idx],
-                    param(f"{prefix}/h_beta")[batch_idx]).to_event(1))
-            pyro.sample(
-                "width", ScaledBeta(
-                    param(f"{prefix}/w_mode")[batch_idx],
-                    param(f"{prefix}/w_size")[batch_idx],
-                    0.5, 2.5).to_event(1))
-            pyro.sample(
-                "x", ScaledBeta(
-                    param(f"{prefix}/x_mode")[batch_idx],
-                    param(f"{prefix}/size")[batch_idx],
-                    -(data.D+1)/2, data.D+1).to_event(1))
-            pyro.sample(
-                "y", ScaledBeta(
-                    param(f"{prefix}/y_mode")[batch_idx],
-                    param(f"{prefix}/size")[batch_idx],
-                    -(data.D+1)/2, data.D+1).to_event(1))
+            with K_plate:
+                pyro.sample(
+                    "height", dist.Gamma(
+                        param(f"{prefix}/h_loc")[:, batch_idx]
+                        * param(f"{prefix}/h_beta")[:, batch_idx],
+                        param(f"{prefix}/h_beta")[:, batch_idx]))
+                pyro.sample(
+                    "width", ScaledBeta(
+                        param(f"{prefix}/w_mode")[:, batch_idx],
+                        param(f"{prefix}/w_size")[:, batch_idx],
+                        0.5, 2.5))
+                #pyro.sample(
+                #    "x", ScaledBeta(
+                #        param(f"{prefix}/x_mode")[:, batch_idx],
+                #        param(f"{prefix}/size")[:, batch_idx],
+                #        -(data.D+1)/2, data.D+1))
+                #pyro.sample(
+                #    "y", ScaledBeta(
+                #        param(f"{prefix}/y_mode")[:, batch_idx],
+                #        param(f"{prefix}/size")[:, batch_idx],
+                #        -(data.D+1)/2, data.D+1))
+                #pyro.sample(
+                #    "xy", ScaledBeta(
+                #        torch.stack([param(f"{prefix}/x_mode")[:, batch_idx], param(f"{prefix}/y_mode")[:, batch_idx]], dim=-1),
+                #        torch.stack([param(f"{prefix}/size")[:, batch_idx], param(f"{prefix}/size")[:, batch_idx]], dim=-1),
+                #        -(data.D+1)/2, data.D+1).to_event(1))
+                x_dist = ScaledBeta(
+                        param(f"{prefix}/x_mode")[:, batch_idx],
+                        param(f"{prefix}/size")[:, batch_idx],
+                        -(data.D+1)/2, data.D+1)
+                y_dist = ScaledBeta(
+                        param(f"{prefix}/y_mode")[:, batch_idx],
+                        param(f"{prefix}/size")[:, batch_idx],
+                        -(data.D+1)/2, data.D+1)
+                xy_dist = CatDistribution(x_dist, y_dist)
+                pyro.sample("xy", xy_dist)
 
     def spot_parameters(self, data, prefix):
-        param(f"{prefix}/background_loc",
-              torch.ones(data.N, 1) * 50.,
-              constraint=constraints.positive)
-        param(f"{prefix}/b_loc",
-              torch.ones(data.N, data.F) * 50.,
-              constraint=constraints.positive)
-        param(f"{prefix}/b_beta",
-              torch.ones(data.N, data.F) * 30,
-              constraint=constraints.positive)
-        param(f"{prefix}/h_loc",
-              torch.ones(data.N, data.F, self.K) * 1000.,
-              constraint=constraints.positive)
-        param(f"{prefix}/h_beta",
-              torch.ones(data.N, data.F, self.K),
-              constraint=constraints.positive)
-        param(f"{prefix}/w_mode",
-              torch.ones(data.N, data.F, self.K) * 1.3,
-              constraint=constraints.interval(0.5, 3.))
-        param(f"{prefix}/w_size",
-              torch.ones(data.N, data.F, self.K) * 100.,
-              constraint=constraints.greater_than(2.))
-        param(f"{prefix}/x_mode",
-              torch.zeros(data.N, data.F, self.K),
-              constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        param(f"{prefix}/y_mode",
-              torch.zeros(data.N, data.F, self.K),
-              constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        size = torch.ones(data.N, data.F, self.K) * 5.
-        size[..., 0] = ((data.D+1) / (2*0.5)) ** 2 - 1
-        param(f"{prefix}/size",
-              size, constraint=constraints.greater_than(2.))
+        pass
 
     def model_parameters(self):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
-        param("background_beta", torch.tensor([1.]),
+        param("height_loc", torch.tensor([100., 1000., 2000.])[:self.S+1],
               constraint=constraints.positive)
-        param("height_loc", torch.tensor([1000., 1000.]),
+        param("height_beta", torch.tensor([0.01, 0.01, 0.01])[:self.S+1],
               constraint=constraints.positive)
-        param("height_beta", torch.tensor([0.01, 0.01]),
-              constraint=constraints.positive)
-        param("width_mode", torch.tensor([1.3]),
-              constraint=constraints.interval(0.5, 3.))
-        param("width_size",
-              torch.tensor([10.]), constraint=constraints.positive)
-        param("pi", torch.ones(2), constraint=constraints.simplex)
-        param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
-
-        if self.control:
-            self.offset_max = torch.where(
-                self.data[:].min() < self.control[:].min(),
-                self.data[:].min() - 0.1,
-                self.control[:].min() - 0.1)
-        else:
-            self.offset_max = self.data[:].min() - 0.1
-        param("offset", self.offset_max-50,
-              constraint=constraints.interval(0, self.offset_max))
-        param("gain", torch.tensor(5.), constraint=constraints.positive)
+        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)

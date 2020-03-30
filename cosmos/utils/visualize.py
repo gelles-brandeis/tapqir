@@ -75,7 +75,7 @@ def view_m_probs(aoi, data, frames, m, z, sp, labels, predictions, prefix):
 
     if z:
         z_probs = z_probs_calc(
-            pyro.param("d/m_probs")[n],
+            pyro.param("d/m_probs")[:, n],
             pyro.param("d/theta_probs")[n]).squeeze()
         ax.plot(
             data.drift.index.values[f1:f2+1],
@@ -133,45 +133,45 @@ def view_parameters(aoi, data, frames, m, params, prefix):
     for i, p in enumerate(params):
         if p == "background":
             hpd = hpdi(dist.Gamma(
-                param("b_loc").data[n]
-                * param("b_beta").data[n],
-                param("b_beta").data[n])
+                param("d/b_loc").data[n]
+                * param("d/b_beta").data[n],
+                param("d/b_beta").data[n])
                 .sample((500,)), 0.95, dim=0)
-            mean = param("b_loc").data[n]
+            mean = param("d/b_loc").data[n]
             ax[i].set_ylim(0, hpd.max()+1)
         elif p == "intensity":
             hpd = hpdi(dist.Gamma(
-                param("h_loc").data[n]
-                * param("h_beta").data[n],
-                param("h_beta").data[n])
+                param("d/h_loc").data[:, n]
+                * param("d/h_beta").data[:, n],
+                param("d/h_beta").data[:, n])
                 .sample((500,)), 0.95, dim=0)
-            mean = param("h_loc").data[n]
+            mean = param("d/h_loc").data[:, n]
             ax[i].set_ylim(0, hpd.max()+10)
         elif p == "x":
             hpd = hpdi(ScaledBeta(
-                Vindex(param("x_mode").data[n])[..., :, torch.from_numpy(data.predictions["theta"][n].copy())],
-                Vindex(param("size").data[n])[..., :, torch.from_numpy(data.predictions["theta"][n].copy())],
-                -(data.D+3)/2, data.D+3)
+                param("d/x_mode").data[:, n],
+                param("d/size").data[:, n],
+                -(data.D+1)/2, data.D+1)
                 .sample((500,)), 0.95, dim=0)
-            hpd = hpd * (data.D+3) - (data.D+3)/2
-            mean = Vindex(param("x_mode").data[n])[..., :, torch.from_numpy(data.predictions["theta"][n].copy())]
-            ax[i].set_ylim(-(data.D+3)/2, (data.D+3)/2)
+            hpd = hpd * (data.D+1) - (data.D+1)/2
+            mean = param("d/x_mode").data[:, n]
+            ax[i].set_ylim(-(data.D+1)/2, (data.D+1)/2)
         elif p == "y":
             hpd = hpdi(ScaledBeta(
-                param("y_mode").data[n],
-                param("size").data[n],
+                param("d/y_mode").data[:, n],
+                param("d/size").data[:, n],
                 -(data.D+3)/2, data.D+3)
                 .sample((500,)), 0.95, dim=0)
-            hpd = hpd * (data.D+3) - (data.D+3)/2
-            mean = param("y_mode").data[n]
-            ax[i].set_ylim(-(data.D+3)/2, (data.D+3)/2)
+            hpd = hpd * (data.D+1) - (data.D+1)/2
+            mean = param("d/y_mode").data[:, n]
+            ax[i].set_ylim(-(data.D+1)/2, (data.D+1)/2)
         elif p == "width":
             hpd = hpdi(ScaledBeta(
-                param("w_mode").data[n],
-                param("w_size").data[n], 0.5, 2.5)
+                param("d/w_mode").data[:, n],
+                param("d/w_size").data[:, n], 0.5, 2.5)
                 .sample((500,)), 0.95, dim=0)
             hpd = hpd * 2.5 + 0.5
-            mean = param("w_mode").data[n]
+            mean = param("d/w_mode").data[:, n]
 
         hpd = hpd.squeeze()
         mean = mean.squeeze()
@@ -186,11 +186,11 @@ def view_parameters(aoi, data, frames, m, params, prefix):
             for k in range(2):
                 ax[i].fill_between(
                     data.drift.index.values[f1:f2+1],
-                    hpd[0][f1:f2+1, k], hpd[1][f1:f2+1, k],
+                    hpd[0][k, f1:f2+1], hpd[1][k, f1:f2+1],
                     where=(k_probs[f1:f2+1, k] > 0.5) if m else None,
                     color="C{}".format(k), alpha=0.2)
                 ax[i].scatter(
-                    data.drift.index.values[f1:f2+1], mean[f1:f2+1, k],
+                    data.drift.index.values[f1:f2+1], mean[k, f1:f2+1],
                     s=10, color=m_colors[k] if m else "C{}".format(k),
                     label="K={}".format(k))
         ax[i].set_ylabel(p, fontsize=20)
@@ -209,7 +209,7 @@ def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
     f = data.drift.index.get_loc(frame)
     if z:
         z_probs = z_probs_calc(
-            pyro.param("d/m_probs")[n],
+            pyro.param("d/m_probs")[:, n],
             pyro.param("d/theta_probs")[n]).squeeze()
 
     #m_mask = k_probs_calc(
@@ -218,11 +218,11 @@ def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
     m_mask = torch.tensor(data.predictions["m"][n]).reshape(data.F, 1, 1, 2).bool()
     ideal_spot = GaussianSpot(data.target, data.drift, data.D)
     ideal_data = ideal_spot(
-                    param("h_loc".format(prefix))[n],
-                    param("w_mode".format(prefix))[n],
-                    param("x_mode".format(prefix))[n],
-                    param("y_mode".format(prefix))[n],
-                    param("b_loc".format(prefix))[n], n) + param("offset")
+                    param("d/h_loc".format(prefix))[:, n],
+                    param("d/w_mode".format(prefix))[:, n],
+                    param("d/x_mode".format(prefix))[:, n],
+                    param("d/y_mode".format(prefix))[:, n],
+                    param("d/b_loc".format(prefix))[n], n) + param("offset")
 
     for i in range(10):
         try:
@@ -264,7 +264,7 @@ def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
     for i in range(10):
         try:
             ax[1, i].imshow(
-                ideal_data.data[f+i, :, :, 0].cpu(),
+                ideal_data.data[f+i].cpu(),
                 cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
             if target:
                 ax[1, i].plot(
@@ -285,19 +285,18 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
     f = data.drift.index.get_loc(frame)
     if z:
         z_probs = z_probs_calc(
-            param("d/m_probs")[n, f],
+            param("d/m_probs")[:, n, f],
             param("d/theta_probs")[n, f]).squeeze()
 
     #m_mask = k_probs_calc(
     #    param(f"{prefix}/m_probs")[n,f]) > 0.5
-    m_mask = torch.tensor(data.predictions["m"][n]).reshape(data.F, 1, 1, 2).bool()
-    ideal_spot = GaussianSpot(data.target, data.drift, data.D, 2)
+    ideal_spot = GaussianSpot(data.target, data.drift, data.D)
     ideal_data = ideal_spot(
-                    n, m_mask, param("{}/h_loc".format(prefix))[n],
-                    param("{}/w_mode".format(prefix))[n],
-                    param("{}/x_mode".format(prefix))[n],
-                    param("{}/y_mode".format(prefix))[n],
-                    param("{}/b_loc".format(prefix))[n]) + param("offset")
+                    param("{}/h_loc".format(prefix))[:, n],
+                    param("{}/w_mode".format(prefix))[:, n],
+                    param("{}/x_mode".format(prefix))[:, n],
+                    param("{}/y_mode".format(prefix))[:, n],
+                    param("{}/b_loc".format(prefix))[n], n) + param("offset")
 
     ax[0].set_title("f #{:d}".format(data.drift.index[f]), fontsize=15)
     ax[0].imshow(
@@ -327,7 +326,7 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
     ax[0].axes.get_yaxis().set_ticks([])
 
     ax[1].imshow(
-        ideal_data.data[f, :, :, 0].cpu(),
+        ideal_data.data[f, :, :].cpu(),
         cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
     if target:
         ax[1].plot(
@@ -388,29 +387,38 @@ def view_globals(z, j, data):
     #        weights=(1 - j_probs.reshape(-1) - theta_probs.reshape(-1)),
     #        bins=100, label="0", alpha=0.3)
 
-    h = torch.linspace(param("d/h_loc").min().item(), param("d/h_loc").max().item(), 100)
+    #h = torch.linspace(param("d/h_loc").min().item(), param("d/h_loc").max().item(), 100)
+    h = torch.linspace(0, 7000., 100)
     w = torch.linspace(0.5, 3., 100)
     x = torch.linspace(-(data.D+3)/2, (data.D+3)/2, 100)
-    ax[0,0].plot(h,
-            dist.Gamma(
-                param("height_loc").item() * param("height_beta").item(),
-                param("height_beta").item()).log_prob(h).exp()
-                #* (theta_probs.sum() + j_probs.sum())
-                * (h.max() - h.min()) / 100)
-    #ax[0,0].plot(h[1],
+    #h = ax[0,0].hist(
+    #        param("d/h_loc").squeeze().data.reshape(-1),
+    #        bins=100, range=(0, 3000), label="z", alpha=0.3)
+    #h = h[1]
+    #ax[0,0].plot(h,
+    #        dist.Gamma(
+    #            param("height_loc").item() * param("height_beta").item(),
+    #            param("height_beta").item()).log_prob(h).exp()
+               #* (theta_probs.sum() + j_probs.sum())
+    #            * (h.max() - h.min()) / 100)
+    #ax[0,0].plot(h,
     #        dist.Gamma(
     #            param("height_loc")[0].item() * param("height_beta")[0].item(),
-    #            param("height_beta")[0].item()).log_prob(h[1]).exp()
-    #            * (theta_probs.sum() + j_probs.sum())
-    #            * (h[1].max() - h[1].min()) / 100
-    #            * param("pi_k")[0].item())
-    #ax[0,0].plot(h[1],
+    #            param("height_beta")[0].item()).log_prob(h).exp()
+    #            #* (theta_probs.sum() + j_probs.sum())
+    #            * (h.max() - h.min()) / 100)
+    #ax[0,0].plot(h,
     #        dist.Gamma(
     #            param("height_loc")[1].item() * param("height_beta")[1].item(),
-    #            param("height_beta")[1].item()).log_prob(h[1]).exp()
-    #            * (theta_probs.sum() + j_probs.sum())
-    #            * (h[1].max() - h[1].min()) / 100
-    #            * param("pi_k")[1].item())
+    #            param("height_beta")[1].item()).log_prob(h).exp()
+    #            #* (theta_probs.sum() + j_probs.sum())
+    #            * (h.max() - h.min()) / 100)
+    #ax[0,0].plot(h,
+    #        dist.Gamma(
+    #            param("height_loc")[2].item() * param("height_beta")[2].item(),
+    #            param("height_beta")[2].item()).log_prob(h).exp()
+    #            #* (theta_probs.sum() + j_probs.sum())
+    #            * (h.max() - h.min()) / 100)
     ax[0,1].plot(w,
             ScaledBeta(
                 param("width_mode").item(),
