@@ -127,6 +127,9 @@ class Marginal(Model):
             theta = pyro.sample("theta", dist.Categorical(pi_theta))
             theta_mask = Vindex(self.theta_matrix)[..., theta]
             m_mask = Vindex(self.m_matrix)[..., theta]
+            print(theta.shape)
+            print(theta_mask.shape)
+            print(m_mask.shape)
 
             with K_plate:
                 m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[m_mask]))
@@ -138,22 +141,22 @@ class Marginal(Model):
                     "width", ScaledBeta(
                         param("width_mode"),
                         param("width_size"), 0.5, 2.5))
-                #x = pyro.sample(
-                #    "x", ScaledBeta(
-                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
-                #y = pyro.sample(
-                #    "y", ScaledBeta(
-                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+                x = pyro.sample(
+                    "x", ScaledBeta(
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+                y = pyro.sample(
+                    "y", ScaledBeta(
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
                 #xy = pyro.sample(
                 #    "xy", ScaledBeta(
                 #        0, torch.stack([self.size[theta_mask], self.size[theta_mask]], dim=-1), -(data.D+1)/2, data.D+1).to_event(1))
-                x_dist = ScaledBeta(
-                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
-                y_dist = ScaledBeta(
-                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
-                xy_dist = CatDistribution(x_dist, y_dist)
-                xy = pyro.sample("xy", xy_dist)
-                x, y = torch.unbind(xy, dim=-1)
+                #x_dist = ScaledBeta(
+                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
+                #y_dist = ScaledBeta(
+                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
+                #xy_dist = CatDistribution(x_dist, y_dist)
+                #xy = pyro.sample("xy", xy_dist)
+                #x, y = torch.unbind(xy, dim=-1)
 
             width = width * 2.5 + 0.5
             x = x * (data.D+1) - (data.D+1)/2
@@ -189,31 +192,31 @@ class Marginal(Model):
                         param(f"{prefix}/w_mode")[:, batch_idx],
                         param(f"{prefix}/w_size")[:, batch_idx],
                         0.5, 2.5))
-                #pyro.sample(
-                #    "x", ScaledBeta(
-                #        param(f"{prefix}/x_mode")[:, batch_idx],
-                #        param(f"{prefix}/size")[:, batch_idx],
-                #        -(data.D+1)/2, data.D+1))
-                #pyro.sample(
-                #    "y", ScaledBeta(
-                #        param(f"{prefix}/y_mode")[:, batch_idx],
-                #        param(f"{prefix}/size")[:, batch_idx],
-                #        -(data.D+1)/2, data.D+1))
+                pyro.sample(
+                    "x", ScaledBeta(
+                        param(f"{prefix}/x_mode")[:, batch_idx],
+                        param(f"{prefix}/size")[:, batch_idx],
+                        -(data.D+1)/2, data.D+1))
+                pyro.sample(
+                    "y", ScaledBeta(
+                        param(f"{prefix}/y_mode")[:, batch_idx],
+                        param(f"{prefix}/size")[:, batch_idx],
+                        -(data.D+1)/2, data.D+1))
                 #pyro.sample(
                 #    "xy", ScaledBeta(
                 #        torch.stack([param(f"{prefix}/x_mode")[:, batch_idx], param(f"{prefix}/y_mode")[:, batch_idx]], dim=-1),
                 #        torch.stack([param(f"{prefix}/size")[:, batch_idx], param(f"{prefix}/size")[:, batch_idx]], dim=-1),
                 #        -(data.D+1)/2, data.D+1).to_event(1))
-                x_dist = ScaledBeta(
-                        param(f"{prefix}/x_mode")[:, batch_idx],
-                        param(f"{prefix}/size")[:, batch_idx],
-                        -(data.D+1)/2, data.D+1)
-                y_dist = ScaledBeta(
-                        param(f"{prefix}/y_mode")[:, batch_idx],
-                        param(f"{prefix}/size")[:, batch_idx],
-                        -(data.D+1)/2, data.D+1)
-                xy_dist = CatDistribution(x_dist, y_dist)
-                pyro.sample("xy", xy_dist)
+                #x_dist = ScaledBeta(
+                #        param(f"{prefix}/x_mode")[:, batch_idx],
+                #        param(f"{prefix}/size")[:, batch_idx],
+                #        -(data.D+1)/2, data.D+1)
+                #y_dist = ScaledBeta(
+                #        param(f"{prefix}/y_mode")[:, batch_idx],
+                #        param(f"{prefix}/size")[:, batch_idx],
+                #        -(data.D+1)/2, data.D+1)
+                #xy_dist = CatDistribution(x_dist, y_dist)
+                #pyro.sample("xy", xy_dist)
 
     def spot_parameters(self, data, prefix):
         pass

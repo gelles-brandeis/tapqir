@@ -15,16 +15,20 @@ from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc, theta_trans_calc, trans_calc, init_calc
 
 
-class CatDistribution(TorchDistribution):
+class StackDistributions(TorchDistribution):
     """
-    Concatenate multiple heterogeneous distributions.
+    Stack multiple heterogeneous distributions.
 
     This is useful when multiple heterogeneous distributions
     depend on the same hidden state in DiscreteHMM.
 
     Example::
 
-    :param
+        d1 = dist.Normal(torch.zeros(3), 1.)
+        d2 = dist.Gamma(torch.ones(3), 1.)
+        d = StackDistributions(d1, d2)
+
+    :param sequence of pyro.distributions.TorchDistribution distributions
     """
     arg_constraints = {}  # nothing to be constrained
 
@@ -86,14 +90,16 @@ class HMM(Model):
     def model(self):
         self.model_parameters(self.data)
 
-        self.spot_model(self.data, prefix="d")
+        #self.spot_model(self.data, prefix="d")
+        self.viterbi_model(self.data)
 
         if self.control:
             self.spot_model(self.control, prefix="c")
 
     def guide(self):
         self.guide_parameters()
-        self.spot_guide(self.data, prefix="d")
+        #self.spot_guide(self.data, prefix="d")
+        self.viterbi_guide(self.data)
 
         if self.control:
             self.spot_guide(self.control, prefix="c")
@@ -117,7 +123,7 @@ class HMM(Model):
 
             with K_plate:
                 pi_m = pi_m_calc(param("lamda"), self.S)
-                m_logits = probs_to_logits(Vindex(pi_m)[self.m_matrix])
+                m_logits = Vindex(pi_m)[self.m_matrix].log()
                 h_dist = EnumDistribution(dist.Gamma(
                         param("height_loc") * param("height_beta"),
                         param("height_beta")), m_logits)
@@ -132,10 +138,10 @@ class HMM(Model):
                 #        0, self.size[self.theta_state], -(data.D+1)/2, data.D+1)
                 #y_dist = ScaledBeta(
                 #        0, self.size[self.theta_state], -(data.D+1)/2, data.D+1)
-                hxy_dist = CatDistribution(h_dist, x_dist, y_dist)
+                hxy_dist = StackDistributions(h_dist, x_dist, y_dist)
 
-                init = probs_to_logits(pi_theta_calc(param("pi"), self.K, self.S))  # N, state_dim
-                trans = probs_to_logits(theta_trans_calc(param("A"), self.K, self.S)) # N, F, state_dim, state_dim
+                init = pi_theta_calc(param("pi"), self.K, self.S).log()  # N, state_dim
+                trans = theta_trans_calc(param("A"), self.K, self.S).log() # N, F, state_dim, state_dim
                 #init = init_calc(param("pi"), param("lamda"))  # N, state_dim
                 #trans = trans_calc(param("A"), param("lamda")) # N, F, state_dim, state_dim
                 hmm_dist = dist.DiscreteHMM(init, trans, hxy_dist, duration=data.F)
@@ -184,7 +190,7 @@ class HMM(Model):
                         param(f"{prefix}/y_mode")[:, batch_idx],
                         param(f"{prefix}/size")[:, batch_idx],
                         -(data.D+1)/2, data.D+1).to_event(1)
-                hxy_dist = CatDistribution(h_dist, x_dist, y_dist)
+                hxy_dist = StackDistributions(h_dist, x_dist, y_dist)
                 pyro.sample(
                     "hxy", hxy_dist)
                 pyro.sample(
@@ -228,17 +234,17 @@ class HMM(Model):
         init = pi_theta_calc(param("pi"), self.K, self.S)  # N, state_dim
         trans = theta_trans_calc(param("A"), self.K, self.S) # N, F, state_dim, state_dim
         with N_plate as batch_idx:
-            init = probs_to_logits(pi_theta_calc(param("pi"), self.K, self.S))  # N, state_dim
-            trans = probs_to_logits(theta_trans_calc(param("A"), self.K, self.S)) # N, F, state_dim, state_dim
+
+            init = pi_theta_calc(param("pi"), self.K, self.S)  # N, state_dim
+            trans = theta_trans_calc(param("A"), self.K, self.S) # N, F, state_dim, state_dim
             pi_m = pi_m_calc(param("lamda"), self.S)
-            theta = 0
+            theta = pyro.sample("theta", dist.Categorical(init))
             thetas = []
             for f in pyro.markov(range(data.F)):
                 background = pyro.sample(
                     f"background_{f}", dist.Gamma(
-                        param("d/b_loc")[batch_idx, f]
-                        * param("d/b_beta")[batch_idx, f],
-                        param("d/b_beta")[batch_idx, f]))
+                        param(f"d/background_loc")[batch_idx, 0]
+                        * param("background_beta"), param("background_beta")))
 
                 theta = pyro.sample(
                     f"theta_{f}", dist.Categorical(Vindex(trans)[theta, :]))
@@ -277,11 +283,25 @@ class HMM(Model):
 
     def viterbi_guide(self, data):
         K_plate = pyro.plate("K_plate", self.K, dim=-2)
-        N_plate = pyro.plate("N_plate", data.N, dim=-1)
+        #N_plate = pyro.plate("N_plate", data.N, dim=-1)
+        N_plate = pyro.plate("N_plate", data.N,
+                             subsample_size=self.n_batch, dim=-1)
 
         with N_plate as batch_idx:
+            pyro.sample(
+                "background", dist.Gamma(
+                    param("d/b_loc")[batch_idx]
+                    * param("d/b_beta")[batch_idx],
+                    param("d/b_beta")[batch_idx]).to_event(1))
+            with K_plate:
+                pyro.sample(
+                    "width", ScaledBeta(
+                        param("d/w_mode")[:, batch_idx],
+                        param("d/w_size")[:, batch_idx],
+                        0.5, 2.5).to_event(1))
+
             for f in pyro.markov(range(data.F)):
-                background = pyro.sample(
+                pyro.sample(
                     f"background_{f}", dist.Gamma(
                         param("d/b_loc")[batch_idx, f]
                         * param("d/b_beta")[batch_idx, f],

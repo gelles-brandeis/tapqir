@@ -98,9 +98,9 @@ class Model(nn.Module):
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        self.elbo = Trace_ELBO()
-        #self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
-        #    max_plate_nesting=3, ignore_jit_warnings=True)
+        #self.elbo = Trace_ELBO()
+        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+            max_plate_nesting=3, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
         if self.__name__ in ["tracker"]:
@@ -182,18 +182,19 @@ class Model(nn.Module):
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def infer(self):
-        if self.__name__ in ["mmarginal"]:
+        if self.__name__ in ["marginal"]:
             guide_trace = poutine.trace(self.guide).get_trace()
             trained_model = poutine.replay(
-                poutine.enum(self.model), trace=guide_trace)
+                #self.model, trace=guide_trace)
+                poutine.enum(self.model, first_available_dim=-4), trace=guide_trace)
             inferred_model = infer_discrete(
-                trained_model, temperature=0, first_available_dim=-3)
+                trained_model, temperature=0, first_available_dim=-4)
             trace = poutine.trace(inferred_model).get_trace()
             self.predictions["z"][self.batch_idx] = (
                 trace.nodes["d/theta"]["value"] > 0) \
                 .cpu().data.squeeze()
-            self.predictions["m"][self.batch_idx] = \
-                self.m_matrix[trace.nodes["d/m"]["value"]].squeeze().cpu().data
+            #self.predictions["m"][self.batch_idx] = \
+            #    self.m_matrix[trace.nodes["d/m"]["value"]].squeeze().cpu().data
         elif self.__name__ == "tracker":
             z_probs = z_probs_calc(
                 pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
@@ -203,14 +204,15 @@ class Model(nn.Module):
                 self.predictions["z_prob"] > 0.5
             #self.predictions["m_prob"] = k_probs.squeeze()
             #self.predictions["m"] = self.predictions["m_prob"] > 0.5
-        elif self.__name__ == "hmm":
+        elif self.__name__ == "hhmm":
+            #import pdb; pdb.set_trace()
             guide_trace = poutine.trace(self.viterbi_guide).get_trace(self.data)
             trained_model = poutine.replay(
-                self.viterbi_model, trace=guide_trace)
-                #poutine.enum(self.viterbi_model), trace=guide_trace)
+                #self.viterbi_model, trace=guide_trace)
+                poutine.enum(self.viterbi_model, first_available_dim=-4), trace=guide_trace)
             thetas = infer_discrete(
                 #self.viterbi_model, temperature=0, first_available_dim=-3)(data=self.data)
-                trained_model, temperature=0, first_available_dim=-3)(data=self.data)
+                trained_model, temperature=0, first_available_dim=-4)(data=self.data)
             thetas = torch.stack(thetas, dim=-1)
             self.predictions["z"] = (thetas > 0).cpu().data
             #trace = poutine.trace(inferred_model).get_trace()
