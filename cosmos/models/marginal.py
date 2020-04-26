@@ -1,93 +1,55 @@
 import torch
 import pyro
+import numpy as np
+import os
 import pyro.distributions as dist
 from pyro.infer import config_enumerate
 from pyro import param
 from pyro import poutine
+from pyro.infer import infer_discrete
+from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from cosmos.models.helper import ScaledBeta
 import torch.distributions.constraints as constraints
-from pyro.distributions import TorchDistribution
 
 from cosmos.models.model import Model
-from cosmos.models.helper import pi_m_calc, pi_theta_calc, theta_trans_calc
-import torch.nn as nn
+from cosmos.models.helper import pi_m_calc, pi_theta_calc
+import cosmos
+from git import Repo
 
-
-class CatDistribution(TorchDistribution):
-    """
-    Concatenate multiple heterogeneous distributions.
-
-    This is useful when multiple heterogeneous distributions
-    depend on the same hidden state in DiscreteHMM.
-
-    Example::
-
-    :param
-    """
-    arg_constraints = {}  # nothing to be constrained
-
-    def __init__(self, *dists):
-        self.dists = dists
-        batch_shape = self.dists[0].batch_shape
-        event_shape = self.dists[0].event_shape + (len(self.dists),)
-        super().__init__(batch_shape, event_shape)
-
-    @property
-    def has_rsample(self):
-        return all(dist.has_rsample for dist in self.dists)
-
-    def expand(self, batch_shape):
-        dists = (dist.expand(batch_shape) for dist in self.dists)
-        return type(self)(*dists)
-
-    def sample(self, sample_shape=torch.Size()):
-        result = tuple(dist.sample(sample_shape) for dist in self.dists)
-        return torch.stack(result, dim=-1)
-
-    def rsample(self, sample_shape=torch.Size()):
-        result = tuple(dist.rsample(sample_shape) for dist in self.dists)
-        return torch.stack(result, dim=-1)
-
-    def log_prob(self, value):
-        values = torch.unbind(value, dim=-1)
-        log_probs = tuple(dist.log_prob(value) for dist, value in zip(self.dists, values))
-        result = torch.sum(torch.stack(log_probs, -1), -1)
-        return result
-
-class EnumDistribution(TorchDistribution):
-    arg_constraints = {}  # nothing to be constrained
-
-    def __init__(self, dist, emission_logits):
-        self.dist = dist
-        self.emission_logits = emission_logits
-        batch_shape = self.dist.batch_shape
-        event_shape = self.dist.event_shape
-        super().__init__(batch_shape, event_shape)
-
-    def log_prob(self, value):
-        value = value.unsqueeze(-1 - self.observation_dist.event_dim)
-        obs_logits = self.dist.log_prob(value)
-        result = obs_logits.unsqueeze(dim=-2) + self.emission_logits
-        result = torch.logsumexp(result, -1)
-        return result
 
 class Marginal(Model):
     """ Track on-target Spot """
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "marginal"
+        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+            max_plate_nesting=3, ignore_jit_warnings=True)
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
+
+        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+        version = repo.git.describe()
+        param_path = os.path.join(
+            path, "runs",
+            "{}{}".format("feature", version),
+            "{}".format("jit" if self.jit else "nojit"),
+            "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
+            "{}".format(self.n_batch))
+        pyro.get_param_store().load(
+            os.path.join(param_path, "params"),
+            map_location=self.data.device)
 
     @poutine.block(hide=["width_mode", "width_size"])
     @config_enumerate
     def model(self):
         self.model_parameters()
-        data_pi_m = pi_m_calc(param("lamda"), self.S)
-        control_pi_m = pi_m_calc(param("lamda"), self.S)
-        pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
+        pi_z = pyro.sample("pi_z", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        lamda = pyro.sample("lamda_j", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        data_pi_m = pi_m_calc(lamda, self.S)
+        control_pi_m = pi_m_calc(lamda, self.S)
+        pi_theta = pi_theta_calc(pi_z, self.K, self.S)
 
         with scope(prefix="d"):
             self.spot_model(self.data, data_pi_m, pi_theta, prefix="d")
@@ -98,19 +60,15 @@ class Marginal(Model):
 
     def guide(self):
         self.guide_parameters()
+        pyro.sample("pi_z", dist.Dirichlet(param("pi") * param("size_z")))
+        pyro.sample("lamda_j", dist.Dirichlet(param("lamda") * param("size_lamda")))
+
         with scope(prefix="d"):
             self.spot_guide(self.data, prefix="d")
 
         if self.control:
             with scope(prefix="c"):
                 self.spot_guide(self.control, prefix="c")
-
-    def guide_parameters(self):
-        self.spot_parameters(self.data, prefix="d")
-        if self.control:
-            self.spot_parameters(
-                self.control, prefix="c")
-
 
     def spot_model(self, data, pi_m, pi_theta, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
@@ -123,13 +81,9 @@ class Marginal(Model):
                     param(f"{prefix}/background_loc")[batch_idx]
                     * param("background_beta"), param("background_beta")))
 
-
             theta = pyro.sample("theta", dist.Categorical(pi_theta))
             theta_mask = Vindex(self.theta_matrix)[..., theta]
             m_mask = Vindex(self.m_matrix)[..., theta]
-            print(theta.shape)
-            print(theta_mask.shape)
-            print(m_mask.shape)
 
             with K_plate:
                 m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[m_mask]))
@@ -147,16 +101,6 @@ class Marginal(Model):
                 y = pyro.sample(
                     "y", ScaledBeta(
                         0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
-                #xy = pyro.sample(
-                #    "xy", ScaledBeta(
-                #        0, torch.stack([self.size[theta_mask], self.size[theta_mask]], dim=-1), -(data.D+1)/2, data.D+1).to_event(1))
-                #x_dist = ScaledBeta(
-                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
-                #y_dist = ScaledBeta(
-                #        0, self.size[theta_mask], -(data.D+1)/2, data.D+1)
-                #xy_dist = CatDistribution(x_dist, y_dist)
-                #xy = pyro.sample("xy", xy_dist)
-                #x, y = torch.unbind(xy, dim=-1)
 
             width = width * 2.5 + 0.5
             x = x * (data.D+1) - (data.D+1)/2
@@ -202,21 +146,16 @@ class Marginal(Model):
                         param(f"{prefix}/y_mode")[:, batch_idx],
                         param(f"{prefix}/size")[:, batch_idx],
                         -(data.D+1)/2, data.D+1))
-                #pyro.sample(
-                #    "xy", ScaledBeta(
-                #        torch.stack([param(f"{prefix}/x_mode")[:, batch_idx], param(f"{prefix}/y_mode")[:, batch_idx]], dim=-1),
-                #        torch.stack([param(f"{prefix}/size")[:, batch_idx], param(f"{prefix}/size")[:, batch_idx]], dim=-1),
-                #        -(data.D+1)/2, data.D+1).to_event(1))
-                #x_dist = ScaledBeta(
-                #        param(f"{prefix}/x_mode")[:, batch_idx],
-                #        param(f"{prefix}/size")[:, batch_idx],
-                #        -(data.D+1)/2, data.D+1)
-                #y_dist = ScaledBeta(
-                #        param(f"{prefix}/y_mode")[:, batch_idx],
-                #        param(f"{prefix}/size")[:, batch_idx],
-                #        -(data.D+1)/2, data.D+1)
-                #xy_dist = CatDistribution(x_dist, y_dist)
-                #pyro.sample("xy", xy_dist)
+
+    def guide_parameters(self):
+        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("size_z", torch.tensor([1000.]), constraint=constraints.positive)
+        param("size_lamda", torch.tensor([1000.]), constraint=constraints.positive)
+        self.spot_parameters(self.data, prefix="d")
+        if self.control:
+            self.spot_parameters(
+                self.control, prefix="c")
 
     def spot_parameters(self, data, prefix):
         pass
@@ -229,5 +168,18 @@ class Marginal(Model):
               constraint=constraints.positive)
         param("height_beta", torch.tensor([0.01, 0.01, 0.01])[:self.S+1],
               constraint=constraints.positive)
-        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
-        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
+
+    def infer(self):
+        guide_trace = poutine.trace(self.guide).get_trace()
+        trained_model = poutine.replay(
+            poutine.enum(self.model, first_available_dim=-4), trace=guide_trace)
+        inferred_model = infer_discrete(
+            trained_model, temperature=0, first_available_dim=-4)
+        trace = poutine.trace(inferred_model).get_trace()
+        self.predictions["z"][self.batch_idx] = (
+            trace.nodes["d/theta"]["value"] > 0) \
+            .cpu().data.squeeze()
+        # self.predictions["m"][self.batch_idx] = \
+        #     trace.nodes["d/m"]["value"].cpu().data.squeeze()
+        np.save(os.path.join(self.path, "predictions.npy"),
+                self.predictions)

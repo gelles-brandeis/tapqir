@@ -1,7 +1,5 @@
 import torch
 import pyro.distributions as dist
-from torch.distributions.utils import probs_to_logits
-import math
 
 
 def ScaledBeta(mode, size, loc, scale):
@@ -10,10 +8,16 @@ def ScaledBeta(mode, size, loc, scale):
     concentration0 = (1 - mode) * size
     return dist.Beta(concentration1, concentration0)
 
+
+def probs_to_logits(probs):
+    return torch.log(probs / (1 - probs))
+
+
 def pi_m_calc(lamda, S):
     pi_m = torch.eye(S+1)
     pi_m[0] = lamda
     return pi_m
+
 
 def pi_theta_calc(pi, K, S):
     pi_theta = torch.zeros(S*K+1)
@@ -22,6 +26,7 @@ def pi_theta_calc(pi, K, S):
         for k in range(K):
             pi_theta[K*s + k + 1] = pi[s + 1] / K
     return pi_theta
+
 
 def theta_trans_calc(A, K, S):
     theta_trans = torch.zeros(K*S+1, K*S+1)
@@ -35,24 +40,24 @@ def theta_trans_calc(A, K, S):
                     theta_trans[K*s + k + 1, K*z + q + 1] = A[s+1, z+1] / K
     return theta_trans
 
-def m_theta_calc():
-    m_theta = torch.zeros(K, 1, 1, K*S+1, S+1)
-    
-
 
 def z_probs_calc(m_probs, theta_probs):
     return theta_probs[..., 1:].sum(dim=-1).cpu().data
 
+
 def k_probs_calc(m_probs):
     return torch.stack((m_probs[..., 1] + m_probs[..., 3],
                         m_probs[..., 2] + m_probs[..., 3]),
-                        dim=-1).squeeze(dim=-2).cpu().data
+                       dim=-1).squeeze(dim=-2).cpu().data
+
 
 def theta_probs_calc(m_probs, theta_probs):
     return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
 
+
 def j_probs_calc(m_probs, theta_probs):
     return (m_probs.unsqueeze(dim=-1) * (torch.tensor([[0., 0.], [1., 0.], [0., 1.], [1., 1.]]) - theta_probs[..., 1:])).sum(dim=-2).cpu().data
+
 
 def init_calc(pi, lamda):
     init = torch.zeros(8)
@@ -64,7 +69,8 @@ def init_calc(pi, lamda):
     init[5] = pi[1] * lamda[1] / 2
     init[6] = pi[1] * lamda[0] / 2
     init[7] = pi[1] * lamda[1] / 2
-    return probs_to_logits(init)
+    return init
+
 
 def trans_calc(A, lamda):
     trans = torch.zeros(8, 8)
@@ -132,4 +138,4 @@ def trans_calc(A, lamda):
     trans[7, 5] = A[1, 1] * lamda[1] / 2
     trans[7, 6] = A[1, 1] * lamda[0] / 2
     trans[7, 7] = A[1, 1] * lamda[1] / 2
-    return probs_to_logits(trans)
+    return trans

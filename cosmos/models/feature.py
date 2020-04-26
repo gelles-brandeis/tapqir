@@ -4,6 +4,7 @@ import pyro.distributions as dist
 from pyro.infer import config_enumerate
 from pyro import param
 from pyro import poutine
+from pyro.infer import Trace_ELBO
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from cosmos.models.helper import ScaledBeta
@@ -18,6 +19,7 @@ class Feature(Model):
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "feature"
+        self.elbo = Trace_ELBO()
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
@@ -73,17 +75,14 @@ class Feature(Model):
                 x = pyro.sample(
                     "x", ScaledBeta(
                         0, 2., -(data.D+1)/2, data.D+1))
-                        #0, self.size[theta_mask], -(data.D+1)/2, data.D+1).to_event(1))
                 y = pyro.sample(
                     "y", ScaledBeta(
                         0, 2., -(data.D+1)/2, data.D+1))
-                        #0, self.size[theta_mask], -(data.D+1)/2, data.D+1).to_event(1))
 
             width = width * 2.5 + 0.5
             x = x * (data.D+1) - (data.D+1)/2
             y = y * (data.D+1) - (data.D+1)/2
 
-            #locs = data.loc(height, width, x, y, background, batch_idx, m_mask)
             locs = data.loc(height, width, x, y, background, batch_idx)
             pyro.sample(
                 "data", self.CameraUnit(
@@ -179,3 +178,6 @@ class Feature(Model):
         param("offset", self.offset_max-50,
               constraint=constraints.interval(0, self.offset_max))
         param("gain", torch.tensor(5.), constraint=constraints.positive)
+
+    def infer(self):
+        pass

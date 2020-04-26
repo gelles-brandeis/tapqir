@@ -1,9 +1,13 @@
 import torch
 import pyro
+import numpy as np
+import os
 import pyro.distributions as dist
 from pyro.infer import config_enumerate
 from pyro import param
 from pyro import poutine
+from pyro.infer import SVI, infer_discrete
+from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from cosmos.models.helper import ScaledBeta
@@ -11,6 +15,9 @@ import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
+from cosmos.models.helper import z_probs_calc, k_probs_calc
+import cosmos
+from git import Repo
 
 
 class Tracker(Model):
@@ -18,16 +25,32 @@ class Tracker(Model):
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "tracker"
+        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+            max_plate_nesting=3, ignore_jit_warnings=True)
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
+
+        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+        version = repo.git.describe()
+        param_path = os.path.join(
+            path, "runs",
+            "{}{}".format("marginal", version),
+            "{}".format("jit" if self.jit else "nojit"),
+            "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
+            "{}".format(self.n_batch))
+        pyro.get_param_store().load(
+            os.path.join(param_path, "params"),
+            map_location=self.data.device)
 
     #@poutine.block(hide=["width_mode", "width_size"])
     @poutine.block(hide_types=["param"])
     def model(self):
         self.model_parameters()
-        data_pi_m = pi_m_calc(param("lamda"), self.K)
-        control_pi_m = pi_m_calc(param("lamda"), self.K)
-        pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
+        pi_z = pyro.sample("pi_z", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        lamda = pyro.sample("lamda_j", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        data_pi_m = pi_m_calc(lamda, self.S)
+        control_pi_m = pi_m_calc(lamda, self.S)
+        pi_theta = pi_theta_calc(pi_z, self.K, self.S)
 
         with scope(prefix="d"):
             self.spot_model(self.data, data_pi_m, pi_theta, prefix="d")
@@ -40,6 +63,9 @@ class Tracker(Model):
     @config_enumerate
     def guide(self):
         self.guide_parameters()
+        pyro.sample("pi_z", dist.Dirichlet(param("pi") * param("size_z")))
+        pyro.sample("lamda_j", dist.Dirichlet(param("lamda") * param("size_lamda")))
+
         with scope(prefix="d"):
             self.spot_guide(self.data, True, prefix="d")
 
@@ -160,3 +186,15 @@ class Tracker(Model):
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
         pass
+
+    def infer(self):
+        z_probs = z_probs_calc(
+            pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
+        #k_probs = k_probs_calc(pyro.param("d/m_probs"))
+        self.predictions["z_prob"] = z_probs.squeeze()
+        self.predictions["z"] = \
+            self.predictions["z_prob"] > 0.5
+        #self.predictions["m_prob"] = k_probs.squeeze()
+        #self.predictions["m"] = self.predictions["m_prob"] > 0.5
+        np.save(os.path.join(self.path, "predictions.npy"),
+                self.predictions)

@@ -1,19 +1,17 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import pandas as pd
 import os
 import pyro
 import pyro.distributions as dist
-from pyro.infer import SVI, infer_discrete
-from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO, Trace_ELBO
+from pyro.infer import SVI
 from pyro import param
 from cosmos.models.noise import _noise_fn
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import matthews_corrcoef, confusion_matrix
 from tqdm import tqdm
 import logging
-from pyro import poutine
-from cosmos.models.helper import z_probs_calc, k_probs_calc
 import cosmos
 from git import Repo
 
@@ -33,18 +31,18 @@ class GaussianSpot(nn.Module):
             .float()
 
     # Ideal 2D gaussian spots
-    def forward(self, height, width, x, y, background, n_idx, m_mask=None, f=None):
-        if m_mask is not None:
-            height = height.masked_fill(~m_mask, 0.)
+    def forward(self, height, width, x, y, background, n_idx, f=None):
         if f is not None:
-            spot_locs = self.target_locs[n_idx, f] + torch.stack((x, y), dim=-1)
+            spot_locs = self.target_locs[n_idx, f] + torch.stack((x, y), -1)
         else:
-            spot_locs = self.target_locs[n_idx] + torch.stack((x, y), dim=-1)
+            spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2) * width[..., None, None, None, None])
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
-        return (height[..., None, None] * gaussian_spot).sum(dim=0) + background[..., None, None]
+        result = (height[..., None, None] * gaussian_spot).sum(dim=0) \
+            + background[..., None, None]
+        return result
 
 
 class Model(nn.Module):
@@ -55,6 +53,7 @@ class Model(nn.Module):
         super().__init__()
         # D - number of pixels along axis
         # K - max number of spots
+        # pyro.set_rng_seed(0)
         self.data = data
         self.control = control
         self.path = path
@@ -66,22 +65,28 @@ class Model(nn.Module):
         self.jit = jit
 
         self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
-        #self.size = torch.tensor([[2., 2.],
-        #                          [(((data.D+1) / (2*0.5)) ** 2 - 1), 2.],
-        #                          [2., (((data.D+1) / (2*0.5)) ** 2 - 1)]]).T
-        #self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 4)
-        #self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 5)
-        #self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [2, 0], [0, 2]]).T.reshape(2, 1, 1, 5)
-        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
-        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
-        self.m_state = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1], [1, 0], [1, 1], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 8)
-        self.theta_state = torch.tensor([[0, 0], [0, 0], [0, 0], [0, 0], [1, 0], [1, 0], [0, 1], [0, 1]]).T.reshape(2, 1, 1, 8)
-        #self.z_matrix = torch.tensor([0, 0, 1, 0, 1, 0, 1, 1])
+        self.theta_matrix = \
+            torch.tensor([[0, 0],
+                          [1, 0],
+                          [0, 1]]).T.reshape(2, 1, 1, 3)
+        self.m_matrix = \
+            torch.tensor([[0, 0],
+                          [1, 0],
+                          [0, 1]]).T.reshape(2, 1, 1, 3)
+        self.m_state = \
+            torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1],
+                          [1, 0], [1, 1], [0, 1], [1, 1]]) \
+            .T.reshape(2, 1, 1, 8)
+        self.theta_state = \
+            torch.tensor([[0, 0], [0, 0], [0, 0], [0, 0],
+                          [1, 0], [1, 0], [0, 1], [0, 1]]) \
+            .T.reshape(2, 1, 1, 8)
 
         self.predictions = np.zeros(
             (data.N, data.F),
-            dtype=[("aoi", int), ("frame", int), ("z", bool), ("z_prob", float),
-                   ("m", bool, (2,)), ("m_prob", float, (2,)), ("theta", int)])
+            dtype=[("aoi", int), ("frame", int), ("z", bool),
+                   ("z_prob", float), ("m", bool, (2,)),
+                   ("m_prob", float, (2,)), ("theta", int)])
         self.predictions["aoi"] = data.target.index.values.reshape(-1, 1)
         self.predictions["frame"] = data.drift.index.values
 
@@ -98,35 +103,7 @@ class Model(nn.Module):
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        #self.elbo = Trace_ELBO()
-        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
-            max_plate_nesting=3, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-
-        if self.__name__ in ["tracker"]:
-            repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-            version = repo.git.describe()
-            param_path = os.path.join(
-                path, "runs",
-                "{}{}".format("marginal", version),
-                "{}".format("jit" if self.jit else "nojit"),
-                "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
-                "{}".format(self.n_batch))
-            pyro.get_param_store().load(
-                os.path.join(param_path, "params"),
-                map_location=self.data.device)
-        elif self.__name__ in ["marginal", "hmm"]:
-            repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-            version = repo.git.describe()
-            param_path = os.path.join(
-                path, "runs",
-                "{}{}".format("feature", version),
-                "{}".format("jit" if self.jit else "nojit"),
-                "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
-                "{}".format(self.n_batch))
-            pyro.get_param_store().load(
-                os.path.join(param_path, "params"),
-                map_location=self.data.device)
 
         self.log()
 
@@ -139,7 +116,6 @@ class Model(nn.Module):
     def train(self, num_steps):
         for epoch in tqdm(range(num_steps)):
             # with torch.autograd.detect_anomaly():
-            #import pdb; pdb.set_trace()
             self.epoch_loss = self.svi.step()
             if not self.epoch_count % 100:
                 self.infer()
@@ -181,57 +157,6 @@ class Model(nn.Module):
         self.logger.info("Batch size - {}".format(self.n_batch))
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
-    def infer(self):
-        if self.__name__ in ["marginal"]:
-            guide_trace = poutine.trace(self.guide).get_trace()
-            trained_model = poutine.replay(
-                #self.model, trace=guide_trace)
-                poutine.enum(self.model, first_available_dim=-4), trace=guide_trace)
-            inferred_model = infer_discrete(
-                trained_model, temperature=0, first_available_dim=-4)
-            trace = poutine.trace(inferred_model).get_trace()
-            self.predictions["z"][self.batch_idx] = (
-                trace.nodes["d/theta"]["value"] > 0) \
-                .cpu().data.squeeze()
-            #self.predictions["m"][self.batch_idx] = \
-            #    self.m_matrix[trace.nodes["d/m"]["value"]].squeeze().cpu().data
-        elif self.__name__ == "tracker":
-            z_probs = z_probs_calc(
-                pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
-            #k_probs = k_probs_calc(pyro.param("d/m_probs"))
-            self.predictions["z_prob"] = z_probs.squeeze()
-            self.predictions["z"] = \
-                self.predictions["z_prob"] > 0.5
-            #self.predictions["m_prob"] = k_probs.squeeze()
-            #self.predictions["m"] = self.predictions["m_prob"] > 0.5
-        elif self.__name__ == "hhmm":
-            #import pdb; pdb.set_trace()
-            guide_trace = poutine.trace(self.viterbi_guide).get_trace(self.data)
-            trained_model = poutine.replay(
-                #self.viterbi_model, trace=guide_trace)
-                poutine.enum(self.viterbi_model, first_available_dim=-4), trace=guide_trace)
-            thetas = infer_discrete(
-                #self.viterbi_model, temperature=0, first_available_dim=-3)(data=self.data)
-                trained_model, temperature=0, first_available_dim=-4)(data=self.data)
-            thetas = torch.stack(thetas, dim=-1)
-            self.predictions["z"] = (thetas > 0).cpu().data
-            #trace = poutine.trace(inferred_model).get_trace()
-            #self.predictions["z"][self.batch_idx] = (
-            #    trace.nodes["d/theta"]["value"] > 0) \
-            #    .cpu().data.squeeze()
-            #z_probs = z_probs_calc(
-            #    pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
-            #self.predictions["z_prob"] = z_probs.squeeze()
-            #self.predictions["z"] = \
-            #    self.predictions["z_prob"] > 0.5
-            #states = infer_discrete(self.viterbi_decoder, first_available_dim=-2, temperature=0)(data=self.data)
-            #states = torch.stack(states, dim=-1)
-            #self.predictions["m"] = self.m_matrix[states].cpu().data
-            #self.predictions["z"] = self.z_matrix[states].cpu().data
-            #self.predictions["theta"] = self.theta_matrix[states].cpu().data
-        np.save(os.path.join(self.path, "predictions.npy"),
-                self.predictions)
-
     def save_checkpoint(self):
         if not any([torch.isnan(v).any()
                    for v in pyro.get_param_store().values()]):
@@ -239,29 +164,38 @@ class Model(nn.Module):
             pyro.get_param_store().save(os.path.join(self.path, "params"))
             np.savetxt(os.path.join(self.path, "epoch_count"),
                        np.array([self.epoch_count]))
+            params_last = pd.Series(data={"epoch_count": self.epoch_count})
 
             self.writer_scalar.add_scalar(
                 "-ELBO", self.epoch_loss, self.epoch_count)
+            params_last["-ELBO"] = self.epoch_loss
             for p in pyro.get_param_store().keys():
                 if param(p).squeeze().dim() == 0:
                     self.writer_scalar.add_scalar(
                         p, pyro.param(p).squeeze().item(), self.epoch_count)
+                    params_last[p] = pyro.param(p).item()
                 elif param(p).squeeze().dim() == 1 and \
                         len(param(p).squeeze()) <= self.S+1:
                     scalars = {str(i): p
                                for i, p in enumerate(param(p).squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}".format(p), scalars, self.epoch_count)
+                    for key, value in scalars.items():
+                        params_last[key] = value
                 elif param(p).squeeze().dim() == 2 and \
                         len(param(p).squeeze()) <= self.S+1:
                     scalars = {str(i): p
                                for i, p in enumerate(param(p)[0].squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}_0".format(p), scalars, self.epoch_count)
+                    for key, value in scalars.items():
+                        params_last["{}_0".format(key)] = value
                     scalars = {str(i): p
                                for i, p in enumerate(param(p)[1].squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}_1".format(p), scalars, self.epoch_count)
+                    for key, value in scalars.items():
+                        params_last["{}_1".format(key)] = value
             if self.data.labels is not None:
                 mask = self.data.labels["z"] < 2
                 predictions = self.predictions["z"][mask]
@@ -269,7 +203,13 @@ class Model(nn.Module):
                 mcc = matthews_corrcoef(true_labels, predictions)
                 tn, fp, fn, tp = confusion_matrix(
                     true_labels, predictions).ravel()
+                fuzzy_tp = self.predictions["z_prob"][self.data.labels["z"] == 1].sum()
+                fuzzy_tn = (1 - self.predictions["z_prob"][self.data.labels["z"] == 0]).sum()
+                fuzzy_fp = self.predictions["z_prob"][self.data.labels["z"] == 0].sum()
+                fuzzy_fn = (1 - self.predictions["z_prob"][self.data.labels["z"] == 1]).sum()
                 scalars = {}
+                scalars["fuzzy_MCC"] = (fuzzy_tp*fuzzy_tn - fuzzy_fp*fuzzy_fn) \
+                    / np.sqrt((fuzzy_tp+fuzzy_fp)*(fuzzy_tp+fuzzy_fn)*(fuzzy_tn+fuzzy_fp)*(fuzzy_tn+fuzzy_fn))
                 scalars["MCC"] = mcc
                 scalars["TPR"] = tp / (tp + fn)
                 scalars["TNR"] = tn / (tn + fp)
@@ -285,6 +225,12 @@ class Model(nn.Module):
                     "NEGATIVES", negatives, self.epoch_count)
                 self.writer_scalar.add_scalars(
                     "POSITIVES", positives, self.epoch_count)
+                for key, value in scalars.items():
+                    params_last[key] = value
+                for key, value in negatives.items():
+                    params_last[key] = value
+                for key, value in positives.items():
+                    params_last[key] = value
                 #if self.data.name.startswith("FL") and \
                 #        self.data.name.endswith("OD"):
                 #    atten_labels = self.data.labels.copy()
@@ -294,6 +240,7 @@ class Model(nn.Module):
                 #    atten_labels["spotpicker"] = 0
                 #    atten_labels.to_csv(os.path.join(self.path, "atten_labels.csv"))
 
+            params_last.to_csv(os.path.join(self.path, "params_last.csv"))
             self.logger.debug(
                     "Step #{}. Saved model params and optimizer state in {}"
                     .format(self.epoch_count, self.path))
