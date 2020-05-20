@@ -40,7 +40,7 @@ class GaussianSpot(nn.Module):
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2) * width[..., None, None, None, None])
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
-        result = (height[..., None, None] * gaussian_spot).sum(dim=0) \
+        result = (height[..., None, None] * gaussian_spot).sum(dim=-5, keepdim=True) \
             + background[..., None, None]
         return result
 
@@ -65,14 +65,24 @@ class Model(nn.Module):
         self.jit = jit
 
         self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
+        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2,1,1,4)
+        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2,1,1,3)
+        """
         self.theta_matrix = \
             torch.tensor([[0, 0],
                           [1, 0],
+                          #[1, 0],
+                          #[0, 1],
+                          #[0, 1]]).T.reshape(2, 1, 1, 5)
                           [0, 1]]).T.reshape(2, 1, 1, 3)
         self.m_matrix = \
             torch.tensor([[0, 0],
                           [1, 0],
+                          #[2, 0],
+                          #[0, 1],
+                          #[0, 2]]).T.reshape(2, 1, 1, 5)
                           [0, 1]]).T.reshape(2, 1, 1, 3)
+        """
         self.m_state = \
             torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1],
                           [1, 0], [1, 1], [0, 1], [1, 1]]) \
@@ -116,6 +126,7 @@ class Model(nn.Module):
     def train(self, num_steps):
         for epoch in tqdm(range(num_steps)):
             # with torch.autograd.detect_anomaly():
+            #import pdb; pdb.set_trace()
             self.epoch_loss = self.svi.step()
             if not self.epoch_count % 100:
                 self.infer()
@@ -176,26 +187,26 @@ class Model(nn.Module):
                     params_last[p] = pyro.param(p).item()
                 elif param(p).squeeze().dim() == 1 and \
                         len(param(p).squeeze()) <= self.S+1:
-                    scalars = {str(i): p
+                    scalars = {str(i): p.item()
                                for i, p in enumerate(param(p).squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}".format(p), scalars, self.epoch_count)
                     for key, value in scalars.items():
-                        params_last[key] = value
+                        params_last["{}_{}".format(p, key)] = value
                 elif param(p).squeeze().dim() == 2 and \
                         len(param(p).squeeze()) <= self.S+1:
-                    scalars = {str(i): p
+                    scalars = {str(i): p.item()
                                for i, p in enumerate(param(p)[0].squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}_0".format(p), scalars, self.epoch_count)
                     for key, value in scalars.items():
-                        params_last["{}_0".format(key)] = value
-                    scalars = {str(i): p
+                        params_last["{}_{}_0".format(p, key)] = value
+                    scalars = {str(i): p.item()
                                for i, p in enumerate(param(p)[1].squeeze())}
                     self.writer_scalar.add_scalars(
                         "{}_1".format(p), scalars, self.epoch_count)
                     for key, value in scalars.items():
-                        params_last["{}_1".format(key)] = value
+                        params_last["{}_{}_1".format(p, key)] = value
             if self.data.labels is not None:
                 mask = self.data.labels["z"] < 2
                 predictions = self.predictions["z"][mask]

@@ -1,5 +1,7 @@
 import torch
 import pyro
+import numpy as np
+import os
 import pyro.distributions as dist
 from pyro.infer import config_enumerate
 from pyro import param
@@ -180,4 +182,5 @@ class Feature(Model):
         param("gain", torch.tensor(5.), constraint=constraints.positive)
 
     def infer(self):
-        pass
+        np.save(os.path.join(self.path, "predictions.npy"),
+                self.predictions)
