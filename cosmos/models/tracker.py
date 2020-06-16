@@ -41,6 +41,10 @@ class Tracker(Model):
         pyro.get_param_store().load(
             os.path.join(param_path, "params"),
             map_location=self.data.device)
+        self.offset_stat = self.data.offset.mean()
+        self.data.data = torch.max(self.offset_stat+0.1, self.data.data)
+        if control:
+            self.control.data = torch.max(self.offset_stat+0.1, self.control.data)
 
     #@poutine.block(hide=["width_mode", "width_size"])
     @poutine.block(hide_types=["param"])
@@ -128,9 +132,11 @@ class Tracker(Model):
             y = y * (data.D+1) - (data.D+1)/2
 
             locs = data.loc(height, width, x, y, background, batch_idx)
+            offset = self.offset_stat
             pyro.sample(
                 "data", self.CameraUnit(
-                    locs, param("gain"), param("offset")).to_event(2),
+                    locs, param("gain"), offset).to_event(2),
+                    #locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
 
     def spot_guide(self, data, theta, prefix):
@@ -265,11 +271,11 @@ class Tracker(Model):
     def infer(self):
         z_probs = z_probs_calc(
             pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
-        #k_probs = k_probs_calc(pyro.param("d/m_probs"))
+        k_probs = k_probs_calc(pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
         self.predictions["z_prob"] = z_probs.squeeze()
         self.predictions["z"] = \
             self.predictions["z_prob"] > 0.5
-        #self.predictions["m_prob"] = k_probs.squeeze()
-        #self.predictions["m"] = self.predictions["m_prob"] > 0.5
+        self.predictions["m_prob"] = k_probs.squeeze()
+        self.predictions["m"] = self.predictions["m_prob"] > 0.5
         np.save(os.path.join(self.path, "predictions.npy"),
                 self.predictions)

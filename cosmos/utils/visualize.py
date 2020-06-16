@@ -292,18 +292,29 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
     f = data.drift.index.get_loc(frame)
     if z:
         z_probs = z_probs_calc(
-            param(f"{prefix}/m_probs")[:, n, f],
+            param(f"{prefix}/m_probs")[n, f],
             param(f"{prefix}/theta_probs")[n, f]).squeeze()
 
     #m_mask = k_probs_calc(
     #    param(f"{prefix}/m_probs")[n,f]) > 0.5
+    #ideal_spot = GaussianSpot(data.target, data.drift, data.D)
+    #ideal_data = ideal_spot(
+    #                param("{}/h_loc".format(prefix))[:, n],
+    #                param("{}/w_mode".format(prefix))[:, n],
+    #                param("{}/x_mode".format(prefix))[:, n],
+    #                param("{}/y_mode".format(prefix))[:, n],
+    #                param("{}/b_loc".format(prefix))[n], n) + param("offset")
+
+    m_mask = torch.tensor(data.predictions["m"][n, None]).permute(2, 0, 1)
+    height = param(f"{prefix}/h_loc".format(prefix))[:, n, None]
+    height = height.masked_fill(~m_mask, 0.)
     ideal_spot = GaussianSpot(data.target, data.drift, data.D)
     ideal_data = ideal_spot(
-                    param("{}/h_loc".format(prefix))[:, n],
-                    param("{}/w_mode".format(prefix))[:, n],
-                    param("{}/x_mode".format(prefix))[:, n],
-                    param("{}/y_mode".format(prefix))[:, n],
-                    param("{}/b_loc".format(prefix))[n], n) + param("offset")
+                    height,
+                    param(f"{prefix}/w_mode".format(prefix))[:, n, None],
+                    param(f"{prefix}/x_mode".format(prefix))[:, n, None],
+                    param(f"{prefix}/y_mode".format(prefix))[:, n, None],
+                    param(f"{prefix}/b_loc".format(prefix))[n, None], n) + param("offset")
 
     ax[0].set_title("f #{:d}".format(data.drift.index[f]), fontsize=15)
     ax[0].imshow(
@@ -333,7 +344,8 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
     ax[0].axes.get_yaxis().set_ticks([])
 
     ax[1].imshow(
-        ideal_data.data[f, :, :].cpu(),
+        ideal_data.data[0, 0, f].cpu(),
+        #ideal_data.data[f, :, :].cpu(),
         cmap="gray", vmin=data.vmin, vmax=data.vmax+100)
     if target:
         ax[1].plot(

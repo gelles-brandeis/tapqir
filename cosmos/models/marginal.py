@@ -29,8 +29,20 @@ class Marginal(Model):
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
+        #self.data.offset_weights, self.data.offset_vals = np.histogram(self.data.offset.cpu(), bins=20, density=True)
+        #self.data.offset_weights = torch.log(torch.tensor(self.data.offset_weights))
+        #self.data.offset_vals = torch.tensor(self.data.offset_vals[:-1])
 
-    @poutine.block(hide=["width_mode", "width_size", "offset"])
+        #self.control.offset_weights, self.control.offset_vals = np.histogram(self.control.offset.cpu(), bins=20, density=True)
+        #self.control.offset_weights = torch.log(torch.tensor(self.control.offset_weights))
+        #self.control.offset_vals = torch.tensor(self.control.offset_vals[:-1])
+        self.offset_stat = self.data.offset.mean()
+        self.data.data = torch.max(self.offset_stat+0.1, self.data.data)
+        if control:
+            self.control.data = torch.max(self.offset_stat+0.1, self.control.data)
+
+
+    @poutine.block(hide=["width_mode", "width_size"])
     #@poutine.block(hide=["width_mode", "width_size", "height_loc", "height_beta"])
     @config_enumerate
     def model(self):
@@ -127,9 +139,13 @@ class Marginal(Model):
             y = y * (data.D+1) - (data.D+1)/2
 
             locs = data.loc(height, width, x, y, background, batch_idx)
+            #offset = dist.Empirical(data.offset_vals, data.offset_weights).sample()
+            #offset = 100.
+            offset = self.offset_stat
             pyro.sample(
                 "data", self.CameraUnit(
-                    locs, param("gain"), param("offset")).to_event(2),
+                    locs, param("gain"), offset).to_event(2),
+                    #locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
 
     def spot_guide(self, data, prefix):
@@ -170,6 +186,7 @@ class Marginal(Model):
 
     def guide_parameters(self):
         param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
+        #param("pi", torch.tensor([0.1, 0.9]), constraint=constraints.simplex)
         param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
         #param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
         param("size_z", torch.tensor([1000.]), constraint=constraints.positive)
@@ -181,16 +198,18 @@ class Marginal(Model):
 
     def spot_parameters(self, data, prefix):
         param(f"{prefix}/background_loc",
-              torch.ones(data.N, 1) * 150.,
+              data[:].mean(dim=(1,2,3)).reshape(data.N, 1) - data.offset.mean(),
+              #torch.ones(data.N, 1) * 50.,
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
-              torch.ones(data.N, data.F) * 150.,
+              torch.ones(data.N, data.F) * 50.,
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F) * 30,
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              torch.ones(self.K, data.N, data.F) * 750.,
+              #torch.ones(self.K, data.N, data.F) * 300.,
+              torch.ones(self.K, data.N, data.F) * 1000.,
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(self.K, data.N, data.F),
@@ -217,7 +236,8 @@ class Marginal(Model):
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
         #param("height_loc", torch.tensor([100., 900., 1000.])[:self.S+1],
-        param("height_loc", torch.tensor([750.]),
+        #param("height_loc", torch.tensor([300.]),
+        param("height_loc", torch.tensor([1000.]),
               constraint=constraints.positive)
         param("height_beta", torch.tensor([0.01]),
               constraint=constraints.positive)
@@ -239,9 +259,9 @@ class Marginal(Model):
                 self.control[:].min() - 0.1)
         else:
             self.offset_max = self.data[:].min() - 0.1
-        #param("offset", self.offset_max-50,
-        #      constraint=constraints.interval(0, self.offset_max))
-        param("offset", torch.tensor([90.]), constraint=constraints.positive)
+        param("offset", self.offset_max-50,
+              constraint=constraints.interval(0, self.offset_max))
+        #param("offset", torch.tensor([90.]), constraint=constraints.positive)
         param("gain", torch.tensor(7.), constraint=constraints.positive)
 
     def infer(self):

@@ -80,7 +80,8 @@ def z_probs_calc(m_probs, theta_probs):
     return theta_probs[..., 1:].sum(dim=-1).cpu().data
 
 
-def k_probs_calc(m_probs):
+def k_probs_calc(m_probs, theta_probs):
+    m_probs = (theta_probs.unsqueeze(dim=-1) * m_probs).sum(dim=-2)
     return torch.stack((m_probs[..., 1] + m_probs[..., 3],
                         m_probs[..., 2] + m_probs[..., 3]),
                        dim=-1).squeeze(dim=-2).cpu().data

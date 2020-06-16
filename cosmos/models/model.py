@@ -242,14 +242,21 @@ class Model(nn.Module):
                     params_last[key] = value
                 for key, value in positives.items():
                     params_last[key] = value
+                #import pdb; pdb.set_trace()
                 #if self.data.name.startswith("FL") and \
                 #        self.data.name.endswith("OD"):
-                #    atten_labels = self.data.labels.copy()
+                try:
+                    atten_labels = np.copy(self.data.labels)
+                    atten_labels["z"][
+                        self.data.labels["spotpicker"] != self.predictions["z"]] = 2 
+                    atten_labels["spotpicker"] = 0
+                    np.save(os.path.join(self.path, "atten_labels.npy"),
+                            atten_labels)
+                except:
+                    pass
                 #    atten_labels.loc[
                 #        self.data.labels["spotpicker"] != self.data.predictions["binary"],
                 #        "binary"] = 2
-                #    atten_labels["spotpicker"] = 0
-                #    atten_labels.to_csv(os.path.join(self.path, "atten_labels.csv"))
 
             params_last.to_csv(os.path.join(self.path, "params_last.csv"))
             self.logger.debug(

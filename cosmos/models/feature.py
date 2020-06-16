@@ -128,10 +128,10 @@ class Feature(Model):
 
     def spot_parameters(self, data, prefix):
         param(f"{prefix}/background_loc",
-              torch.ones(data.N, 1) * 50.,
+              torch.ones(data.N, 1) * 150.,
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
-              torch.ones(data.N, data.F) * 50.,
+              torch.ones(data.N, data.F) * 150.,
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F) * 30,
@@ -179,7 +179,8 @@ class Feature(Model):
             self.offset_max = self.data[:].min() - 0.1
         param("offset", self.offset_max-50,
               constraint=constraints.interval(0, self.offset_max))
-        param("gain", torch.tensor(5.), constraint=constraints.positive)
+        #param("offset", torch.tensor(90.), constraint=constraints.positive)
+        param("gain", torch.tensor(7.), constraint=constraints.positive)
 
     def infer(self):
         np.save(os.path.join(self.path, "predictions.npy"),

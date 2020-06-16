@@ -17,7 +17,7 @@ def ReadAoi(path=None, control=None, device=None):
         data = read_glimpse(path, D=14, dtype="test", device=device)
         data.save(path)
         if control is not None:
-            control = read_glimpse(path, D=14, dtype="control", device=device)
+            control = read_glimpse(control, D=14, dtype="control", device=device)
             control.save(path)
 
     return data, control

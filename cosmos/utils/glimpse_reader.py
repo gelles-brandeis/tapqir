@@ -7,17 +7,19 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import pyro
 
 
 class CoSMoSDataset(Dataset):
     """ CoSMoS Dataset """
 
-    def __init__(self, data=None, target=None, drift=None, labels=None, dtype=None, device=None):
+    def __init__(self, data=None, target=None, drift=None, labels=None, dtype=None, device=None, offset=None):
         self.data = data.to(device)
         self.N, self.F, self.D, _ = self.data.shape
         self.target = target
         self.drift = drift
         self.labels = labels
+        self.offset = offset
         assert self.N == len(self.target)
         assert self.F == len(self.drift)
         self.dtype = dtype
@@ -47,6 +49,8 @@ class CoSMoSDataset(Dataset):
             path, "{}_drift.csv".format(self.dtype)))
         np.save(os.path.join(path, "{}_labels.npy".format(self.dtype)),
                 self.labels)
+        torch.save(self.offset, os.path.join(
+            path, "{}_offset.pt".format(self.dtype)))
 
 def load_data(path, dtype, device=None):
     data = torch.load(os.path.join(
@@ -58,12 +62,15 @@ def load_data(path, dtype, device=None):
     drift = pd.read_csv(os.path.join(
         path, "{}_drift.csv".format(dtype)),
         index_col="frame")
+    offset = torch.load(os.path.join(
+        path, "{}_offset.pt".format(dtype)),
+        map_location=device).detach()
     labels = None
     if os.path.isfile(os.path.join(path, "{}_labels.npy".format(dtype))):
         labels = np.load(os.path.join(
             path, "{}_labels.npy".format(dtype)))
 
-    return CoSMoSDataset(data, target, drift, labels, dtype, device)
+    return CoSMoSDataset(data, target, drift, labels, dtype, device, offset)
 
 def read_glimpse(name, D, dtype, device=None):
     """ Read Glimpse files """
@@ -75,9 +82,9 @@ def read_glimpse(name, D, dtype, device=None):
     config.read("datasets.cfg")
     files = ["dir", "header", "aoiinfo", "driftlist", "labels"]
     path_to = {}
-    if name in config:
+    if name.split(".")[0] in config:
         for FILE in files:
-            path_to[FILE] = config[name][FILE]
+            path_to[FILE] = config[name.split(".")[0]][FILE]
     else:
         config.add_section(name)
         for FILE in files:
@@ -159,17 +166,17 @@ def read_glimpse(name, D, dtype, device=None):
     if path_to["labels"]:
         if name.startswith("FL"):
             framelist = loadmat(path_to["labels"])
-            f1 = framelist[name.split(".")[0]][0, 2]
-            f2 = framelist[name.split(".")[0]][-1, 2]
+            f1 = framelist[name.split("-")[0].split(".")[0]][0, 2]
+            f2 = framelist[name.split("-")[0].split(".")[0]][-1, 2]
             drift_df = drift_df.loc[f1:f2]
-            aoi_list = np.unique(framelist[name.split(".")[0]][:, 0])
+            aoi_list = np.unique(framelist[name.split("-")[0].split(".")[0]][:, 0])
             aoi_df = aoi_df.loc[aoi_list]
             labels = np.zeros(
                 (len(aoi_df), len(drift_df)),
                 dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)])
-            labels["aoi"] = framelist[name.split(".")[0]][:, 0].reshape(len(aoi_df), len(drift_df))
-            labels["frame"] = framelist[name.split(".")[0]][:, 2].reshape(len(aoi_df), len(drift_df))
-            labels["spotpicker"] = framelist[name.split(".")[0]][:, 1] \
+            labels["aoi"] = framelist[name.split("-")[0].split(".")[0]][:, 0].reshape(len(aoi_df), len(drift_df))
+            labels["frame"] = framelist[name.split("-")[0].split(".")[0]][:, 2].reshape(len(aoi_df), len(drift_df))
+            labels["spotpicker"] = framelist[name.split("-")[0].split(".")[0]][:, 1] \
                                    .reshape(len(aoi_df), len(drift_df))
             labels["spotpicker"][labels["spotpicker"] == 0] = 3
             labels["spotpicker"][labels["spotpicker"] == 2] = 0
@@ -197,6 +204,22 @@ def read_glimpse(name, D, dtype, device=None):
 
         labels["z"] = labels["spotpicker"]
 
+    if name.endswith(".clean"):
+        pyro.clear_param_store()
+        pyro.get_param_store().load(
+            filename=os.path.join("{}/runs/featurev0.9.8/nojit/lr0.005/Adam/32".format(name.split("-")[0].split(".")[0]), "params"),
+            map_location=torch.device("cpu"))
+        data_stat = load_data(name.split("-")[0].split(".")[0], dtype="test", device=torch.device("cpu"))
+        control_stat = load_data(name.split("-")[0].split(".")[0], dtype="control", device=torch.device("cpu"))
+        bg_stat = data_stat.data.mean(dim=(1,2,3))
+        try:
+            bg_fit = (pyro.param("d/background_loc") + pyro.param("offset")).data.reshape(-1)
+        except:
+            bg_fit = (pyro.param("c/background_loc") + pyro.param("offset")).data.reshape(-1)
+        fs = data_stat.target.index[torch.abs(bg_stat - bg_fit) < 5]
+        aoi_df = aoi_df.loc[fs]
+        labels = labels[torch.abs(bg_stat - bg_fit) < 5]
+
     """
     target DataFrame
     aoi frame x y abs_x abs_y
@@ -220,6 +243,7 @@ def read_glimpse(name, D, dtype, device=None):
               "abs_dy": drift_df["dy"]},
         index=drift_df.index)
     data = np.ones((N, F, D, D)) * 2**15
+    offsets = np.ones((F, 4, 60, 60)) * 2**15
     # loop through each frame
     for i, frame in enumerate(tqdm(drift_df.index)):
         # read the entire frame image
@@ -234,6 +258,10 @@ def read_glimpse(name, D, dtype, device=None):
                 count=height*width) \
                 .reshape(height, width)
 
+        offsets[i, 0, :, :] += img[10:70, 10:70]
+        offsets[i, 1, :, :] += img[10:70, -70:-10]
+        offsets[i, 2, :, :] += img[-70:-10, 10:70]
+        offsets[i, 3, :, :] += img[-70:-10, -70:-10]
         # new drift list (fractional part)
         drift.at[frame, "dx"] = drift_df.at[frame, "dx"] % 1
         drift.at[frame, "dy"] = drift_df.at[frame, "dy"] % 1
@@ -259,5 +287,6 @@ def read_glimpse(name, D, dtype, device=None):
             - int((aoi_df.at[aoi, "y"] - D * 0.5) // 1) - 1
     # convert data into torch tensor
     data = torch.tensor(data, dtype=torch.float32, device=device)
+    offset = torch.tensor(offsets, dtype=torch.float32, device=device)
 
-    return CoSMoSDataset(data, target, drift, labels, dtype, device)
+    return CoSMoSDataset(data, target, drift, labels, dtype, device, offset)
