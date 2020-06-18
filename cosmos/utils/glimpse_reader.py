@@ -20,6 +20,9 @@ class CoSMoSDataset(Dataset):
         self.drift = drift
         self.labels = labels
         self.offset = offset
+        self.offset_median = torch.median(self.offset)
+        self.data_median = torch.median(self.data)
+        self.noise = self.data.std(dim=(1, 2, 3)).mean() * np.pi * (2 * 1.3) ** 2
         assert self.N == len(self.target)
         assert self.F == len(self.drift)
         self.dtype = dtype
@@ -216,9 +219,9 @@ def read_glimpse(name, D, dtype, device=None):
             bg_fit = (pyro.param("d/background_loc") + pyro.param("offset")).data.reshape(-1)
         except:
             bg_fit = (pyro.param("c/background_loc") + pyro.param("offset")).data.reshape(-1)
-        fs = data_stat.target.index[torch.abs(bg_stat - bg_fit) < 5]
+        fs = data_stat.target.index[torch.abs(bg_stat - bg_fit) < 8]
         aoi_df = aoi_df.loc[fs]
-        labels = labels[torch.abs(bg_stat - bg_fit) < 5]
+        labels = labels[torch.abs(bg_stat - bg_fit) < 8]
 
     """
     target DataFrame

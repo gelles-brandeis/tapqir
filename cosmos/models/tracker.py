@@ -41,10 +41,10 @@ class Tracker(Model):
         pyro.get_param_store().load(
             os.path.join(param_path, "params"),
             map_location=self.data.device)
-        self.offset_stat = self.data.offset.mean()
-        self.data.data = torch.max(self.offset_stat+0.1, self.data.data)
-        if control:
-            self.control.data = torch.max(self.offset_stat+0.1, self.control.data)
+        #self.offset_stat = self.data.offset.mean()
+        #self.data.data = torch.max(self.offset_stat+0.1, self.data.data)
+        #if control:
+        #    self.control.data = torch.max(self.offset_stat+0.1, self.control.data)
 
     #@poutine.block(hide=["width_mode", "width_size"])
     @poutine.block(hide_types=["param"])
@@ -132,11 +132,11 @@ class Tracker(Model):
             y = y * (data.D+1) - (data.D+1)/2
 
             locs = data.loc(height, width, x, y, background, batch_idx)
-            offset = self.offset_stat
+            #offset = self.offset_stat
             pyro.sample(
                 "data", self.CameraUnit(
-                    locs, param("gain"), offset).to_event(2),
-                    #locs, param("gain"), param("offset")).to_event(2),
+                    #locs, param("gain"), offset).to_event(2),
+                    locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
 
     def spot_guide(self, data, theta, prefix):
@@ -190,9 +190,7 @@ class Tracker(Model):
         if m:
             #m_probs = torch.zeros(self.K, data.N, data.F, self.S+1, self.S+1)
             m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
-            #m_probs[..., 0, :] = 1
-            #for s in range(self.S+1):
-            #    m_probs[..., s, s] = 1
+            #m_probs = pi_m_calc(param("lamda"), self.S).repeat(data.N, data.F, 1, 1)
             m_probs[..., 1, 0] = 0
             m_probs[..., 1, 2] = 0
             m_probs[..., 2, 0] = 0
@@ -201,72 +199,14 @@ class Tracker(Model):
                   m_probs,
                   constraint=constraints.simplex)
         if theta:
+            #theta_probs = pi_theta_calc(param("pi"), self.K, self.S).repeat(data.N, data.F, 1)
             theta_probs = torch.ones(
                 data.N, data.F, self.S*self.K+1)
             param(f"{prefix}/theta_probs", theta_probs,
                   constraint=constraints.simplex)
 
-        param(f"{prefix}/background_loc",
-              torch.ones(data.N, 1) * 50.,
-              constraint=constraints.positive)
-        param(f"{prefix}/b_loc",
-              torch.ones(data.N, data.F) * 50.,
-              constraint=constraints.positive)
-        param(f"{prefix}/b_beta",
-              torch.ones(data.N, data.F) * 30,
-              constraint=constraints.positive)
-        param(f"{prefix}/h_loc",
-              torch.ones(self.K, data.N, data.F) * 1000.,
-              constraint=constraints.positive)
-        param(f"{prefix}/h_beta",
-              torch.ones(self.K, data.N, data.F),
-              constraint=constraints.positive)
-        param(f"{prefix}/w_mode",
-              torch.ones(self.K, data.N, data.F) * 1.3,
-              constraint=constraints.interval(0.5, 3.))
-        param(f"{prefix}/w_size",
-              torch.ones(self.K, data.N, data.F) * 100.,
-              constraint=constraints.greater_than(2.))
-        param(f"{prefix}/x_mode",
-              torch.zeros(self.K, data.N, data.F),
-              constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        param(f"{prefix}/y_mode",
-              torch.zeros(self.K, data.N, data.F),
-              constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        size = torch.ones(self.K, data.N, data.F) * 5.
-        size[0] = ((data.D+1) / (2*0.5)) ** 2 - 1
-        param(f"{prefix}/size",
-              size, constraint=constraints.greater_than(2.))
-
     def model_parameters(self):
-        # Global Parameters
-        # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
-        #       constraint=constraints.greater_than(30.))
-        param("height_loc", torch.tensor([100., 900., 1000.])[:self.S+1],
-              constraint=constraints.positive)
-        param("height_beta", torch.tensor([0.01, 0.01, 0.01])[:self.S+1],
-              constraint=constraints.positive)
-        #param("height_loc", torch.tensor([1000.]),
-        #      constraint=constraints.positive)
-        #param("height_beta", torch.tensor([0.01]),
-        #      constraint=constraints.positive)
-        param("background_beta", torch.tensor([1.]),
-              constraint=constraints.positive)
-        param("width_mode", torch.tensor([1.3]),
-              constraint=constraints.interval(0.5, 3.))
-        param("width_size",
-              torch.tensor([10.]), constraint=constraints.positive)
-
-        if self.control:
-            self.offset_max = torch.where(
-                self.data[:].min() < self.control[:].min(),
-                self.data[:].min() - 0.1,
-                self.control[:].min() - 0.1)
-        else:
-            self.offset_max = self.data[:].min() - 0.1
-        param("offset", self.offset_max-50,
-              constraint=constraints.interval(0, self.offset_max))
-        param("gain", torch.tensor(5.), constraint=constraints.positive)
+        pass
 
     def infer(self):
         z_probs = z_probs_calc(

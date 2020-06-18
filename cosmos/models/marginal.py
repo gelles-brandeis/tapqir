@@ -29,17 +29,9 @@ class Marginal(Model):
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
-        #self.data.offset_weights, self.data.offset_vals = np.histogram(self.data.offset.cpu(), bins=20, density=True)
-        #self.data.offset_weights = torch.log(torch.tensor(self.data.offset_weights))
-        #self.data.offset_vals = torch.tensor(self.data.offset_vals[:-1])
-
-        #self.control.offset_weights, self.control.offset_vals = np.histogram(self.control.offset.cpu(), bins=20, density=True)
-        #self.control.offset_weights = torch.log(torch.tensor(self.control.offset_weights))
-        #self.control.offset_vals = torch.tensor(self.control.offset_vals[:-1])
-        self.offset_stat = self.data.offset.mean()
-        self.data.data = torch.max(self.offset_stat+0.1, self.data.data)
+        self.data.data = torch.max(self.data.offset_median + 0.1, self.data.data)
         if control:
-            self.control.data = torch.max(self.offset_stat+0.1, self.control.data)
+            self.control.data = torch.max(self.data.offset_median + 0.1, self.control.data)
 
 
     @poutine.block(hide=["width_mode", "width_size"])
@@ -86,20 +78,6 @@ class Marginal(Model):
                     param(f"{prefix}/background_loc")[batch_idx]
                     * param("background_beta"), param("background_beta")))
 
-            #if pi_theta is not None:
-            #    theta = pyro.sample("theta", dist.Categorical(pi_theta))
-            #else:
-            #    theta = 0
-            #theta_mask = Vindex(self.theta_matrix)[..., theta]
-            #m_mask = Vindex(self.m_matrix)[..., theta]
-
-            #m = pyro.sample("m", dist.Categorical(pi_m))
-            #if pi_theta is not None:
-            #    theta = pyro.sample("theta", dist.Categorical(pi_theta[m]))
-            #    theta_mask = Vindex(self.theta_matrix)[..., theta]
-            #else:
-            #    theta_mask = 0
-
             if pi_theta is not None:
                 theta = pyro.sample("theta", dist.Categorical(pi_theta))
             else:
@@ -108,20 +86,11 @@ class Marginal(Model):
             m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
             m_mask = Vindex(self.m_matrix)[..., m]
 
-            #height_loc = torch.cat((torch.tensor([0.01]), param("height_loc")), 0)
-            #height_beta = torch.cat((torch.tensor([100.]), param("height_beta")), 0)
-            #height_loc = torch.cumsum(param("height_loc"), 0)
-            height_loc = param("height_loc")
-            height_beta = param("height_beta")
             with K_plate:
-                #m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[m_mask]))
-                #with poutine.mask(mask=m_mask>0):
                 height = pyro.sample(
                     "height", dist.Gamma(
-                        height_loc * height_beta,
-                        height_beta))
-                        #height_loc[m_mask] * height_beta[m_mask],
-                        #height_beta[m_mask]))
+                        param("height_loc") * param("height_beta"),
+                        param("height_beta")))
                 width = pyro.sample(
                     "width", ScaledBeta(
                         param("width_mode"),
@@ -139,12 +108,9 @@ class Marginal(Model):
             y = y * (data.D+1) - (data.D+1)/2
 
             locs = data.loc(height, width, x, y, background, batch_idx)
-            #offset = dist.Empirical(data.offset_vals, data.offset_weights).sample()
-            #offset = 100.
-            offset = self.offset_stat
             pyro.sample(
                 "data", self.CameraUnit(
-                    locs, param("gain"), offset).to_event(2),
+                    locs, param("gain"), self.data.offset_median).to_event(2),
                     #locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
 
@@ -198,18 +164,16 @@ class Marginal(Model):
 
     def spot_parameters(self, data, prefix):
         param(f"{prefix}/background_loc",
-              data[:].mean(dim=(1,2,3)).reshape(data.N, 1) - data.offset.mean(),
-              #torch.ones(data.N, 1) * 50.,
+              (self.data.data_median - self.data.offset_median).repeat(data.N, 1),
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
-              torch.ones(data.N, data.F) * 50.,
+              (self.data.data_median - self.data.offset_median).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
-              torch.ones(data.N, data.F) * 30,
+              torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              #torch.ones(self.K, data.N, data.F) * 300.,
-              torch.ones(self.K, data.N, data.F) * 1000.,
+              (self.data.noise * 2).repeat(self.K, data.N, data.F)
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(self.K, data.N, data.F),
@@ -235,34 +199,21 @@ class Marginal(Model):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
-        #param("height_loc", torch.tensor([100., 900., 1000.])[:self.S+1],
-        #param("height_loc", torch.tensor([300.]),
-        param("height_loc", torch.tensor([1000.]),
+        param("height_loc", self.data.noise * 2,
               constraint=constraints.positive)
         param("height_beta", torch.tensor([0.01]),
               constraint=constraints.positive)
-        #param("height_loc", torch.tensor([1000.]),
-        #      constraint=constraints.positive)
-        #param("height_beta", torch.tensor([0.01]),
-        #      constraint=constraints.positive)
-        param("background_beta", torch.tensor([30.]),
+        param("background_beta", torch.tensor([1.]),
               constraint=constraints.positive)
         param("width_mode", torch.tensor([1.3]),
               constraint=constraints.interval(0.5, 3.))
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
 
-        if self.control:
-            self.offset_max = torch.where(
-                self.data[:].min() < self.control[:].min(),
-                self.data[:].min() - 0.1,
-                self.control[:].min() - 0.1)
-        else:
-            self.offset_max = self.data[:].min() - 0.1
-        param("offset", self.offset_max-50,
-              constraint=constraints.interval(0, self.offset_max))
+        #param("offset", self.offset_guess,
+        #      constraint=constraints.interval(0, self.offset_max))
         #param("offset", torch.tensor([90.]), constraint=constraints.positive)
-        param("gain", torch.tensor(7.), constraint=constraints.positive)
+        param("gain", torch.tensor(5.), constraint=constraints.positive)
 
     def infer(self):
         guide_trace = poutine.trace(self.guide).get_trace()
