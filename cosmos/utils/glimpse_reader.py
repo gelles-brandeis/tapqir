@@ -210,15 +210,15 @@ def read_glimpse(name, D, dtype, device=None):
     if name.endswith(".clean"):
         pyro.clear_param_store()
         pyro.get_param_store().load(
-            filename=os.path.join("{}/runs/featurev0.9.8/nojit/lr0.005/Adam/32".format(name.split("-")[0].split(".")[0]), "params"),
+            filename=os.path.join("{}/runs/marginalv0.9.9/nojit/lr0.005/Adam/32".format(name.split("-")[0].split(".")[0]), "params"),
             map_location=torch.device("cpu"))
         data_stat = load_data(name.split("-")[0].split(".")[0], dtype="test", device=torch.device("cpu"))
         control_stat = load_data(name.split("-")[0].split(".")[0], dtype="control", device=torch.device("cpu"))
         bg_stat = data_stat.data.mean(dim=(1,2,3))
         try:
-            bg_fit = (pyro.param("d/background_loc") + pyro.param("offset")).data.reshape(-1)
+            bg_fit = (pyro.param("d/background_loc") + data_stat.offset_median).data.reshape(-1)
         except:
-            bg_fit = (pyro.param("c/background_loc") + pyro.param("offset")).data.reshape(-1)
+            bg_fit = (pyro.param("c/background_loc") + data_stat.offset_median).data.reshape(-1)
         fs = data_stat.target.index[torch.abs(bg_stat - bg_fit) < 8]
         aoi_df = aoi_df.loc[fs]
         labels = labels[torch.abs(bg_stat - bg_fit) < 8]

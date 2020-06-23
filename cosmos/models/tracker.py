@@ -41,20 +41,29 @@ class Tracker(Model):
         pyro.get_param_store().load(
             os.path.join(param_path, "params"),
             map_location=self.data.device)
-        #self.offset_stat = self.data.offset.mean()
-        #self.data.data = torch.max(self.offset_stat+0.1, self.data.data)
-        #if control:
-        #    self.control.data = torch.max(self.offset_stat+0.1, self.control.data)
+
+        if self.control:
+            self.offset_max = torch.where(
+                self.data[:].min() < self.control[:].min(),
+                self.data[:].min() - 0.1,
+                self.control[:].min() - 0.1)
+        else:
+            self.offset_max = self.data[:].min() - 0.1
+
+        self.offset_guess = torch.min(self.data.offset_median, self.offset_max)
 
     #@poutine.block(hide=["width_mode", "width_size"])
     @poutine.block(hide_types=["param"])
     def model(self):
         self.model_parameters()
-        pi_z = pyro.sample("pi_z", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
-        lamda = pyro.sample("lamda_j", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
-        data_pi_m = pi_m_calc(lamda, self.S)
-        control_pi_m = pi_m_calc(lamda, self.S)
-        pi_theta = pi_theta_calc(pi_z, self.K, self.S)
+        #pi_z = pyro.sample("pi_z", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        #lamda = pyro.sample("lamda_j", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        #data_pi_m = pi_m_calc(param("lamda"), self.S)
+        #control_pi_m = pi_m_calc(param("lamda"), self.S)
+        #pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
+        data_pi_m = pi_m_calc(param("pi"), param("lamda"), self.K)
+        control_pi_m = pi_m_calc(param("pi"), param("lamda"), self.K)
+        pi_theta = pi_theta_calc(param("pi"), param("lamda"), self.K)
 
         with scope(prefix="d"):
             self.spot_model(self.data, data_pi_m, pi_theta, prefix="d")
@@ -67,8 +76,8 @@ class Tracker(Model):
     @config_enumerate
     def guide(self):
         self.guide_parameters()
-        pyro.sample("pi_z", dist.Dirichlet(param("pi") * param("size_z")))
-        pyro.sample("lamda_j", dist.Dirichlet(param("lamda") * param("size_lamda")))
+        #pyro.sample("pi_z", dist.Dirichlet(param("pi") * param("size_z")))
+        #pyro.sample("lamda_j", dist.Dirichlet(param("lamda") * param("size_lamda")))
 
         with scope(prefix="d"):
             self.spot_guide(self.data, True, prefix="d")
@@ -96,12 +105,21 @@ class Tracker(Model):
                     * param("background_beta"), param("background_beta")))
 
 
+            #if pi_theta is not None:
+            #    theta = pyro.sample("theta", dist.Categorical(pi_theta))
+            #else:
+            #    theta = 0
+            #theta_mask = Vindex(self.theta_matrix)[..., theta]
+            #m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
+            #m_mask = Vindex(self.m_matrix)[..., m]
+            m = pyro.sample("m", dist.Categorical(pi_m))
             if pi_theta is not None:
-                theta = pyro.sample("theta", dist.Categorical(pi_theta))
+                theta = pyro.sample("theta", dist.Categorical(Vindex(pi_theta)[m]))
+                #theta_mask = self.theta_matrix[theta.squeeze(dim=-1)]
+                theta_mask = Vindex(self.theta_matrix)[..., theta]
             else:
-                theta = 0
-            theta_mask = Vindex(self.theta_matrix)[..., theta]
-            m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
+                theta_mask = 0
+            #m_mask = self.m_matrix[m.squeeze(dim=-1)].bool()
             m_mask = Vindex(self.m_matrix)[..., m]
 
             height_loc = param("height_loc")
@@ -132,10 +150,9 @@ class Tracker(Model):
             y = y * (data.D+1) - (data.D+1)/2
 
             locs = data.loc(height, width, x, y, background, batch_idx)
-            #offset = self.offset_stat
             pyro.sample(
                 "data", self.CameraUnit(
-                    #locs, param("gain"), offset).to_event(2),
+                    #locs, param("gain"), self.data.offset_median).to_event(2),
                     locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
 
@@ -153,13 +170,20 @@ class Tracker(Model):
                     * param(f"{prefix}/b_beta")[batch_idx],
                     param(f"{prefix}/b_beta")[batch_idx]))
 
+            #if theta:
+            #    theta = pyro.sample("theta", dist.Categorical(
+            #        param(f"{prefix}/theta_probs")[batch_idx]))
+            #else:
+            #    theta = 0
+            #pyro.sample("m", dist.Categorical(
+            #    Vindex(param(f"{prefix}/m_probs")[batch_idx])[..., theta, :]))
+
+            m = pyro.sample("m", dist.Categorical(
+                param(f"{prefix}/m_probs")[batch_idx]))
             if theta:
-                theta = pyro.sample("theta", dist.Categorical(
-                    param(f"{prefix}/theta_probs")[batch_idx]))
-            else:
-                theta = 0
-            pyro.sample("m", dist.Categorical(
-                Vindex(param(f"{prefix}/m_probs")[batch_idx])[..., theta, :]))
+                pyro.sample("theta", dist.Categorical(
+                    Vindex(param(
+                        f"{prefix}/theta_probs")[batch_idx])[..., m, :]))
 
             with K_plate:
                 #pyro.sample("m", dist.Categorical(
@@ -187,21 +211,34 @@ class Tracker(Model):
                         -(data.D+1)/2, data.D+1))
 
     def spot_parameters(self, data, m, theta, prefix):
-        if m:
+        #if m:
             #m_probs = torch.zeros(self.K, data.N, data.F, self.S+1, self.S+1)
-            m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
+        #    m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
             #m_probs = pi_m_calc(param("lamda"), self.S).repeat(data.N, data.F, 1, 1)
-            m_probs[..., 1, 0] = 0
-            m_probs[..., 1, 2] = 0
-            m_probs[..., 2, 0] = 0
-            m_probs[..., 2, 1] = 0
+        #    m_probs[..., 1, 0] = 0
+        #    m_probs[..., 1, 2] = 0
+        #    m_probs[..., 2, 0] = 0
+        #    m_probs[..., 2, 1] = 0
+        #    param(f"{prefix}/m_probs",
+        #          m_probs,
+        #          constraint=constraints.simplex)
+        #if theta:
+            #theta_probs = pi_theta_calc(param("pi"), self.K, self.S).repeat(data.N, data.F, 1)
+        #    theta_probs = torch.ones(
+        #        data.N, data.F, self.S*self.K+1)
+        #    param(f"{prefix}/theta_probs", theta_probs,
+        #          constraint=constraints.simplex)
+
+        if m:
             param(f"{prefix}/m_probs",
-                  m_probs,
+                  torch.ones(data.N, data.F, 2**self.K),
                   constraint=constraints.simplex)
         if theta:
-            #theta_probs = pi_theta_calc(param("pi"), self.K, self.S).repeat(data.N, data.F, 1)
             theta_probs = torch.ones(
-                data.N, data.F, self.S*self.K+1)
+                data.N, data.F, 2**self.K, self.K+1)
+            theta_probs[..., 0, 1:] = 0
+            theta_probs[..., 1, 2] = 0
+            theta_probs[..., 2, 1] = 0
             param(f"{prefix}/theta_probs", theta_probs,
                   constraint=constraints.simplex)
 

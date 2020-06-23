@@ -11,7 +11,7 @@ def ScaledBeta(mode, size, loc, scale):
 
 def probs_to_logits(probs):
     return torch.log(probs / (1 - probs))
-
+"""
 def pi_m_calc(lamda, S):
     #pi_m = torch.eye(S+1)
     #pi_m[0] = lamda
@@ -61,7 +61,6 @@ def pi_theta_calc(pi, lamda, K):
     pi_theta[3, 1] = pi[1] * lamda[1] / 2
     pi_theta[3, 2] = pi[1] * lamda[1] / 2
     return pi_theta
-"""
 
 def theta_trans_calc(A, K, S):
     theta_trans = torch.zeros(K*S+1, K*S+1)
@@ -75,7 +74,18 @@ def theta_trans_calc(A, K, S):
                     theta_trans[K*s + k + 1, K*z + q + 1] = A[s+1, z+1] / K
     return theta_trans
 
+def z_probs_calc(m_probs, theta_probs):
+    return (m_probs * theta_probs[..., 1:].sum(dim=-1)).sum(dim=-1).cpu().data
 
+def k_probs_calc(m_probs, theta_probs):
+    return torch.stack((m_probs[..., 1] + m_probs[..., 3],
+                        m_probs[..., 2] + m_probs[..., 3]),
+                        dim=-1).squeeze(dim=-2).cpu().data
+
+def theta_probs_calc(m_probs, theta_probs):
+    return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
+
+"""
 def z_probs_calc(m_probs, theta_probs):
     return theta_probs[..., 1:].sum(dim=-1).cpu().data
 
@@ -89,6 +99,7 @@ def k_probs_calc(m_probs, theta_probs):
 
 def theta_probs_calc(m_probs, theta_probs):
     return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
+"""
 
 
 def j_probs_calc(m_probs, theta_probs):
