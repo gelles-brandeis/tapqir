@@ -11,6 +11,29 @@ def ScaledBeta(mode, size, loc, scale):
 
 def probs_to_logits(probs):
     return torch.log(probs / (1 - probs))
+
+def pi_m_calc(pi, lamda, K):
+    poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
+    pi_m = torch.zeros(2**K)
+    pi_m[0] = pi[0] * poisson(0)
+    pi_m[1] = (pi[1] * poisson(0) + pi[0] * poisson(1)) / 2
+    pi_m[2] = (pi[1] * poisson(0) + pi[0] * poisson(1)) / 2
+    pi_m[3] = pi[1] * poisson(1) + pi[0] * poisson(2)
+    return pi_m
+
+def pi_theta_calc(pi, lamda, K):
+    poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
+    pi_theta = torch.zeros(2**K,K+1)
+    pi_theta[0, 0] = 1
+    pi_theta[1, 0] = pi[0] * poisson(1)
+    pi_theta[1, 1] = pi[1] * poisson(0)
+    pi_theta[2, 0] = pi[0] * poisson(1)
+    pi_theta[2, 2] = pi[1] * poisson(0)
+    pi_theta[3, 0] = pi[0] * poisson(2)
+    pi_theta[3, 1] = pi[1] * poisson(1) / 2
+    pi_theta[3, 2] = pi[1] * poisson(1) / 2
+    return pi_theta
+
 """
 def pi_m_calc(lamda, S):
     #pi_m = torch.eye(S+1)
@@ -34,7 +57,6 @@ def pi_theta_calc(pi, K, S):
         for k in range(K):
             pi_theta[K*s + k + 1] = pi[s + 1] / K
     return pi_theta
-"""
 
 def pi_m_calc(pi, lamda, K):
     #poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
@@ -61,6 +83,7 @@ def pi_theta_calc(pi, lamda, K):
     pi_theta[3, 1] = pi[1] * lamda[1] / 2
     pi_theta[3, 2] = pi[1] * lamda[1] / 2
     return pi_theta
+"""
 
 def theta_trans_calc(A, K, S):
     theta_trans = torch.zeros(K*S+1, K*S+1)

@@ -178,7 +178,7 @@ class Marginal(Model):
         param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
         #param("pi", torch.tensor([0.1, 0.9]), constraint=constraints.simplex)
         #param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
-        param("lamda", torch.tensor([0.9, 0.1]), constraint=constraints.simplex)
+        param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
         #param("size_z", torch.tensor([1000.]), constraint=constraints.positive)
         #param("size_lamda", torch.tensor([1000.]), constraint=constraints.positive)
         self.spot_parameters(self.data, prefix="d")
@@ -241,7 +241,9 @@ class Marginal(Model):
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
 
-        param("offset", self.offset_guess,
+        #param("offset", self.offset_guess,
+        #      constraint=constraints.interval(0, self.offset_max))
+        param("offset", self.offset_max-50,
               constraint=constraints.interval(0, self.offset_max))
         #param("offset", torch.tensor([90.]), constraint=constraints.positive)
         param("gain", torch.tensor(5.), constraint=constraints.positive)
