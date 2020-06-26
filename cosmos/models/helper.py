@@ -11,7 +11,7 @@ def ScaledBeta(mode, size, loc, scale):
 
 def probs_to_logits(probs):
     return torch.log(probs / (1 - probs))
-
+"""
 def pi_m_calc(pi, lamda, K):
     poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
     pi_m = torch.zeros(2**K)
@@ -33,7 +33,6 @@ def pi_theta_calc(pi, lamda, K):
     pi_theta[3, 1] = pi[1] * poisson(1) / 2
     pi_theta[3, 2] = pi[1] * poisson(1) / 2
     return pi_theta
-
 """
 def pi_m_calc(lamda, S):
     #pi_m = torch.eye(S+1)
@@ -57,7 +56,7 @@ def pi_theta_calc(pi, K, S):
         for k in range(K):
             pi_theta[K*s + k + 1] = pi[s + 1] / K
     return pi_theta
-
+"""
 def pi_m_calc(pi, lamda, K):
     #poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
     pi_m = torch.zeros(2**K)
@@ -83,6 +82,18 @@ def pi_theta_calc(pi, lamda, K):
     pi_theta[3, 1] = pi[1] * lamda[1] / 2
     pi_theta[3, 2] = pi[1] * lamda[1] / 2
     return pi_theta
+
+def z_probs_calc(m_probs, theta_probs):
+    return (m_probs * theta_probs[..., 1:].sum(dim=-1)).sum(dim=-1).cpu().data
+
+def k_probs_calc(m_probs, theta_probs):
+    return torch.stack((m_probs[..., 1] + m_probs[..., 3],
+                        m_probs[..., 2] + m_probs[..., 3]),
+                        dim=-1).squeeze(dim=-2).cpu().data
+
+def theta_probs_calc(m_probs, theta_probs):
+    return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
+
 """
 
 def theta_trans_calc(A, K, S):
@@ -98,18 +109,6 @@ def theta_trans_calc(A, K, S):
     return theta_trans
 
 def z_probs_calc(m_probs, theta_probs):
-    return (m_probs * theta_probs[..., 1:].sum(dim=-1)).sum(dim=-1).cpu().data
-
-def k_probs_calc(m_probs, theta_probs):
-    return torch.stack((m_probs[..., 1] + m_probs[..., 3],
-                        m_probs[..., 2] + m_probs[..., 3]),
-                        dim=-1).squeeze(dim=-2).cpu().data
-
-def theta_probs_calc(m_probs, theta_probs):
-    return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
-
-"""
-def z_probs_calc(m_probs, theta_probs):
     return theta_probs[..., 1:].sum(dim=-1).cpu().data
 
 
@@ -122,7 +121,6 @@ def k_probs_calc(m_probs, theta_probs):
 
 def theta_probs_calc(m_probs, theta_probs):
     return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
-"""
 
 
 def j_probs_calc(m_probs, theta_probs):

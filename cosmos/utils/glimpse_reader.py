@@ -21,8 +21,9 @@ class CoSMoSDataset(Dataset):
         self.labels = labels
         self.offset = offset
         self.offset_median = torch.median(self.offset)
+        self.offset_var = torch.var(self.offset)
         self.data_median = torch.median(self.data)
-        self.noise = self.data.std(dim=(1, 2, 3)).mean() * np.pi * (2 * 1.3) ** 2
+        self.noise = (self.data.std(dim=(1, 2, 3)).mean() - self.offset.std()) * np.pi * (2 * 1.3) ** 2
         assert self.N == len(self.target)
         assert self.F == len(self.drift)
         self.dtype = dtype

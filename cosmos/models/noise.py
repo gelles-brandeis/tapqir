@@ -7,10 +7,18 @@ _noise = dict()
 _noise_fn = dict()
 
 
-def CameraUnit(locs, gain, offset):
+def CameraUnit2(locs, gain, offset):
     base_distribution = dist.Gamma(locs/gain, 1/gain)
     transforms = [AffineTransform(loc=offset, scale=1)]
     return dist.TransformedDistribution(base_distribution, transforms)
+
+def CameraUnit3(locs, gain, offset, offset_var):
+    return dist.Normal(locs + offset, torch.sqrt(locs * gain + offset_var))
+
+def CameraUnit(locs, gain, offset, offset_var):
+    shape = (locs + offset) ** 2 / (locs * gain + offset_var)
+    rate = shape / (locs + offset)
+    return dist.Gamma(shape, rate)
 
 
 _noise["GammaOffset"] = {
