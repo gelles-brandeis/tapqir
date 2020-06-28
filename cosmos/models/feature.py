@@ -25,6 +25,16 @@ class Feature(Model):
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
+        if self.control:
+            self.offset_max = torch.where(
+                self.data[:].min() < self.control[:].min(),
+                self.data[:].min() - 0.1,
+                self.control[:].min() - 0.1)
+        else:
+            self.offset_max = self.data[:].min() - 0.1
+
+        self.offset_guess = torch.min(self.data.offset_median, self.offset_max)
+
     @poutine.block(hide=["width_mode", "width_size"])
     @config_enumerate
     def model(self):
@@ -128,10 +138,12 @@ class Feature(Model):
 
     def spot_parameters(self, data, prefix):
         param(f"{prefix}/background_loc",
-              torch.ones(data.N, 1) * 150.,
+              (data.data_median - self.offset_guess).repeat(data.N, 1),
+              #torch.ones(data.N, 1) * 150.,
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
-              torch.ones(data.N, data.F) * 150.,
+              #torch.ones(data.N, data.F) * 150.,
+              (data.data_median - self.offset_guess).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F) * 30,
@@ -170,14 +182,9 @@ class Feature(Model):
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
 
-        if self.control:
-            self.offset_max = torch.where(
-                self.data[:].min() < self.control[:].min(),
-                self.data[:].min() - 0.1,
-                self.control[:].min() - 0.1)
-        else:
-            self.offset_max = self.data[:].min() - 0.1
-        param("offset", self.offset_max-50,
+        #param("offset", self.offset_max-50,
+        #      constraint=constraints.interval(0, self.offset_max))
+        param("offset", self.offset_guess,
               constraint=constraints.interval(0, self.offset_max))
         #param("offset", torch.tensor(90.), constraint=constraints.positive)
         param("gain", torch.tensor(7.), constraint=constraints.positive)

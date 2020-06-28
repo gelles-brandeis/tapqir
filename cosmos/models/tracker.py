@@ -30,18 +30,6 @@ class Tracker(Model):
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
-        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-        version = repo.git.describe()
-        param_path = os.path.join(
-            path, "runs",
-            "{}{}".format("marginal", version),
-            "{}".format("jit" if self.jit else "nojit"),
-            "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
-            "{}".format(self.n_batch))
-        pyro.get_param_store().load(
-            os.path.join(param_path, "params"),
-            map_location=self.data.device)
-
         if self.control:
             self.offset_max = torch.where(
                 self.data[:].min() < self.control[:].min(),
@@ -52,15 +40,9 @@ class Tracker(Model):
 
         self.offset_guess = torch.min(self.data.offset_median, self.offset_max)
 
-    #@poutine.block(hide=["width_mode", "width_size"])
-    @poutine.block(hide_types=["param"])
+    @poutine.block(hide=["width_mode", "width_size"])
     def model(self):
         self.model_parameters()
-        #pi_z = pyro.sample("pi_z", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
-        #lamda = pyro.sample("lamda_j", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
-        #data_pi_m = pi_m_calc(param("lamda"), self.S)
-        #control_pi_m = pi_m_calc(param("lamda"), self.S)
-        #pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
         data_pi_m = pi_m_calc(param("lamda"), self.S)
         control_pi_m = pi_m_calc(param("lamda"), self.S)
         pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
@@ -72,12 +54,9 @@ class Tracker(Model):
             with scope(prefix="c"):
                 self.spot_model(self.control, control_pi_m, None, prefix="c")
 
-    @poutine.block(expose_types=["sample"], expose=["d/theta_probs", "d/m_probs"])
     @config_enumerate
     def guide(self):
         self.guide_parameters()
-        #pyro.sample("pi_z", dist.Dirichlet(param("pi") * param("size_z")))
-        #pyro.sample("lamda_j", dist.Dirichlet(param("lamda") * param("size_lamda")))
 
         with scope(prefix="d"):
             self.spot_guide(self.data, True, prefix="d")
@@ -107,11 +86,12 @@ class Tracker(Model):
             m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
             m_mask = Vindex(self.m_matrix)[..., m]
 
-            with K_plate:
+            with K_plate, pyro.poutine.mask(mask=m_mask>0):
                 height = pyro.sample(
-                    "height", dist.Gamma(
-                        param("height_loc") * param("height_beta"),
-                        param("height_beta")))
+                    "height", dist.HalfNormal(10000.))
+                    #"height", dist.Gamma(
+                    #    param("height_loc") * param("height_beta"),
+                    #    param("height_beta")))
                 width = pyro.sample(
                     "width", ScaledBeta(
                         param("width_mode"),
@@ -154,20 +134,12 @@ class Tracker(Model):
                     param(f"{prefix}/theta_probs")[batch_idx]))
             else:
                 theta = 0
-            pyro.sample("m", dist.Categorical(
-                Vindex(param(f"{prefix}/m_probs")[batch_idx])[..., theta, :]))
+            m = pyro.sample("m", dist.Categorical(
+                    Vindex(param(f"{prefix}/m_probs")[batch_idx])[..., theta, :]))
+            m_mask = Vindex(self.m_matrix)[..., m]
 
-            #m = pyro.sample("m", dist.Categorical(
-            #    param(f"{prefix}/m_probs")[batch_idx]))
-            #if theta:
-            #    pyro.sample("theta", dist.Categorical(
-            #        Vindex(param(
-            #            f"{prefix}/theta_probs")[batch_idx])[..., m, :]))
 
-            with K_plate:
-                #pyro.sample("m", dist.Categorical(
-                #    Vindex(param(f"{prefix}/m_probs")[:, batch_idx])[..., m_mask, :]))
-
+            with K_plate, pyro.poutine.mask(mask=m_mask>0):
                 pyro.sample(
                     "height", dist.Gamma(
                         param(f"{prefix}/h_loc")[:, batch_idx]
@@ -218,8 +190,9 @@ class Tracker(Model):
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
               #torch.ones(self.K, data.N, data.F) * 2000,
-              (self.data.noise * 1.5).repeat(self.K, data.N, data.F),
+              (self.data.noise * 2).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
+        #print(self.data.noise * 1.5)
         param(f"{prefix}/h_beta",
               torch.ones(self.K, data.N, data.F),
               constraint=constraints.positive)
@@ -275,11 +248,11 @@ class Tracker(Model):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
-        param("height_loc", self.data.noise * 1.5,
+        #param("height_loc", self.data.noise * 1.5,
         #param("height_loc", torch.tensor([2000.]),
-              constraint=constraints.positive)
-        param("height_beta", torch.tensor([0.01]),
-              constraint=constraints.positive)
+        #      constraint=constraints.positive)
+        #param("height_beta", torch.tensor([0.01]),
+        #      constraint=constraints.positive)
         param("background_beta", torch.tensor([1.]),
               constraint=constraints.positive)
         param("width_mode", torch.tensor([1.3]),
