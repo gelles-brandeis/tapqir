@@ -95,6 +95,8 @@ class Marginal(Model):
             else:
                 theta = 0
             theta_mask = Vindex(self.theta_matrix)[..., theta]
+            print(Vindex(pi_m)[theta].shape)
+            print(Vindex(pi_m)[theta])
             m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
             m_mask = Vindex(self.m_matrix)[..., m]
 
@@ -108,11 +110,13 @@ class Marginal(Model):
             #m_mask = self.m_matrix[m.squeeze(dim=-1)].bool()
             #m_mask = Vindex(self.m_matrix)[..., m]
 
-            with K_plate:
+            #with K_plate:
+            with K_plate, pyro.poutine.mask(mask=(m_mask>0)):
                 height = pyro.sample(
-                    "height", dist.Gamma(
-                        param("height_loc") * param("height_beta"),
-                        param("height_beta")))
+                    "height", dist.HalfNormal(5000.))
+                    #"height", dist.Gamma(
+                    #    param("height_loc") * param("height_beta"),
+                    #    param("height_beta")))
                 width = pyro.sample(
                     "width", ScaledBeta(
                         param("width_mode"),
@@ -132,8 +136,8 @@ class Marginal(Model):
             locs = data.loc(height, width, x, y, background, batch_idx)
             pyro.sample(
                 "data", self.CameraUnit(
-                    locs, param("gain"), self.data.offset_median, self.data.offset_var).to_event(2),
-                    #locs, param("gain"), param("offset")).to_event(2),
+                    #locs, param("gain"), self.data.offset_median, self.data.offset_var).to_event(2),
+                    locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
 
     def spot_guide(self, data, prefix):
@@ -187,21 +191,21 @@ class Marginal(Model):
     def spot_parameters(self, data, prefix):
         param(f"{prefix}/background_loc",
               #(data[:].mean(dim=(1, 2, 3)) - self.offset_guess).reshape(data.N, 1),
-              #torch.ones(data.N, 1) * 50.,
-              (data.data_median - self.offset_guess).repeat(data.N, 1),
+              torch.ones(data.N, 1) * 50.,
+              #(data.data_median - self.offset_guess).repeat(data.N, 1),
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
-              #torch.ones(data.N, data.F) * 50.,
+              torch.ones(data.N, data.F) * 50.,
               #(data[:].mean(dim=(1, 2, 3)) - self.offset_guess).reshape(data.N, 1).repeat(data.N, data.F),
-              (data.data_median - self.offset_guess).repeat(data.N, data.F),
+              #(data.data_median - self.offset_guess).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F),
               #torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              torch.ones(self.K, data.N, data.F) * 1500,
-              #(self.data.noise * 2).repeat(self.K, data.N, data.F),
+              torch.ones(self.K, data.N, data.F) * 1000,
+              #(self.data.noise * 1).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(self.K, data.N, data.F),
@@ -227,8 +231,8 @@ class Marginal(Model):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
-        #param("height_loc", self.data.noise * 2,
-        param("height_loc", torch.tensor([1500.]),
+        #param("height_loc", self.data.noise * 1,
+        param("height_loc", torch.tensor([1000.]),
               constraint=constraints.positive)
         param("height_beta", torch.tensor([0.01]),
               constraint=constraints.positive)
@@ -239,10 +243,10 @@ class Marginal(Model):
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
 
-        param("offset", self.offset_guess,
-              constraint=constraints.interval(0, self.offset_max))
-        #param("offset", self.offset_max-50,
+        #param("offset", self.offset_guess,
         #      constraint=constraints.interval(0, self.offset_max))
+        param("offset", self.offset_max-50,
+              constraint=constraints.interval(0, self.offset_max))
         #param("offset", torch.tensor([90.]), constraint=constraints.positive)
         param("gain", torch.tensor(5.), constraint=constraints.positive)
 
