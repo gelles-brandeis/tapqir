@@ -189,7 +189,7 @@ class Tracker(Model):
               #torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              #torch.ones(self.K, data.N, data.F) * 2000,
+              #torch.ones(self.K, data.N, data.F) * 500,
               (self.data.noise * 2).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
         #print(self.data.noise * 1.5)

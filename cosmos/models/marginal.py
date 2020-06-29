@@ -204,8 +204,8 @@ class Marginal(Model):
               #torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              torch.ones(self.K, data.N, data.F) * 1000,
-              #(self.data.noise * 1).repeat(self.K, data.N, data.F),
+              #torch.ones(self.K, data.N, data.F) * 1000,
+              (self.data.noise * 1).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(self.K, data.N, data.F),
