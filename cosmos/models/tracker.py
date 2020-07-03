@@ -12,6 +12,7 @@ from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from cosmos.models.helper import ScaledBeta
 import torch.distributions.constraints as constraints
+from pyro.distributions import TorchDistribution
 
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
@@ -19,6 +20,54 @@ from cosmos.models.helper import z_probs_calc, k_probs_calc
 import cosmos
 from git import Repo
 
+"""
+class ConvGamma(TorchDistribution):
+    arg_constraints = {}  # nothing to be constrained
+
+    def __init__(self, concentration, rate, samples, log_weights):
+        self.dist = dist.Gamma(concentration, rate)
+        self.samples = samples
+        self.log_weights = log_weights
+        batch_shape = self.dist.batch_shape
+        event_shape = self.dist.event_shape
+        super().__init__(batch_shape, event_shape)
+
+    def log_prob(self, value):
+        samples = self.samples[(...,) + (None,) * value.dim()]
+        mask = value > samples
+
+        obs_logits = self.dist.log_prob(value - samples)
+        log_weights = self.log_weights[(...,) + (None,) * value.dim()]
+        result = obs_logits + log_weights
+        result = torch.where(mask, result, result.new_zeros(()))
+        result = torch.logsumexp(result, 0)
+        return result
+"""
+
+class ConvGamma(TorchDistribution):
+    arg_constraints = {}  # nothing to be constrained
+
+    def __init__(self, concentration, rate, samples, log_weights):
+        self.dist = dist.Gamma(concentration.unsqueeze(-1), rate)
+        self.samples = samples
+        self.log_weights = log_weights
+        batch_shape = self.dist.batch_shape[:-1]
+        event_shape = self.dist.event_shape
+        super().__init__(batch_shape, event_shape)
+
+    def log_prob(self, value):
+        value = value.unsqueeze(-1)
+        mask = value > self.samples
+        value = torch.where(mask, value - self.samples, value.new_ones(()))
+
+        obs_logits = self.dist.log_prob(value)
+        result = obs_logits + self.log_weights
+        result = result.masked_fill(~mask, -40.)
+        #result = result.masked_fill(~mask, torch.tensor(float("-inf")))
+        #result = result.exp()
+        #result = result.sum(-1).log()
+        result = torch.logsumexp(result, -1)
+        return result
 
 class Tracker(Model):
     """ Track on-target Spot """
@@ -38,9 +87,12 @@ class Tracker(Model):
         else:
             self.offset_max = self.data[:].min() - 0.1
 
-        self.offset_guess = torch.min(self.data.offset_median, self.offset_max)
+        #self.offset_guess = torch.min(self.data.offset_median, self.offset_max)
+        self.offset_guess = self.data.offset_mean
+        print(self.data.noise * 2)
 
     @poutine.block(hide=["width_mode", "width_size"])
+    @config_enumerate
     def model(self):
         self.model_parameters()
         data_pi_m = pi_m_calc(param("lamda"), self.S)
@@ -86,6 +138,7 @@ class Tracker(Model):
             m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
             m_mask = Vindex(self.m_matrix)[..., m]
 
+            #with K_plate:
             with K_plate, pyro.poutine.mask(mask=m_mask>0):
                 height = pyro.sample(
                     "height", dist.HalfNormal(10000.))
@@ -108,12 +161,23 @@ class Tracker(Model):
             x = x * (data.D+1) - (data.D+1)/2
             y = y * (data.D+1) - (data.D+1)/2
 
+
             locs = data.loc(height, width, x, y, background, batch_idx)
+            #offset = pyro.sample(
+            #    "offset", dist.Categorical(data.offset_weights).expand([data.D, data.D]).to_event(2))
+            #offset = data.offset_samples[offset]
+            #print(offset.shape)
             pyro.sample(
-                "data", self.CameraUnit(
-                    #locs, param("gain"), self.data.offset_median).to_event(2),
-                    locs, param("gain"), param("offset")).to_event(2),
+                "data", ConvGamma(
+                    locs / param("gain"), 1 / param("gain"), data.offset_samples, data.offset_weights.log()).to_event(2),
+                    #locs / param("gain"), 1 / param("gain")).mask(data[batch_idx]>offset[..., None, None]).to_event(2),
+                    #locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
+            #pyro.sample(
+            #    "data", self.CameraUnit(
+            #        locs, param("gain"), self.data.offset_mean, self.data.offset_var).to_event(2),
+            #        #locs, param("gain"), param("offset")).to_event(2),
+            #    obs=data[batch_idx])
 
     def spot_guide(self, data, theta, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
@@ -123,7 +187,7 @@ class Tracker(Model):
 
         with N_plate as batch_idx, F_plate:
             self.batch_idx = batch_idx.cpu()
-            pyro.sample(
+            background = pyro.sample(
                 "background", dist.Gamma(
                     param(f"{prefix}/b_loc")[batch_idx]
                     * param(f"{prefix}/b_beta")[batch_idx],
@@ -139,27 +203,29 @@ class Tracker(Model):
             m_mask = Vindex(self.m_matrix)[..., m]
 
 
+            #with K_plate:
             with K_plate, pyro.poutine.mask(mask=m_mask>0):
-                pyro.sample(
+                height = pyro.sample(
                     "height", dist.Gamma(
                         param(f"{prefix}/h_loc")[:, batch_idx]
                         * param(f"{prefix}/h_beta")[:, batch_idx],
                         param(f"{prefix}/h_beta")[:, batch_idx]))
-                pyro.sample(
+                width = pyro.sample(
                     "width", ScaledBeta(
                         param(f"{prefix}/w_mode")[:, batch_idx],
                         param(f"{prefix}/w_size")[:, batch_idx],
                         0.5, 2.5))
-                pyro.sample(
+                x = pyro.sample(
                     "x", ScaledBeta(
                         param(f"{prefix}/x_mode")[:, batch_idx],
                         param(f"{prefix}/size")[:, batch_idx],
                         -(data.D+1)/2, data.D+1))
-                pyro.sample(
+                y = pyro.sample(
                     "y", ScaledBeta(
                         param(f"{prefix}/y_mode")[:, batch_idx],
                         param(f"{prefix}/size")[:, batch_idx],
                         -(data.D+1)/2, data.D+1))
+
 
     def guide_parameters(self):
         param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
@@ -174,6 +240,7 @@ class Tracker(Model):
                 self.control, True, False, prefix="c")
 
     def spot_parameters(self, data, m, theta, prefix):
+        param("gain", torch.tensor(5.), constraint=constraints.positive)
         param(f"{prefix}/background_loc",
               #(data[:].mean(dim=(1, 2, 3)) - self.offset_guess).reshape(data.N, 1),
               #torch.ones(data.N, 1) * 50.,
@@ -260,12 +327,12 @@ class Tracker(Model):
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
 
-        param("offset", self.offset_guess,
-              constraint=constraints.interval(0, self.offset_max))
+        #param("offset", self.offset_guess,
+        #      constraint=constraints.interval(0, self.offset_max))
         #param("offset", self.offset_max-50,
         #      constraint=constraints.interval(0, self.offset_max))
         #param("offset", torch.tensor([90.]), constraint=constraints.positive)
-        param("gain", torch.tensor(5.), constraint=constraints.positive)
+        #param("gain", torch.tensor(5.), constraint=constraints.positive)
 
     def infer(self):
         z_probs = z_probs_calc(

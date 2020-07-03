@@ -229,7 +229,7 @@ def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
                     param(f"{prefix}/w_mode".format(prefix))[:, n, None],
                     param(f"{prefix}/x_mode".format(prefix))[:, n, None],
                     param(f"{prefix}/y_mode".format(prefix))[:, n, None],
-                    param(f"{prefix}/b_loc".format(prefix))[n, None], n) + param("offset")
+                    param(f"{prefix}/b_loc".format(prefix))[n, None], n) + data.offset_median
 
     for i in range(10):
         try:
@@ -314,7 +314,7 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
                     param(f"{prefix}/w_mode".format(prefix))[:, n, None],
                     param(f"{prefix}/x_mode".format(prefix))[:, n, None],
                     param(f"{prefix}/y_mode".format(prefix))[:, n, None],
-                    param(f"{prefix}/b_loc".format(prefix))[n, None], n) + param("offset")
+                    param(f"{prefix}/b_loc".format(prefix))[n, None], n) + data.offset_median
 
     ax[0].set_title("f #{:d}".format(data.drift.index[f]), fontsize=15)
     ax[0].imshow(
