@@ -8,6 +8,7 @@ from cosmos.models.tracker import Tracker
 from cosmos.models.marginal import Marginal
 from cosmos.models.hmm import HMM
 from cosmos.models.feature import Feature
+from cosmos.models.globalhwb import GlobalHWB
 
 pyro.enable_validation(True)
 
@@ -16,6 +17,7 @@ models["tracker"] = Tracker
 models["marginal"] = Marginal
 models["hmm"] = HMM
 models["feature"] = Feature
+models["globalhwb"] = GlobalHWB
 
 # parse command-line arguments and execute the main method
 parser = argparse.ArgumentParser(

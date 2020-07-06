@@ -29,7 +29,7 @@ class CoSMoSDataset(Dataset):
         offset_min = np.percentile(self.offset.cpu().numpy(), 0.5)
         offset_weights, offset_samples = np.histogram(self.offset.cpu().numpy(),
                                              range=(offset_min, offset_max),
-                                             bins=int(offset_max - offset_min),
+                                             bins=max(1, int(offset_max - offset_min)),
                                              #bins=8,
                                              density=True)
         offset_samples = offset_samples[:-1]
@@ -258,7 +258,7 @@ def read_glimpse(name, D, dtype, device=None):
               "abs_dy": drift_df["dy"]},
         index=drift_df.index)
     data = np.ones((N, F, D, D)) * 2**15
-    offsets = np.ones((F, 4, 60, 60)) * 2**15
+    offsets = np.ones((F, 4, 30, 30)) * 2**15
     # loop through each frame
     for i, frame in enumerate(tqdm(drift_df.index)):
         # read the entire frame image
@@ -273,10 +273,10 @@ def read_glimpse(name, D, dtype, device=None):
                 count=height*width) \
                 .reshape(height, width)
 
-        offsets[i, 0, :, :] += img[10:70, 10:70]
-        offsets[i, 1, :, :] += img[10:70, -70:-10]
-        offsets[i, 2, :, :] += img[-70:-10, 10:70]
-        offsets[i, 3, :, :] += img[-70:-10, -70:-10]
+        offsets[i, 0, :, :] += img[10:40, 10:40]
+        offsets[i, 1, :, :] += img[10:40, -40:-10]
+        offsets[i, 2, :, :] += img[-40:-10, 10:40]
+        offsets[i, 3, :, :] += img[-40:-10, -40:-10]
         # new drift list (fractional part)
         drift.at[frame, "dx"] = drift_df.at[frame, "dx"] % 1
         drift.at[frame, "dy"] = drift_df.at[frame, "dy"] % 1
