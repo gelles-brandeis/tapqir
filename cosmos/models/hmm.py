@@ -18,7 +18,6 @@ from pyro.distributions import TorchDistribution
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc, theta_trans_calc, trans_calc, init_calc
 import cosmos
-from git import Repo
 
 
 class StackDistributions(TorchDistribution):
@@ -94,8 +93,7 @@ class HMM(Model):
         super().__init__(data, control, path,
                          K, lr, n_batch, jit, noise="GammaOffset")
 
-        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-        version = repo.git.describe()
+        version = cosmos.__version__
         param_path = os.path.join(
             path, "runs",
             "{}{}".format("feature", version),
