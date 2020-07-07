@@ -1,6 +1,6 @@
 import os
 import setuptools
-from git import Repo
+import versioneer
 
 PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 VERSION = """
@@ -8,19 +8,13 @@ VERSION = """
 __version__ = '{}'
 """
 
-# Find cosmos version.
-repo = Repo(".", search_parent_directories=True)
-version = repo.git.describe()
-# for line in open(os.path.join(PROJECT_PATH, 'cosmos', '__init__.py')):
-#     if line.startswith('version_prefix = '):
-#         version = line.strip().split()[2][1:-1]
-
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="cosmos",
-    version=version,
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     author="Yerdos Ordabayev",
     author_email="ordabayev@brandeis.edu",
     description="Bayesian analysis of the single-molecule image data",

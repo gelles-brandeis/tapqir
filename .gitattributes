@@ -6,3 +6,4 @@
 *.slx -crlf -diff -merge
 *.mdl -crlf -diff -merge
 *.dll -crlf -diff -merge
+cosmos/_version.py export-subst
