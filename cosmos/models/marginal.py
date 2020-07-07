@@ -16,7 +16,6 @@ import torch.distributions.constraints as constraints
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
 import cosmos
-from git import Repo
 
 
 class Marginal(Model):

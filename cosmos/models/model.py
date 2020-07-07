@@ -13,7 +13,7 @@ from sklearn.metrics import matthews_corrcoef, confusion_matrix
 from tqdm import tqdm
 import logging
 import cosmos
-from git import Repo
+#from git import Repo
 
 
 class GaussianSpot(nn.Module):
@@ -134,8 +134,9 @@ class Model(nn.Module):
             self.epoch_count += 1
 
     def log(self):
-        repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-        version = repo.git.describe()
+        #repo = Repo(cosmos.__path__[0], search_parent_directories=True)
+        #version = repo.git.describe()
+        version = cosmos.__version__
         self.path = os.path.join(
             self.path, "runs",
             "{}{}".format(self.__name__, version),

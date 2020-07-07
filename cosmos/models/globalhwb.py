@@ -18,7 +18,6 @@ from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
 from cosmos.models.helper import z_probs_calc, k_probs_calc
 import cosmos
-from git import Repo
 
 """
 class ConvGamma(TorchDistribution):
