@@ -124,7 +124,7 @@ class Model(nn.Module):
         raise NotImplementedError
 
     def train(self, num_steps):
-        for epoch in tqdm(range(num_steps)):
+        for epoch in range(num_steps):
             # with torch.autograd.detect_anomaly():
             #import pdb; pdb.set_trace()
             self.epoch_loss = self.svi.step()
@@ -140,9 +140,10 @@ class Model(nn.Module):
         self.path = os.path.join(
             self.path, "runs",
             "{}{}".format(self.__name__, version),
-            "{}".format("jit" if self.jit else "nojit"),
-            "lr{}".format(self.lr), "{}".format(self.optim_fn.__name__),
-            "{}".format(self.n_batch))
+            "{}".format("control" if self.control else "nocontrol"),
+            "lr{}".format(self.lr),
+            #  "{}".format(self.optim_fn.__name__),
+            "bs{}".format(self.n_batch))
         self.writer_scalar = SummaryWriter(
             log_dir=os.path.join(self.path, "scalar"))
         self.writer_hist = SummaryWriter(
@@ -260,7 +261,7 @@ class Model(nn.Module):
                 #        "binary"] = 2
 
             params_last.to_csv(os.path.join(self.path, "params_last.csv"))
-            self.logger.debug(
+            self.logger.info(
                     "Step #{}. Saved model params and optimizer state in {}"
                     .format(self.epoch_count, self.path))
         else:

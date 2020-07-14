@@ -98,6 +98,6 @@ def main(args=args):
             data, control, path=args.dataset, K=2, lr=args.learning_rate,
             n_batch=args.batch_size, jit=args.jit)
 
-    if args.num_iter and not args.sample:
+    if args.num_iter:
         model.load_checkpoint()
         model.train(args.num_iter)

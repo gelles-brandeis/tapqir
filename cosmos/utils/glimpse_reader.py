@@ -13,18 +13,18 @@ import pyro
 class CoSMoSDataset(Dataset):
     """ CoSMoS Dataset """
 
-    def __init__(self, data=None, target=None, drift=None, labels=None, dtype=None, device=None, offset=None):
+    def __init__(self, data=None, target=None, drift=None, dtype=None, device=None, offset=None, labels=None):
         self.data = data.to(device)
         self.N, self.F, self.D, _ = self.data.shape
         self.target = target
         self.drift = drift
+        self.data_median = torch.median(self.data)
         if dtype == "test":
             self.labels = labels
             self.offset = offset
             self.offset_median = torch.median(self.offset)
             self.offset_mean = torch.mean(self.offset)
             self.offset_var = torch.var(self.offset)
-            self.data_median = torch.median(self.data)
             self.noise = (self.data.std(dim=(1, 2, 3)).mean() - self.offset.std()) * np.pi * (2 * 1.3) ** 2
             offset_max = np.percentile(self.offset.cpu().numpy(), 99.5)
             offset_min = np.percentile(self.offset.cpu().numpy(), 0.5)
@@ -99,7 +99,7 @@ def read_glimpse(name, D, dtype, device=None):
     """
     config = configparser.ConfigParser(allow_no_value=True)
     config.read("datasets.cfg")
-    files = ["dir", "header", "test_aoiinfo", "control_aoiinfo", "driftlist", "labels"]
+    files = ["dir", "test_aoiinfo", "control_aoiinfo", "driftlist", "labels"]
     path_to = {}
     if name.split(".")[0] in config:
         for FILE in files:
@@ -122,7 +122,7 @@ def read_glimpse(name, D, dtype, device=None):
     select subset of frames and aois
     """
     # convert header into dict format
-    mat_header = loadmat(path_to["header"])
+    mat_header = loadmat(os.path.join(path_to["dir"], "header.mat"))
     header = dict()
     for i, dt in enumerate(mat_header["vid"].dtype.names):
         header[dt] = np.squeeze(mat_header["vid"][0, 0][i])
@@ -254,7 +254,7 @@ def read_glimpse(name, D, dtype, device=None):
     data = np.ones((N, F, D, D)) * 2**15
     offsets = np.ones((F, 4, 30, 30)) * 2**15
     # loop through each frame
-    for i, frame in enumerate(tqdm(drift_df.index)):
+    for i, frame in enumerate(drift_df.index):
         # read the entire frame image
         glimpse_number = header["filenumber"][frame - 1]
         glimpse_path = os.path.join(

@@ -166,7 +166,7 @@ class Tracker(Model):
             #print(offset.shape)
             pyro.sample(
                 "data", ConvGamma(
-                    locs / param("gain"), 1 / param("gain"), data.offset_samples, data.offset_weights.log()).to_event(2),
+                    locs / param("gain"), 1 / param("gain"), self.data.offset_samples, self.data.offset_weights.log()).to_event(2),
                     #locs / param("gain"), 1 / param("gain")).mask(data[batch_idx]>offset[..., None, None]).to_event(2),
                     #locs, param("gain"), param("offset")).to_event(2),
                 obs=data[batch_idx])
