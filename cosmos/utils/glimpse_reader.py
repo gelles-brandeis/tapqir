@@ -18,23 +18,24 @@ class CoSMoSDataset(Dataset):
         self.N, self.F, self.D, _ = self.data.shape
         self.target = target
         self.drift = drift
-        self.labels = labels
-        self.offset = offset
-        self.offset_median = torch.median(self.offset)
-        self.offset_mean = torch.mean(self.offset)
-        self.offset_var = torch.var(self.offset)
-        self.data_median = torch.median(self.data)
-        self.noise = (self.data.std(dim=(1, 2, 3)).mean() - self.offset.std()) * np.pi * (2 * 1.3) ** 2
-        offset_max = np.percentile(self.offset.cpu().numpy(), 99.5)
-        offset_min = np.percentile(self.offset.cpu().numpy(), 0.5)
-        offset_weights, offset_samples = np.histogram(self.offset.cpu().numpy(),
-                                             range=(offset_min, offset_max),
-                                             bins=max(1, int(offset_max - offset_min)),
-                                             #bins=8,
-                                             density=True)
-        offset_samples = offset_samples[:-1]
-        self.offset_samples = torch.from_numpy(offset_samples).float().to(device)
-        self.offset_weights = torch.from_numpy(offset_weights).float().to(device)
+        if dtype == "test":
+            self.labels = labels
+            self.offset = offset
+            self.offset_median = torch.median(self.offset)
+            self.offset_mean = torch.mean(self.offset)
+            self.offset_var = torch.var(self.offset)
+            self.data_median = torch.median(self.data)
+            self.noise = (self.data.std(dim=(1, 2, 3)).mean() - self.offset.std()) * np.pi * (2 * 1.3) ** 2
+            offset_max = np.percentile(self.offset.cpu().numpy(), 99.5)
+            offset_min = np.percentile(self.offset.cpu().numpy(), 0.5)
+            offset_weights, offset_samples = np.histogram(self.offset.cpu().numpy(),
+                                                 range=(offset_min, offset_max),
+                                                 bins=max(1, int(offset_max - offset_min)),
+                                                 #bins=8,
+                                                 density=True)
+            offset_samples = offset_samples[:-1]
+            self.offset_samples = torch.from_numpy(offset_samples).float().to(device)
+            self.offset_weights = torch.from_numpy(offset_weights).float().to(device)
         assert self.N == len(self.target)
         assert self.F == len(self.drift)
         self.dtype = dtype
@@ -61,11 +62,12 @@ class CoSMoSDataset(Dataset):
         self.target.to_csv(os.path.join(
             path, "{}_target.csv".format(self.dtype)))
         self.drift.to_csv(os.path.join(
-            path, "{}_drift.csv".format(self.dtype)))
-        np.save(os.path.join(path, "{}_labels.npy".format(self.dtype)),
-                self.labels)
-        torch.save(self.offset, os.path.join(
-            path, "{}_offset.pt".format(self.dtype)))
+            path, "drift.csv"))
+        if self.dtype == "test":
+            np.save(os.path.join(path, "labels.npy"),
+                    self.labels)
+            torch.save(self.offset, os.path.join(
+                path, "offset.pt"))
 
 def load_data(path, dtype, device=None):
     data = torch.load(os.path.join(
@@ -75,17 +77,19 @@ def load_data(path, dtype, device=None):
         path, "{}_target.csv".format(dtype)),
         index_col="aoi")
     drift = pd.read_csv(os.path.join(
-        path, "{}_drift.csv".format(dtype)),
+        path, "drift.csv"),
         index_col="frame")
-    offset = torch.load(os.path.join(
-        path, "{}_offset.pt".format(dtype)),
-        map_location=device).detach()
-    labels = None
-    if os.path.isfile(os.path.join(path, "{}_labels.npy".format(dtype))):
-        labels = np.load(os.path.join(
-            path, "{}_labels.npy".format(dtype)))
+    if dtype == "test":
+        offset = torch.load(os.path.join(
+            path, "offset.pt"),
+            map_location=device).detach()
+        labels = None
+        if os.path.isfile(os.path.join(path, "labels.npy")):
+            labels = np.load(os.path.join(
+                path, "labels.npy"))
+        return CoSMoSDataset(data, target, drift, dtype, device, offset, labels)
 
-    return CoSMoSDataset(data, target, drift, labels, dtype, device, offset)
+    return CoSMoSDataset(data, target, drift, dtype, device)
 
 def read_glimpse(name, D, dtype, device=None):
     """ Read Glimpse files """
@@ -95,7 +99,7 @@ def read_glimpse(name, D, dtype, device=None):
     """
     config = configparser.ConfigParser(allow_no_value=True)
     config.read("datasets.cfg")
-    files = ["dir", "header", "aoiinfo", "driftlist", "labels"]
+    files = ["dir", "header", "test_aoiinfo", "control_aoiinfo", "driftlist", "labels"]
     path_to = {}
     if name.split(".")[0] in config:
         for FILE in files:
@@ -135,9 +139,9 @@ def read_glimpse(name, D, dtype, device=None):
     drift_df = drift_df.astype({"frame": int}).set_index("frame")
 
     # load aoiinfo mat file
-    aoi_mat = loadmat(path_to["aoiinfo"])
+    aoi_mat = loadmat(path_to["{}_aoiinfo".format(dtype)])
     # convert aoiinfo into DataFrame
-    if name in ["Gracecy3", "Gracecy3Supervised"]:
+    if name in ["Gracecy3"]:
         aoi_df = pd.DataFrame(
             aoi_mat["aoifits"]["aoiinfo2"][0, 0],
             columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
@@ -158,13 +162,6 @@ def read_glimpse(name, D, dtype, device=None):
         drift_df = drift_df.loc[f1:f2]
         aoi_list = np.arange(1, 33)
         aoi_df = aoi_df.loc[aoi_list]
-    elif name in ["LarryCy3sigma54Shortest",
-                     "LarryCy3sigma54NegativeControlShortest"]:
-        f1 = 200
-        f2 = 400
-        drift_df = drift_df.loc[f1:f2]
-        aoi_list = np.arange(1, 33)
-        aoi_df = aoi_df.loc[aoi_list]
     elif name in ["LarryCy3sigma54NegativeControl1"]:
         aoi_df = aoi_df.loc[:64]
     elif name in ["LarryCy3sigma54NegativeControl2"]:
@@ -173,9 +170,6 @@ def read_glimpse(name, D, dtype, device=None):
         aoi_df = aoi_df.loc[:263]
     elif name in ["GraceArticlePol2NegativeControl2"]:
         aoi_df = aoi_df.loc[264:]
-    elif name in ["Gracecy3Short"]:
-        aoi_list = np.arange(160, 240)
-        aoi_df = aoi_df.loc[aoi_list]
 
     labels = None
     if path_to["labels"]:

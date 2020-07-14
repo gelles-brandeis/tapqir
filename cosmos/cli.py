@@ -1,6 +1,7 @@
+import argparse
+import cosmos
 import pyro
 import torch
-import argparse
 import logging
 
 from cosmos.utils.aoi_reader import ReadAoi
@@ -21,23 +22,42 @@ models["globalhwb"] = GlobalHWB
 
 # parse command-line arguments and execute the main method
 parser = argparse.ArgumentParser(
-    description="Bayesian analysis of single molecule image data",
-    usage="%(prog)s --model=Model --dataset=Dataset \
-    --negative-control=NegativeControl --num-steps=1000 \
-    --learning-rate=0.001 --n-batch=32 --device=cuda0",
-    epilog="Good luck!")
-parser.add_argument("-m", "--model", default="features",
-                    choices=models.keys(), type=str)
-parser.add_argument("-n", "--num-steps", type=int)
-parser.add_argument("-N", "--n-batch", default=32, type=int)
-parser.add_argument("-lr", "--learning-rate", default=0.001, type=float)
-parser.add_argument("-d", "--dataset", type=str)
-parser.add_argument("-nc", "--negative-control", type=str)
-parser.add_argument("-dev", "--device",
-                    default="cuda0", choices=["cuda0", "cuda1", "cpu"],
-                    type=str)
-parser.add_argument("--jit", action="store_true")
-parser.add_argument("--sample", action="store_true")
+    description="cosmos {}. Bayesian analysis of single molecule image data" \
+                .format(cosmos.__version__),
+    #usage="%(prog)s [OPTIONS]",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    add_help=False)
+    #epilog="Good luck!")
+
+group = parser.add_argument_group("options")
+group2 = parser.add_argument_group("other arguments")
+
+
+parser.add_argument("model", default="tracker", type=str,
+                    help="Choose the model: {}".format(", ".join(models.keys())))
+parser.add_argument("dataset", type=str,
+                    help="Name of the dataset folder")
+
+group.add_argument("-it", "--num-iter", default=20000, type=int, metavar="\b",
+                    help="Number of iterations")
+group.add_argument("-bs", "--batch-size", default=8, type=int, metavar="\b",
+                    help="Batch size")
+group.add_argument("-lr", "--learning-rate", default=0.005, type=float, metavar="\b",
+                    help="Learning rate")
+
+group.add_argument("-c", "--control", action="store_true",
+                    help="Analyze control dataset")
+group.add_argument("-dev", "--device", default="cuda0",
+                    choices=["cuda0", "cuda1", "cpu"], type=str, metavar="\b",
+                    help="GPU device")
+group.add_argument("--jit", action="store_true",
+                    help="Just in time compilation")
+
+group2.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS,
+                    help="show this help message.")
+group2.add_argument("-v", "--version", action="version",
+                    version="%(prog)s {}".format(cosmos.__version__),
+                    help="show program's version number.")
 args = parser.parse_args()
 
 
@@ -71,13 +91,13 @@ def main(args=args):
     logger.info("Using device: {}".format(args.device))
 
     logger.info("Loading dataset: {}".format(args.dataset))
-    data, control = ReadAoi(args.dataset, args.negative_control, device)
+    data, control = ReadAoi(args.dataset, args.control, device)
 
     logger.info("Model: {}".format(args.model))
     model = models[args.model](
             data, control, path=args.dataset, K=2, lr=args.learning_rate,
-            n_batch=args.n_batch, jit=args.jit)
+            n_batch=args.batch_size, jit=args.jit)
 
-    if args.num_steps and not args.sample:
+    if args.num_iter and not args.sample:
         model.load_checkpoint()
-        model.train(args.num_steps)
+        model.train(args.num_iter)
