@@ -19,13 +19,14 @@ pip install .
 
 **Install from source:**
 ```sh
-conda create --name cosmos python=3.7
-conda activate cosmos
-conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
 git clone https://github.com/ordabayevy/cosmos.git
 cd cosmos
 git checkout latest
+
+conda create --name cosmos python=3.7
+conda activate cosmos
 pip install .
+pip install . -f https://download.pytorch.org/whl/torch_stable.html
 ```
 
 ## Citation

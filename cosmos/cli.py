@@ -72,7 +72,7 @@ args = parser.parse_args()
 # setup and training
 def main(args=args):
     if args.subparser_name == "view":
-        subprocess.run("voila --no-browser {}".format(os.path.join(cosmos.__path__[0], "app.ipynb")),
+        subprocess.run("voila {}".format(os.path.join(cosmos.__path__[0], "app.ipynb")),
             shell=True)
         return
     # create logger with args.log
