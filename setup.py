@@ -23,8 +23,8 @@ setuptools.setup(
     url="https://github.com/ordabayevy/cosmos",
     packages=setuptools.find_packages(),
     install_requires=[
-        "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "jupyter", "future", "configparser",
-        "pyro-ppl", "tb-nightly", "appmode", "ipyfilechooser",
+        "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "future", "configparser",
+        "pyro-ppl", "tb-nightly", "voila", "ipyfilechooser",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

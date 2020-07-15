@@ -3,6 +3,8 @@ import cosmos
 import pyro
 import torch
 import logging
+import subprocess
+import os
 
 from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.tracker import Tracker
@@ -28,30 +30,36 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     add_help=False)
     #epilog="Good luck!")
+subparsers = parser.add_subparsers(dest="subparser_name")
 
-group = parser.add_argument_group("options")
+parser_run = subparsers.add_parser("run")
+group_run = parser_run.add_argument_group("options")
 group2 = parser.add_argument_group("other arguments")
 
 
-parser.add_argument("model", default="tracker", type=str,
+parser_run.add_argument("model", default="tracker", type=str,
                     help="Choose the model: {}".format(", ".join(models.keys())))
-parser.add_argument("dataset", type=str,
+parser_run.add_argument("dataset", type=str,
                     help="Name of the dataset folder")
 
-group.add_argument("-it", "--num-iter", default=20000, type=int, metavar="\b",
+group_run.add_argument("-it", "--num-iter", default=20000, type=int, metavar="\b",
                     help="Number of iterations")
-group.add_argument("-bs", "--batch-size", default=8, type=int, metavar="\b",
+group_run.add_argument("-bs", "--batch-size", default=8, type=int, metavar="\b",
                     help="Batch size")
-group.add_argument("-lr", "--learning-rate", default=0.005, type=float, metavar="\b",
+group_run.add_argument("-lr", "--learning-rate", default=0.005, type=float, metavar="\b",
                     help="Learning rate")
 
-group.add_argument("-c", "--control", action="store_true",
+group_run.add_argument("-c", "--control", action="store_true",
                     help="Analyze control dataset")
-group.add_argument("-dev", "--device", default="cuda0",
+group_run.add_argument("-dev", "--device", default="cuda0",
                     choices=["cuda0", "cuda1", "cpu"], type=str, metavar="\b",
                     help="GPU device")
-group.add_argument("--jit", action="store_true",
+group_run.add_argument("--jit", action="store_true",
                     help="Just in time compilation")
+
+parser_view = subparsers.add_parser("view")
+#parser_view.add_argument("--results", action="store_false",
+#                    help="Show results")
 
 group2.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS,
                     help="show this help message.")
@@ -63,6 +71,10 @@ args = parser.parse_args()
 
 # setup and training
 def main(args=args):
+    if args.subparser_name == "view":
+        subprocess.run("voila --no-browser {}".format(os.path.join(cosmos.__path__[0], "app.ipynb")),
+            shell=True)
+        return
     # create logger with args.log
     logger = logging.getLogger("cosmos")
     logger.setLevel(logging.DEBUG)
