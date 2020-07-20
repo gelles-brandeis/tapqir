@@ -25,7 +25,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "future", "configparser",
-        "torch", "torchvision",
+        "torch", "torchvision", "cliff",
         "pyro-ppl", "tb-nightly", "voila", "ipyfilechooser",
     ],
     classifiers=[
