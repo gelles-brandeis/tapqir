@@ -17,18 +17,18 @@ import cosmos
 
 
 class GaussianSpot(nn.Module):
-    def __init__(self, target, drift, D):
+    def __init__(self, target, drift, D, device):
         super().__init__()
         # create meshgrid of DxD pixel positions
-        i_pixel, j_pixel = torch.meshgrid(
-            torch.arange(D), torch.arange(D))
-        self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1).float()
+        D_range = torch.arange(D, dtype=torch.float, device=device)
+        i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
+        self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
 
         # drift locs for 2D gaussian spot
         self.target_locs = torch.tensor(
             drift[["dx", "dy"]].values.reshape(-1, 2)
-            + target[["x", "y"]].values.reshape(-1, 1, 2)) \
-            .float()
+            + target[["x", "y"]].values.reshape(-1, 1, 2),
+            device=device, dtype=torch.float)
 
     # Ideal 2D gaussian spots
     def forward(self, height, width, x, y, background, n_idx, f=None):
@@ -38,7 +38,7 @@ class GaussianSpot(nn.Module):
             spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
-            scale_tril=torch.eye(2) * width[..., None, None, None, None])
+            scale_tril=torch.eye(2, device=width.device) * width[..., None, None, None, None])
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
         result = (height[..., None, None] * gaussian_spot).sum(dim=-5, keepdim=True) \
             + background[..., None, None]
@@ -49,13 +49,14 @@ class Model(nn.Module):
     """ Gaussian Spot Model """
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit,
-                 noise="GammaOffset"):
+                 device, noise="GammaOffset"):
         super().__init__()
         # D - number of pixels along axis
         # K - max number of spots
         # pyro.set_rng_seed(0)
         self.data = data
         self.control = control
+        self.device = device
         self.path = path
         self.K = K
         self.S = 1
@@ -64,9 +65,9 @@ class Model(nn.Module):
         self.n_batch = n_batch
         self.jit = jit
 
-        self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)])
-        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2,1,1,4)
-        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2,1,1,3)
+        self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)], device=self.device)
+        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], device=self.device).T.reshape(2,1,1,4)
+        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]], device=self.device).T.reshape(2,1,1,3)
         """
         self.theta_matrix = \
             torch.tensor([[0, 0],
@@ -102,11 +103,11 @@ class Model(nn.Module):
 
         self.data.loc = GaussianSpot(
             self.data.target, self.data.drift,
-            self.data.D)
+            self.data.D, self.device)
         if self.control:
             self.control.loc = GaussianSpot(
                 self.control.target, self.control.drift,
-                self.control.D)
+                self.control.D, self.device)
 
         pyro.clear_param_store()
         self.epoch_count = 0
@@ -126,7 +127,7 @@ class Model(nn.Module):
     def train(self, num_steps):
         for epoch in range(num_steps):
             # with torch.autograd.detect_anomaly():
-            #import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
             self.epoch_loss = self.svi.step()
             if not self.epoch_count % 100:
                 self.infer()
@@ -261,11 +262,9 @@ class Model(nn.Module):
                 #        "binary"] = 2
 
             params_last.to_csv(os.path.join(self.path, "params_last.csv"))
-            self.logger.info(
-                    "Step #{}. Saved model params and optimizer state in {}"
-                    .format(self.epoch_count, self.path))
+            self.logger.info("Step #{}.".format(self.epoch_count))
         else:
-            self.logger.warning("Step #{}. Detected NaN values in parameters")
+            self.logger.warning("Step #{}. Detected NaN values in parameters".format(self.epoch_count))
 
     def load_checkpoint(self):
         try:
@@ -275,7 +274,7 @@ class Model(nn.Module):
             pyro.clear_param_store()
             pyro.get_param_store().load(
                     os.path.join(self.path, "params"),
-                    map_location=self.data.device)
+                    map_location=self.device)
             self.logger.info(
                     "Step #{}. Loaded model params and optimizer state from {}"
                     .format(self.epoch_count, self.path))

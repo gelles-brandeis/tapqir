@@ -223,7 +223,7 @@ def view_aoi(data, aoi, frame, z, sp, labels, predictions, target, prefix):
     m_mask = torch.tensor(data.predictions["m"][n, None]).permute(2, 0, 1)
     height = param(f"{prefix}/h_loc".format(prefix))[:, n, None]
     height = height.masked_fill(~m_mask, 0.)
-    ideal_spot = GaussianSpot(data.target, data.drift, data.D)
+    ideal_spot = GaussianSpot(data.target, data.drift, data.D, data.device)
     ideal_data = ideal_spot(
                     height,
                     param(f"{prefix}/w_mode".format(prefix))[:, n, None],
@@ -308,7 +308,7 @@ def view_single_aoi(data, aoi, frame, z, sp, labels, target, acc, prefix):
     m_mask = torch.tensor(data.predictions["m"][n, None]).permute(2, 0, 1)
     height = param(f"{prefix}/h_loc".format(prefix))[:, n, None]
     height = height.masked_fill(~m_mask, 0.)
-    ideal_spot = GaussianSpot(data.target, data.drift, data.D)
+    ideal_spot = GaussianSpot(data.target, data.drift, data.D, data.device)
     ideal_data = ideal_spot(
                     height,
                     param(f"{prefix}/w_mode".format(prefix))[:, n, None],

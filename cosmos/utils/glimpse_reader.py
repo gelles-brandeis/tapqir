@@ -31,7 +31,6 @@ class CoSMoSDataset(Dataset):
             offset_weights, offset_samples = np.histogram(self.offset.cpu().numpy(),
                                                  range=(offset_min, offset_max),
                                                  bins=max(1, int(offset_max - offset_min)),
-                                                 #bins=8,
                                                  density=True)
             offset_samples = offset_samples[:-1]
             self.offset_samples = torch.from_numpy(offset_samples).float().to(device)

@@ -69,12 +69,13 @@ class ConvGamma(TorchDistribution):
 class Tracker(Model):
     """ Track on-target Spot """
     def __init__(self, data, control, path,
-                 K, lr, n_batch, jit, noise="GammaOffset"):
+                 K, lr, n_batch, jit, device, noise="GammaOffset"):
         self.__name__ = "tracker"
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
             max_plate_nesting=3, ignore_jit_warnings=True)
         super().__init__(data, control, path,
-                         K, lr, n_batch, jit, noise="GammaOffset")
+                         K, lr, n_batch, jit,
+                         device, noise="GammaOffset")
 
         if self.control:
             self.offset_max = torch.where(
@@ -237,7 +238,7 @@ class Tracker(Model):
                 self.control, True, False, prefix="c")
 
     def spot_parameters(self, data, m, theta, prefix):
-        param("gain", torch.tensor(5.), constraint=constraints.positive)
+        param("gain", torch.tensor(5., device=self.device), constraint=constraints.positive)
         param(f"{prefix}/background_loc",
               #(data[:].mean(dim=(1, 2, 3)) - self.offset_guess).reshape(data.N, 1),
               #torch.ones(data.N, 1) * 50.,
@@ -249,7 +250,7 @@ class Tracker(Model):
               (data.data_median - self.offset_guess).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
-              torch.ones(data.N, data.F) * 30,
+              torch.ones(data.N, data.F, device=self.device) * 30,
               #torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
@@ -258,28 +259,28 @@ class Tracker(Model):
               constraint=constraints.positive)
         #print(self.data.noise * 1.5)
         param(f"{prefix}/h_beta",
-              torch.ones(self.K, data.N, data.F),
+              torch.ones(self.K, data.N, data.F, device=self.device),
               constraint=constraints.positive)
         param(f"{prefix}/w_mode",
-              torch.ones(self.K, data.N, data.F) * 1.3,
+              torch.ones(self.K, data.N, data.F, device=self.device) * 1.3,
               constraint=constraints.interval(0.5, 3.))
         param(f"{prefix}/w_size",
-              torch.ones(self.K, data.N, data.F) * 100.,
+              torch.ones(self.K, data.N, data.F, device=self.device) * 100.,
               constraint=constraints.greater_than(2.))
         param(f"{prefix}/x_mode",
-              torch.zeros(self.K, data.N, data.F),
+              torch.zeros(self.K, data.N, data.F, device=self.device),
               constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
         param(f"{prefix}/y_mode",
-              torch.zeros(self.K, data.N, data.F),
+              torch.zeros(self.K, data.N, data.F, device=self.device),
               constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        size = torch.ones(self.K, data.N, data.F) * 5.
+        size = torch.ones(self.K, data.N, data.F, device=self.device) * 5.
         size[0] = ((data.D+1) / (2*0.5)) ** 2 - 1
         param(f"{prefix}/size",
               size, constraint=constraints.greater_than(2.))
 
         if m:
             #m_probs = torch.zeros(self.K, data.N, data.F, self.S+1, self.S+1)
-            m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
+            m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K, device=self.device)
             #m_probs = pi_m_calc(param("lamda"), self.S).repeat(data.N, data.F, 1, 1)
             m_probs[..., 1, 0] = 0
             m_probs[..., 1, 2] = 0
@@ -291,7 +292,7 @@ class Tracker(Model):
         if theta:
             #theta_probs = pi_theta_calc(param("pi"), self.K, self.S).repeat(data.N, data.F, 1)
             theta_probs = torch.ones(
-                data.N, data.F, self.S*self.K+1)
+                data.N, data.F, self.S*self.K+1, device=self.device)
             param(f"{prefix}/theta_probs", theta_probs,
                   constraint=constraints.simplex)
 
@@ -317,12 +318,12 @@ class Tracker(Model):
         #      constraint=constraints.positive)
         #param("height_beta", torch.tensor([0.01]),
         #      constraint=constraints.positive)
-        param("background_beta", torch.tensor([1.]),
+        param("background_beta", torch.tensor([1.], device=self.device),
               constraint=constraints.positive)
-        param("width_mode", torch.tensor([1.3]),
+        param("width_mode", torch.tensor([1.3], device=self.device),
               constraint=constraints.interval(0.5, 3.))
         param("width_size",
-              torch.tensor([10.]), constraint=constraints.positive)
+              torch.tensor([10.], device=self.device), constraint=constraints.positive)
 
         #param("offset", self.offset_guess,
         #      constraint=constraints.interval(0, self.offset_max))
