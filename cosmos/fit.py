@@ -7,12 +7,14 @@ from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.tracker import Tracker
 from cosmos.models.marginal import Marginal
 from cosmos.models.globalhwb import GlobalHWB
+from cosmos.models.globalhw import GlobalHW
 
 
 models = dict()
 models["tracker"] = Tracker
 models["marginal"] = Marginal
 models["globalhwb"] = GlobalHWB
+models["globalhw"] = GlobalHW
 
 class Fit(Command):
     "A command to fit the data to the model"

@@ -25,7 +25,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "future", "configparser",
-        "torch", "torchvision", "cliff",
+        "torch", "torchvision", "cliff", "PySide2",
         "pyro-ppl", "tb-nightly", "voila", "ipyfilechooser",
     ],
     classifiers=[
@@ -35,7 +35,7 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     entry_points={
-        "console_scripts": ["cosmos=cosmos.app:main"],
+        "console_scripts": ["cosmos=cosmos.app:main", "cosmosGui=cosmos.ui.gui:main"],
         "cosmos.app": [
             "fit=cosmos.fit:Fit",
             "view=cosmos.view:View",

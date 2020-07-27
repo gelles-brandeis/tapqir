@@ -6,6 +6,7 @@ import os
 import pyro
 import pyro.distributions as dist
 from pyro.infer import SVI
+from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro import param
 from cosmos.models.noise import _noise_fn
 from torch.utils.tensorboard import SummaryWriter
@@ -13,7 +14,7 @@ from sklearn.metrics import matthews_corrcoef, confusion_matrix
 from tqdm import tqdm
 import logging
 import cosmos
-#from git import Repo
+from cosmos.utils.glimpse_reader import load_data
 
 
 class GaussianSpot(nn.Module):
@@ -31,11 +32,11 @@ class GaussianSpot(nn.Module):
             device=device, dtype=torch.float)
 
     # Ideal 2D gaussian spots
-    def forward(self, height, width, x, y, background, n_idx, f=None):
-        if f is not None:
-            spot_locs = self.target_locs[n_idx, f] + torch.stack((x, y), -1)
-        else:
-            spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)
+    def forward(self, height, width, x, y, background, n_idx, f_idx):
+        #if f is not None:
+        spot_locs = self.target_locs[n_idx][f_idx] + torch.stack((x, y), -1)
+        #else:
+        #    spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2, device=width.device) * width[..., None, None, None, None])
@@ -47,76 +48,73 @@ class GaussianSpot(nn.Module):
 
 class Model(nn.Module):
     """ Gaussian Spot Model """
-    def __init__(self, data, control, path,
-                 K, lr, n_batch, jit,
-                 device, noise="GammaOffset"):
+    def __init__(self, K=2):
         super().__init__()
-        # D - number of pixels along axis
-        # K - max number of spots
-        # pyro.set_rng_seed(0)
-        self.data = data
-        self.control = control
-        self.device = device
-        self.path = path
         self.K = K
         self.S = 1
-        self.CameraUnit = _noise_fn[noise]
-        self.lr = lr
-        self.n_batch = n_batch
-        self.jit = jit
+        self.batch_size = None
+        # for plotting
+        self.n = None
+        self.frames = None
 
-        self.size = torch.tensor([2., (((data.D+1) / (2*0.5)) ** 2 - 1)], device=self.device)
-        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], device=self.device).T.reshape(2,1,1,4)
-        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]], device=self.device).T.reshape(2,1,1,3)
-        """
-        self.theta_matrix = \
-            torch.tensor([[0, 0],
-                          [1, 0],
-                          #[1, 0],
-                          #[0, 1],
-                          #[0, 1]]).T.reshape(2, 1, 1, 5)
-                          [0, 1]]).T.reshape(2, 1, 1, 3)
-        self.m_matrix = \
-            torch.tensor([[0, 0],
-                          [1, 0],
-                          #[2, 0],
-                          #[0, 1],
-                          #[0, 2]]).T.reshape(2, 1, 1, 5)
-                          [0, 1]]).T.reshape(2, 1, 1, 3)
-        """
-        self.m_state = \
-            torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1],
-                          [1, 0], [1, 1], [0, 1], [1, 1]]) \
-            .T.reshape(2, 1, 1, 8)
-        self.theta_state = \
-            torch.tensor([[0, 0], [0, 0], [0, 0], [0, 0],
-                          [1, 0], [1, 0], [0, 1], [0, 1]]) \
-            .T.reshape(2, 1, 1, 8)
+    def load(self, path, control, device):
+        # set path
+        self.path = path
 
-        self.predictions = np.zeros(
-            (data.N, data.F),
-            dtype=[("aoi", int), ("frame", int), ("z", bool),
-                   ("z_prob", float), ("m", bool, (2,)),
-                   ("m_prob", float, (2,)), ("theta", int)])
-        self.predictions["aoi"] = data.target.index.values.reshape(-1, 1)
-        self.predictions["frame"] = data.drift.index.values
+        # set device
+        self.device = torch.device(device)
+        torch.set_default_tensor_type("torch.cuda.FloatTensor")
 
+        # load test data
+        self.data = load_data(self.path, dtype="test", device=self.device)
         self.data.loc = GaussianSpot(
             self.data.target, self.data.drift,
             self.data.D, self.device)
-        if self.control:
+
+        self.offset_guess = self.data.offset_mean
+
+        # load control data
+        if control:
+            self.control = load_data(self.path, dtype="control", device=self.device)
             self.control.loc = GaussianSpot(
                 self.control.target, self.control.drift,
                 self.control.D, self.device)
+        else:
+            self.control = control
+
+        self.size = torch.tensor([2., (((self.data.D+1) / (2*0.5)) ** 2 - 1)], device=self.device)
+        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], device=self.device).T.reshape(2,1,1,4)
+        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]], device=self.device).T.reshape(2,1,1,3)
+
+    def settings(self, lr, batch_size, jit=False):
+        # K - max number of spots
+        self.lr = lr
+        self.batch_size = batch_size
+        self.jit = jit
+
+        self.predictions = np.zeros(
+            (self.data.N, self.data.F),
+            dtype=[("aoi", int), ("frame", int), ("z", bool),
+                   ("z_prob", float), ("m", bool, (2,)),
+                   ("m_prob", float, (2,)), ("theta", int)])
+        self.predictions["aoi"] = self.data.target.index.values.reshape(-1, 1)
+        self.predictions["frame"] = self.data.drift.index.values
 
         pyro.clear_param_store()
-        self.epoch_count = 0
+        self.iter = 0
         self.optim_fn = pyro.optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
+        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+            max_plate_nesting=3, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
         self.log()
+
+        try:
+            self.load_checkpoint()
+        except:
+            pass
 
     def model(self):
         raise NotImplementedError
@@ -124,19 +122,17 @@ class Model(nn.Module):
     def guide(self):
         raise NotImplementedError
 
-    def train(self, num_steps):
-        for epoch in range(num_steps):
+    def run(self, num_iter):
+        for i in range(num_iter):
             # with torch.autograd.detect_anomaly():
-            # import pdb; pdb.set_trace()
+            import pdb; pdb.set_trace()
             self.epoch_loss = self.svi.step()
-            if not self.epoch_count % 100:
+            if not self.iter % 100:
                 self.infer()
                 self.save_checkpoint()
-            self.epoch_count += 1
+            self.iter += 1
 
     def log(self):
-        #repo = Repo(cosmos.__path__[0], search_parent_directories=True)
-        #version = repo.git.describe()
         version = cosmos.__version__
         self.path = os.path.join(
             self.path, "runs",
@@ -144,7 +140,7 @@ class Model(nn.Module):
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
             #  "{}".format(self.optim_fn.__name__),
-            "bs{}".format(self.n_batch))
+            "bs{}".format(self.batch_size))
         self.writer_scalar = SummaryWriter(
             log_dir=os.path.join(self.path, "scalar"))
         self.writer_hist = SummaryWriter(
@@ -168,7 +164,7 @@ class Model(nn.Module):
             self.logger.debug("control.F - {}".format(self.control.F))
         self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
         self.logger.info("Learning rate - {}".format(self.lr))
-        self.logger.info("Batch size - {}".format(self.n_batch))
+        self.logger.info("Batch size - {}".format(self.batch_size))
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def save_checkpoint(self):
@@ -176,24 +172,24 @@ class Model(nn.Module):
                    for v in pyro.get_param_store().values()]):
             self.optim.save(os.path.join(self.path, "optimizer"))
             pyro.get_param_store().save(os.path.join(self.path, "params"))
-            np.savetxt(os.path.join(self.path, "epoch_count"),
-                       np.array([self.epoch_count]))
-            params_last = pd.Series(data={"epoch_count": self.epoch_count})
+            np.savetxt(os.path.join(self.path, "iter"),
+                       np.array([self.iter]))
+            params_last = pd.Series(data={"iter": self.iter})
 
             self.writer_scalar.add_scalar(
-                "-ELBO", self.epoch_loss, self.epoch_count)
+                "-ELBO", self.epoch_loss, self.iter)
             params_last["-ELBO"] = self.epoch_loss
             for p in pyro.get_param_store().keys():
                 if param(p).squeeze().dim() == 0:
                     self.writer_scalar.add_scalar(
-                        p, pyro.param(p).squeeze().item(), self.epoch_count)
+                        p, pyro.param(p).squeeze().item(), self.iter)
                     params_last[p] = pyro.param(p).item()
                 elif param(p).squeeze().dim() == 1 and \
                         len(param(p).squeeze()) <= self.S+1:
                     scalars = {str(i): p.item()
                                for i, p in enumerate(param(p).squeeze())}
                     self.writer_scalar.add_scalars(
-                        "{}".format(p), scalars, self.epoch_count)
+                        "{}".format(p), scalars, self.iter)
                     for key, value in scalars.items():
                         params_last["{}_{}".format(p, key)] = value
                 elif param(p).squeeze().dim() == 2 and \
@@ -201,13 +197,13 @@ class Model(nn.Module):
                     scalars = {str(i): p.item()
                                for i, p in enumerate(param(p)[0].squeeze())}
                     self.writer_scalar.add_scalars(
-                        "{}_0".format(p), scalars, self.epoch_count)
+                        "{}_0".format(p), scalars, self.iter)
                     for key, value in scalars.items():
                         params_last["{}_{}_0".format(p, key)] = value
                     scalars = {str(i): p.item()
                                for i, p in enumerate(param(p)[1].squeeze())}
                     self.writer_scalar.add_scalars(
-                        "{}_1".format(p), scalars, self.epoch_count)
+                        "{}_1".format(p), scalars, self.iter)
                     for key, value in scalars.items():
                         params_last["{}_{}_1".format(p, key)] = value
             if self.data.labels is not None:
@@ -234,11 +230,11 @@ class Model(nn.Module):
                 positives["TP"] = tp
                 positives["FN"] = fn
                 self.writer_scalar.add_scalars(
-                    "ACCURACY", scalars, self.epoch_count)
+                    "ACCURACY", scalars, self.iter)
                 self.writer_scalar.add_scalars(
-                    "NEGATIVES", negatives, self.epoch_count)
+                    "NEGATIVES", negatives, self.iter)
                 self.writer_scalar.add_scalars(
-                    "POSITIVES", positives, self.epoch_count)
+                    "POSITIVES", positives, self.iter)
                 for key, value in scalars.items():
                     params_last[key] = value
                 for key, value in negatives.items():
@@ -262,21 +258,35 @@ class Model(nn.Module):
                 #        "binary"] = 2
 
             params_last.to_csv(os.path.join(self.path, "params_last.csv"))
-            self.logger.info("Step #{}.".format(self.epoch_count))
+            self.logger.info("Step #{}.".format(self.iter))
         else:
-            self.logger.warning("Step #{}. Detected NaN values in parameters".format(self.epoch_count))
+            self.logger.warning("Step #{}. Detected NaN values in parameters".format(self.iter))
 
-    def load_checkpoint(self):
-        try:
-            self.epoch_count = int(
-                np.loadtxt(os.path.join(self.path, "epoch_count")))
-            self.optim.load(os.path.join(self.path, "optimizer"))
-            pyro.clear_param_store()
-            pyro.get_param_store().load(
-                    os.path.join(self.path, "params"),
-                    map_location=self.device)
-            self.logger.info(
-                    "Step #{}. Loaded model params and optimizer state from {}"
-                    .format(self.epoch_count, self.path))
-        except:
-            pass
+    def load_checkpoint(self, path=None):
+        if path is None:
+            path = self.path
+        self.iter = int(
+            np.loadtxt(os.path.join(path, "epoch_count")))
+        self.optim.load(os.path.join(path, "optimizer"))
+        pyro.clear_param_store()
+        pyro.get_param_store().load(
+                os.path.join(path, "params"),
+                map_location=self.device)
+        self.predictions = np.load(os.path.join(path, "predictions.npy"))
+        self.logger.info(
+                "Step #{}. Loaded model params and optimizer state from {}"
+                .format(self.iter, path))
+
+    def load_parameters(self, path=None):
+        if path is None:
+            path = self.path
+        self.iter = int(
+            np.loadtxt(os.path.join(path, "epoch_count")))
+        pyro.clear_param_store()
+        pyro.get_param_store().load(
+                os.path.join(path, "params"),
+                map_location=self.device)
+        self.predictions = np.load(os.path.join(path, "predictions.npy"))
+        #self.logger.info(
+        #        "Step #{}. Loaded model params and optimizer state from {}"
+        #        .format(self.iter, path))

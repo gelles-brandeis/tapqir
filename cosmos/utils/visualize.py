@@ -64,8 +64,10 @@ def view_m_probs(aoi, data, frames, m, z, sp, labels, predictions, prefix):
     fig, ax = plt.subplots(figsize=(15,3)) 
     #ax.clear()
     n = data.target.index.get_loc(aoi)
-    f1 = data.drift.index.get_loc(frames[0])
-    f2 = data.drift.index.get_loc(frames[1])
+    #f1 = data.drift.index.get_loc(frames[0])
+    #f2 = data.drift.index.get_loc(frames[1])
+    f1 = 1
+    f2 = 800
     if m:
         #k_probs = k_probs_calc(
         #    param(f"{prefix}/m_probs")[n]).squeeze()
@@ -117,7 +119,8 @@ def view_m_probs(aoi, data, frames, m, z, sp, labels, predictions, prefix):
     ax.tick_params(axis="y", labelsize=14)
     ax.legend(fontsize=14)
     plt.tight_layout()
-    plt.show()
+    #plt.show()
+    return fig
 
 
 def view_parameters(aoi, data, frames, m, params, prefix):
