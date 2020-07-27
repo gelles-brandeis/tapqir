@@ -26,7 +26,8 @@ setuptools.setup(
     install_requires=[
         "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "future", "configparser",
         "torch", "torchvision", "cliff", "PySide2",
-        "pyro-ppl", "tb-nightly", "voila", "ipyfilechooser",
+        "pyro-ppl",
+        #"tb-nightly", "voila", "ipyfilechooser",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
