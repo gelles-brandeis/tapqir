@@ -11,7 +11,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
-from MainWindow import Ui_MainWindow
+from cosmos.ui.MainWindow import Ui_MainWindow
 
 from cosmos.models.tracker import Tracker
 from cosmos.utils.visualize import view_m_probs
