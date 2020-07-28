@@ -32,12 +32,21 @@ class MplCanvas(FigureCanvas):
                                    QSizePolicy.Fixed)
         #FigureCanvas.setAlignment(self, Qt.AlignHCenter)
         FigureCanvas.updateGeometry(self)
+        self._line = {}
+        self._fill_line = {}
+        for p in params:
+            if p.endswith("background") or p == "z_probs":
+                self._line[p] = None
+            else:
+                for k in range(2):
+                    self._line["{}_{}".format(p, k)] = None
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, *args, obj=None, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
         self.setupUi(self)
         self.Model = Tracker()
+        self._plot_ref = None
 
         #self.canvas = MplCanvas(self, width=1, height=1, dpi=100)
         #self.canvas.axes.plot([0,1,2,3,4], [10,1,20,3,40])
@@ -93,9 +102,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #self.aoiNumber.setSingleStep(1)
         #self.aoiNumber.setPageStep(10)
         #self.aoiNumber.setTickInterval(20)
-        self.Model.data.predictions = self.Model.predictions
+        #self.Model.data.predictions = self.Model.predictions
         
-        params = ["d/height", "d/width", "d/x", "d/y", "d/background"]
+        params = ["z_probs", "d/height", "d/width", "d/x", "d/y", "d/background"]
         self.canvas = MplCanvas(self, params=params)
         toolbar = NavigationToolbar(self.canvas, self)
         self.plotParam.addWidget(toolbar)
@@ -128,8 +137,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         trace = pyro.poutine.trace(self.Model.guide).get_trace()
         self.Model.n = None
         self.Model.frames = None
-        params = ["d/height", "d/width", "d/x", "d/y", "d/background"]
-        plot_dist(self.canvas.axes, self.Model.data.drift.index, trace, params, ci=0.95)
+        params = ["z_probs", "d/height", "d/width", "d/x", "d/y", "d/background"]
+        plot_dist(
+            self.canvas.axes, self.canvas._line, self.canvas._fill_line,
+            self.Model.predictions, self.aoiNumber.value(),
+            self.Model.data.drift.index, trace, params, ci=0.95)
         self.canvas.draw()
 
 def main():

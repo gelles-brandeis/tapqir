@@ -35,7 +35,8 @@ class GaussianSpot(nn.Module):
     # Ideal 2D gaussian spots
     def forward(self, height, width, x, y, background, n_idx, f_idx):
         #if f is not None:
-        n_idx = n_idx[:, None]
+        #n_idx = n_idx[:, None]
+        #import pdb; pdb.set_trace()
         spot_locs = Vindex(self.target_locs)[n_idx, f_idx, :] + torch.stack((x, y), -1)
         #else:
         #    spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)

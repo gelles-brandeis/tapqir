@@ -346,7 +346,7 @@ class Ui_MainWindow(object):
         self.pushButton_4.clicked.connect(MainWindow.browseParamSlot)
         self.pushButton_5.clicked.connect(MainWindow.loadParamSlot)
         self.aoiSlider.valueChanged.connect(MainWindow.plotParamSlot)
-        self.aoiNumber.editingFinished.connect(MainWindow.plotParamSlot)
+        self.aoiNumber.valueChanged.connect(MainWindow.plotParamSlot)
 
         self.tabWidget.setCurrentIndex(0)
 
