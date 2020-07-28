@@ -8,6 +8,7 @@ import pyro.distributions as dist
 from pyro.infer import SVI
 from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro import param
+from pyro.ops.indexing import Vindex
 from cosmos.models.noise import _noise_fn
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import matthews_corrcoef, confusion_matrix
