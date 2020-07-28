@@ -25,7 +25,7 @@ class MplCanvas(FigureCanvas):
 
     def __init__(self, parent=None, params=None):
         fig, self.axes = plt.subplots(len(params), 1, sharex=True,
-                               figsize=(12, 2.*len(params))) 
+                               figsize=(9, 1.5*len(params))) 
         super(MplCanvas, self).__init__(fig)
         FigureCanvas.setSizePolicy(self,
                                    QSizePolicy.Fixed,
