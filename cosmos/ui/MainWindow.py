@@ -119,22 +119,23 @@ class Ui_MainWindow(object):
         self.horizontalLayout_4.addLayout(self.verticalLayout_2)
 
         self.tabWidget.addTab(self.tab, "")
-        self.tab_2 = QWidget()
-        self.tab_2.setObjectName(u"tab_2")
-        self.horizontalLayout_8 = QHBoxLayout(self.tab_2)
+        self.Analysis = QWidget()
+        self.Analysis.setObjectName(u"Analysis")
+        self.Analysis.setEnabled(False)
+        self.horizontalLayout_8 = QHBoxLayout(self.Analysis)
         self.horizontalLayout_8.setObjectName(u"horizontalLayout_8")
         self.verticalLayout_3 = QVBoxLayout()
         self.verticalLayout_3.setObjectName(u"verticalLayout_3")
         self.formLayout_2 = QFormLayout()
         self.formLayout_2.setObjectName(u"formLayout_2")
-        self.label_4 = QLabel(self.tab_2)
+        self.label_4 = QLabel(self.Analysis)
         self.label_4.setObjectName(u"label_4")
 
         self.formLayout_2.setWidget(0, QFormLayout.LabelRole, self.label_4)
 
         self.horizontalLayout_7 = QHBoxLayout()
         self.horizontalLayout_7.setObjectName(u"horizontalLayout_7")
-        self.batchSize = QSpinBox(self.tab_2)
+        self.batchSize = QSpinBox(self.Analysis)
         self.batchSize.setObjectName(u"batchSize")
         self.batchSize.setMaximum(999)
         self.batchSize.setValue(8)
@@ -148,14 +149,14 @@ class Ui_MainWindow(object):
 
         self.formLayout_2.setLayout(0, QFormLayout.FieldRole, self.horizontalLayout_7)
 
-        self.label_5 = QLabel(self.tab_2)
+        self.label_5 = QLabel(self.Analysis)
         self.label_5.setObjectName(u"label_5")
 
         self.formLayout_2.setWidget(1, QFormLayout.LabelRole, self.label_5)
 
         self.horizontalLayout_6 = QHBoxLayout()
         self.horizontalLayout_6.setObjectName(u"horizontalLayout_6")
-        self.learningRate = QDoubleSpinBox(self.tab_2)
+        self.learningRate = QDoubleSpinBox(self.Analysis)
         self.learningRate.setObjectName(u"learningRate")
         self.learningRate.setDecimals(3)
         self.learningRate.setSingleStep(0.001000000000000)
@@ -170,14 +171,14 @@ class Ui_MainWindow(object):
 
         self.formLayout_2.setLayout(1, QFormLayout.FieldRole, self.horizontalLayout_6)
 
-        self.label_6 = QLabel(self.tab_2)
+        self.label_6 = QLabel(self.Analysis)
         self.label_6.setObjectName(u"label_6")
 
         self.formLayout_2.setWidget(2, QFormLayout.LabelRole, self.label_6)
 
         self.horizontalLayout_5 = QHBoxLayout()
         self.horizontalLayout_5.setObjectName(u"horizontalLayout_5")
-        self.numIter = QSpinBox(self.tab_2)
+        self.numIter = QSpinBox(self.Analysis)
         self.numIter.setObjectName(u"numIter")
         self.numIter.setMaximum(999999)
         self.numIter.setSingleStep(5000)
@@ -195,7 +196,7 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_3.addLayout(self.formLayout_2)
 
-        self.pushButton_3 = QPushButton(self.tab_2)
+        self.pushButton_3 = QPushButton(self.Analysis)
         self.pushButton_3.setObjectName(u"pushButton_3")
 
         self.verticalLayout_3.addWidget(self.pushButton_3)
@@ -204,7 +205,7 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_3.addItem(self.verticalSpacer_2)
 
-        self.progressBar = QProgressBar(self.tab_2)
+        self.progressBar = QProgressBar(self.Analysis)
         self.progressBar.setObjectName(u"progressBar")
         self.progressBar.setValue(0)
 
@@ -213,93 +214,115 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_8.addLayout(self.verticalLayout_3)
 
-        self.tabWidget.addTab(self.tab_2, "")
-        self.tab_3 = QWidget()
-        self.tab_3.setObjectName(u"tab_3")
-        self.horizontalLayout_11 = QHBoxLayout(self.tab_3)
+        self.tabWidget.addTab(self.Analysis, "")
+        self.Parameters = QWidget()
+        self.Parameters.setObjectName(u"Parameters")
+        self.Parameters.setEnabled(False)
+        self.horizontalLayout_11 = QHBoxLayout(self.Parameters)
         self.horizontalLayout_11.setObjectName(u"horizontalLayout_11")
-        self.probPlot = QWidget(self.tab_3)
-        self.probPlot.setObjectName(u"probPlot")
-
-        self.horizontalLayout_11.addWidget(self.probPlot)
-
-        self.verticalLayout_5 = QVBoxLayout()
-        self.verticalLayout_5.setObjectName(u"verticalLayout_5")
+        self.verticalLayout_4 = QVBoxLayout()
+        self.verticalLayout_4.setObjectName(u"verticalLayout_4")
         self.horizontalLayout_10 = QHBoxLayout()
         self.horizontalLayout_10.setObjectName(u"horizontalLayout_10")
-        self.label_7 = QLabel(self.tab_3)
+        self.label_7 = QLabel(self.Parameters)
         self.label_7.setObjectName(u"label_7")
 
         self.horizontalLayout_10.addWidget(self.label_7)
 
-        self.paramPath = QLineEdit(self.tab_3)
+        self.paramPath = QLineEdit(self.Parameters)
         self.paramPath.setObjectName(u"paramPath")
 
         self.horizontalLayout_10.addWidget(self.paramPath)
 
-        self.pushButton_4 = QPushButton(self.tab_3)
+        self.pushButton_4 = QPushButton(self.Parameters)
         self.pushButton_4.setObjectName(u"pushButton_4")
 
         self.horizontalLayout_10.addWidget(self.pushButton_4)
 
 
-        self.verticalLayout_5.addLayout(self.horizontalLayout_10)
+        self.verticalLayout_4.addLayout(self.horizontalLayout_10)
 
-        self.pushButton_5 = QPushButton(self.tab_3)
+        self.pushButton_5 = QPushButton(self.Parameters)
         self.pushButton_5.setObjectName(u"pushButton_5")
 
-        self.verticalLayout_5.addWidget(self.pushButton_5)
+        self.verticalLayout_4.addWidget(self.pushButton_5)
 
-        self.line = QFrame(self.tab_3)
+        self.line = QFrame(self.Parameters)
         self.line.setObjectName(u"line")
         self.line.setFrameShape(QFrame.HLine)
         self.line.setFrameShadow(QFrame.Sunken)
 
-        self.verticalLayout_5.addWidget(self.line)
+        self.verticalLayout_4.addWidget(self.line)
 
-        self.paramPlot = QVBoxLayout()
-        self.paramPlot.setObjectName(u"paramPlot")
+        self.aoiSlider = QSlider(self.Parameters)
+        self.aoiSlider.setObjectName(u"aoiSlider")
+        self.aoiSlider.setTracking(False)
+        self.aoiSlider.setOrientation(Qt.Horizontal)
+
+        self.verticalLayout_4.addWidget(self.aoiSlider)
+
         self.horizontalLayout_9 = QHBoxLayout()
         self.horizontalLayout_9.setObjectName(u"horizontalLayout_9")
-        self.label_8 = QLabel(self.tab_3)
-        self.label_8.setObjectName(u"label_8")
-
-        self.horizontalLayout_9.addWidget(self.label_8)
-
         self.horizontalSpacer_6 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.horizontalLayout_9.addItem(self.horizontalSpacer_6)
 
+        self.label_9 = QLabel(self.Parameters)
+        self.label_9.setObjectName(u"label_9")
 
-        self.paramPlot.addLayout(self.horizontalLayout_9)
+        self.horizontalLayout_9.addWidget(self.label_9)
 
-        self.aoiNumber = QSlider(self.tab_3)
+        self.aoiNumber = QSpinBox(self.Parameters)
         self.aoiNumber.setObjectName(u"aoiNumber")
-        self.aoiNumber.setTracking(False)
-        self.aoiNumber.setOrientation(Qt.Horizontal)
-        self.aoiNumber.setTickPosition(QSlider.TicksAbove)
-        self.aoiNumber.setTickInterval(10)
 
-        self.paramPlot.addWidget(self.aoiNumber)
+        self.horizontalLayout_9.addWidget(self.aoiNumber)
+
+        self.aoiMax = QLabel(self.Parameters)
+        self.aoiMax.setObjectName(u"aoiMax")
+
+        self.horizontalLayout_9.addWidget(self.aoiMax)
+
+        self.horizontalSpacer_7 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        self.horizontalLayout_9.addItem(self.horizontalSpacer_7)
 
 
-        self.verticalLayout_5.addLayout(self.paramPlot)
+        self.verticalLayout_4.addLayout(self.horizontalLayout_9)
 
-        self.verticalSpacer_3 = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        self.scrollArea = QScrollArea(self.Parameters)
+        self.scrollArea.setObjectName(u"scrollArea")
+        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setAlignment(Qt.AlignHCenter|Qt.AlignTop)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
+        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 737, 351))
+        self.verticalLayout_5 = QVBoxLayout(self.scrollAreaWidgetContents)
+        self.verticalLayout_5.setObjectName(u"verticalLayout_5")
+        self.plotParam = QVBoxLayout()
+        self.plotParam.setObjectName(u"plotParam")
+
+        self.verticalLayout_5.addLayout(self.plotParam)
+
+        self.verticalSpacer_3 = QSpacerItem(20, 320, QSizePolicy.Minimum, QSizePolicy.Expanding)
 
         self.verticalLayout_5.addItem(self.verticalSpacer_3)
 
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
 
-        self.horizontalLayout_11.addLayout(self.verticalLayout_5)
+        self.verticalLayout_4.addWidget(self.scrollArea)
 
-        self.tabWidget.addTab(self.tab_3, "")
+
+        self.horizontalLayout_11.addLayout(self.verticalLayout_4)
+
+        self.tabWidget.addTab(self.Parameters, "")
 
         self.verticalLayout.addWidget(self.tabWidget)
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 800, 27))
+        self.menubar.setGeometry(QRect(0, 0, 800, 22))
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")
         self.menuHelp = QMenu(self.menubar)
@@ -322,7 +345,8 @@ class Ui_MainWindow(object):
         self.pushButton_3.clicked.connect(MainWindow.runAnalysisSlot)
         self.pushButton_4.clicked.connect(MainWindow.browseParamSlot)
         self.pushButton_5.clicked.connect(MainWindow.loadParamSlot)
-        self.aoiNumber.valueChanged.connect(MainWindow.plotParamSlot)
+        self.aoiSlider.valueChanged.connect(MainWindow.plotParamSlot)
+        self.aoiNumber.editingFinished.connect(MainWindow.plotParamSlot)
 
         self.tabWidget.setCurrentIndex(0)
 
@@ -348,12 +372,13 @@ class Ui_MainWindow(object):
         self.label_5.setText(QCoreApplication.translate("MainWindow", u"Learning rate", None))
         self.label_6.setText(QCoreApplication.translate("MainWindow", u"Num. of iterations", None))
         self.pushButton_3.setText(QCoreApplication.translate("MainWindow", u"Run Analysis", None))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), QCoreApplication.translate("MainWindow", u"Analysis", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.Analysis), QCoreApplication.translate("MainWindow", u"Analysis", None))
         self.label_7.setText(QCoreApplication.translate("MainWindow", u"Folder Name", None))
         self.pushButton_4.setText(QCoreApplication.translate("MainWindow", u"Browse", None))
         self.pushButton_5.setText(QCoreApplication.translate("MainWindow", u"Load Parameters", None))
-        self.label_8.setText(QCoreApplication.translate("MainWindow", u"Aoi Number", None))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), QCoreApplication.translate("MainWindow", u"Parameters", None))
+        self.label_9.setText(QCoreApplication.translate("MainWindow", u"AoI Number", None))
+        self.aoiMax.setText(QCoreApplication.translate("MainWindow", u"/0", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.Parameters), QCoreApplication.translate("MainWindow", u"Parameters", None))
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.menuHelp.setTitle(QCoreApplication.translate("MainWindow", u"Help", None))
     # retranslateUi

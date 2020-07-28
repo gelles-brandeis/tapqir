@@ -6,6 +6,7 @@ matplotlib.use('Qt5Agg')
 #from PySide2.QtWidgets import \
 #    QMainWindow, QApplication, QFileDialog
 from PySide2.QtWidgets import *
+from PySide2.QtCore import Qt
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -24,8 +25,13 @@ class MplCanvas(FigureCanvas):
 
     def __init__(self, parent=None, params=None):
         fig, self.axes = plt.subplots(len(params), 1, sharex=True,
-                               figsize=(15, 2.5*len(params))) 
+                               figsize=(12, 2.*len(params))) 
         super(MplCanvas, self).__init__(fig)
+        FigureCanvas.setSizePolicy(self,
+                                   QSizePolicy.Fixed,
+                                   QSizePolicy.Fixed)
+        #FigureCanvas.setAlignment(self, Qt.AlignHCenter)
+        FigureCanvas.updateGeometry(self)
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, *args, obj=None, **kwargs):
@@ -60,6 +66,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(self.pathName.text(), self.controlBox.isChecked(), self.deviceName.currentText())
         try:
             self.Model.load(self.pathName.text(), self.controlBox.isChecked(), self.deviceName.currentText())
+            self.Analysis.setEnabled(True)
+            self.Parameters.setEnabled(True)
             print("Successful")
         except:
             print("Something went wrong")
@@ -80,17 +88,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #try:
         self.Model.load_parameters(self.paramPath.text())
         #import pdb; pdb.set_trace()
-        self.aoiNumber.setMaximum(self.Model.data.N - 1)
-        self.aoiNumber.setSingleStep(1)
-        self.aoiNumber.setPageStep(10)
+        self.aoiNumber.setRange(0, self.Model.data.N - 1)
+        self.aoiMax.setText("/{}".format(self.Model.data.N - 1))
+        #self.aoiNumber.setSingleStep(1)
+        #self.aoiNumber.setPageStep(10)
         #self.aoiNumber.setTickInterval(20)
         self.Model.data.predictions = self.Model.predictions
         
         params = ["d/height", "d/width", "d/x", "d/y", "d/background"]
         self.canvas = MplCanvas(self, params=params)
         toolbar = NavigationToolbar(self.canvas, self)
-        self.paramPlot.addWidget(toolbar)
-        self.paramPlot.addWidget(self.canvas)
+        self.plotParam.addWidget(toolbar)
+        self.plotParam.addWidget(self.canvas)
+        self.plotParam.setAlignment(self.canvas, Qt.AlignHCenter)
 
         self.aoiNumber.setValue(1)
 
@@ -113,8 +123,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print("Successful")
 
     def plotParamSlot(self):
-        self.label_8.setText("Aoi: {}/{}".format(self.aoiNumber.value(), self.Model.data.N - 1))
-
         self.Model.n = torch.tensor([self.aoiNumber.value()])
         self.Model.frames = torch.arange(self.Model.data.F)
         trace = pyro.poutine.trace(self.Model.guide).get_trace()
@@ -129,3 +137,6 @@ def main():
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()

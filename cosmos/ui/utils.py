@@ -24,8 +24,8 @@ def plot_dist(ax, x, trace, params, ci=None, label=None):
                     x, trace.nodes[p]["fn"].mean.data[k, 0].cpu(),
                     color="C{}".format(k), s=5, label=label)
 
-        ax[i].set_ylabel(p, fontsize=20)
+        ax[i].set_ylabel(p, fontsize=10)
 
     ax[len(params)-1].set_xlim(x[0]-2, x[-1]+2)
-    ax[len(params)-1].set_xlabel("frame #", fontsize=20)
+    ax[len(params)-1].set_xlabel("frame #", fontsize=10)
     plt.tight_layout()

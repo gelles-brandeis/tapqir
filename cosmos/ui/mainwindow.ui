@@ -163,7 +163,10 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tab_2">
+      <widget class="QWidget" name="Analysis">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <attribute name="title">
         <string>Analysis</string>
        </attribute>
@@ -313,14 +316,14 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tab_3">
+      <widget class="QWidget" name="Parameters">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <attribute name="title">
         <string>Parameters</string>
        </attribute>
-       <layout class="QHBoxLayout" name="horizontalLayout_12">
-        <item>
-         <widget class="QWidget" name="probPlot" native="true"/>
-        </item>
+       <layout class="QHBoxLayout" name="horizontalLayout_11">
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_4">
           <item>
@@ -359,55 +362,102 @@
            </widget>
           </item>
           <item>
-           <layout class="QVBoxLayout" name="probLayout">
+           <widget class="QSlider" name="aoiSlider">
+            <property name="tracking">
+             <bool>false</bool>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_9">
             <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_9">
+             <spacer name="horizontalSpacer_6">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_9">
+              <property name="text">
+               <string>AoI Number</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="aoiNumber"/>
+            </item>
+            <item>
+             <widget class="QLabel" name="aoiMax">
+              <property name="text">
+               <string>/0</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_7">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QScrollArea" name="scrollArea">
+            <property name="verticalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOn</enum>
+            </property>
+            <property name="widgetResizable">
+             <bool>true</bool>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignHCenter|Qt::AlignTop</set>
+            </property>
+            <widget class="QWidget" name="scrollAreaWidgetContents">
+             <property name="geometry">
+              <rect>
+               <x>0</x>
+               <y>0</y>
+               <width>737</width>
+               <height>351</height>
+              </rect>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_5">
               <item>
-               <widget class="QCheckBox" name="z_probBox">
-                <property name="text">
-                 <string>spot probability</string>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
+               <layout class="QVBoxLayout" name="plotParam"/>
               </item>
               <item>
-               <widget class="QCheckBox" name="z_binaryBox">
-                <property name="text">
-                 <string>binary</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <spacer name="horizontalSpacer_6">
+               <spacer name="verticalSpacer_3">
                 <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
+                 <enum>Qt::Vertical</enum>
                 </property>
                 <property name="sizeHint" stdset="0">
                  <size>
-                  <width>40</width>
-                  <height>20</height>
+                  <width>20</width>
+                  <height>320</height>
                  </size>
                 </property>
                </spacer>
               </item>
              </layout>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <spacer name="verticalSpacer_3">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>40</height>
-             </size>
-            </property>
-           </spacer>
+            </widget>
+           </widget>
           </item>
          </layout>
         </item>
@@ -423,7 +473,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>20</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -457,8 +507,8 @@
    <slot>browseSlot()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>776</x>
-     <y>149</y>
+     <x>774</x>
+     <y>160</y>
     </hint>
     <hint type="destinationlabel">
      <x>798</x>
@@ -530,6 +580,38 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>aoiSlider</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>MainWindow</receiver>
+   <slot>plotParamSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>164</x>
+     <y>157</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>2</x>
+     <y>275</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>aoiNumber</sender>
+   <signal>editingFinished()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>plotParamSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>428</x>
+     <y>184</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>3</x>
+     <y>359</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>browseSlot()</slot>
@@ -537,5 +619,7 @@
   <slot>runAnalysisSlot()</slot>
   <slot>browseParamSlot()</slot>
   <slot>loadParamSlot()</slot>
+  <slot>plotParamSlot()</slot>
+  <slot>aoiChangeSlot()</slot>
  </slots>
 </ui>
