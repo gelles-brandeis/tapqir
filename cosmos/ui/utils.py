@@ -11,7 +11,7 @@ def plot_dist(ax, x, trace, params, ci=None, label=None):
         if p.endswith("background"):
             ax[i].fill_between(
                 #x, hpd[0][0], hpd[1][0],
-                x, mean - 2 * std, mean + 2 * std,
+                x, mean[0] - 2 * std[0], mean[0] + 2 * std[0],
                 color="C0", alpha=0.2
             )
             ax[i].scatter(
@@ -21,11 +21,11 @@ def plot_dist(ax, x, trace, params, ci=None, label=None):
             for k in range(2):
                 ax[i].fill_between(
                     #x, hpd[0][k, 0], hpd[1][k, 0],
-                    x, mean[k] - 2 * std[k], mean[k] + 2 * std[k],
+                    x, mean[k, 0] - 2 * std[k, 0], mean[k, 0] + 2 * std[k, 0],
                     color="C{}".format(k), alpha=0.2
                 )
                 ax[i].scatter(
-                    x, mean[k],
+                    x, mean[k, 0],
                     color="C{}".format(k), s=5, label=label)
 
         ax[i].set_ylabel(p, fontsize=10)
