@@ -21,7 +21,7 @@ def plot_dist(ax, x, trace, params, ci=None, label=None):
             for k in range(2):
                 ax[i].fill_between(
                     #x, hpd[0][k, 0], hpd[1][k, 0],
-                    x, mean[k] - 2 * std[k], mean[k] + 2 * std[k]
+                    x, mean[k] - 2 * std[k], mean[k] + 2 * std[k],
                     color="C{}".format(k), alpha=0.2
                 )
                 ax[i].scatter(
