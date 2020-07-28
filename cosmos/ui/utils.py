@@ -5,7 +5,7 @@ from pyro.ops.stats import hpdi
 def plot_dist(ax, x, trace, params, ci=None, label=None):
     for i, p in enumerate(params):
         #hpd = hpdi(trace.nodes[p]["fn"].sample((500,)).data.cpu(), ci, dim=0)
-        std = trace.nodes[p]["fn"].var.data.cpu().sqrt()
+        std = trace.nodes[p]["fn"].variance.data.cpu().sqrt()
         mean = trace.nodes[p]["fn"].mean.data.cpu()
         ax[i].clear()
         if p.endswith("background"):
