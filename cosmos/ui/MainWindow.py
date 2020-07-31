@@ -30,10 +30,10 @@ class Ui_MainWindow(object):
         self.tabWidget.setTabShape(QTabWidget.Rounded)
         self.tab = QWidget()
         self.tab.setObjectName(u"tab")
-        self.horizontalLayout_4 = QHBoxLayout(self.tab)
-        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
-        self.verticalLayout_2 = QVBoxLayout()
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.horizontalLayout_13 = QHBoxLayout(self.tab)
+        self.horizontalLayout_13.setObjectName(u"horizontalLayout_13")
+        self.verticalLayout_7 = QVBoxLayout()
+        self.verticalLayout_7.setObjectName(u"verticalLayout_7")
         self.formLayout = QFormLayout()
         self.formLayout.setObjectName(u"formLayout")
         self.label_3 = QLabel(self.tab)
@@ -99,24 +99,67 @@ class Ui_MainWindow(object):
         self.formLayout.setLayout(2, QFormLayout.FieldRole, self.horizontalLayout)
 
 
-        self.verticalLayout_2.addLayout(self.formLayout)
+        self.verticalLayout_7.addLayout(self.formLayout)
 
         self.pushButton_2 = QPushButton(self.tab)
         self.pushButton_2.setObjectName(u"pushButton_2")
 
-        self.verticalLayout_2.addWidget(self.pushButton_2)
+        self.verticalLayout_7.addWidget(self.pushButton_2)
 
-        self.output = QLabel(self.tab)
-        self.output.setObjectName(u"output")
+        self.line_2 = QFrame(self.tab)
+        self.line_2.setObjectName(u"line_2")
+        self.line_2.setFrameShape(QFrame.HLine)
+        self.line_2.setFrameShadow(QFrame.Sunken)
 
-        self.verticalLayout_2.addWidget(self.output)
+        self.verticalLayout_7.addWidget(self.line_2)
+
+        self.scrollArea_2 = QScrollArea(self.tab)
+        self.scrollArea_2.setObjectName(u"scrollArea_2")
+        self.scrollArea_2.setWidgetResizable(True)
+        self.scrollAreaWidgetContents_2 = QWidget()
+        self.scrollAreaWidgetContents_2.setObjectName(u"scrollAreaWidgetContents_2")
+        self.scrollAreaWidgetContents_2.setGeometry(QRect(0, 0, 744, 359))
+        self.verticalLayout_6 = QVBoxLayout(self.scrollAreaWidgetContents_2)
+        self.verticalLayout_6.setObjectName(u"verticalLayout_6")
+        self.verticalLayout_2 = QVBoxLayout()
+        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.horizontalLayout_12 = QHBoxLayout()
+        self.horizontalLayout_12.setObjectName(u"horizontalLayout_12")
+        self.label_8 = QLabel(self.scrollAreaWidgetContents_2)
+        self.label_8.setObjectName(u"label_8")
+
+        self.horizontalLayout_12.addWidget(self.label_8)
+
+        self.horizontalSpacer_8 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        self.horizontalLayout_12.addItem(self.horizontalSpacer_8)
+
+
+        self.verticalLayout_2.addLayout(self.horizontalLayout_12)
+
+        self.plotData = QHBoxLayout()
+        self.plotData.setObjectName(u"plotData")
+
+        self.verticalLayout_2.addLayout(self.plotData)
 
         self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
 
         self.verticalLayout_2.addItem(self.verticalSpacer)
 
 
-        self.horizontalLayout_4.addLayout(self.verticalLayout_2)
+        self.verticalLayout_6.addLayout(self.verticalLayout_2)
+
+        self.scrollArea_2.setWidget(self.scrollAreaWidgetContents_2)
+
+        self.verticalLayout_7.addWidget(self.scrollArea_2)
+
+
+        self.horizontalLayout_13.addLayout(self.verticalLayout_7)
+
+        self.output = QLabel(self.tab)
+        self.output.setObjectName(u"output")
+
+        self.horizontalLayout_13.addWidget(self.output)
 
         self.tabWidget.addTab(self.tab, "")
         self.Analysis = QWidget()
@@ -217,7 +260,7 @@ class Ui_MainWindow(object):
         self.tabWidget.addTab(self.Analysis, "")
         self.Parameters = QWidget()
         self.Parameters.setObjectName(u"Parameters")
-        self.Parameters.setEnabled(False)
+        self.Parameters.setEnabled(True)
         self.horizontalLayout_11 = QHBoxLayout(self.Parameters)
         self.horizontalLayout_11.setObjectName(u"horizontalLayout_11")
         self.verticalLayout_4 = QVBoxLayout()
@@ -294,21 +337,13 @@ class Ui_MainWindow(object):
         self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setAlignment(Qt.AlignHCenter|Qt.AlignTop)
-        self.scrollAreaWidgetContents = QWidget()
-        self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
-        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 737, 351))
-        self.verticalLayout_5 = QVBoxLayout(self.scrollAreaWidgetContents)
-        self.verticalLayout_5.setObjectName(u"verticalLayout_5")
-        self.plotParam = QVBoxLayout()
-        self.plotParam.setObjectName(u"plotParam")
-
-        self.verticalLayout_5.addLayout(self.plotParam)
-
-        self.verticalSpacer_3 = QSpacerItem(20, 320, QSizePolicy.Minimum, QSizePolicy.Expanding)
-
-        self.verticalLayout_5.addItem(self.verticalSpacer_3)
-
-        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+        self.scrollLayout2 = QWidget()
+        self.scrollLayout2.setObjectName(u"scrollLayout2")
+        self.scrollLayout2.setGeometry(QRect(0, 0, 742, 367))
+        self.scrollLayout2.setLayoutDirection(Qt.LeftToRight)
+        self.scrollLayout = QVBoxLayout(self.scrollLayout2)
+        self.scrollLayout.setObjectName(u"scrollLayout")
+        self.scrollArea.setWidget(self.scrollLayout2)
 
         self.verticalLayout_4.addWidget(self.scrollArea)
 
@@ -322,7 +357,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 800, 22))
+        self.menubar.setGeometry(QRect(0, 0, 800, 20))
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")
         self.menuHelp = QMenu(self.menubar)
@@ -348,7 +383,7 @@ class Ui_MainWindow(object):
         self.aoiSlider.valueChanged.connect(MainWindow.plotParamSlot)
         self.aoiNumber.valueChanged.connect(MainWindow.plotParamSlot)
 
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(2)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -366,6 +401,7 @@ class Ui_MainWindow(object):
         self.label.setText(QCoreApplication.translate("MainWindow", u"Folder Name", None))
         self.pushButton.setText(QCoreApplication.translate("MainWindow", u"Browse", None))
         self.pushButton_2.setText(QCoreApplication.translate("MainWindow", u"Load Data", None))
+        self.label_8.setText(QCoreApplication.translate("MainWindow", u"TextLabel", None))
         self.output.setText("")
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), QCoreApplication.translate("MainWindow", u"Data", None))
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Batch size", None))
