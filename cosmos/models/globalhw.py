@@ -87,17 +87,17 @@ class GlobalHW(Model):
                         "y", ScaledBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
-            height = height.masked_fill(m_mask==0, 0.)
-            width = width * 2.5 + 0.5
-            x = x * (data.D+1) - (data.D+1)/2
-            y = y * (data.D+1) - (data.D+1)/2
+                height = height.masked_fill(m_mask==0, 0.)
+                width = width * 2.5 + 0.5
+                x = x * (data.D+1) - (data.D+1)/2
+                y = y * (data.D+1) - (data.D+1)/2
 
 
-            locs = data.loc(height, width, x, y, background, batch_idx, frame_idx)
-            pyro.sample(
-                "data", ConvGamma(
-                    locs / param("gain"), 1 / param("gain"), self.data.offset_samples, self.data.offset_weights.log()).to_event(2),
-                obs=Vindex(data.data)[batch_idx, frame_idx, :, :])
+                locs = data.loc(height, width, x, y, background, batch_idx, frame_idx)
+                pyro.sample(
+                    "data", ConvGamma(
+                        locs / param("gain"), 1 / param("gain"), self.data.offset_samples, self.data.offset_weights.log()).to_event(2),
+                    obs=Vindex(data.data)[batch_idx, frame_idx, :, :])
 
     def spot_guide(self, data, theta, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
