@@ -74,8 +74,8 @@ class AnotherWindow(QScrollArea):
 
 class MainWindow(QMainWindow):
 
-    def __init__(self):
-        super().__init__(dataset=None, parameters=None, control=False, device="cpu")
+    def __init__(self, dataset=None, parameters=None, control=False, device="cpu"):
+        super().__init__()
         if dataset is None:
             dataset = "/home/ordabayev/Documents/cosmos_test/test_data/GraceArticlePol2",
         if parameters is None:
