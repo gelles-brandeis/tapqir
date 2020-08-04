@@ -3,7 +3,7 @@ import sys
 
 from cliff.command import Command
 
-from PySyde2.QtWidgets import QApplication
+from PySide2.QtWidgets import QApplication
 from cosmos.ui.qtgui import MainWindow
 
 class Show(Command):

@@ -10,11 +10,8 @@ import pyqtgraph as pg
 import torch
 import numpy as np
 import pyro
-from pyro import param
 from pyro.ops.stats import pi
 from cosmos.models.tracker import Tracker
-import pyro.distributions as dist
-from collections import defaultdict
 
 C = {}
 C[0] = (31, 119, 180)
