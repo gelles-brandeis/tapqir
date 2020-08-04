@@ -46,17 +46,10 @@ class Fit(Command):
         return parser
 
     def take_action(self, args):
-        device = torch.device(args.device)
-        torch.set_default_tensor_type("torch.cuda.FloatTensor")
-        data, control = ReadAoi(args.dataset, args.control, device)
-
-        model = models[args.model](
-                data, control, path=args.dataset, K=2, lr=args.learning_rate,
-                n_batch=args.batch_size, jit=args.jit, device=device)
-
-        if args.num_iter:
-            model.load_checkpoint()
-            model.train(args.num_iter)
+        model = models[args.model]()
+        model.load(args.dataset, args.control, args.device)
+        model.settings(args.learning_rate, args.batch_size)
+        model.run(args.num_iter)
         """
         logger.info("Using device: {}".format(args.device))
         logger.info("Loading dataset: {}".format(args.dataset))

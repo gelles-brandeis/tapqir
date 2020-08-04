@@ -177,19 +177,12 @@ class Tracker(Model):
 
 
     def guide_parameters(self):
-        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
-        #param("pi", torch.tensor([0.1, 0.9]), constraint=constraints.simplex)
-        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
-        #param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
-        #param("size_z", torch.tensor([1000.]), constraint=constraints.positive)
-        #param("size_lamda", torch.tensor([1000.]), constraint=constraints.positive)
         self.spot_parameters(self.data, True, True, prefix="d")
         if self.control:
             self.spot_parameters(
                 self.control, True, False, prefix="c")
 
     def spot_parameters(self, data, m, theta, prefix):
-        param("gain", torch.tensor(5., device=self.device), constraint=constraints.positive)
         param(f"{prefix}/background_loc",
               #(data[:].mean(dim=(1, 2, 3)) - self.offset_guess).reshape(data.N, 1),
               #torch.ones(data.N, 1) * 50.,
@@ -269,6 +262,9 @@ class Tracker(Model):
         #      constraint=constraints.positive)
         #param("height_beta", torch.tensor([0.01]),
         #      constraint=constraints.positive)
+        param("gain", torch.tensor(5., device=self.device), constraint=constraints.positive)
+        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
         param("background_beta", torch.tensor([1.], device=self.device),
               constraint=constraints.positive)
         param("width_mode", torch.tensor([1.3], device=self.device),

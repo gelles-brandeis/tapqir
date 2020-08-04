@@ -2,17 +2,28 @@ import torch
 import matplotlib.pyplot as plt
 from pyro.ops.stats import hpdi
 import pyqtgraph as pg
+import numpy as np
 
-def construct_graph(app, plot, p, k, C):
-    app.phigh["{}_{}".format(p, k)] = pg.PlotDataItem(pen=(*C[k],70))           
-    app.plow["{}_{}".format(p, k)] = pg.PlotDataItem(pen =(*C[k],70))                  
-    app.pfill["{}_{}".format(p, k)] = pg.FillBetweenItem(app.phigh["{}_{}".format(p, k)], app.plow["{}_{}".format(p, k)], brush=(*C[k],70))
-    app.pmean["{}_{}".format(p, k)] = pg.PlotDataItem(pen=C[k])
-    plot.addItem(app.phigh["{}_{}".format(p, k)])
-    plot.addItem(app.plow["{}_{}".format(p, k)])
-    plot.addItem(app.pfill["{}_{}".format(p, k)])
-    plot.addItem(app.pmean["{}_{}".format(p, k)])
+from pyqtgraph import HistogramLUTItem
 
+class HistogramLUTGraph(HistogramLUTItem):
+
+    def __init__(self, graph, **kwargs):
+        self.graph = graph
+        super().__init__(**kwargs)
+
+    def regionChanged(self):
+        for image in self.graph.values():
+            image.setLevels(self.getLevels())
+        self.sigLevelChangeFinished.emit(self)
+
+
+def construct_image(app, plot, f):
+    app.img[f] = pg.ImageItem(np.random.normal(size=(14,14)))
+    plot.addItem(app.img[f])
+    bg = pg.BarGraphItem(x=(0.,), height=(14.,), width=1, brush="r")
+    plot.addItem(bg)
+    #plot.autoRange()
 
 def plot_graph(gr, predictions, n, x, trace, params):
     for i, p in enumerate(params):

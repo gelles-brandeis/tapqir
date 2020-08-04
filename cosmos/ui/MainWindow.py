@@ -115,40 +115,17 @@ class Ui_MainWindow(object):
 
         self.scrollArea_2 = QScrollArea(self.tab)
         self.scrollArea_2.setObjectName(u"scrollArea_2")
+        sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.scrollArea_2.sizePolicy().hasHeightForWidth())
+        self.scrollArea_2.setSizePolicy(sizePolicy)
         self.scrollArea_2.setWidgetResizable(True)
         self.scrollAreaWidgetContents_2 = QWidget()
         self.scrollAreaWidgetContents_2.setObjectName(u"scrollAreaWidgetContents_2")
         self.scrollAreaWidgetContents_2.setGeometry(QRect(0, 0, 744, 359))
-        self.verticalLayout_6 = QVBoxLayout(self.scrollAreaWidgetContents_2)
-        self.verticalLayout_6.setObjectName(u"verticalLayout_6")
-        self.verticalLayout_2 = QVBoxLayout()
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.horizontalLayout_12 = QHBoxLayout()
-        self.horizontalLayout_12.setObjectName(u"horizontalLayout_12")
-        self.label_8 = QLabel(self.scrollAreaWidgetContents_2)
-        self.label_8.setObjectName(u"label_8")
-
-        self.horizontalLayout_12.addWidget(self.label_8)
-
-        self.horizontalSpacer_8 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        self.horizontalLayout_12.addItem(self.horizontalSpacer_8)
-
-
-        self.verticalLayout_2.addLayout(self.horizontalLayout_12)
-
-        self.plotData = QHBoxLayout()
-        self.plotData.setObjectName(u"plotData")
-
-        self.verticalLayout_2.addLayout(self.plotData)
-
-        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-
-        self.verticalLayout_2.addItem(self.verticalSpacer)
-
-
-        self.verticalLayout_6.addLayout(self.verticalLayout_2)
-
+        self.dataLayout = QHBoxLayout(self.scrollAreaWidgetContents_2)
+        self.dataLayout.setObjectName(u"dataLayout")
         self.scrollArea_2.setWidget(self.scrollAreaWidgetContents_2)
 
         self.verticalLayout_7.addWidget(self.scrollArea_2)
@@ -334,16 +311,15 @@ class Ui_MainWindow(object):
 
         self.scrollArea = QScrollArea(self.Parameters)
         self.scrollArea.setObjectName(u"scrollArea")
-        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        sizePolicy.setHeightForWidth(self.scrollArea.sizePolicy().hasHeightForWidth())
+        self.scrollArea.setSizePolicy(sizePolicy)
         self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setAlignment(Qt.AlignHCenter|Qt.AlignTop)
-        self.scrollLayout2 = QWidget()
-        self.scrollLayout2.setObjectName(u"scrollLayout2")
-        self.scrollLayout2.setGeometry(QRect(0, 0, 742, 367))
-        self.scrollLayout2.setLayoutDirection(Qt.LeftToRight)
-        self.scrollLayout = QVBoxLayout(self.scrollLayout2)
-        self.scrollLayout.setObjectName(u"scrollLayout")
-        self.scrollArea.setWidget(self.scrollLayout2)
+        self.scrollWidget = QWidget()
+        self.scrollWidget.setObjectName(u"scrollWidget")
+        self.scrollWidget.setGeometry(QRect(0, 0, 756, 367))
+        self.scrollContent = QHBoxLayout(self.scrollWidget)
+        self.scrollContent.setObjectName(u"scrollContent")
+        self.scrollArea.setWidget(self.scrollWidget)
 
         self.verticalLayout_4.addWidget(self.scrollArea)
 
@@ -351,6 +327,33 @@ class Ui_MainWindow(object):
         self.horizontalLayout_11.addLayout(self.verticalLayout_4)
 
         self.tabWidget.addTab(self.Parameters, "")
+        self.tab_2 = QWidget()
+        self.tab_2.setObjectName(u"tab_2")
+        self.horizontalLayout_4 = QHBoxLayout(self.tab_2)
+        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.verticalLayout_5 = QVBoxLayout()
+        self.verticalLayout_5.setObjectName(u"verticalLayout_5")
+        self.pushButton_6 = QPushButton(self.tab_2)
+        self.pushButton_6.setObjectName(u"pushButton_6")
+
+        self.verticalLayout_5.addWidget(self.pushButton_6)
+
+        self.scrollArea_3 = QScrollArea(self.tab_2)
+        self.scrollArea_3.setObjectName(u"scrollArea_3")
+        self.scrollArea_3.setWidgetResizable(True)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
+        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 756, 460))
+        self.imagesLayout = QVBoxLayout(self.scrollAreaWidgetContents)
+        self.imagesLayout.setObjectName(u"imagesLayout")
+        self.scrollArea_3.setWidget(self.scrollAreaWidgetContents)
+
+        self.verticalLayout_5.addWidget(self.scrollArea_3)
+
+
+        self.horizontalLayout_4.addLayout(self.verticalLayout_5)
+
+        self.tabWidget.addTab(self.tab_2, "")
 
         self.verticalLayout.addWidget(self.tabWidget)
 
@@ -383,7 +386,7 @@ class Ui_MainWindow(object):
         self.aoiSlider.valueChanged.connect(MainWindow.plotParamSlot)
         self.aoiNumber.valueChanged.connect(MainWindow.plotParamSlot)
 
-        self.tabWidget.setCurrentIndex(2)
+        self.tabWidget.setCurrentIndex(0)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -401,7 +404,6 @@ class Ui_MainWindow(object):
         self.label.setText(QCoreApplication.translate("MainWindow", u"Folder Name", None))
         self.pushButton.setText(QCoreApplication.translate("MainWindow", u"Browse", None))
         self.pushButton_2.setText(QCoreApplication.translate("MainWindow", u"Load Data", None))
-        self.label_8.setText(QCoreApplication.translate("MainWindow", u"TextLabel", None))
         self.output.setText("")
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), QCoreApplication.translate("MainWindow", u"Data", None))
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Batch size", None))
@@ -415,6 +417,8 @@ class Ui_MainWindow(object):
         self.label_9.setText(QCoreApplication.translate("MainWindow", u"AoI Number", None))
         self.aoiMax.setText(QCoreApplication.translate("MainWindow", u"/0", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.Parameters), QCoreApplication.translate("MainWindow", u"Parameters", None))
+        self.pushButton_6.setText(QCoreApplication.translate("MainWindow", u"PushButton", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), QCoreApplication.translate("MainWindow", u"Images", None))
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.menuHelp.setTitle(QCoreApplication.translate("MainWindow", u"Help", None))
     # retranslateUi

@@ -11,7 +11,8 @@ from pyro import param
 from pyro.ops.indexing import Vindex
 from cosmos.models.noise import _noise_fn
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.metrics import matthews_corrcoef, confusion_matrix
+from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
+    recall_score, precision_score
 from tqdm import tqdm
 import logging
 import cosmos
@@ -97,11 +98,9 @@ class Model(nn.Module):
 
         self.predictions = np.zeros(
             (self.data.N, self.data.F),
-            dtype=[("aoi", int), ("frame", int), ("z", bool),
+            dtype=[("z", bool),
                    ("z_prob", float), ("m", bool, (2,)),
                    ("m_prob", float, (2,)), ("theta", int)])
-        self.predictions["aoi"] = self.data.target.index.values.reshape(-1, 1)
-        self.predictions["frame"] = self.data.drift.index.values
 
         pyro.clear_param_store()
         self.iter = 0
@@ -128,8 +127,7 @@ class Model(nn.Module):
     def run(self, num_iter):
         for i in range(num_iter):
             # with torch.autograd.detect_anomaly():
-            import pdb; pdb.set_trace()
-            self.epoch_loss = self.svi.step()
+            self.iter_loss = self.svi.step()
             if not self.iter % 100:
                 self.infer()
                 self.save_checkpoint()
@@ -142,12 +140,9 @@ class Model(nn.Module):
             "{}{}".format(self.__name__, version),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
-            #  "{}".format(self.optim_fn.__name__),
             "bs{}".format(self.batch_size))
-        self.writer_scalar = SummaryWriter(
+        self.writer = SummaryWriter(
             log_dir=os.path.join(self.path, "scalar"))
-        self.writer_hist = SummaryWriter(
-            log_dir=os.path.join(self.path, "hist"))
 
         self.logger = logging.getLogger(__name__)
         fh = logging.FileHandler(os.path.join(
@@ -171,105 +166,70 @@ class Model(nn.Module):
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def save_checkpoint(self):
-        if not any([torch.isnan(v).any()
+        # save only if no NaN values
+        if any([torch.isnan(v).any()
                    for v in pyro.get_param_store().values()]):
-            self.optim.save(os.path.join(self.path, "optimizer"))
-            pyro.get_param_store().save(os.path.join(self.path, "params"))
-            np.savetxt(os.path.join(self.path, "iter"),
-                       np.array([self.iter]))
-            params_last = pd.Series(data={"iter": self.iter})
-
-            self.writer_scalar.add_scalar(
-                "-ELBO", self.epoch_loss, self.iter)
-            params_last["-ELBO"] = self.epoch_loss
-            for p in pyro.get_param_store().keys():
-                if param(p).squeeze().dim() == 0:
-                    self.writer_scalar.add_scalar(
-                        p, pyro.param(p).squeeze().item(), self.iter)
-                    params_last[p] = pyro.param(p).item()
-                elif param(p).squeeze().dim() == 1 and \
-                        len(param(p).squeeze()) <= self.S+1:
-                    scalars = {str(i): p.item()
-                               for i, p in enumerate(param(p).squeeze())}
-                    self.writer_scalar.add_scalars(
-                        "{}".format(p), scalars, self.iter)
-                    for key, value in scalars.items():
-                        params_last["{}_{}".format(p, key)] = value
-                elif param(p).squeeze().dim() == 2 and \
-                        len(param(p).squeeze()) <= self.S+1:
-                    scalars = {str(i): p.item()
-                               for i, p in enumerate(param(p)[0].squeeze())}
-                    self.writer_scalar.add_scalars(
-                        "{}_0".format(p), scalars, self.iter)
-                    for key, value in scalars.items():
-                        params_last["{}_{}_0".format(p, key)] = value
-                    scalars = {str(i): p.item()
-                               for i, p in enumerate(param(p)[1].squeeze())}
-                    self.writer_scalar.add_scalars(
-                        "{}_1".format(p), scalars, self.iter)
-                    for key, value in scalars.items():
-                        params_last["{}_{}_1".format(p, key)] = value
-            if self.data.labels is not None:
-                mask = self.data.labels["z"] < 2
-                predictions = self.predictions["z"][mask]
-                true_labels = self.data.labels["z"][mask]
-                mcc = matthews_corrcoef(true_labels, predictions)
-                tn, fp, fn, tp = confusion_matrix(
-                    true_labels, predictions).ravel()
-                fuzzy_tp = self.predictions["z_prob"][self.data.labels["z"] == 1].sum()
-                fuzzy_tn = (1 - self.predictions["z_prob"][self.data.labels["z"] == 0]).sum()
-                fuzzy_fp = self.predictions["z_prob"][self.data.labels["z"] == 0].sum()
-                fuzzy_fn = (1 - self.predictions["z_prob"][self.data.labels["z"] == 1]).sum()
-                scalars = {}
-                scalars["fuzzy_MCC"] = (fuzzy_tp*fuzzy_tn - fuzzy_fp*fuzzy_fn) \
-                    / np.sqrt((fuzzy_tp+fuzzy_fp)*(fuzzy_tp+fuzzy_fn)*(fuzzy_tn+fuzzy_fp)*(fuzzy_tn+fuzzy_fn))
-                scalars["MCC"] = mcc
-                scalars["TPR"] = tp / (tp + fn)
-                scalars["TNR"] = tn / (tn + fp)
-                negatives = {}
-                negatives["TN"] = tn
-                negatives["FP"] = fp
-                positives = {}
-                positives["TP"] = tp
-                positives["FN"] = fn
-                self.writer_scalar.add_scalars(
-                    "ACCURACY", scalars, self.iter)
-                self.writer_scalar.add_scalars(
-                    "NEGATIVES", negatives, self.iter)
-                self.writer_scalar.add_scalars(
-                    "POSITIVES", positives, self.iter)
-                for key, value in scalars.items():
-                    params_last[key] = value
-                for key, value in negatives.items():
-                    params_last[key] = value
-                for key, value in positives.items():
-                    params_last[key] = value
-                #import pdb; pdb.set_trace()
-                #if self.data.name.startswith("FL") and \
-                #        self.data.name.endswith("OD"):
-                try:
-                    atten_labels = np.copy(self.data.labels)
-                    atten_labels["z"][
-                        self.data.labels["spotpicker"] != self.predictions["z"]] = 2 
-                    atten_labels["spotpicker"] = 0
-                    np.save(os.path.join(self.path, "atten_labels.npy"),
-                            atten_labels)
-                except:
-                    pass
-                #    atten_labels.loc[
-                #        self.data.labels["spotpicker"] != self.data.predictions["binary"],
-                #        "binary"] = 2
-
-            params_last.to_csv(os.path.join(self.path, "params_last.csv"))
-            self.logger.info("Step #{}.".format(self.iter))
-        else:
             self.logger.warning("Step #{}. Detected NaN values in parameters".format(self.iter))
+            return
+
+        self.optim.save(os.path.join(self.path, "optimizer"))
+        pyro.get_param_store().save(os.path.join(self.path, "params"))
+        np.savetxt(os.path.join(self.path, "iter"),
+                   np.array([self.iter]))
+        params_last = pd.Series(data={"iter": self.iter})
+
+        self.writer.add_scalar(
+            "-ELBO", self.iter_loss, self.iter)
+        params_last["-ELBO"] = self.iter_loss
+        for name, val in pyro.get_param_store().items():
+            if val.dim() == 0:
+                self.writer.add_scalar(name, val.item(), self.iter)
+                params_last[name] = val.item()
+            elif val.dim() == 1:
+                scalars = {str(i): v.item() for i, v in enumerate(val)}
+                self.writer.add_scalars(name, scalars, self.iter)
+                for key, value in scalars.items():
+                    params_last["{}_{}".format(name, key)] = value
+
+        if self.data.labels is not None:
+            mask = self.data.labels["z"] < 2
+            pred_labels = self.predictions["z"][mask]
+            true_labels = self.data.labels["z"][mask]
+
+            metrics = {}
+            metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
+            metrics["Recall"] = recall_score(true_labels, pred_labels, zero_division=0)
+            metrics["Precision"] = precision_score(true_labels, pred_labels, zero_division=0)
+
+            neg, pos = {}, {}
+            neg["TN"], neg["FP"], pos["FN"], pos["TP"] = confusion_matrix(
+                true_labels, pred_labels).ravel()
+
+            self.writer.add_scalars(
+                "ACCURACY", metrics, self.iter)
+            self.writer.add_scalars(
+                "NEGATIVES", neg, self.iter)
+            self.writer.add_scalars(
+                "POSITIVES", pos, self.iter)
+            for key, value in {**metrics, **pos, **neg}.items():
+                params_last[key] = value
+            try:
+                atten_labels = np.copy(self.data.labels)
+                atten_labels["z"][
+                    self.data.labels["spotpicker"] != self.predictions["z"]] = 2 
+                atten_labels["spotpicker"] = 0
+                np.save(os.path.join(self.path, "atten_labels.npy"),
+                        atten_labels)
+            except:
+                pass
+
+        params_last.to_csv(os.path.join(self.path, "params_last.csv"))
+        self.logger.info("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
         if path is None:
             path = self.path
-        self.iter = int(
-            np.loadtxt(os.path.join(path, "epoch_count")))
+        self.iter = int(np.loadtxt(os.path.join(path, "iter")))
         self.optim.load(os.path.join(path, "optimizer"))
         pyro.clear_param_store()
         pyro.get_param_store().load(
@@ -284,12 +244,9 @@ class Model(nn.Module):
         if path is None:
             path = self.path
         self.iter = int(
-            np.loadtxt(os.path.join(path, "epoch_count")))
+            np.loadtxt(os.path.join(path, "iter")))
         pyro.clear_param_store()
         pyro.get_param_store().load(
                 os.path.join(path, "params"),
                 map_location=self.device)
         self.predictions = np.load(os.path.join(path, "predictions.npy"))
-        #self.logger.info(
-        #        "Step #{}. Loaded model params and optimizer state from {}"
-        #        .format(self.iter, path))
