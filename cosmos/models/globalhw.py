@@ -63,12 +63,13 @@ class GlobalHW(Model):
                 param("width_mode"),
                 param("width_size"), 0.5, 2.5))
         with N_plate as batch_idx:
+            batch_idx = batch_idx[:, None]
             background = pyro.sample(
                 "background", dist.Gamma(
-                    param(f"{prefix}/background_loc")[batch_idx]
+                    Vindex(param(f"{prefix}/background_loc"))[batch_idx, 0]
                     * param("background_beta"), param("background_beta")))
 
-            with F_plate:
+            with F_plate as frame_idx:
                 if pi_theta is not None:
                     theta = pyro.sample("theta", dist.Categorical(pi_theta))
                 else:
@@ -86,21 +87,17 @@ class GlobalHW(Model):
                         "y", ScaledBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
-                height = height.masked_fill(m_mask==0, 0.)
-                width = width * 2.5 + 0.5
-                x = x * (data.D+1) - (data.D+1)/2
-                y = y * (data.D+1) - (data.D+1)/2
+            height = height.masked_fill(m_mask==0, 0.)
+            width = width * 2.5 + 0.5
+            x = x * (data.D+1) - (data.D+1)/2
+            y = y * (data.D+1) - (data.D+1)/2
 
 
-                locs = data.loc(height, width, x, y, background, batch_idx)
-                #offset = pyro.sample(
-                #    "offset", dist.Categorical(data.offset_weights).expand([data.D, data.D]).to_event(2))
-                #offset = data.offset_samples[offset]
-                #print(offset.shape)
-                pyro.sample(
-                    "data", ConvGamma(
-                        locs / param("gain"), 1 / param("gain"), self.data.offset_samples, self.data.offset_weights.log()).to_event(2),
-                    obs=data[batch_idx])
+            locs = data.loc(height, width, x, y, background, batch_idx, frame_idx)
+            pyro.sample(
+                "data", ConvGamma(
+                    locs / param("gain"), 1 / param("gain"), self.data.offset_samples, self.data.offset_weights.log()).to_event(2),
+                obs=Vindex(data.data)[batch_idx, frame_idx, :, :])
 
     def spot_guide(self, data, theta, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
@@ -119,35 +116,37 @@ class GlobalHW(Model):
                 param(f"{prefix}/w_size"),
                 0.5, 2.5))
         with N_plate as batch_idx:
+            batch_idx = batch_idx[:, None]
             self.batch_idx = batch_idx.cpu()
             background = pyro.sample(
                 "background", dist.Gamma(
-                    param(f"{prefix}/b_loc")[batch_idx]
-                    * param(f"{prefix}/b_beta")[batch_idx],
-                    param(f"{prefix}/b_beta")[batch_idx]))
+                    Vindex(param(f"{prefix}/b_loc"))[batch_idx, 0]
+                    * Vindex(param(f"{prefix}/b_beta"))[batch_idx, 0],
+                    Vindex(param(f"{prefix}/b_beta"))[batch_idx, 0]))
 
-            with F_plate:
+            with F_plate as frame_idx:
                 if theta:
                     theta = pyro.sample("theta", dist.Categorical(
-                        param(f"{prefix}/theta_probs")[batch_idx]))
+                        Vindex(param(f"{prefix}/theta_probs"))[batch_idx, frame_idx, :]))
                 else:
                     theta = 0
                 m = pyro.sample("m", dist.Categorical(
-                        Vindex(param(f"{prefix}/m_probs")[batch_idx])[..., theta, :]))
+                        Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
                 m_mask = Vindex(self.m_matrix)[..., m]
 
 
                 #with K_plate:
-                with K_plate, pyro.poutine.mask(mask=m_mask>0):
+                with K_plate as k_idx, pyro.poutine.mask(mask=m_mask>0):
+                    k_idx = k_idx[:, None, None]
                     x = pyro.sample(
                         "x", ScaledBeta(
-                            param(f"{prefix}/x_mode")[:, batch_idx],
-                            param(f"{prefix}/size")[:, batch_idx],
+                            Vindex(param(f"{prefix}/x_mode"))[k_idx, batch_idx, frame_idx],
+                            Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
                             -(data.D+1)/2, data.D+1))
                     y = pyro.sample(
                         "y", ScaledBeta(
-                            param(f"{prefix}/y_mode")[:, batch_idx],
-                            param(f"{prefix}/size")[:, batch_idx],
+                            Vindex(param(f"{prefix}/y_mode"))[k_idx, batch_idx, frame_idx],
+                            Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
                             -(data.D+1)/2, data.D+1))
 
 

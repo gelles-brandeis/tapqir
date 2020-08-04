@@ -19,29 +19,6 @@ from cosmos.models.helper import pi_m_calc, pi_theta_calc
 from cosmos.models.helper import z_probs_calc, k_probs_calc
 import cosmos
 
-"""
-class ConvGamma(TorchDistribution):
-    arg_constraints = {}  # nothing to be constrained
-
-    def __init__(self, concentration, rate, samples, log_weights):
-        self.dist = dist.Gamma(concentration, rate)
-        self.samples = samples
-        self.log_weights = log_weights
-        batch_shape = self.dist.batch_shape
-        event_shape = self.dist.event_shape
-        super().__init__(batch_shape, event_shape)
-
-    def log_prob(self, value):
-        samples = self.samples[(...,) + (None,) * value.dim()]
-        mask = value > samples
-
-        obs_logits = self.dist.log_prob(value - samples)
-        log_weights = self.log_weights[(...,) + (None,) * value.dim()]
-        result = obs_logits + log_weights
-        result = torch.where(mask, result, result.new_zeros(()))
-        result = torch.logsumexp(result, 0)
-        return result
-"""
 
 class ConvGamma(TorchDistribution):
     arg_constraints = {}  # nothing to be constrained
