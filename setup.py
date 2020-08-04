@@ -36,10 +36,10 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     entry_points={
-        "console_scripts": ["cosmos=cosmos.app:main", "cosmosGui=cosmos.ui.gui:main"],
+        "console_scripts": ["cosmos=cosmos.ui.app:main"],
         "cosmos.app": [
-            "fit=cosmos.fit:Fit",
-            "view=cosmos.view:View",
+            "fit=cosmos.ui.fit:Fit",
+            "show=cosmos.ui.show:Show",
         ]
     }
 )
