@@ -3,7 +3,6 @@ import torch
 
 from cliff.command import Command
 
-from cosmos.utils.aoi_reader import ReadAoi
 from cosmos.models.tracker import Tracker
 from cosmos.models.marginal import Marginal
 from cosmos.models.globalhwb import GlobalHWB
@@ -50,9 +49,3 @@ class Fit(Command):
         model.load(args.dataset, args.control, args.device)
         model.settings(args.learning_rate, args.batch_size)
         model.run(args.num_iter)
-        """
-        logger.info("Using device: {}".format(args.device))
-        logger.info("Loading dataset: {}".format(args.dataset))
-
-        logger.info("Model: {}".format(args.model))
-        """
