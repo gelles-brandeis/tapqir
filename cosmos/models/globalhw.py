@@ -105,7 +105,7 @@ class GlobalHW(Model):
     def spot_guide(self, data, theta, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
         N_plate = pyro.plate("N_plate", data.N,
-                             subsample_size=self.n_batch, dim=-2)
+                             subsample_size=self.batch_size, dim=-2)
         F_plate = pyro.plate("F_plate", data.F, dim=-1)
 
         height = pyro.sample(
