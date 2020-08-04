@@ -27,7 +27,6 @@ setuptools.setup(
         "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "future", "configparser",
         "torch", "torchvision", "cliff", "PySide2",
         "pyro-ppl", "tb-nightly",
-        # "voila", "ipyfilechooser",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -40,6 +39,7 @@ setuptools.setup(
         "cosmos.app": [
             "fit=cosmos.ui.fit:Fit",
             "show=cosmos.ui.show:Show",
+            "glimpse=cosmos.ui.glimpse:Glimpse",
         ]
     }
 )

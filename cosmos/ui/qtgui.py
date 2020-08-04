@@ -14,8 +14,6 @@ from pyro import param
 from pyro.ops.stats import pi
 from cosmos.models.tracker import Tracker
 import pyro.distributions as dist
-from cosmos.ui.utils import plot_graph, \
-    HistogramLUTGraph
 from collections import defaultdict
 
 C = {}
@@ -77,7 +75,7 @@ class AnotherWindow(QScrollArea):
 class MainWindow(QMainWindow):
 
     def __init__(self):
-        super().__init__(dataset=None, parameters=None, control, device)
+        super().__init__(dataset=None, parameters=None, control=False, device="cpu")
         if dataset is None:
             dataset = "/home/ordabayev/Documents/cosmos_test/test_data/GraceArticlePol2",
         if parameters is None:

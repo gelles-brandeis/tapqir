@@ -90,25 +90,27 @@ def load_data(path, dtype, device=None):
 
     return CoSMoSDataset(data, target, drift, dtype, device)
 
-def read_glimpse(name, D, dtype, device=None):
+def read_glimpse(path, D, dtype, device="cpu"):
     """ Read Glimpse files """
 
     """
     read header, aoiinfo, driftlist, and labels files
     """
+    device = torch.device(device)
     config = configparser.ConfigParser(allow_no_value=True)
-    config.read("datasets.cfg")
-    files = ["dir", "test_aoiinfo", "control_aoiinfo", "driftlist", "labels"]
+    config.read(os.path.join(path, "dataset.cfg"))
+    files = ["dir", "test_aoiinfo", "control_aoiinfo", "driftlist",
+             "labels", "labeltype"]
     path_to = {}
-    if name.split(".")[0] in config:
+    if "glimpse" in config:
         for FILE in files:
-            path_to[FILE] = config[name.split(".")[0]][FILE]
+            path_to[FILE] = config["glimpse"][FILE]
     else:
-        config.add_section(name)
+        config.add_section("glimpse")
         for FILE in files:
             path_to[FILE] = input("{}: ".format(FILE))
-            config.set(name, FILE, path_to[FILE])
-        with open("datasets.cfg", "w") as configfile:
+            config.set("glimpse", FILE, path_to[FILE])
+        with open("dataset.cfg", "w") as configfile:
             config.write(configfile)
 
     """
@@ -140,40 +142,25 @@ def read_glimpse(name, D, dtype, device=None):
     # load aoiinfo mat file
     aoi_mat = loadmat(path_to["{}_aoiinfo".format(dtype)])
     # convert aoiinfo into DataFrame
-    if name in ["Gracecy3"]:
-        aoi_df = pd.DataFrame(
-            aoi_mat["aoifits"]["aoiinfo2"][0, 0],
-            columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
-    else:
-        aoi_df = pd.DataFrame(
-            aoi_mat["aoiinfo2"],
-            columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+    #if name in ["Gracecy3"]:
+    #    aoi_df = pd.DataFrame(
+    #        aoi_mat["aoifits"]["aoiinfo2"][0, 0],
+    #        columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+    #else:
+    aoi_df = pd.DataFrame(
+        aoi_mat["aoiinfo2"],
+        columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
     aoi_df = aoi_df.astype({"aoi": int}).set_index("aoi")
     aoi_df["x"] = aoi_df["x"] \
         - drift_df.at[int(aoi_df.at[1, "frame"]), "dx"]
     aoi_df["y"] = aoi_df["y"] \
         - drift_df.at[int(aoi_df.at[1, "frame"]), "dy"]
 
-    if name in ["LarryCy3sigma54Short",
-                     "LarryCy3sigma54NegativeControlShort"]:
-        f1 = 170
-        f2 = 1000
-        drift_df = drift_df.loc[f1:f2]
-        aoi_list = np.arange(1, 33)
-        aoi_df = aoi_df.loc[aoi_list]
-    elif name in ["LarryCy3sigma54NegativeControl1"]:
-        aoi_df = aoi_df.loc[:64]
-    elif name in ["LarryCy3sigma54NegativeControl2"]:
-        aoi_df = aoi_df.loc[65:]
-    elif name in ["GraceArticlePol2NegativeControl1"]:
-        aoi_df = aoi_df.loc[:263]
-    elif name in ["GraceArticlePol2NegativeControl2"]:
-        aoi_df = aoi_df.loc[264:]
 
     labels = None
     if dtype == "test":
         if path_to["labels"]:
-            if name.startswith("FL"):
+            if path_to["labeltype"] == "framelist":
                 framelist = loadmat(path_to["labels"])
                 f1 = framelist[name.split("-")[0].split(".")[0]][0, 2]
                 f2 = framelist[name.split("-")[0].split(".")[0]][-1, 2]
@@ -213,21 +200,6 @@ def read_glimpse(name, D, dtype, device=None):
 
             labels["z"] = labels["spotpicker"]
 
-    if name.endswith(".clean"):
-        pyro.clear_param_store()
-        pyro.get_param_store().load(
-            filename=os.path.join("{}/runs/marginalv0.9.9/nojit/lr0.005/Adam/32".format(name.split("-")[0].split(".")[0]), "params"),
-            map_location=torch.device("cpu"))
-        data_stat = load_data(name.split("-")[0].split(".")[0], dtype="test", device=torch.device("cpu"))
-        control_stat = load_data(name.split("-")[0].split(".")[0], dtype="control", device=torch.device("cpu"))
-        bg_stat = data_stat.data.mean(dim=(1,2,3))
-        try:
-            bg_fit = (pyro.param("d/background_loc") + data_stat.offset_median).data.reshape(-1)
-        except:
-            bg_fit = (pyro.param("c/background_loc") + data_stat.offset_median).data.reshape(-1)
-        fs = data_stat.target.index[torch.abs(bg_stat - bg_fit) < 8]
-        aoi_df = aoi_df.loc[fs]
-        labels = labels[torch.abs(bg_stat - bg_fit) < 8]
 
     """
     target DataFrame
@@ -255,7 +227,7 @@ def read_glimpse(name, D, dtype, device=None):
     if dtype == "test":
         offsets = np.ones((F, 4, 30, 30)) * 2**15
     # loop through each frame
-    for i, frame in enumerate(drift_df.index):
+    for i, frame in enumerate(tqdm(drift_df.index)):
         # read the entire frame image
         glimpse_number = header["filenumber"][frame - 1]
         glimpse_path = os.path.join(
