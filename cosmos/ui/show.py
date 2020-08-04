@@ -3,6 +3,7 @@ import sys
 
 from cliff.command import Command
 
+from PySyde2.QtWidgets import QApplication
 from cosmos.ui.qtgui import MainWindow
 
 class Show(Command):
@@ -26,7 +27,8 @@ class Show(Command):
         return parser
 
     def take_action(self, args):
-        app = MainWindow(
+        app = QApplication(sys.argv)
+        window = MainWindow(
             args.dataset, args.parameters,
             args.control, args.device
         )
