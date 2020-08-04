@@ -10,37 +10,13 @@ from pyro.infer import SVI, infer_discrete
 from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
-from cosmos.models.helper import ScaledBeta
+from cosmos.models.helper import ScaledBeta, ConvGamma
 import torch.distributions.constraints as constraints
-from pyro.distributions import TorchDistribution
 
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
 from cosmos.models.helper import z_probs_calc, k_probs_calc
-import cosmos
 
-
-class ConvGamma(TorchDistribution):
-    arg_constraints = {}  # nothing to be constrained
-
-    def __init__(self, concentration, rate, samples, log_weights):
-        self.dist = dist.Gamma(concentration.unsqueeze(-1), rate)
-        self.samples = samples
-        self.log_weights = log_weights
-        batch_shape = self.dist.batch_shape[:-1]
-        event_shape = self.dist.event_shape
-        super().__init__(batch_shape, event_shape)
-
-    def log_prob(self, value):
-        value = value.unsqueeze(-1)
-        mask = value > self.samples
-        value = torch.where(mask, value - self.samples, value.new_ones(()))
-
-        obs_logits = self.dist.log_prob(value)
-        result = obs_logits + self.log_weights
-        result = result.masked_fill(~mask, -40.)
-        result = torch.logsumexp(result, -1)
-        return result
 
 class Tracker(Model):
     """ Track on-target Spot """
@@ -271,13 +247,6 @@ class Tracker(Model):
               constraint=constraints.interval(0.5, 3.))
         param("width_size",
               torch.tensor([10.], device=self.device), constraint=constraints.positive)
-
-        #param("offset", self.offset_guess,
-        #      constraint=constraints.interval(0, self.offset_max))
-        #param("offset", self.offset_max-50,
-        #      constraint=constraints.interval(0, self.offset_max))
-        #param("offset", torch.tensor([90.]), constraint=constraints.positive)
-        #param("gain", torch.tensor(5.), constraint=constraints.positive)
 
     def infer(self):
         z_probs = z_probs_calc(

@@ -10,82 +10,19 @@ from pyro.infer import SVI, infer_discrete
 from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
-from cosmos.models.helper import ScaledBeta
+from cosmos.models.helper import ScaledBeta, ConvGamma
 import torch.distributions.constraints as constraints
-from pyro.distributions import TorchDistribution
 
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
 from cosmos.models.helper import z_probs_calc, k_probs_calc
-import cosmos
 
-"""
-class ConvGamma(TorchDistribution):
-    arg_constraints = {}  # nothing to be constrained
-
-    def __init__(self, concentration, rate, samples, log_weights):
-        self.dist = dist.Gamma(concentration, rate)
-        self.samples = samples
-        self.log_weights = log_weights
-        batch_shape = self.dist.batch_shape
-        event_shape = self.dist.event_shape
-        super().__init__(batch_shape, event_shape)
-
-    def log_prob(self, value):
-        samples = self.samples[(...,) + (None,) * value.dim()]
-        mask = value > samples
-
-        obs_logits = self.dist.log_prob(value - samples)
-        log_weights = self.log_weights[(...,) + (None,) * value.dim()]
-        result = obs_logits + log_weights
-        result = torch.where(mask, result, result.new_zeros(()))
-        result = torch.logsumexp(result, 0)
-        return result
-"""
-
-class ConvGamma(TorchDistribution):
-    arg_constraints = {}  # nothing to be constrained
-
-    def __init__(self, concentration, rate, samples, log_weights):
-        self.dist = dist.Gamma(concentration.unsqueeze(-1), rate)
-        self.samples = samples
-        self.log_weights = log_weights
-        batch_shape = self.dist.batch_shape[:-1]
-        event_shape = self.dist.event_shape
-        super().__init__(batch_shape, event_shape)
-
-    def log_prob(self, value):
-        value = value.unsqueeze(-1)
-        mask = value > self.samples
-        value = torch.where(mask, value - self.samples, value.new_ones(()))
-
-        obs_logits = self.dist.log_prob(value)
-        result = obs_logits + self.log_weights
-        result = result.masked_fill(~mask, -40.)
-        result = torch.logsumexp(result, -1)
-        return result
 
 class GlobalHW(Model):
     """ Track on-target Spot """
-    def __init__(self, data, control, path,
-                 K, lr, n_batch, jit, device, noise="GammaOffset"):
+    def __init__(self):
         self.__name__ = "globalhw"
-        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
-            max_plate_nesting=3, ignore_jit_warnings=True)
-        super().__init__(data, control, path,
-                         K, lr, n_batch, jit, device, noise="GammaOffset")
-
-        if self.control:
-            self.offset_max = torch.where(
-                self.data[:].min() < self.control[:].min(),
-                self.data[:].min() - 0.1,
-                self.control[:].min() - 0.1)
-        else:
-            self.offset_max = self.data[:].min() - 0.1
-
-        #self.offset_guess = torch.min(self.data.offset_median, self.offset_max)
-        self.offset_guess = self.data.offset_mean
-        print(self.data.noise * 2)
+        super().__init__()
 
     @poutine.block(hide=["width_mode", "width_size"])
     @config_enumerate
@@ -215,19 +152,12 @@ class GlobalHW(Model):
 
 
     def guide_parameters(self):
-        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
-        #param("pi", torch.tensor([0.1, 0.9]), constraint=constraints.simplex)
-        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
-        #param("lamda", torch.tensor([0.1]), constraint=constraints.positive)
-        #param("size_z", torch.tensor([1000.]), constraint=constraints.positive)
-        #param("size_lamda", torch.tensor([1000.]), constraint=constraints.positive)
         self.spot_parameters(self.data, True, True, prefix="d")
         if self.control:
             self.spot_parameters(
                 self.control, True, False, prefix="c")
 
     def spot_parameters(self, data, m, theta, prefix):
-        param("gain", torch.tensor(5.), constraint=constraints.positive)
         param(f"{prefix}/background_loc",
               #(data[:].mean(dim=(1, 2, 3)) - self.offset_guess).reshape(data.N, 1),
               #torch.ones(data.N, 1) * 50.,
@@ -307,19 +237,15 @@ class GlobalHW(Model):
         #      constraint=constraints.positive)
         #param("height_beta", torch.tensor([0.01]),
         #      constraint=constraints.positive)
+        param("gain", torch.tensor(5.), constraint=constraints.positive)
+        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
         param("background_beta", torch.tensor([1.]),
               constraint=constraints.positive)
         param("width_mode", torch.tensor([1.3]),
               constraint=constraints.interval(0.5, 3.))
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
-
-        #param("offset", self.offset_guess,
-        #      constraint=constraints.interval(0, self.offset_max))
-        #param("offset", self.offset_max-50,
-        #      constraint=constraints.interval(0, self.offset_max))
-        #param("offset", torch.tensor([90.]), constraint=constraints.positive)
-        #param("gain", torch.tensor(5.), constraint=constraints.positive)
 
     def infer(self):
         z_probs = z_probs_calc(
