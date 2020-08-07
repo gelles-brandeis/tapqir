@@ -71,15 +71,11 @@ class AnotherWindow(QScrollArea):
 
 class MainWindow(QMainWindow):
 
-    def __init__(self, dataset=None, parameters=None, control=False, device="cpu"):
+    def __init__(self, dataset, parameters, control=False):
         super().__init__()
-        if dataset is None:
-            dataset = "/home/ordabayev/Documents/cosmos_test/test_data/GraceArticlePol2",
-        if parameters is None:
-            parameters = "/home/ordabayev/Documents/cosmos_test/test_data/GraceArticlePol2/runs/trackerv1.1.2+14.g2c7940f.dirty/control/lr0.005/bs8"
 
         self.Model = Tracker()
-        self.Model.load(dataset, control, device)
+        self.Model.load(dataset, control, "cpu")
         self.Model.load_parameters(parameters)
 
         self.initUI()

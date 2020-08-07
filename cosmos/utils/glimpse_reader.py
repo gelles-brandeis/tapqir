@@ -11,7 +11,9 @@ import pyro
 
 
 class CoSMoSDataset(Dataset):
-    """ CoSMoS Dataset """
+    """
+    CoSMoS Dataset
+    """
 
     def __init__(self, data=None, target=None, drift=None, dtype=None, device=None, offset=None, labels=None):
         self.data = data.to(device)
@@ -63,10 +65,11 @@ class CoSMoSDataset(Dataset):
         self.drift.to_csv(os.path.join(
             path, "drift.csv"))
         if self.dtype == "test":
-            np.save(os.path.join(path, "labels.npy"),
-                    self.labels)
             torch.save(self.offset, os.path.join(
                 path, "offset.pt"))
+            if self.labels is not None:
+                np.save(os.path.join(path, "labels.npy"),
+                        self.labels)
 
 def load_data(path, dtype, device=None):
     data = torch.load(os.path.join(
@@ -90,27 +93,35 @@ def load_data(path, dtype, device=None):
 
     return CoSMoSDataset(data, target, drift, dtype, device)
 
-def read_glimpse(path, D, dtype, device="cpu"):
+def read_glimpse(path, D, dtype):
     """ Read Glimpse files """
 
     """
     read header, aoiinfo, driftlist, and labels files
     """
-    device = torch.device(device)
+    device = torch.device("cpu")
     config = configparser.ConfigParser(allow_no_value=True)
-    config.read(os.path.join(path, "dataset.cfg"))
+    cfg_file = os.path.join(path, "dataset.cfg")
+    config.read(cfg_file)
     files = ["dir", "test_aoiinfo", "control_aoiinfo", "driftlist",
              "labels", "labeltype"]
+    message = ["Enter /path/to/glimpse/folder",
+               "Enter /path/to/test_aoiinfo_files.dat",
+               "Enter /path/to/control_aoiinfo_files.dat",
+               "Enter /path/to/driftlist_file.dat",
+               "Enter /path/to/labels_file.dat (optional)",
+               "Leave empty"]
     path_to = {}
     if "glimpse" in config:
         for FILE in files:
             path_to[FILE] = config["glimpse"][FILE]
     else:
         config.add_section("glimpse")
-        for FILE in files:
-            path_to[FILE] = input("{}: ".format(FILE))
+        for FILE, msg in zip(files, message):
+            print("")
+            path_to[FILE] = input("{}:\n".format(msg))
             config.set("glimpse", FILE, path_to[FILE])
-        with open("dataset.cfg", "w") as configfile:
+        with open(cfg_file, "w") as configfile:
             config.write(configfile)
 
     """

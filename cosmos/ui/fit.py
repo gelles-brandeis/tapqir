@@ -12,16 +12,15 @@ models["tracker"] = Tracker
 models["globalhw"] = GlobalHW
 
 class Fit(Command):
-    "A command to fit the data to the model"
+    "Fit the data to the model"
 
     def get_parser(self, prog_name):
-        """Command argument parsing."""
         parser = super(Fit, self).get_parser(prog_name)
 
         parser.add_argument("model", default="tracker", type=str,
                             help="Choose the model: {}".format(", ".join(models.keys())))
         parser.add_argument("dataset", type=str,
-                            help="Name of the dataset folder")
+                            help="Path to the dataset folder")
 
         parser.add_argument("-it", "--num-iter", default=20000, type=int, metavar="\b",
                             help="Number of iterations")
