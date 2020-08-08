@@ -197,7 +197,8 @@ class Model(nn.Module):
             true_labels = self.data.labels["z"][mask]
 
             metrics = {}
-            metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
             metrics["Recall"] = recall_score(true_labels, pred_labels, zero_division=0)
             metrics["Precision"] = precision_score(true_labels, pred_labels, zero_division=0)
 
