@@ -21,6 +21,7 @@ from git import Repo
 
 class Marginal(Model):
     """ Track on-target Spot """
+
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "marginal"

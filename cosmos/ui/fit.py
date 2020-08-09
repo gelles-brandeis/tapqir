@@ -1,6 +1,3 @@
-import logging
-import torch
-
 from cliff.command import Command
 
 from cosmos.models.tracker import Tracker
@@ -10,6 +7,7 @@ from cosmos.models.globalhw import GlobalHW
 models = dict()
 models["tracker"] = Tracker
 models["globalhw"] = GlobalHW
+
 
 class Fit(Command):
     "Fit the data to the model"

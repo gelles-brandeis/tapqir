@@ -12,8 +12,10 @@ def CameraUnit2(locs, gain, offset):
     transforms = [AffineTransform(loc=offset, scale=1)]
     return dist.TransformedDistribution(base_distribution, transforms)
 
+
 def CameraUnit3(locs, gain, offset, offset_var):
     return dist.Normal(locs + offset, torch.sqrt(locs * gain + offset_var))
+
 
 def CameraUnit(locs, gain, offset, offset_var):
     shape = (locs + offset) ** 2 / (locs * gain + offset_var)

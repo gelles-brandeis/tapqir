@@ -1,9 +1,7 @@
-import logging
-import torch
-
 from cliff.command import Command
 
 from cosmos.utils.glimpse_reader import read_glimpse
+
 
 class Glimpse(Command):
     """
@@ -20,14 +18,7 @@ class Glimpse(Command):
         parser.add_argument("dataset", type=str,
                             help="Path to the dataset folder")
 
-        parser.add_argument("-c", "--control", action="store_true",
-                            help="Read and save control data as well")
-
         return parser
 
     def take_action(self, args):
-        data = read_glimpse(args.dataset, D=14, dtype="test")
-        data.save(args.dataset)
-        if args.control:
-            control = read_glimpse(args.dataset, D=14, dtype="control")
-            control.save(args.dataset)
+        read_glimpse(args.dataset, D=14)

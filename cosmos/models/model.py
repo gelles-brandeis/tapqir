@@ -7,13 +7,10 @@ import pyro
 import pyro.distributions as dist
 from pyro.infer import SVI
 from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
-from pyro import param
 from pyro.ops.indexing import Vindex
-from cosmos.models.noise import _noise_fn
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
-from tqdm import tqdm
 import logging
 import cosmos
 from cosmos.utils.glimpse_reader import load_data
@@ -23,7 +20,7 @@ class GaussianSpot(nn.Module):
     def __init__(self, target, drift, D, device):
         super().__init__()
         # create meshgrid of DxD pixel positions
-        D_range = torch.arange(D, dtype=torch.float, device=device)
+        D_range = torch.arange(D, dtype=torch.float)
         i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
         self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
 
@@ -31,19 +28,17 @@ class GaussianSpot(nn.Module):
         self.target_locs = torch.tensor(
             drift[["dx", "dy"]].values.reshape(-1, 2)
             + target[["x", "y"]].values.reshape(-1, 1, 2),
-            device=device, dtype=torch.float)
+            dtype=torch.float)
 
     # Ideal 2D gaussian spots
     def forward(self, height, width, x, y, background, n_idx, f_idx):
-        #if f is not None:
-        #n_idx = n_idx[:, None]
-        #import pdb; pdb.set_trace()
+        # if f is not None:
         spot_locs = Vindex(self.target_locs)[n_idx, f_idx, :] + torch.stack((x, y), -1)
-        #else:
+        # else:
         #    spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
-            scale_tril=torch.eye(2, device=width.device) * width[..., None, None, None, None])
+            scale_tril=torch.eye(2) * width[..., None, None, None, None])
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
         result = (height[..., None, None] * gaussian_spot).sum(dim=-5, keepdim=True) \
             + background[..., None, None]
@@ -52,6 +47,7 @@ class GaussianSpot(nn.Module):
 
 class Model(nn.Module):
     """ Gaussian Spot Model """
+
     def __init__(self, K=2):
         super().__init__()
         self.K = K
@@ -86,9 +82,9 @@ class Model(nn.Module):
         else:
             self.control = control
 
-        self.size = torch.tensor([2., (((self.data.D+1) / (2*0.5)) ** 2 - 1)], device=self.device)
-        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], device=self.device).T.reshape(2,1,1,4)
-        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]], device=self.device).T.reshape(2,1,1,3)
+        self.size = torch.tensor([2., (((self.data.D+1) / (2*0.5)) ** 2 - 1)])
+        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 4)
+        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
 
     def settings(self, lr, batch_size, jit=False):
         # K - max number of spots
@@ -168,7 +164,7 @@ class Model(nn.Module):
     def save_checkpoint(self):
         # save only if no NaN values
         if any([torch.isnan(v).any()
-                   for v in pyro.get_param_store().values()]):
+                for v in pyro.get_param_store().values()]):
             self.logger.warning("Step #{}. Detected NaN values in parameters".format(self.iter))
             return
 
@@ -217,7 +213,7 @@ class Model(nn.Module):
             try:
                 atten_labels = np.copy(self.data.labels)
                 atten_labels["z"][
-                    self.data.labels["spotpicker"] != self.predictions["z"]] = 2 
+                    self.data.labels["spotpicker"] != self.predictions["z"]] = 2
                 atten_labels["spotpicker"] = 0
                 np.save(os.path.join(self.path, "atten_labels.npy"),
                         atten_labels)
@@ -234,12 +230,12 @@ class Model(nn.Module):
         self.optim.load(os.path.join(path, "optimizer"))
         pyro.clear_param_store()
         pyro.get_param_store().load(
-                os.path.join(path, "params"),
-                map_location=self.device)
+            os.path.join(path, "params"),
+            map_location=self.device)
         self.predictions = np.load(os.path.join(path, "predictions.npy"))
         self.logger.info(
-                "Step #{}. Loaded model params and optimizer state from {}"
-                .format(self.iter, path))
+            "Step #{}. Loaded model params and optimizer state from {}"
+            .format(self.iter, path))
 
     def load_parameters(self, path=None):
         if path is None:
@@ -248,6 +244,6 @@ class Model(nn.Module):
             np.loadtxt(os.path.join(path, "iter")))
         pyro.clear_param_store()
         pyro.get_param_store().load(
-                os.path.join(path, "params"),
-                map_location=self.device)
+            os.path.join(path, "params"),
+            map_location=self.device)
         self.predictions = np.load(os.path.join(path, "predictions.npy"))

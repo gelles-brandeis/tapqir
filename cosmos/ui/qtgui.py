@@ -1,8 +1,8 @@
-from PySide2.QtWidgets import (QWidget, QSlider, QLineEdit, QLabel, QPushButton, QScrollArea, QApplication,
-                             QHBoxLayout, QVBoxLayout, QMainWindow, QSizePolicy, QSpacerItem)
-from PySide2.QtCore import Qt, QSize
+from pyqtgraph import HistogramLUTItem
+from PySide2.QtWidgets import (QWidget, QLineEdit, QLabel, QPushButton, QScrollArea, QApplication,
+                               QHBoxLayout, QVBoxLayout, QMainWindow, QSizePolicy, QSpacerItem)
+from PySide2.QtCore import Qt
 from PySide2.QtGui import QIntValidator
-from PySide2 import QtWidgets
 import sys
 from functools import partial
 
@@ -19,7 +19,6 @@ C[1] = (255, 127, 14)
 C[2] = (44, 160, 44)
 C[3] = (214, 39, 40)
 
-from pyqtgraph import HistogramLUTItem
 
 class HistogramLUTGraph(HistogramLUTItem):
 
@@ -35,39 +34,31 @@ class HistogramLUTGraph(HistogramLUTItem):
     def regionChanging(self):
         pass
 
+
 class AnotherWindow(QScrollArea):
-    """
-    This "window" is a QWidget. If it has no parent, it 
-    will appear as a free-floating window as we want.
-    """
+
     def __init__(self):
         super().__init__()
-        #layout = QVBoxLayout()
-        #self.label = QLabel("Another Window")
-        #layout.addWidget(self.label)
-        #self.setLayout(layout)
-        #self.setWindowTitle("CoSMoS Images")
         self.initUI()
 
     def initUI(self):
-        self.widget = QWidget()                 # Widget that contains the collection of Vertical Box
-        self.vbox = QVBoxLayout()               # The Vertical Box that contains the Horizontal Boxes of  labels and buttons
-
+        self.widget = QWidget()
+        self.vbox = QVBoxLayout()
 
         self.widget.setLayout(self.vbox)
 
-        #Scroll Area Properties
+        # Scroll Area Properties
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setWidgetResizable(True)
         self.setWidget(self.widget)
 
-        #self.setGeometry(600, 100, 1000, 1000)
         self.resize(1200, 600)
         self.setWindowTitle("CoSMoS Images")
         self.show()
 
         return
+
 
 class MainWindow(QMainWindow):
 
@@ -81,9 +72,9 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.scroll = QScrollArea()             # Scroll Area which contains the widgets, set as the centralWidget
-        self.widget = QWidget()                 # Widget that contains the collection of Vertical Box
-        self.vbox = QVBoxLayout()               # The Vertical Box that contains the Horizontal Boxes of  labels and buttons
+        self.scroll = QScrollArea()
+        self.widget = QWidget()
+        self.vbox = QVBoxLayout()
 
         self.controlPanel()
         self.initParams()
@@ -91,8 +82,7 @@ class MainWindow(QMainWindow):
 
         self.widget.setLayout(self.vbox)
 
-
-        #Scroll Area Properties
+        # Scroll Area Properties
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.scroll.setWidgetResizable(True)
@@ -100,7 +90,6 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(self.scroll)
 
-        #self.setGeometry(600, 100, 1000, 1000)
         self.resize(1000, 1000)
         self.setWindowTitle("CoSMoS Params")
         self.show()
@@ -109,7 +98,6 @@ class MainWindow(QMainWindow):
 
     def controlPanel(self):
         layout = QHBoxLayout()
-        #layout.setMinimumSize(900, 25)
 
         self.aoiIncr = QPushButton(">")
         self.aoiIncr.clicked.connect(partial(self.updateParams, 1))
@@ -156,8 +144,8 @@ class MainWindow(QMainWindow):
             self.updateImages()
             self.hist.regionChanged()
             self.lr.sigRegionChangeFinished.connect(self.updateImages)
-            #self.w.show()
-        
+            # self.w.show()
+
         else:
             self.plot["z_probs"].removeItem(self.lr)
             self.w.close()  # Close window.
@@ -231,7 +219,7 @@ class MainWindow(QMainWindow):
                     self.item[f"{p}.{k}_mean"] = pg.PlotDataItem(
                         pen=C[k], symbol="o", symbolBrush=C[k],
                         symbolPen=None, symbolSize=5, name=k
-                        )
+                    )
                     self.item[f"{p}.{k}_high"] = pg.PlotDataItem(pen=(*C[k], 70))
                     self.item[f"{p}.{k}_low"] = pg.PlotDataItem(pen=(*C[k], 70))
                     self.item[f"{p}.{k}_fill"] = pg.FillBetweenItem(
@@ -242,7 +230,7 @@ class MainWindow(QMainWindow):
         # add items to plots
         for key, value in self.item.items():
             self.plot[key.split(".")[0]].addItem(value)
-                
+
         # set plot ranges
         self.plot["z_probs"].setYRange(0, 1, padding=0.01)
         self.plot["d/height"].setYRange(0, 7000, padding=0.01)
@@ -255,7 +243,7 @@ class MainWindow(QMainWindow):
     def updateParams(self, inc):
         n = (int(self.aoiNumber.text()) + inc) % self.Model.data.N
         self.aoiNumber.setText(str(n))
-        
+
         self.Model.n = torch.tensor([n])
         self.Model.frames = torch.arange(self.Model.data.F)
         trace = pyro.poutine.trace(self.Model.guide).get_trace()
@@ -266,32 +254,27 @@ class MainWindow(QMainWindow):
                 self.item[p].setData(self.Model.predictions["z_prob"][n])
             else:
                 hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
-                #std = trace.nodes[p]["fn"].variance.data.squeeze().cpu().sqrt()
                 mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()
                 k_max = 2
                 if p.endswith("background"):
                     k_max = 1
-                    #mean, std = mean[None], std[None]
                     mean, hpd = mean[None], hpd[:, None]
                 elif p.endswith("x") or p.endswith("y"):
                     mean = mean * (self.Model.data.D+1) - (self.Model.data.D+1)/2
                     hpd = hpd * (self.Model.data.D+1) - (self.Model.data.D+1)/2
-                    #std = std * (self.Model.data.D+1) - (self.Model.data.D+1)/2
                 elif p.endswith("width"):
                     mean = mean * 2.5 + 0.5
                     hpd = hpd * 2.5 + 0.5
-                    #std = std * 2.5 + 0.5
                 for k in range(k_max):
                     self.item[f"{p}.{k}_high"].setData(hpd[0, k])
                     self.item[f"{p}.{k}_low"].setData(hpd[1, k])
-                    #self.item[f"{p}.{k}_high"].setData(mean[k] + 2 * std[k])
-                    #self.item[f"{p}.{k}_low"].setData(mean[k] - 2 * std[k])
                     self.item[f"{p}.{k}_mean"].setData(mean[k])
 
         if self.w is not None:
             self.updateImages()
 
+
 if __name__ == "__main__":
-        app = QApplication(sys.argv)
-        window = MainWindow()
-        sys.exit(app.exec_())
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    sys.exit(app.exec_())

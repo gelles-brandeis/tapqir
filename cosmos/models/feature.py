@@ -13,11 +13,11 @@ from cosmos.models.helper import ScaledBeta
 import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
-from cosmos.models.helper import pi_m_calc, pi_theta_calc
-import torch.nn as nn
+
 
 class Feature(Model):
     """ Track on-target Spot """
+
     def __init__(self, data, control, path,
                  K, lr, n_batch, jit, noise="GammaOffset"):
         self.__name__ = "feature"
@@ -62,7 +62,6 @@ class Feature(Model):
             self.spot_parameters(
                 self.control, prefix="c")
 
-
     def spot_model(self, data, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
         N_plate = pyro.plate("N_plate", data.N, dim=-2)
@@ -78,8 +77,7 @@ class Feature(Model):
                 height = pyro.sample(
                     "height", dist.Gamma(
                         1., 1.).mask(False))
-                        #param("height_loc")[m_mask] * param("height_beta")[m_mask],
-                        #param("height_beta")[m_mask]).to_event(1))
+                # param("height_beta")[m_mask]).to_event(1))
                 width = pyro.sample(
                     "width", ScaledBeta(
                         param("width_mode"),
@@ -139,10 +137,8 @@ class Feature(Model):
     def spot_parameters(self, data, prefix):
         param(f"{prefix}/background_loc",
               (data.data_median - self.offset_guess).repeat(data.N, 1),
-              #torch.ones(data.N, 1) * 150.,
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
-              #torch.ones(data.N, data.F) * 150.,
               (data.data_median - self.offset_guess).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
@@ -182,11 +178,8 @@ class Feature(Model):
         param("width_size",
               torch.tensor([10.]), constraint=constraints.positive)
 
-        #param("offset", self.offset_max-50,
-        #      constraint=constraints.interval(0, self.offset_max))
         param("offset", self.offset_guess,
               constraint=constraints.interval(0, self.offset_max))
-        #param("offset", torch.tensor(90.), constraint=constraints.positive)
         param("gain", torch.tensor(7.), constraint=constraints.positive)
 
     def infer(self):

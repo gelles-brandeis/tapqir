@@ -25,6 +25,7 @@ class ConvGamma(TorchDistribution):
         result = torch.logsumexp(result, -1)
         return result
 
+
 def ScaledBeta(mode, size, loc, scale):
     mode = (mode - loc) / scale
     concentration1 = mode * size
@@ -34,6 +35,8 @@ def ScaledBeta(mode, size, loc, scale):
 
 def probs_to_logits(probs):
     return torch.log(probs / (1 - probs))
+
+
 """
 def pi_m_calc(pi, lamda, K):
     poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
@@ -57,9 +60,11 @@ def pi_theta_calc(pi, lamda, K):
     pi_theta[3, 2] = pi[1] * poisson(1) / 2
     return pi_theta
 """
+
+
 def pi_m_calc(lamda, S):
-    #pi_m = torch.eye(S+1)
-    #pi_m[0] = lamda
+    # pi_m = torch.eye(S+1)
+    # pi_m[0] = lamda
     pi_m = torch.zeros(3, 4)
     pi_m[0, 0] = lamda[0] * lamda[0]
     pi_m[0, 1] = lamda[1] * lamda[0]
@@ -79,6 +84,8 @@ def pi_theta_calc(pi, K, S):
         for k in range(K):
             pi_theta[K*s + k + 1] = pi[s + 1] / K
     return pi_theta
+
+
 """
 def pi_m_calc(pi, lamda, K):
     #poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
@@ -119,6 +126,7 @@ def theta_probs_calc(m_probs, theta_probs):
 
 """
 
+
 def theta_trans_calc(A, K, S):
     theta_trans = torch.zeros(K*S+1, K*S+1)
     theta_trans[0, 0] = A[0, 0]
@@ -130,6 +138,7 @@ def theta_trans_calc(A, K, S):
                 for q in range(K):
                     theta_trans[K*s + k + 1, K*z + q + 1] = A[s+1, z+1] / K
     return theta_trans
+
 
 def z_probs_calc(m_probs, theta_probs):
     return theta_probs[..., 1:].sum(dim=-1).cpu().data

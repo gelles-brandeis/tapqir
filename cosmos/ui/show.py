@@ -1,10 +1,10 @@
-import logging
 import sys
 
 from cliff.command import Command
 
 from PySide2.QtWidgets import QApplication
 from cosmos.ui.qtgui import MainWindow
+
 
 class Show(Command):
     "Show fitting results."
@@ -16,12 +16,10 @@ class Show(Command):
                             help="Path to the dataset folder")
         parser.add_argument("parameters", type=str,
                             help="Path to the parameters folder")
-        #parser.add_argument("-c", "--control", action="store_true",
-        #                    help="Analyze control dataset")
 
         return parser
 
     def take_action(self, args):
         app = QApplication(sys.argv)
-        window = MainWindow(args.dataset, args.parameters)
+        MainWindow(args.dataset, args.parameters)
         sys.exit(app.exec_())

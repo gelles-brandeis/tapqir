@@ -37,6 +37,7 @@ setuptools.setup(
     entry_points={
         "console_scripts": ["cosmos=cosmos.ui.app:main"],
         "cosmos.app": [
+            "config=cosmos.ui.config:Config",
             "fit=cosmos.ui.fit:Fit",
             "show=cosmos.ui.show:Show",
             "glimpse=cosmos.ui.glimpse:Glimpse",
