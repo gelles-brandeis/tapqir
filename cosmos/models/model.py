@@ -13,7 +13,7 @@ from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
 import cosmos
-from cosmos.utils.glimpse_reader import load_data
+from cosmos.utils.dataset import load_data
 
 
 class GaussianSpot(nn.Module):

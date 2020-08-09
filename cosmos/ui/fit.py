@@ -1,5 +1,7 @@
 from cliff.command import Command
 
+import os
+import configparser
 from cosmos.models.tracker import Tracker
 from cosmos.models.globalhw import GlobalHW
 
@@ -17,28 +19,38 @@ class Fit(Command):
 
         parser.add_argument("model", default="tracker", type=str,
                             help="Choose the model: {}".format(", ".join(models.keys())))
-        parser.add_argument("dataset", type=str,
+        parser.add_argument("dataset", default=".", type=str,
                             help="Path to the dataset folder")
 
-        parser.add_argument("-it", "--num-iter", default=20000, type=int, metavar="\b",
+        parser.add_argument("-it", "--num-iter", type=int, metavar="\b",
                             help="Number of iterations")
-        parser.add_argument("-bs", "--batch-size", default=8, type=int, metavar="\b",
+        parser.add_argument("-bs", "--batch-size", type=int, metavar="\b",
                             help="Batch size")
-        parser.add_argument("-lr", "--learning-rate", default=0.005, type=float, metavar="\b",
+        parser.add_argument("-lr", "--learning-rate", type=float, metavar="\b",
                             help="Learning rate")
 
-        parser.add_argument("-c", "--control", action="store_true",
+        parser.add_argument("-c", "--control", type=bool,
                             help="Analyze control dataset")
-        parser.add_argument("-dev", "--device", default="cuda",
-                            type=str, metavar="\b",
-                            help="GPU device")
+        parser.add_argument("-dev", "--device", type=str, metavar="\b",
+                            help="Compute device")
         parser.add_argument("--jit", action="store_true",
                             help="Just in time compilation")
 
         return parser
 
     def take_action(self, args):
+        # read options.cfg fiel
+        config = configparser.ConfigParser(allow_no_value=True)
+        cfg_file = os.path.join(args.dataset, "options.cfg")
+        config.read(cfg_file)
+
+        num_iter = args.num_iter or config["fit"].getint("num_iter")
+        batch_size = args.batch_size or config["fit"].getint("batch_size")
+        learning_rate = args.learning_rate or config["fit"].getfloat("learning_rate")
+        control = args.control or config["fit"].getboolean("control")
+        device = args.device or config["fit"].get("device")
+
         model = models[args.model]()
-        model.load(args.dataset, args.control, args.device)
-        model.settings(args.learning_rate, args.batch_size)
-        model.run(args.num_iter)
+        model.load(args.dataset, control, device)
+        model.settings(learning_rate, batch_size)
+        model.run(num_iter)

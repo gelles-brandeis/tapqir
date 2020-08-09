@@ -26,6 +26,13 @@ class Config(Command):
         config["glimpse"]["labels"] = None
         config["glimpse"]["labeltype"] = None
 
+        config["fit"] = {}
+        config["fit"]["num_iter"] = "20000"
+        config["fit"]["batch_size"] = "8"
+        config["fit"]["learning_rate"] = "0.005"
+        config["fit"]["control"] = "False"
+        config["fit"]["device"] = "cuda"
+
         cfg_file = os.path.join(args.dataset, "options.cfg")
         with open(cfg_file, "w") as configfile:
             config.write(configfile)
