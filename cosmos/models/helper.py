@@ -65,7 +65,7 @@ def pi_theta_calc(pi, lamda, K):
 def pi_m_calc(lamda, S):
     # pi_m = torch.eye(S+1)
     # pi_m[0] = lamda
-    pi_m = torch.zeros(3, 4)
+    pi_m = lamda.new_zeros(3, 4)
     pi_m[0, 0] = lamda[0] * lamda[0]
     pi_m[0, 1] = lamda[1] * lamda[0]
     pi_m[0, 2] = lamda[0] * lamda[1]
@@ -78,7 +78,7 @@ def pi_m_calc(lamda, S):
 
 
 def pi_theta_calc(pi, K, S):
-    pi_theta = torch.zeros(S*K+1)
+    pi_theta = pi.new_zeros(S*K+1)
     pi_theta[0] = pi[0]
     for s in range(S):
         for k in range(K):
@@ -128,7 +128,7 @@ def theta_probs_calc(m_probs, theta_probs):
 
 
 def theta_trans_calc(A, K, S):
-    theta_trans = torch.zeros(K*S+1, K*S+1)
+    theta_trans = A.new_zeros(K*S+1, K*S+1)
     theta_trans[0, 0] = A[0, 0]
     for s in range(S):
         for k in range(K):

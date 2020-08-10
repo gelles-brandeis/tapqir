@@ -27,16 +27,17 @@ class Tracker(Model):
     @config_enumerate
     def model(self):
         self.model_parameters()
+
         data_pi_m = pi_m_calc(param("lamda"), self.S)
         control_pi_m = pi_m_calc(param("lamda"), self.S)
         pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
 
         with scope(prefix="d"):
-            self.spot_model(self.data, data_pi_m, pi_theta, prefix="d")
+            self.spot_model(self.data, self.data_loc, data_pi_m, pi_theta, prefix="d")
 
         if self.control:
             with scope(prefix="c"):
-                self.spot_model(self.control, control_pi_m, None, prefix="c")
+                self.spot_model(self.control, self.control_loc, control_pi_m, None, prefix="c")
 
     @config_enumerate
     def guide(self):
@@ -49,7 +50,7 @@ class Tracker(Model):
             with scope(prefix="c"):
                 self.spot_guide(self.control, False, prefix="c")
 
-    def spot_model(self, data, pi_m, pi_theta, prefix):
+    def spot_model(self, data, data_loc, pi_m, pi_theta, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
         N_plate = pyro.plate("N_plate", data.N, dim=-2)
         F_plate = pyro.plate("F_plate", data.F, dim=-1)
@@ -92,11 +93,11 @@ class Tracker(Model):
             x = x * (data.D+1) - (data.D+1)/2
             y = y * (data.D+1) - (data.D+1)/2
 
-            locs = data.loc(height, width, x, y, background, batch_idx, frame_idx)
+            locs = data_loc(height, width, x, y, background, batch_idx, frame_idx)
             pyro.sample(
                 "data", ConvGamma(
                     locs / param("gain"), 1 / param("gain"),
-                    self.data.offset_samples, self.data.offset_weights.log()
+                    self.offset_samples, self.offset_weights.log()
                 ).to_event(2),
                 obs=Vindex(data.data)[batch_idx, frame_idx, :, :])
 
@@ -155,16 +156,16 @@ class Tracker(Model):
 
     def spot_parameters(self, data, m, theta, prefix):
         param(f"{prefix}/background_loc",
-              (data.data_median - self.offset_guess).repeat(data.N, 1),
+              (self.data_median - self.offset_median).repeat(data.N, 1),
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
-              (data.data_median - self.offset_guess).repeat(data.N, data.F),
+              (self.data_median - self.offset_median).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F) * 30,
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              (self.data.noise * 2).repeat(self.K, data.N, data.F),
+              (self.noise * 2).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(self.K, data.N, data.F),

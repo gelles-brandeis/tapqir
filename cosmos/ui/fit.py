@@ -1,6 +1,7 @@
 from cliff.command import Command
 
 import os
+import torch
 import configparser
 from cosmos.models.tracker import Tracker
 from cosmos.models.globalhw import GlobalHW
@@ -49,6 +50,11 @@ class Fit(Command):
         learning_rate = args.learning_rate or config["fit"].getfloat("learning_rate")
         control = args.control or config["fit"].getboolean("control")
         device = args.device or config["fit"].get("device")
+
+        if device == "cuda":
+            torch.set_default_tensor_type("torch.cuda.FloatTensor")
+        else:
+            torch.set_default_tensor_type("torch.FloatTensor")
 
         model = models[args.model]()
         model.load(args.dataset, control, device)

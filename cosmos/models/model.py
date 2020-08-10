@@ -13,11 +13,12 @@ from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
 import cosmos
+from tqdm import tqdm
 from cosmos.utils.dataset import load_data
 
 
 class GaussianSpot(nn.Module):
-    def __init__(self, target, drift, D, device):
+    def __init__(self, target, drift, D):
         super().__init__()
         # create meshgrid of DxD pixel positions
         D_range = torch.arange(D, dtype=torch.float)
@@ -28,7 +29,8 @@ class GaussianSpot(nn.Module):
         self.target_locs = torch.tensor(
             drift[["dx", "dy"]].values.reshape(-1, 2)
             + target[["x", "y"]].values.reshape(-1, 1, 2),
-            dtype=torch.float)
+        ).float()
+
 
     # Ideal 2D gaussian spots
     def forward(self, height, width, x, y, background, n_idx, f_idx):
@@ -38,7 +40,8 @@ class GaussianSpot(nn.Module):
         #    spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
-            scale_tril=torch.eye(2) * width[..., None, None, None, None])
+            scale_tril=torch.eye(2) * width[..., None, None, None, None]
+        )
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
         result = (height[..., None, None] * gaussian_spot).sum(dim=-5, keepdim=True) \
             + background[..., None, None]
@@ -63,22 +66,33 @@ class Model(nn.Module):
 
         # set device
         self.device = torch.device(device)
-        torch.set_default_tensor_type("torch.cuda.FloatTensor")
+        #torch.set_default_tensor_type("torch.cuda.FloatTensor")
 
         # load test data
         self.data = load_data(self.path, dtype="test", device=self.device)
-        self.data.loc = GaussianSpot(
+        self.data_loc = GaussianSpot(
             self.data.target, self.data.drift,
-            self.data.D, self.device)
+            self.data.D)
 
-        self.offset_guess = self.data.offset_mean
+        self.data_median = torch.median(self.data.data)
+        self.offset_median = torch.median(self.data.offset)
+        self.noise = (self.data.data.std(dim=(1, 2, 3)).mean() - self.data.offset.std()) * np.pi * (2 * 1.3) ** 2
+        offset_max = np.percentile(self.data.offset.cpu().numpy(), 99.5)
+        offset_min = np.percentile(self.data.offset.cpu().numpy(), 0.5)
+        offset_weights, offset_samples = np.histogram(self.data.offset.cpu().numpy(),
+                                                      range=(offset_min, offset_max),
+                                                      bins=max(1, int(offset_max - offset_min)),
+                                                      density=True)
+        offset_samples = offset_samples[:-1]
+        self.offset_samples = torch.from_numpy(offset_samples).float().to(device)
+        self.offset_weights = torch.from_numpy(offset_weights).float().to(device)
 
         # load control data
         if control:
             self.control = load_data(self.path, dtype="control", device=self.device)
-            self.control.loc = GaussianSpot(
+            self.control_loc = GaussianSpot(
                 self.control.target, self.control.drift,
-                self.control.D, self.device)
+                self.control.D)
         else:
             self.control = control
 
@@ -99,20 +113,20 @@ class Model(nn.Module):
                    ("m_prob", float, (2,)), ("theta", int)])
 
         pyro.clear_param_store()
-        self.iter = 0
-        self.optim_fn = pyro.optim.Adam
-        self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
-        self.optim = self.optim_fn(self.optim_args)
+
+        try:
+            self.load_checkpoint()
+        except:
+            self.iter = 0
+            self.optim_fn = pyro.optim.Adam
+            self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
+            self.optim = self.optim_fn(self.optim_args)
+
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
             max_plate_nesting=3, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
         self.log()
-
-        try:
-            self.load_checkpoint()
-        except:
-            pass
 
     def model(self):
         raise NotImplementedError
@@ -121,7 +135,7 @@ class Model(nn.Module):
         raise NotImplementedError
 
     def run(self, num_iter):
-        for i in range(num_iter):
+        for i in tqdm(range(num_iter)):
             # with torch.autograd.detect_anomaly():
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
