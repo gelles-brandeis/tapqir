@@ -31,7 +31,6 @@ class GaussianSpot(nn.Module):
             + target[["x", "y"]].values.reshape(-1, 1, 2),
         ).float()
 
-
     # Ideal 2D gaussian spots
     def forward(self, height, width, x, y, background, n_idx, f_idx):
         # if f is not None:
@@ -62,14 +61,13 @@ class Model(nn.Module):
 
     def load(self, path, control, device):
         # set path
-        self.path = path
+        self.data_path = path
 
         # set device
         self.device = torch.device(device)
-        #torch.set_default_tensor_type("torch.cuda.FloatTensor")
 
         # load test data
-        self.data = load_data(self.path, dtype="test", device=self.device)
+        self.data = load_data(self.data_path, dtype="test", device=self.device)
         self.data_loc = GaussianSpot(
             self.data.target, self.data.drift,
             self.data.D)
@@ -89,7 +87,7 @@ class Model(nn.Module):
 
         # load control data
         if control:
-            self.control = load_data(self.path, dtype="control", device=self.device)
+            self.control = load_data(self.data_path, dtype="control", device=self.device)
             self.control_loc = GaussianSpot(
                 self.control.target, self.control.drift,
                 self.control.D)
@@ -98,12 +96,11 @@ class Model(nn.Module):
 
         self.size = torch.tensor([2., (((self.data.D+1) / (2*0.5)) ** 2 - 1)])
         self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 4)
-        # self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
         self.theta_matrix = \
             torch.tensor([[0, 0],
                           [1, 0],
                           [0, 1]]).T.reshape(2, 1, 1, 3)
-        #self.m_matrix = \
+        # self.m_matrix = \
         #    torch.tensor([[0, 0],
         #                  [1, 0],
         #                  [0, 1]]).T.reshape(2, 1, 1, 3)
@@ -114,27 +111,26 @@ class Model(nn.Module):
         self.batch_size = batch_size
         self.jit = jit
 
-        self.predictions = np.zeros(
-            (self.data.N, self.data.F),
-            dtype=[("z", bool),
-                   ("z_prob", float), ("m", bool, (2,)),
-                   ("m_prob", float, (2,)), ("theta", int)])
-
-        pyro.clear_param_store()
+        self.optim_fn = pyro.optim.Adam
+        self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
+        self.optim = self.optim_fn(self.optim_args)
+        self.log()
 
         try:
             self.load_checkpoint()
         except:
+            pyro.clear_param_store()
             self.iter = 0
-            self.optim_fn = pyro.optim.Adam
-            self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
-            self.optim = self.optim_fn(self.optim_args)
+
+            self.predictions = np.zeros(
+                (self.data.N, self.data.F),
+                dtype=[("z", bool),
+                       ("z_prob", float), ("m", bool, (2,)),
+                       ("m_prob", float, (2,)), ("theta", int)])
 
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
             max_plate_nesting=3, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
-
-        self.log()
 
     def model(self):
         raise NotImplementedError
@@ -155,7 +151,7 @@ class Model(nn.Module):
     def log(self):
         version = cosmos.__version__
         self.path = os.path.join(
-            self.path, "runs",
+            self.data_path, "runs",
             "{}{}".format(self.__name__, version),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),

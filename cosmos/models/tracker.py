@@ -13,7 +13,7 @@ import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
-from cosmos.models.helper import z_probs_calc, k_probs_calc
+from cosmos.models.helper import z_probs_calc
 
 
 class Tracker(Model):
@@ -71,19 +71,18 @@ class Tracker(Model):
             # m_mask = Vindex(self.m_matrix)[..., theta]
 
             with K_plate:
-            # with K_plate, pyro.poutine.mask(mask=m_mask > 0):
                 # m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta_mask, :]))
                 height = pyro.sample(
                     "height", dist.MaskedMixture(
                         m_mask > 0,
                         dist.Delta(torch.tensor(0.)),
                         dist.HalfNormal(10000.)
+                        # dist.Gamma(
+                        #     param("height_loc") * param("height_beta"),
+                        #     param("height_beta")
+                        # )
                     )
                 )
-                #     "height", dist.HalfNormal(10000.))
-                # "height", dist.Gamma(
-                #    param("height_loc") * param("height_beta"),
-                #    param("height_beta")))
                 width = pyro.sample(
                     "width", ScaledBeta(
                         param("width_mode"),
@@ -95,7 +94,6 @@ class Tracker(Model):
                     "y", ScaledBeta(
                         0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
-            # height = height.masked_fill(m_mask == 0, 0.)
             width = width * 2.5 + 0.5
             x = x * (data.D+1) - (data.D+1)/2
             y = y * (data.D+1) - (data.D+1)/2
@@ -133,7 +131,6 @@ class Tracker(Model):
                 Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
             m_mask = Vindex(self.m_matrix)[..., m]
 
-            # with K_plate as k_idx, pyro.poutine.mask(mask=m_mask > 0):
             with K_plate as k_idx:
                 k_idx = k_idx[:, None, None]
                 # m_mask = pyro.sample("m", dist.Categorical(
@@ -223,28 +220,15 @@ class Tracker(Model):
             param(f"{prefix}/theta_probs", theta_probs,
                   constraint=constraints.simplex)
 
-        # if m:
-        #    param(f"{prefix}/m_probs",
-        #          torch.ones(data.N, data.F, 2**self.K),
-        #          constraint=constraints.simplex)
-        # if theta:
-        #    theta_probs = torch.ones(
-        #        data.N, data.F, 2**self.K, self.K+1)
-        #    theta_probs[..., 0, 1:] = 0
-        #    theta_probs[..., 1, 2] = 0
-        #    theta_probs[..., 2, 1] = 0
-        #    param(f"{prefix}/theta_probs", theta_probs,
-        #          constraint=constraints.simplex)
-
     def model_parameters(self):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
-        # param("height_loc", self.data.noise * 1.5,
-        # param("height_loc", torch.tensor([2000.]),
-        #      constraint=constraints.positive)
-        # param("height_beta", torch.tensor([0.01]),
-        #      constraint=constraints.positive)
+        # param("height_loc", self.noise * 2,
+        # param("height_loc", torch.tensor([3000.]),
+        #       constraint=constraints.positive)
+        # param("height_beta", torch.tensor([0.001]),
+        #       constraint=constraints.positive)
         param("gain", torch.tensor(5.), constraint=constraints.positive)
         param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
         param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)

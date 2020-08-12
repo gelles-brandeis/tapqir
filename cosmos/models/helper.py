@@ -1,6 +1,48 @@
 import torch
+from torch.distributions import constraints
+from torch.distributions.utils import broadcast_all
 import pyro.distributions as dist
-from pyro.distributions import TorchDistribution
+from pyro.distributions import TorchDistribution, ZeroInflatedDistribution, Gamma
+
+
+class ZeroInflatedGamma(ZeroInflatedDistribution):
+    """
+    A Zero Inflated Gamma distribution.
+    :param torch.Tensor gate: probability of extra zeros.
+    :param torch.Tensor concentration: shape parameter of the distribution.
+    :param torch.Tensor rate: rate = 1 / scale of the distribution.
+    """
+    arg_constraints = {"gate": constraints.unit_interval,
+                       "concentration": constraints.positive,
+                       "rate": constraints.positive}
+    support = constraints.positive
+
+    def __init__(self, gate, concentration, rate, validate_args=None):
+        base_dist = Gamma(concentration, rate, validate_args=False)
+        base_dist._validate_args = validate_args
+
+        super().__init__(
+            gate, base_dist, validate_args=validate_args
+        )
+
+    def log_prob(self, value):
+        if self._validate_args:
+            self._validate_sample(value)
+
+        gate, value = broadcast_all(self.gate, value)
+        mask = (value == 0)
+        log_prob = (-gate).log1p() + self.base_dist.log_prob(value.masked_fill(mask, 1.))
+        # log_prob = (-gate).log1p() + self.base_dist.log_prob(value)
+        log_prob = torch.where(value == 0, gate.log(), log_prob)
+        return log_prob
+
+    @property
+    def concentration(self):
+        return self.base_dist.concentration
+
+    @property
+    def rate(self):
+        return self.base_dist.rate
 
 
 class ConvGamma(TorchDistribution):
@@ -99,7 +141,9 @@ def theta_probs_calc(m_probs, theta_probs):
 
 
 def j_probs_calc(m_probs, theta_probs):
-    return (m_probs.unsqueeze(dim=-1) * (torch.tensor([[0., 0.], [1., 0.], [0., 1.], [1., 1.]]) - theta_probs[..., 1:])).sum(dim=-2).cpu().data
+    return (m_probs.unsqueeze(dim=-1)
+            * (torch.tensor([[0., 0.], [1., 0.], [0., 1.], [1., 1.]])
+            - theta_probs[..., 1:])).sum(dim=-2).cpu().data
 
 
 def init_calc(pi, lamda):

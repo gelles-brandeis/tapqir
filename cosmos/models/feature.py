@@ -8,7 +8,6 @@ from pyro import param
 from pyro import poutine
 from pyro.infer import Trace_ELBO
 from pyro.contrib.autoname import scope
-from pyro.ops.indexing import Vindex
 from cosmos.models.helper import ScaledBeta
 import torch.distributions.constraints as constraints
 

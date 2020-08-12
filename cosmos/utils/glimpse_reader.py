@@ -54,20 +54,22 @@ def read_glimpse(path, D):
 
     labels = None
     if config["glimpse"]["labels"]:
-        if config["glimpse"]["labeltype"] == "framelist":
+        if config["glimpse"]["labeltype"] is not None:
             framelist = loadmat(config["glimpse"]["labels"])
-            f1 = framelist[name.split("-")[0].split(".")[0]][0, 2]
-            f2 = framelist[name.split("-")[0].split(".")[0]][-1, 2]
+            f1 = framelist[config["glimpse"]["labeltype"]][0, 2]
+            f2 = framelist[config["glimpse"]["labeltype"]][-1, 2]
             drift_df = drift_df.loc[f1:f2]
-            aoi_list = np.unique(framelist[name.split("-")[0].split(".")[0]][:, 0])
-            aoi_df = aoi_df.loc[aoi_list]
+            aoi_list = np.unique(framelist[config["glimpse"]["labeltype"]][:, 0])
+            aoi_df["test"] = aoi_df["test"].loc[aoi_list]
             labels = np.zeros(
-                (len(aoi_df), len(drift_df)),
+                (len(aoi_df["test"]), len(drift_df)),
                 dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)])
-            labels["aoi"] = framelist[name.split("-")[0].split(".")[0]][:, 0].reshape(len(aoi_df), len(drift_df))
-            labels["frame"] = framelist[name.split("-")[0].split(".")[0]][:, 2].reshape(len(aoi_df), len(drift_df))
-            labels["spotpicker"] = framelist[name.split("-")[0].split(".")[0]][:, 1] \
-                .reshape(len(aoi_df), len(drift_df))
+            labels["aoi"] = framelist[config["glimpse"]["labeltype"]][:, 0] \
+                                .reshape(len(aoi_df["test"]), len(drift_df))
+            labels["frame"] = framelist[config["glimpse"]["labeltype"]][:, 2] \
+                                .reshape(len(aoi_df["test"]), len(drift_df))
+            labels["spotpicker"] = framelist[config["glimpse"]["labeltype"]][:, 1] \
+                                .reshape(len(aoi_df["test"]), len(drift_df))
             labels["spotpicker"][labels["spotpicker"] == 0] = 3
             labels["spotpicker"][labels["spotpicker"] == 2] = 0
         else:

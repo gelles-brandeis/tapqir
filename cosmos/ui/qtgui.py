@@ -11,7 +11,6 @@ import torch
 import numpy as np
 import pyro
 from pyro.ops.stats import pi
-from cosmos.models.tracker import Tracker
 
 C = {}
 C[0] = (31, 119, 180)
@@ -35,7 +34,7 @@ class HistogramLUTGraph(HistogramLUTItem):
         pass
 
 
-class AnotherWindow(QScrollArea):
+class ImagesWindow(QScrollArea):
 
     def __init__(self):
         super().__init__()
@@ -60,14 +59,40 @@ class AnotherWindow(QScrollArea):
         return
 
 
+class ZoomWindow(QScrollArea):
+
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        self.widget = QWidget()
+        self.vbox = QVBoxLayout()
+
+        self.widget.setLayout(self.vbox)
+
+        # Scroll Area Properties
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setWidgetResizable(True)
+        self.setWidget(self.widget)
+
+        self.resize(1000, 1000)
+        self.setWindowTitle("Zoom Parameters")
+        self.show()
+
+        return
+
+
 class MainWindow(QMainWindow):
 
-    def __init__(self, dataset, parameters, control=False):
+    def __init__(self, model, dataset, parameters, control=False):
         super().__init__()
 
-        self.Model = Tracker()
+        self.Model = model
+        self.parameters = parameters
         self.Model.load(dataset, control, "cpu")
-        self.Model.load_parameters(parameters)
+        self.Model.load_parameters(self.parameters)
 
         self.initUI()
 
@@ -123,6 +148,9 @@ class MainWindow(QMainWindow):
         self.images = QPushButton("toggle images")
         self.images.clicked.connect(self.show_new_window)
 
+        self.refresh = QPushButton("refresh")
+        self.refresh.clicked.connect(self.refreshParams)
+
         layout.addWidget(self.aoiDecrLarge)
         layout.addWidget(self.aoiDecr)
         layout.addWidget(self.aoiLabel)
@@ -132,14 +160,19 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.aoiIncrLarge)
         layout.addItem(self.hspacer)
         layout.addWidget(self.images)
+        layout.addWidget(self.refresh)
 
         self.vbox.addLayout(layout)
+
+    def refreshParams(self):
+        self.Model.load_parameters(self.parameters)
+        self.updateParams(0)
 
     def show_new_window(self, checked):
         if self.w is None:
             self.lr = pg.LinearRegionItem([400, 500])
             self.plot["z"].addItem(self.lr)
-            self.w = AnotherWindow()
+            self.w = ImagesWindow()
             self.initImages()
             self.updateImages()
             self.hist.regionChanged()
@@ -195,6 +228,8 @@ class MainWindow(QMainWindow):
                 height=(self.Model.predictions["z_prob"][int(self.aoiNumber.text()), f]*self.Model.data.D,)
             )
 
+            self.img[(f - f1) % 100].setLevels(self.hist.getLevels())
+
     def initParams(self):
         widget = pg.GraphicsLayoutWidget()
         widget.setMinimumSize(900, 150 * 6)
@@ -205,6 +240,7 @@ class MainWindow(QMainWindow):
         self.item = {}
         for i, p in enumerate(self.params):
             self.plot[p] = widget.addPlot(row=i, col=0)
+            self.plot[p].addLegend()
             self.plot[p].setLabel("left", p)
             self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
             self.plot[p].getViewBox().setMouseMode(pg.ViewBox.RectMode)
@@ -214,8 +250,8 @@ class MainWindow(QMainWindow):
                     symbolPen=None, symbolSize=5, name="z_probs"
                 )
                 self.item[f"{p}.binary"] = pg.PlotDataItem(
-                    pen=C[3], symbol="o", symbolBrush=C[3],
-                    symbolPen=None, symbolSize=5, name="z_binary"
+                    pen=C[3], symbol=None,
+                    symbolPen=None, name="z_binary"
                 )
             else:
                 k_max = 1 if p.endswith("background") else 2

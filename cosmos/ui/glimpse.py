@@ -5,7 +5,7 @@ from cosmos.utils.glimpse_reader import read_glimpse
 
 class Glimpse(Command):
     """
-    Read the data from glimpse files and save it in the CoSMoS native fromat.
+    Read the data from glimpse files and save it in the CoSMoS native format.
 
     Path names to glimpse files can be provided by the dataset.cfg file, or
     alternatively, at the prompt input.

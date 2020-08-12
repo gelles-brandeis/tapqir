@@ -9,12 +9,11 @@ from pyro import poutine
 from pyro.infer import infer_discrete
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
-from cosmos.models.helper import ScaledBeta, ConvGamma
+from cosmos.models.helper import ScaledBeta, ConvGamma, ZeroInflatedGamma
 import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
 from cosmos.models.helper import pi_m_calc, pi_theta_calc
-from cosmos.models.helper import z_probs_calc, k_probs_calc
 
 
 class Marginal(Model):
@@ -71,12 +70,13 @@ class Marginal(Model):
             m_mask = Vindex(self.m_matrix)[..., m]
 
             with K_plate:
-            # with K_plate, pyro.poutine.mask(mask=m_mask > 0):
                 height = pyro.sample(
-                    "height", dist.ZeroInflatedDistribution(m_mask.float(), dist.HalfNormal(10000.)))
-                #    "height", dist.Gamma(
-                #       param("height_loc") * param("height_beta"),
-                #       param("height_beta")))
+                    "height", dist.MaskedMixture(
+                        m_mask > 0,
+                        dist.Delta(torch.tensor(0.)),
+                        dist.HalfNormal(10000.)
+                    )
+                )
                 width = pyro.sample(
                     "width", ScaledBeta(
                         param("width_mode"),
@@ -121,13 +121,11 @@ class Marginal(Model):
                 k_idx = k_idx[:, None, None]
                 pyro.sample(
                     "height",
-                    dist.ZeroInflatedDistribution(
+                    ZeroInflatedGamma(
                         Vindex(param(f"{prefix}/m_loc"))[k_idx, batch_idx, frame_idx],
-                        dist.Gamma(
-                            Vindex(param(f"{prefix}/h_loc"))[k_idx, batch_idx, frame_idx]
-                            * Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx],
-                            Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx]
-                        )
+                        Vindex(param(f"{prefix}/h_loc"))[k_idx, batch_idx, frame_idx]
+                        * Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx],
+                        Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx]
                     )
                 )
                 pyro.sample(
@@ -188,16 +186,14 @@ class Marginal(Model):
         param(f"{prefix}/size",
               size, constraint=constraints.greater_than(2.))
 
-
     def model_parameters(self):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
         param("height_loc", self.noise * 2,
-        # param("height_loc", torch.tensor([2000.]),
               constraint=constraints.positive)
         param("height_beta", torch.tensor([0.01]),
-             constraint=constraints.positive)
+              constraint=constraints.positive)
         param("gain", torch.tensor(5.), constraint=constraints.positive)
         param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
         param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
