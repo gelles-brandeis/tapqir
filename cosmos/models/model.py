@@ -98,7 +98,15 @@ class Model(nn.Module):
 
         self.size = torch.tensor([2., (((self.data.D+1) / (2*0.5)) ** 2 - 1)])
         self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 4)
-        self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
+        # self.theta_matrix = torch.tensor([[0, 0], [1, 0], [0, 1]]).T.reshape(2, 1, 1, 3)
+        self.theta_matrix = \
+            torch.tensor([[0, 0],
+                          [1, 0],
+                          [0, 1]]).T.reshape(2, 1, 1, 3)
+        #self.m_matrix = \
+        #    torch.tensor([[0, 0],
+        #                  [1, 0],
+        #                  [0, 1]]).T.reshape(2, 1, 1, 3)
 
     def settings(self, lr, batch_size, jit=False):
         # K - max number of spots
@@ -137,6 +145,7 @@ class Model(nn.Module):
     def run(self, num_iter):
         for i in tqdm(range(num_iter)):
             # with torch.autograd.detect_anomaly():
+            # import pdb; pdb.set_trace()
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
                 self.infer()

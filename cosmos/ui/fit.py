@@ -5,11 +5,13 @@ import torch
 import configparser
 from cosmos.models.tracker import Tracker
 from cosmos.models.globalhw import GlobalHW
+from cosmos.models.marginal import Marginal
 
 
 models = dict()
 models["tracker"] = Tracker
 models["globalhw"] = GlobalHW
+models["marginal"] = Marginal
 
 
 class Fit(Command):

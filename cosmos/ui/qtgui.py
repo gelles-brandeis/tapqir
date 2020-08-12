@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
     def show_new_window(self, checked):
         if self.w is None:
             self.lr = pg.LinearRegionItem([400, 500])
-            self.plot["z_probs"].addItem(self.lr)
+            self.plot["z"].addItem(self.lr)
             self.w = AnotherWindow()
             self.initImages()
             self.updateImages()
@@ -147,7 +147,7 @@ class MainWindow(QMainWindow):
             # self.w.show()
 
         else:
-            self.plot["z_probs"].removeItem(self.lr)
+            self.plot["z"].removeItem(self.lr)
             self.w.close()  # Close window.
             self.w = None  # Discard reference.
 
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow):
         widget.setMinimumSize(900, 150 * 6)
 
         # create plots and items
-        self.params = ["z_probs", "d/height", "d/width", "d/x", "d/y", "d/background"]
+        self.params = ["z", "d/height", "d/width", "d/x", "d/y", "d/background"]
         self.plot = {}
         self.item = {}
         for i, p in enumerate(self.params):
@@ -208,10 +208,14 @@ class MainWindow(QMainWindow):
             self.plot[p].setLabel("left", p)
             self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
             self.plot[p].getViewBox().setMouseMode(pg.ViewBox.RectMode)
-            if p == "z_probs":
-                self.item[p] = self.plot[p].plot(
+            if p == "z":
+                self.item[f"{p}.probs"] = pg.PlotDataItem(
                     pen=C[2], symbol="o", symbolBrush=C[2],
                     symbolPen=None, symbolSize=5, name="z_probs"
+                )
+                self.item[f"{p}.binary"] = pg.PlotDataItem(
+                    pen=C[3], symbol="o", symbolBrush=C[3],
+                    symbolPen=None, symbolSize=5, name="z_binary"
                 )
             else:
                 k_max = 1 if p.endswith("background") else 2
@@ -232,8 +236,8 @@ class MainWindow(QMainWindow):
             self.plot[key.split(".")[0]].addItem(value)
 
         # set plot ranges
-        self.plot["z_probs"].setYRange(0, 1, padding=0.01)
-        self.plot["d/height"].setYRange(0, 7000, padding=0.01)
+        self.plot["z"].setYRange(0, 1, padding=0.01)
+        # self.plot["d/height"].setYRange(0, 7000, padding=0.01)
         self.plot["d/x"].setYRange(-(self.Model.data.D+1)/2, (self.Model.data.D+1)/2, padding=0.01)
         self.plot["d/y"].setYRange(-(self.Model.data.D+1)/2, (self.Model.data.D+1)/2, padding=0.01)
         self.plot["d/background"].setYRange(0, 300, padding=0.01)
@@ -250,8 +254,9 @@ class MainWindow(QMainWindow):
         self.Model.n = None
         self.Model.frames = None
         for i, p in enumerate(self.params):
-            if p == "z_probs":
-                self.item[p].setData(self.Model.predictions["z_prob"][n])
+            if p == "z":
+                self.item[f"{p}.probs"].setData(self.Model.predictions["z_prob"][n])
+                self.item[f"{p}.binary"].setData(self.Model.predictions["z"][n])
             else:
                 hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
                 mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()

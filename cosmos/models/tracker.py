@@ -24,7 +24,6 @@ class Tracker(Model):
         super().__init__()
 
     @poutine.block(hide=["width_mode", "width_size"])
-    @config_enumerate
     def model(self):
         self.model_parameters()
 
@@ -69,11 +68,19 @@ class Tracker(Model):
             theta_mask = Vindex(self.theta_matrix)[..., theta]
             m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
             m_mask = Vindex(self.m_matrix)[..., m]
+            # m_mask = Vindex(self.m_matrix)[..., theta]
 
-            # with K_plate:
-            with K_plate, pyro.poutine.mask(mask=m_mask > 0):
+            with K_plate:
+            # with K_plate, pyro.poutine.mask(mask=m_mask > 0):
+                # m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta_mask, :]))
                 height = pyro.sample(
-                    "height", dist.HalfNormal(10000.))
+                    "height", dist.MaskedMixture(
+                        m_mask > 0,
+                        dist.Delta(torch.tensor(0.)),
+                        dist.HalfNormal(10000.)
+                    )
+                )
+                #     "height", dist.HalfNormal(10000.))
                 # "height", dist.Gamma(
                 #    param("height_loc") * param("height_beta"),
                 #    param("height_beta")))
@@ -88,7 +95,7 @@ class Tracker(Model):
                     "y", ScaledBeta(
                         0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
-            height = height.masked_fill(m_mask == 0, 0.)
+            # height = height.masked_fill(m_mask == 0, 0.)
             width = width * 2.5 + 0.5
             x = x * (data.D+1) - (data.D+1)/2
             y = y * (data.D+1) - (data.D+1)/2
@@ -99,7 +106,8 @@ class Tracker(Model):
                     locs / param("gain"), 1 / param("gain"),
                     self.offset_samples, self.offset_weights.log()
                 ).to_event(2),
-                obs=Vindex(data.data)[batch_idx, frame_idx, :, :])
+                obs=Vindex(data.data)[batch_idx, frame_idx, :, :]
+            )
 
     def spot_guide(self, data, theta, prefix):
         K_plate = pyro.plate("K_plate", self.K, dim=-3)
@@ -125,13 +133,23 @@ class Tracker(Model):
                 Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
             m_mask = Vindex(self.m_matrix)[..., m]
 
-            with K_plate as k_idx, pyro.poutine.mask(mask=m_mask > 0):
+            # with K_plate as k_idx, pyro.poutine.mask(mask=m_mask > 0):
+            with K_plate as k_idx:
                 k_idx = k_idx[:, None, None]
+                # m_mask = pyro.sample("m", dist.Categorical(
+                #     Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta, :]))
                 pyro.sample(
-                    "height", dist.Gamma(
-                        Vindex(param(f"{prefix}/h_loc"))[k_idx, batch_idx, frame_idx]
-                        * Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx],
-                        Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx]))
+                    "height",
+                    dist.MaskedMixture(
+                        m_mask > 0,
+                        dist.Delta(torch.tensor(0.)),
+                        dist.Gamma(
+                            Vindex(param(f"{prefix}/h_loc"))[k_idx, batch_idx, frame_idx]
+                            * Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx],
+                            Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx]
+                        )
+                    )
+                )
                 pyro.sample(
                     "width", ScaledBeta(
                         Vindex(param(f"{prefix}/w_mode"))[k_idx, batch_idx, frame_idx],
@@ -193,6 +211,9 @@ class Tracker(Model):
             m_probs[..., 1, 2] = 0
             m_probs[..., 2, 0] = 0
             m_probs[..., 2, 1] = 0
+            # m_probs = torch.ones(self.K, data.N, data.F, 3, self.S+1)
+            # m_probs[0, :, :, 1, 0] = 0
+            # m_probs[1, :, :, 2, 0] = 0
             param(f"{prefix}/m_probs",
                   m_probs,
                   constraint=constraints.simplex)
@@ -235,13 +256,12 @@ class Tracker(Model):
               torch.tensor([10.]), constraint=constraints.positive)
 
     def infer(self):
-        z_probs = z_probs_calc(
-            pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
-        k_probs = k_probs_calc(pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
+        z_probs = z_probs_calc(pyro.param("d/theta_probs"))
+        # k_probs = k_probs_calc(pyro.param("d/m_probs"), pyro.param("d/theta_probs"))
         self.predictions["z_prob"] = z_probs.squeeze()
         self.predictions["z"] = \
             self.predictions["z_prob"] > 0.5
-        self.predictions["m_prob"] = k_probs.squeeze()
-        self.predictions["m"] = self.predictions["m_prob"] > 0.5
+        # self.predictions["m_prob"] = k_probs.squeeze()
+        # self.predictions["m"] = self.predictions["m_prob"] > 0.5
         np.save(os.path.join(self.path, "predictions.npy"),
                 self.predictions)

@@ -37,31 +37,6 @@ def probs_to_logits(probs):
     return torch.log(probs / (1 - probs))
 
 
-"""
-def pi_m_calc(pi, lamda, K):
-    poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
-    pi_m = torch.zeros(2**K)
-    pi_m[0] = pi[0] * poisson(0)
-    pi_m[1] = (pi[1] * poisson(0) + pi[0] * poisson(1)) / 2
-    pi_m[2] = (pi[1] * poisson(0) + pi[0] * poisson(1)) / 2
-    pi_m[3] = pi[1] * poisson(1) + pi[0] * poisson(2)
-    return pi_m
-
-def pi_theta_calc(pi, lamda, K):
-    poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
-    pi_theta = torch.zeros(2**K,K+1)
-    pi_theta[0, 0] = 1
-    pi_theta[1, 0] = pi[0] * poisson(1)
-    pi_theta[1, 1] = pi[1] * poisson(0)
-    pi_theta[2, 0] = pi[0] * poisson(1)
-    pi_theta[2, 2] = pi[1] * poisson(0)
-    pi_theta[3, 0] = pi[0] * poisson(2)
-    pi_theta[3, 1] = pi[1] * poisson(1) / 2
-    pi_theta[3, 2] = pi[1] * poisson(1) / 2
-    return pi_theta
-"""
-
-
 def pi_m_calc(lamda, S):
     # pi_m = torch.eye(S+1)
     # pi_m[0] = lamda
@@ -87,43 +62,11 @@ def pi_theta_calc(pi, K, S):
 
 
 """
-def pi_m_calc(pi, lamda, K):
-    #poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
-    pi_m = torch.zeros(2**K)
-    #pi_m[0] = pi[0] * poisson(0)
-    #pi_m[1] = (pi[1] * poisson(0) + pi[0] * poisson(1)) / 2
-    #pi_m[2] = (pi[1] * poisson(0) + pi[0] * poisson(1)) / 2
-    #pi_m[3] = pi[1] * poisson(1) + pi[0] * poisson(2)
-    pi_m[0] = pi[0] * lamda[0] * lamda[0]
-    pi_m[1] = pi[1] * lamda[0] / 2 + pi[0] * lamda[0] * lamda[1]
-    pi_m[2] = pi[1] * lamda[0] / 2 + pi[0] * lamda[0] * lamda[1]
-    pi_m[3] = pi[1] * lamda[1] + pi[0] * lamda[1] * lamda[1]
-    return pi_m
-
-def pi_theta_calc(pi, lamda, K):
-    #poisson = lambda x: dist.Poisson(lamda).log_prob(torch.tensor([float(x)])).exp()
-    pi_theta = torch.zeros(2**K,K+1)
-    pi_theta[0, 0] = 1
-    pi_theta[1, 0] = pi[0] * lamda[1] * lamda[0]
-    pi_theta[1, 1] = pi[1] * lamda[0] / 2
-    pi_theta[2, 0] = pi[0] * lamda[1] * lamda[0]
-    pi_theta[2, 2] = pi[1] * lamda[0] / 2
-    pi_theta[3, 0] = pi[0] * lamda[1] * lamda[1]
-    pi_theta[3, 1] = pi[1] * lamda[1] / 2
-    pi_theta[3, 2] = pi[1] * lamda[1] / 2
-    return pi_theta
-
-def z_probs_calc(m_probs, theta_probs):
-    return (m_probs * theta_probs[..., 1:].sum(dim=-1)).sum(dim=-1).cpu().data
 
 def k_probs_calc(m_probs, theta_probs):
     return torch.stack((m_probs[..., 1] + m_probs[..., 3],
                         m_probs[..., 2] + m_probs[..., 3]),
                         dim=-1).squeeze(dim=-2).cpu().data
-
-def theta_probs_calc(m_probs, theta_probs):
-    return (m_probs.unsqueeze(dim=-1) * theta_probs[..., 1:]).sum(dim=-2).cpu().data
-
 """
 
 
@@ -140,7 +83,7 @@ def theta_trans_calc(A, K, S):
     return theta_trans
 
 
-def z_probs_calc(m_probs, theta_probs):
+def z_probs_calc(theta_probs):
     return theta_probs[..., 1:].sum(dim=-1).cpu().data
 
 
