@@ -16,11 +16,11 @@ from cosmos.models.helper import pi_m_calc, pi_theta_calc
 from cosmos.models.helper import z_probs_calc
 
 
-class Tracker(Model):
+class Mixture(Model):
     """ Track on-target Spot """
 
     def __init__(self):
-        self.__name__ = "tracker"
+        self.__name__ = "mixture"
         super().__init__()
 
     @poutine.block(hide=["width_mode", "width_size"])
@@ -66,11 +66,11 @@ class Tracker(Model):
             else:
                 theta = 0
             theta_mask = Vindex(self.theta_matrix)[..., theta]
-            m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
-            m_mask = Vindex(self.m_matrix)[..., m]
+            # m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
+            # m_mask = Vindex(self.m_matrix)[..., m]
 
             with K_plate:
-                # m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta_mask, :]))
+                m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta_mask, :]))
                 with pyro.poutine.mask(mask=m_mask>0):
                     height = pyro.sample(
                         "height", dist.HalfNormal(10000.)
@@ -120,14 +120,14 @@ class Tracker(Model):
                     Vindex(param(f"{prefix}/theta_probs"))[batch_idx, frame_idx, :]))
             else:
                 theta = 0
-            m = pyro.sample("m", dist.Categorical(
-                Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
-            m_mask = Vindex(self.m_matrix)[..., m]
+            # m = pyro.sample("m", dist.Categorical(
+            #     Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
+            # m_mask = Vindex(self.m_matrix)[..., m]
 
             with K_plate as k_idx:
                 k_idx = k_idx[:, None, None]
-                # m_mask = pyro.sample("m", dist.Categorical(
-                #     Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta, :]))
+                m_mask = pyro.sample("m", dist.Categorical(
+                    Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta, :]))
                 with pyro.poutine.mask(mask=m_mask>0):
                     pyro.sample(
                         "height",
@@ -193,14 +193,14 @@ class Tracker(Model):
               size, constraint=constraints.greater_than(2.))
 
         if m:
-            m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
-            m_probs[..., 1, 0] = 0
-            m_probs[..., 1, 2] = 0
-            m_probs[..., 2, 0] = 0
-            m_probs[..., 2, 1] = 0
-            # m_probs = torch.ones(self.K, data.N, data.F, 3, self.S+1)
-            # m_probs[0, :, :, 1, 0] = 0
-            # m_probs[1, :, :, 2, 0] = 0
+            # m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
+            # m_probs[..., 1, 0] = 0
+            # m_probs[..., 1, 2] = 0
+            # m_probs[..., 2, 0] = 0
+            # m_probs[..., 2, 1] = 0
+            m_probs = torch.ones(self.K, data.N, data.F, 3, self.S+1)
+            m_probs[0, :, :, 1, 0] = 0
+            m_probs[1, :, :, 2, 0] = 0
             param(f"{prefix}/m_probs",
                   m_probs,
                   constraint=constraints.simplex)

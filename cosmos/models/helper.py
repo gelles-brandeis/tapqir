@@ -2,47 +2,7 @@ import torch
 from torch.distributions import constraints
 from torch.distributions.utils import broadcast_all
 import pyro.distributions as dist
-from pyro.distributions import TorchDistribution, ZeroInflatedDistribution, Gamma
-
-
-class ZeroInflatedGamma(ZeroInflatedDistribution):
-    """
-    A Zero Inflated Gamma distribution.
-    :param torch.Tensor gate: probability of extra zeros.
-    :param torch.Tensor concentration: shape parameter of the distribution.
-    :param torch.Tensor rate: rate = 1 / scale of the distribution.
-    """
-    arg_constraints = {"gate": constraints.unit_interval,
-                       "concentration": constraints.positive,
-                       "rate": constraints.positive}
-    support = constraints.positive
-
-    def __init__(self, gate, concentration, rate, validate_args=None):
-        base_dist = Gamma(concentration, rate, validate_args=False)
-        base_dist._validate_args = validate_args
-
-        super().__init__(
-            gate, base_dist, validate_args=validate_args
-        )
-
-    def log_prob(self, value):
-        if self._validate_args:
-            self._validate_sample(value)
-
-        gate, value = broadcast_all(self.gate, value)
-        mask = (value == 0)
-        log_prob = (-gate).log1p() + self.base_dist.log_prob(value.masked_fill(mask, 1.))
-        # log_prob = (-gate).log1p() + self.base_dist.log_prob(value)
-        log_prob = torch.where(value == 0, gate.log(), log_prob)
-        return log_prob
-
-    @property
-    def concentration(self):
-        return self.base_dist.concentration
-
-    @property
-    def rate(self):
-        return self.base_dist.rate
+from pyro.distributions import TorchDistribution
 
 
 class ConvGamma(TorchDistribution):
@@ -82,7 +42,7 @@ def probs_to_logits(probs):
 def pi_m_calc(lamda, S):
     # pi_m = torch.eye(S+1)
     # pi_m[0] = lamda
-    pi_m = lamda.new_zeros(3, 4)
+    pi_m = torch.zeros(3, 4)
     pi_m[0, 0] = lamda[0] * lamda[0]
     pi_m[0, 1] = lamda[1] * lamda[0]
     pi_m[0, 2] = lamda[0] * lamda[1]
@@ -95,7 +55,7 @@ def pi_m_calc(lamda, S):
 
 
 def pi_theta_calc(pi, K, S):
-    pi_theta = pi.new_zeros(S*K+1)
+    pi_theta = torch.zeros(S*K+1)
     pi_theta[0] = pi[0]
     for s in range(S):
         for k in range(K):
@@ -113,7 +73,7 @@ def k_probs_calc(m_probs, theta_probs):
 
 
 def theta_trans_calc(A, K, S):
-    theta_trans = A.new_zeros(K*S+1, K*S+1)
+    theta_trans = torch.zeros(K*S+1, K*S+1)
     theta_trans[0, 0] = A[0, 0]
     for s in range(S):
         for k in range(K):
