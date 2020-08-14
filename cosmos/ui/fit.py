@@ -5,14 +5,12 @@ import torch
 import configparser
 from cosmos.models.tracker import Tracker
 from cosmos.models.globalhw import GlobalHW
-from cosmos.models.mixture import Mixture
 from cosmos.models.marginal import Marginal
 
 
 models = dict()
 models["tracker"] = Tracker
 models["globalhw"] = GlobalHW
-models["mixture"] = Mixture
 models["marginal"] = Marginal
 
 
