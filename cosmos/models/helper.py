@@ -40,17 +40,8 @@ def probs_to_logits(probs):
 
 
 def pi_m_calc(lamda, S):
-    # pi_m = torch.eye(S+1)
-    # pi_m[0] = lamda
-    pi_m = torch.zeros(3, 4)
-    pi_m[0, 0] = lamda[0] * lamda[0]
-    pi_m[0, 1] = lamda[1] * lamda[0]
-    pi_m[0, 2] = lamda[0] * lamda[1]
-    pi_m[0, 3] = lamda[1] * lamda[1]
-    pi_m[1, 1] = lamda[0]
-    pi_m[1, 3] = lamda[1]
-    pi_m[2, 2] = lamda[0]
-    pi_m[2, 3] = lamda[1]
+    pi_m = torch.eye(S+1)
+    pi_m[0] = lamda
     return pi_m
 
 
