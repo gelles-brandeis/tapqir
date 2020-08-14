@@ -33,10 +33,7 @@ class GaussianSpot(nn.Module):
 
     # Ideal 2D gaussian spots
     def forward(self, height, width, x, y, background, n_idx, f_idx):
-        # if f is not None:
         spot_locs = Vindex(self.target_locs)[n_idx, f_idx, :] + torch.stack((x, y), -1)
-        # else:
-        #    spot_locs = self.target_locs[n_idx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2) * width[..., None, None, None, None]
@@ -95,15 +92,10 @@ class Model(nn.Module):
             self.control = control
 
         self.size = torch.tensor([2., (((self.data.D+1) / (2*0.5)) ** 2 - 1)])
-        self.m_matrix = torch.tensor([[0, 0], [1, 0], [0, 1], [1, 1]]).T.reshape(2, 1, 1, 4)
         self.theta_matrix = \
             torch.tensor([[0, 0],
                           [1, 0],
                           [0, 1]])
-        # self.m_matrix = \
-        #    torch.tensor([[0, 0],
-        #                  [1, 0],
-        #                  [0, 1]]).T.reshape(2, 1, 1, 3)
 
     def settings(self, lr, batch_size, jit=False):
         # K - max number of spots

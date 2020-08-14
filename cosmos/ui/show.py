@@ -6,14 +6,10 @@ from PySide2.QtWidgets import QApplication
 from cosmos.ui.qtgui import MainWindow
 
 from cosmos.models.tracker import Tracker
-from cosmos.models.globalhw import GlobalHW
-from cosmos.models.marginal import Marginal
 
 
 models = dict()
 models["tracker"] = Tracker
-models["globalhw"] = GlobalHW
-models["marginal"] = Marginal
 
 
 class Show(Command):

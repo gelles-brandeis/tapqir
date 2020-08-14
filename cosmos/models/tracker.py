@@ -27,16 +27,15 @@ class Tracker(Model):
     def model(self):
         self.model_parameters()
 
-        data_pi_m = pi_m_calc(param("lamda"), self.S)
-        control_pi_m = pi_m_calc(param("lamda"), self.S)
+        pi_m = pi_m_calc(param("lamda"), self.S)
         pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
 
         with scope(prefix="d"):
-            self.spot_model(self.data, self.data_loc, data_pi_m, pi_theta, prefix="d")
+            self.spot_model(self.data, self.data_loc, pi_m, pi_theta, prefix="d")
 
         if self.control:
             with scope(prefix="c"):
-                self.spot_model(self.control, self.control_loc, control_pi_m, None, prefix="c")
+                self.spot_model(self.control, self.control_loc, pi_m, None, prefix="c")
 
     @config_enumerate
     def guide(self):
