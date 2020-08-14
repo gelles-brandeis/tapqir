@@ -236,6 +236,8 @@ class MainWindow(QMainWindow):
 
         # create plots and items
         self.params = ["z", "d/height", "d/width", "d/x", "d/y", "d/background"]
+        self.items = ["z", "d/height_0", "d/height_1", "d/width_0", "d/width_1",
+                       "d/x_0", "d/x_1", "d/y_0", "d/y_1", "d/background"]
         self.plot = {}
         self.item = {}
         for i, p in enumerate(self.params):
@@ -244,32 +246,33 @@ class MainWindow(QMainWindow):
             self.plot[p].setLabel("left", p)
             self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
             self.plot[p].getViewBox().setMouseMode(pg.ViewBox.RectMode)
+        for i, p in enumerate(self.items):
             if p == "z":
-                self.item[f"{p}.probs"] = pg.PlotDataItem(
+                self.item[f"{p}_probs"] = pg.PlotDataItem(
                     pen=C[2], symbol="o", symbolBrush=C[2],
                     symbolPen=None, symbolSize=5, name="z_probs"
                 )
-                self.item[f"{p}.binary"] = pg.PlotDataItem(
+                self.item[f"{p}_binary"] = pg.PlotDataItem(
                     pen=C[3], symbol=None,
                     symbolPen=None, name="z_binary"
                 )
             else:
-                k_max = 1 if p.endswith("background") else 2
-                for k in range(k_max):
-                    self.item[f"{p}.{k}_mean"] = pg.PlotDataItem(
-                        pen=C[k], symbol="o", symbolBrush=C[k],
-                        symbolPen=None, symbolSize=5, name=k
-                    )
-                    self.item[f"{p}.{k}_high"] = pg.PlotDataItem(pen=(*C[k], 70))
-                    self.item[f"{p}.{k}_low"] = pg.PlotDataItem(pen=(*C[k], 70))
-                    self.item[f"{p}.{k}_fill"] = pg.FillBetweenItem(
-                        self.item[f"{p}.{k}_high"], self.item[f"{p}.{k}_low"],
-                        brush=(*C[k], 70)
-                    )
+                k = 0 if p.endswith("background") else int(p.split("_")[-1])
+
+                self.item[f"{p}_mean"] = pg.PlotDataItem(
+                    pen=C[k], symbol="o", symbolBrush=C[k],
+                    symbolPen=None, symbolSize=5, name=k
+                )
+                self.item[f"{p}_high"] = pg.PlotDataItem(pen=(*C[k], 70))
+                self.item[f"{p}_low"] = pg.PlotDataItem(pen=(*C[k], 70))
+                self.item[f"{p}_fill"] = pg.FillBetweenItem(
+                    self.item[f"{p}_high"], self.item[f"{p}_low"],
+                    brush=(*C[k], 70)
+                )
 
         # add items to plots
         for key, value in self.item.items():
-            self.plot[key.split(".")[0]].addItem(value)
+            self.plot[key.split("_")[0]].addItem(value)
 
         # set plot ranges
         self.plot["z"].setYRange(0, 1, padding=0.01)
@@ -289,27 +292,22 @@ class MainWindow(QMainWindow):
         trace = pyro.poutine.trace(self.Model.guide).get_trace()
         self.Model.n = None
         self.Model.frames = None
-        for i, p in enumerate(self.params):
+        for i, p in enumerate(self.items):
             if p == "z":
-                self.item[f"{p}.probs"].setData(self.Model.predictions["z_prob"][n])
-                self.item[f"{p}.binary"].setData(self.Model.predictions["z"][n])
+                self.item[f"{p}_probs"].setData(self.Model.predictions["z_prob"][n])
+                self.item[f"{p}_binary"].setData(self.Model.predictions["z"][n])
             else:
                 hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
                 mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()
-                k_max = 2
-                if p.endswith("background"):
-                    k_max = 1
-                    mean, hpd = mean[None], hpd[:, None]
-                elif p.endswith("x") or p.endswith("y"):
+                if p.startswith("d/x") or p.startswith("d/y"):
                     mean = mean * (self.Model.data.D+1) - (self.Model.data.D+1)/2
                     hpd = hpd * (self.Model.data.D+1) - (self.Model.data.D+1)/2
-                elif p.endswith("width"):
+                elif p.startswith("d/width"):
                     mean = mean * 2.5 + 0.5
                     hpd = hpd * 2.5 + 0.5
-                for k in range(k_max):
-                    self.item[f"{p}.{k}_high"].setData(hpd[0, k])
-                    self.item[f"{p}.{k}_low"].setData(hpd[1, k])
-                    self.item[f"{p}.{k}_mean"].setData(mean[k])
+                self.item[f"{p}_high"].setData(hpd[0])
+                self.item[f"{p}_low"].setData(hpd[1])
+                self.item[f"{p}_mean"].setData(mean)
 
         if self.w is not None:
             self.updateImages()

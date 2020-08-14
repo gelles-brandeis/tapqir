@@ -50,7 +50,7 @@ class Tracker(Model):
                 self.spot_guide(self.control, False, prefix="c")
 
     def spot_model(self, data, data_loc, pi_m, pi_theta, prefix):
-        K_plate = pyro.plate("K_plate", self.K, dim=-3)
+        K_plate = pyro.plate("K_plate", self.K)
         N_plate = pyro.plate("N_plate", data.N, dim=-2)
         F_plate = pyro.plate("F_plate", data.F, dim=-1)
 
@@ -65,33 +65,34 @@ class Tracker(Model):
                 theta = pyro.sample("theta", dist.Categorical(pi_theta))
             else:
                 theta = 0
-            theta_mask = Vindex(self.theta_matrix)[..., theta]
-            m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
-            m_mask = Vindex(self.m_matrix)[..., m]
 
-            with K_plate:
-                # m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta_mask, :]))
+            locs = 0.
+            for k_idx in K_plate:
+                theta_mask = Vindex(self.theta_matrix)[theta, k_idx]
+                m_mask = pyro.sample(f"m_{k_idx}", dist.Categorical(Vindex(pi_m)[theta_mask]))
                 with pyro.poutine.mask(mask=m_mask>0):
                     height = pyro.sample(
-                        "height", dist.HalfNormal(10000.)
+                        f"height_{k_idx}", dist.HalfNormal(10000.)
                     )
                     width = pyro.sample(
-                        "width", ScaledBeta(
+                        f"width_{k_idx}", ScaledBeta(
                             param("width_mode"),
                             param("width_size"), 0.5, 2.5))
                     x = pyro.sample(
-                        "x", ScaledBeta(
+                        f"x_{k_idx}", ScaledBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
                     y = pyro.sample(
-                        "y", ScaledBeta(
+                        f"y_{k_idx}", ScaledBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
-            height = height.masked_fill(m_mask==0, 0.)
-            width = width * 2.5 + 0.5
-            x = x * (data.D+1) - (data.D+1)/2
-            y = y * (data.D+1) - (data.D+1)/2
+                    height = height.masked_fill(m_mask==0, 0.)
+                    width = width * 2.5 + 0.5
+                    x = x * (data.D+1) - (data.D+1)/2
+                    y = y * (data.D+1) - (data.D+1)/2
 
-            locs = data_loc(height, width, x, y, background, batch_idx, frame_idx)
+                    loc = data_loc(height, width, x, y, background, batch_idx, frame_idx)
+                    locs = locs + loc
+
             pyro.sample(
                 "data", ConvGamma(
                     locs / param("gain"), 1 / param("gain"),
@@ -101,7 +102,7 @@ class Tracker(Model):
             )
 
     def spot_guide(self, data, theta, prefix):
-        K_plate = pyro.plate("K_plate", self.K, dim=-3)
+        K_plate = pyro.plate("K_plate", self.K)
         N_plate = pyro.plate("N_plate", data.N,
                              subsample_size=self.batch_size, subsample=self.n, dim=-2)
         F_plate = pyro.plate("F_plate", data.F, subsample=self.frames, dim=-1)
@@ -120,17 +121,14 @@ class Tracker(Model):
                     Vindex(param(f"{prefix}/theta_probs"))[batch_idx, frame_idx, :]))
             else:
                 theta = 0
-            m = pyro.sample("m", dist.Categorical(
-                Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
-            m_mask = Vindex(self.m_matrix)[..., m]
 
-            with K_plate as k_idx:
-                k_idx = k_idx[:, None, None]
-                # m_mask = pyro.sample("m", dist.Categorical(
-                #     Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta, :]))
+            for k_idx in K_plate:
+                theta_mask = Vindex(self.theta_matrix)[theta, k_idx]
+                m_mask = pyro.sample(f"m_{k_idx}", dist.Categorical(
+                    Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta_mask, :]))
                 with pyro.poutine.mask(mask=m_mask>0):
                     pyro.sample(
-                        "height",
+                        f"height_{k_idx}",
                         dist.Gamma(
                             Vindex(param(f"{prefix}/h_loc"))[k_idx, batch_idx, frame_idx]
                             * Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx],
@@ -138,17 +136,17 @@ class Tracker(Model):
                         )
                     )
                     pyro.sample(
-                        "width", ScaledBeta(
+                        f"width_{k_idx}", ScaledBeta(
                             Vindex(param(f"{prefix}/w_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/w_size"))[k_idx, batch_idx, frame_idx],
                             0.5, 2.5))
                     pyro.sample(
-                        "x", ScaledBeta(
+                        f"x_{k_idx}", ScaledBeta(
                             Vindex(param(f"{prefix}/x_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
                             -(data.D+1)/2, data.D+1))
                     pyro.sample(
-                        "y", ScaledBeta(
+                        f"y_{k_idx}", ScaledBeta(
                             Vindex(param(f"{prefix}/y_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
                             -(data.D+1)/2, data.D+1))
@@ -193,14 +191,10 @@ class Tracker(Model):
               size, constraint=constraints.greater_than(2.))
 
         if m:
-            m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
-            m_probs[..., 1, 0] = 0
-            m_probs[..., 1, 2] = 0
-            m_probs[..., 2, 0] = 0
-            m_probs[..., 2, 1] = 0
-            # m_probs = torch.ones(self.K, data.N, data.F, 3, self.S+1)
-            # m_probs[0, :, :, 1, 0] = 0
-            # m_probs[1, :, :, 2, 0] = 0
+            m_probs = torch.zeros(self.K, data.N, data.F, self.S+1, self.S+1)
+            m_probs[..., 0, :] = 1
+            for s in range(1, self.S+1):
+                m_probs[..., s, s] = 1
             param(f"{prefix}/m_probs",
                   m_probs,
                   constraint=constraints.simplex)

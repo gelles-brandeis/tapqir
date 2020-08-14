@@ -12,7 +12,7 @@ from cosmos.models.helper import ScaledBeta, ConvGamma
 import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
-from cosmos.models.helper import pi_m_calc, pi_theta_calc
+from cosmos.models.helper import pi_m_calc, pi_theta_calc, pi_m_mask_calc
 from cosmos.models.helper import z_probs_calc
 
 
@@ -27,8 +27,8 @@ class Mixture(Model):
     def model(self):
         self.model_parameters()
 
-        data_pi_m = pi_m_calc(param("lamda"), self.S)
-        control_pi_m = pi_m_calc(param("lamda"), self.S)
+        data_pi_m = pi_m_mask_calc(param("lamda"), self.S)
+        control_pi_m = pi_m_mask_calc(param("lamda"), self.S)
         pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
 
         with scope(prefix="d"):
@@ -69,8 +69,9 @@ class Mixture(Model):
             # m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
             # m_mask = Vindex(self.m_matrix)[..., m]
 
-            with K_plate:
-                m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta_mask, :]))
+            with K_plate as k_idx:
+                k_idx = k_idx[:, None, None]
+                m_mask = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta, k_idx, :]))
                 with pyro.poutine.mask(mask=m_mask>0):
                     height = pyro.sample(
                         "height", dist.HalfNormal(10000.)
@@ -86,7 +87,8 @@ class Mixture(Model):
                         "y", ScaledBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
-            height = height.masked_fill(m_mask==0, 0.)
+            h_mask = Vindex(self.m_matrix)[..., m.unsqueeze(-1)]
+            height = height.masked_fill(h_mask==0, 0.)
             width = width * 2.5 + 0.5
             x = x * (data.D+1) - (data.D+1)/2
             y = y * (data.D+1) - (data.D+1)/2
@@ -120,14 +122,14 @@ class Mixture(Model):
                     Vindex(param(f"{prefix}/theta_probs"))[batch_idx, frame_idx, :]))
             else:
                 theta = 0
-            # m = pyro.sample("m", dist.Categorical(
-            #     Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
-            # m_mask = Vindex(self.m_matrix)[..., m]
+            m = pyro.sample("m", dist.Categorical(
+                Vindex(param(f"{prefix}/m_probs"))[batch_idx, frame_idx, theta, :]))
+            m_mask = Vindex(self.m_matrix)[..., m]
 
             with K_plate as k_idx:
                 k_idx = k_idx[:, None, None]
-                m_mask = pyro.sample("m", dist.Categorical(
-                    Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta, :]))
+                # m_mask = pyro.sample("m", dist.Categorical(
+                #     Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta, :]))
                 with pyro.poutine.mask(mask=m_mask>0):
                     pyro.sample(
                         "height",
@@ -193,14 +195,14 @@ class Mixture(Model):
               size, constraint=constraints.greater_than(2.))
 
         if m:
-            # m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
-            # m_probs[..., 1, 0] = 0
-            # m_probs[..., 1, 2] = 0
-            # m_probs[..., 2, 0] = 0
-            # m_probs[..., 2, 1] = 0
-            m_probs = torch.ones(self.K, data.N, data.F, 3, self.S+1)
-            m_probs[0, :, :, 1, 0] = 0
-            m_probs[1, :, :, 2, 0] = 0
+            m_probs = torch.ones(data.N, data.F, self.K+1, 2**self.K)
+            m_probs[..., 1, 0] = 0
+            m_probs[..., 1, 2] = 0
+            m_probs[..., 2, 0] = 0
+            m_probs[..., 2, 1] = 0
+            # m_probs = torch.ones(self.K, data.N, data.F, 3, self.S+1)
+            # m_probs[0, :, :, 1, 0] = 0
+            # m_probs[1, :, :, 2, 0] = 0
             param(f"{prefix}/m_probs",
                   m_probs,
                   constraint=constraints.simplex)

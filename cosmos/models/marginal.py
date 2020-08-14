@@ -13,7 +13,7 @@ from cosmos.models.helper import ScaledBeta, ConvGamma
 import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
-from cosmos.models.helper import pi_m_calc, pi_theta_calc
+from cosmos.models.helper import pi_theta_calc, pi_m_calc
 
 
 class Marginal(Model):
@@ -28,6 +28,7 @@ class Marginal(Model):
     def model(self):
         self.model_parameters()
 
+        # data_pi_m = pi_m_calc(param("lamda"), self.S)
         data_pi_m = pi_m_calc(param("lamda"), self.S)
         control_pi_m = pi_m_calc(param("lamda"), self.S)
         pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
@@ -66,24 +67,26 @@ class Marginal(Model):
             else:
                 theta = 0
             theta_mask = Vindex(self.theta_matrix)[..., theta]
-            m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
-            m_mask = Vindex(self.m_matrix)[..., m]
+            # m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta]))
 
-            with K_plate:
-                with pyro.poutine.mask(mask=m_mask>0):
-                    height = pyro.sample(
-                        "height", dist.HalfNormal(10000.)
-                    )
-                    width = pyro.sample(
-                        "width", ScaledBeta(
-                            param("width_mode"),
-                            param("width_size"), 0.5, 2.5))
-                    x = pyro.sample(
-                        "x", ScaledBeta(
-                            0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
-                    y = pyro.sample(
-                        "y", ScaledBeta(
-                            0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+            with K_plate as k_idx:
+                k_idx = k_idx[:, None, None]
+
+                m = pyro.sample("m", dist.Categorical(Vindex(pi_m)[theta, k_idx, :]))
+                m_mask = Vindex(self.m_matrix)[k_idx, theta, m]
+                height = pyro.sample(
+                    "height", dist.HalfNormal(10000.)
+                )
+                width = pyro.sample(
+                    "width", ScaledBeta(
+                        param("width_mode"),
+                        param("width_size"), 0.5, 2.5))
+                x = pyro.sample(
+                    "x", ScaledBeta(
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+                y = pyro.sample(
+                    "y", ScaledBeta(
+                        0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
             height = height.masked_fill(m_mask == 0, 0.)
             width = width * 2.5 + 0.5
@@ -211,7 +214,7 @@ class Marginal(Model):
         self.predictions["z"][self.batch_idx] = (
             trace.nodes["d/theta"]["value"] > 0) \
             .cpu().data.squeeze()
-        self.predictions["m"][self.batch_idx] = \
-            Vindex(self.m_matrix)[..., trace.nodes["d/m"]["value"]].cpu().data.permute(1, 2, 0)
+        # self.predictions["m"][self.batch_idx] = \
+        #     Vindex(self.m_matrix)[..., trace.nodes["d/m"]["value"]].cpu().data.permute(1, 2, 0)
         np.save(os.path.join(self.path, "predictions.npy"),
                 self.predictions)
