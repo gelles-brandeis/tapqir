@@ -32,16 +32,14 @@ class GaussianSpot(nn.Module):
         ).float()
 
     # Ideal 2D gaussian spots
-    def forward(self, height, width, x, y, background, n_idx, f_idx):
+    def forward(self, height, width, x, y, n_idx, f_idx):
         spot_locs = Vindex(self.target_locs)[n_idx, f_idx, :] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2) * width[..., None, None, None, None]
         )
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
-        result = height[..., None, None] * gaussian_spot \
-            + background[..., None, None]
-        return result
+        return height[..., None, None] * gaussian_spot
 
 
 class Model(nn.Module):
