@@ -59,13 +59,13 @@ class Tracker(Model):
                 "background", dist.Gamma(
                     Vindex(param(f"{prefix}/background_loc"))[batch_idx, 0]
                     * param("background_beta"), param("background_beta")))
+            locs = background
 
             if pi_theta is not None:
                 theta = pyro.sample("theta", dist.Categorical(pi_theta))
             else:
                 theta = 0
 
-            locs = 0.
             for k_idx in K_plate:
                 theta_mask = Vindex(self.theta_matrix)[theta, k_idx]
                 m_mask = pyro.sample(f"m_{k_idx}", dist.Categorical(Vindex(pi_m)[theta_mask]))
@@ -89,8 +89,8 @@ class Tracker(Model):
                     x = x * (data.D+1) - (data.D+1)/2
                     y = y * (data.D+1) - (data.D+1)/2
 
-                    loc = data_loc(height, width, x, y, background, batch_idx, frame_idx)
-                    locs = locs + loc
+                    gaussian = data_loc(height, width, x, y, batch_idx, frame_idx)
+                    locs = locs + gaussian
 
             pyro.sample(
                 "data", ConvGamma(
