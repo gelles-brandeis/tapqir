@@ -8,7 +8,7 @@ from pyro import param
 from pyro import poutine
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
-from cosmos.models.helper import ScaledBeta, ConvGamma
+from cosmos.models.helper import AffineBeta, ConvGamma
 import torch.distributions.constraints as constraints
 
 from cosmos.models.model import Model
@@ -70,20 +70,17 @@ class Tracker(Model):
                         f"height_{k_idx}", dist.HalfNormal(10000.)
                     )
                     width = pyro.sample(
-                        f"width_{k_idx}", ScaledBeta(
+                        f"width_{k_idx}", AffineBeta(
                             param("width_mode"),
                             param("width_size"), 0.5, 2.5))
                     x = pyro.sample(
-                        f"x_{k_idx}", ScaledBeta(
+                        f"x_{k_idx}", AffineBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
                     y = pyro.sample(
-                        f"y_{k_idx}", ScaledBeta(
+                        f"y_{k_idx}", AffineBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
                     height = height.masked_fill(m_mask==0, 0.)
-                    width = width * 2.5 + 0.5
-                    x = x * (data.D+1) - (data.D+1)/2
-                    y = y * (data.D+1) - (data.D+1)/2
 
                     gaussian = data_loc(height, width, x, y, batch_idx, frame_idx)
                     locs = locs + gaussian
@@ -131,17 +128,17 @@ class Tracker(Model):
                         )
                     )
                     pyro.sample(
-                        f"width_{k_idx}", ScaledBeta(
+                        f"width_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/w_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/w_size"))[k_idx, batch_idx, frame_idx],
                             0.5, 2.5))
                     pyro.sample(
-                        f"x_{k_idx}", ScaledBeta(
+                        f"x_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/x_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
                             -(data.D+1)/2, data.D+1))
                     pyro.sample(
-                        f"y_{k_idx}", ScaledBeta(
+                        f"y_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/y_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
                             -(data.D+1)/2, data.D+1))

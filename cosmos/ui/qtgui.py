@@ -299,12 +299,6 @@ class MainWindow(QMainWindow):
             else:
                 hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
                 mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()
-                if p.startswith("d/x") or p.startswith("d/y"):
-                    mean = mean * (self.Model.data.D+1) - (self.Model.data.D+1)/2
-                    hpd = hpd * (self.Model.data.D+1) - (self.Model.data.D+1)/2
-                elif p.startswith("d/width"):
-                    mean = mean * 2.5 + 0.5
-                    hpd = hpd * 2.5 + 0.5
                 self.item[f"{p}_high"].setData(hpd[0])
                 self.item[f"{p}_low"].setData(hpd[1])
                 self.item[f"{p}_mean"].setData(mean)

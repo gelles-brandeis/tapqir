@@ -3,6 +3,7 @@ from torch.distributions import constraints
 from torch.distributions.utils import broadcast_all
 import pyro.distributions as dist
 from pyro.distributions import TorchDistribution
+from torch.distributions.transforms import AffineTransform
 
 
 class ConvGamma(TorchDistribution):
@@ -28,11 +29,13 @@ class ConvGamma(TorchDistribution):
         return result
 
 
-def ScaledBeta(mode, size, loc, scale):
+def AffineBeta(mode, size, loc, scale):
     mode = (mode - loc) / scale
     concentration1 = mode * size
     concentration0 = (1 - mode) * size
-    return dist.Beta(concentration1, concentration0)
+    base_dist = dist.Beta(concentration1, concentration0)
+    transforms = [AffineTransform(loc=loc, scale=scale)]
+    return dist.TransformedDistribution(base_dist, transforms)
 
 
 def probs_to_logits(probs):
