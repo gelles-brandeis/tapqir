@@ -27,6 +27,7 @@ class Config(Command):
         config["glimpse"]["labeltype"] = None
 
         config["fit"] = {}
+        config["fit"]["spot"] = "1"
         config["fit"]["num_iter"] = "20000"
         config["fit"]["batch_size"] = "8"
         config["fit"]["learning_rate"] = "0.005"

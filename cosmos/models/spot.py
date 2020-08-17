@@ -16,11 +16,11 @@ from cosmos.models.helper import pi_m_calc, pi_theta_calc
 from cosmos.models.helper import z_probs_calc
 
 
-class Tracker(Model):
+class Spot(Model):
     """ Track on-target Spot """
 
     def __init__(self, S):
-        self.__name__ = "tracker"
+        self.__name__ = "spot"
         super().__init__(S)
 
     @poutine.block(hide=["width_mode", "width_size"])
@@ -62,12 +62,16 @@ class Tracker(Model):
             else:
                 theta = 0
 
+            height_loc = [torch.tensor([1.])]
+            for s in range(1, self.S+1):
+                height_loc.append(param("height_loc") * s)
+            height_loc = torch.cat(height_loc, 0)
             for k_idx in K_plate:
                 theta_mask = Vindex(self.theta_matrix)[theta, k_idx]
                 m_mask = pyro.sample(f"m_{k_idx}", dist.Categorical(Vindex(pi_m)[theta_mask]))
                 with pyro.poutine.mask(mask=m_mask>0):
                     height = pyro.sample(
-                        f"height_{k_idx}", dist.HalfNormal(10000.)
+                        f"height_{k_idx}", dist.Gamma(Vindex(height_loc)[m_mask] / param("gain"), 1 / param("gain"))
                     )
                     width = pyro.sample(
                         f"width_{k_idx}", ScaledBeta(
@@ -125,9 +129,9 @@ class Tracker(Model):
                     pyro.sample(
                         f"height_{k_idx}",
                         dist.Gamma(
-                            Vindex(param(f"{prefix}/h_loc"))[k_idx, batch_idx, frame_idx]
-                            * Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx],
-                            Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx]
+                            Vindex(param(f"{prefix}/h_loc"))[k_idx, batch_idx, frame_idx, m_mask]
+                            * Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx, m_mask],
+                            Vindex(param(f"{prefix}/h_beta"))[k_idx, batch_idx, frame_idx, m_mask]
                         )
                     )
                     pyro.sample(
@@ -162,11 +166,14 @@ class Tracker(Model):
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F) * 30,
               constraint=constraints.positive)
+        h_loc = torch.ones(self.K, data.N, data.F, self.S+1)
+        for s in range(1, self.S+1):
+            h_loc[..., s] = self.noise * 2 * s
         param(f"{prefix}/h_loc",
-              (self.noise * 2).repeat(self.K, data.N, data.F),
+              h_loc,
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
-              torch.ones(self.K, data.N, data.F),
+              torch.ones(self.K, data.N, data.F, self.S+1),
               constraint=constraints.positive)
         param(f"{prefix}/w_mode",
               torch.ones(self.K, data.N, data.F) * 1.3,
@@ -203,9 +210,9 @@ class Tracker(Model):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
-        # param("height_loc", self.noise * 2,
+        param("height_loc", torch.tensor([self.noise * 2]),
         # param("height_loc", torch.tensor([3000.]),
-        #       constraint=constraints.positive)
+              constraint=constraints.positive)
         # param("height_beta", torch.tensor([0.001]),
         #       constraint=constraints.positive)
         param("gain", torch.tensor(5.), constraint=constraints.positive)
