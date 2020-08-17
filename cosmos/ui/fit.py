@@ -4,10 +4,12 @@ import os
 import torch
 import configparser
 from cosmos.models.tracker import Tracker
+from cosmos.models.spot import Spot
 
 
 models = dict()
 models["tracker"] = Tracker
+models["spot"] = Spot
 
 
 class Fit(Command):
@@ -21,6 +23,8 @@ class Fit(Command):
         parser.add_argument("dataset", default=".", type=str,
                             help="Path to the dataset folder")
 
+        parser.add_argument("-s", "--spot", type=int, metavar="\b",
+                            help="Max. number of molecules per spot")
         parser.add_argument("-it", "--num-iter", type=int, metavar="\b",
                             help="Number of iterations")
         parser.add_argument("-bs", "--batch-size", type=int, metavar="\b",
@@ -43,6 +47,7 @@ class Fit(Command):
         cfg_file = os.path.join(args.dataset, "options.cfg")
         config.read(cfg_file)
 
+        spot = args.spot or config["fit"].getint("spot")
         num_iter = args.num_iter or config["fit"].getint("num_iter")
         batch_size = args.batch_size or config["fit"].getint("batch_size")
         learning_rate = args.learning_rate or config["fit"].getfloat("learning_rate")
@@ -54,7 +59,7 @@ class Fit(Command):
         else:
             torch.set_default_tensor_type("torch.FloatTensor")
 
-        model = models[args.model]()
+        model = models[args.model](spot)
         model.load(args.dataset, control, device)
         model.settings(learning_rate, batch_size)
         model.run(num_iter)

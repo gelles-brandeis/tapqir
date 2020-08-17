@@ -45,10 +45,10 @@ class GaussianSpot(nn.Module):
 class Model(nn.Module):
     """ Gaussian Spot Model """
 
-    def __init__(self, K=2):
+    def __init__(self, S, K=2):
         super().__init__()
         self.K = K
-        self.S = 1
+        self.S = S
         self.batch_size = None
         # for plotting
         self.n = None
@@ -89,11 +89,12 @@ class Model(nn.Module):
         else:
             self.control = control
 
-        self.size = torch.tensor([2., (((self.data.D+1) / (2*0.5)) ** 2 - 1)])
-        self.theta_matrix = \
-            torch.tensor([[0, 0],
-                          [1, 0],
-                          [0, 1]])
+        self.size = torch.ones(self.S+1) * (((self.data.D+1) / (2*0.5)) ** 2 - 1)
+        self.size[0] = 2.
+        self.theta_matrix = torch.zeros(1 + self.K * self.S, self.K).long()
+        for s in range(self.S):
+            for k in range(self.K):
+                self.theta_matrix[1 + s*self.K + k, k] = s + 1
 
     def settings(self, lr, batch_size, jit=False):
         # K - max number of spots
@@ -110,6 +111,9 @@ class Model(nn.Module):
             self.load_checkpoint()
         except:
             pyro.clear_param_store()
+            self.model_parameters()
+            self.guide_parameters()
+
             self.iter = 0
 
             self.predictions = np.zeros(
@@ -142,7 +146,9 @@ class Model(nn.Module):
         version = cosmos.__version__
         self.path = os.path.join(
             self.data_path, "runs",
-            "{}{}".format(self.__name__, version),
+            "{}".format(self.__name__),
+            "{}".format(version),
+            "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
             "bs{}".format(self.batch_size))
