@@ -6,12 +6,7 @@ from tqdm import tqdm
 import configparser
 from cliff.command import Command
 
-from cosmos.models import Spot, Tracker
-
-
-models = dict()
-models["tracker"] = Tracker
-models["spot"] = Spot
+from cosmos.models import models
 
 
 class ELBO(Command):

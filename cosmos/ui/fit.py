@@ -3,12 +3,7 @@ from cliff.command import Command
 import os
 import torch
 import configparser
-from cosmos.models import Spot, Tracker
-
-
-models = dict()
-models["tracker"] = Tracker
-models["spot"] = Spot
+from cosmos.models import models
 
 
 class Fit(Command):
