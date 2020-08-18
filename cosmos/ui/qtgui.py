@@ -237,7 +237,7 @@ class MainWindow(QMainWindow):
         # create plots and items
         self.params = ["z", "d/height", "d/width", "d/x", "d/y", "d/background"]
         self.items = ["z", "d/height_0", "d/height_1", "d/width_0", "d/width_1",
-                       "d/x_0", "d/x_1", "d/y_0", "d/y_1", "d/background"]
+                      "d/x_0", "d/x_1", "d/y_0", "d/y_1", "d/background"]
         self.plot = {}
         self.item = {}
         for i, p in enumerate(self.params):

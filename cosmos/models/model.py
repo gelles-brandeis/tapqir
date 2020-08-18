@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
-import cosmos
+from cosmos import __version__ as cosmos_version
 from tqdm import tqdm
 from cosmos.utils.dataset import load_data
 
@@ -143,11 +143,10 @@ class Model(nn.Module):
             self.iter += 1
 
     def log(self):
-        version = cosmos.__version__
         self.path = os.path.join(
             self.data_path, "runs",
             "{}".format(self.__name__),
-            "{}".format(version),
+            "{}".format(cosmos_version),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
@@ -196,7 +195,7 @@ class Model(nn.Module):
             if val.dim() == 0:
                 self.writer.add_scalar(name, val.item(), self.iter)
                 params_last[name] = val.item()
-            elif val.dim() == 1:
+            elif val.dim() == 1 and len(val) <= self.S+1:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 self.writer.add_scalars(name, scalars, self.iter)
                 for key, value in scalars.items():

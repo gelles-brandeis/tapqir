@@ -1,41 +1,4 @@
 import torch
-from torch.distributions import constraints
-from torch.distributions.utils import broadcast_all
-import pyro.distributions as dist
-from pyro.distributions import TorchDistribution
-from torch.distributions.transforms import AffineTransform
-
-
-class ConvGamma(TorchDistribution):
-    arg_constraints = {}  # nothing to be constrained
-
-    def __init__(self, concentration, rate, samples, log_weights):
-        self.dist = dist.Gamma(concentration.unsqueeze(-1), rate)
-        self.samples = samples
-        self.log_weights = log_weights
-        batch_shape = self.dist.batch_shape[:-1]
-        event_shape = self.dist.event_shape
-        super().__init__(batch_shape, event_shape)
-
-    def log_prob(self, value):
-        value = value.unsqueeze(-1)
-        mask = value > self.samples
-        value = torch.where(mask, value - self.samples, value.new_ones(()))
-
-        obs_logits = self.dist.log_prob(value)
-        result = obs_logits + self.log_weights
-        result = result.masked_fill(~mask, -40.)
-        result = torch.logsumexp(result, -1)
-        return result
-
-
-def AffineBeta(mode, size, loc, scale):
-    mode = (mode - loc) / scale
-    concentration1 = mode * size
-    concentration0 = (1 - mode) * size
-    base_dist = dist.Beta(concentration1, concentration0)
-    transforms = [AffineTransform(loc=loc, scale=scale)]
-    return dist.TransformedDistribution(base_dist, transforms)
 
 
 def probs_to_logits(probs):
@@ -55,15 +18,6 @@ def pi_theta_calc(pi, K, S):
         for k in range(K):
             pi_theta[K*s + k + 1] = pi[s + 1] / K
     return pi_theta
-
-
-"""
-
-def k_probs_calc(m_probs, theta_probs):
-    return torch.stack((m_probs[..., 1] + m_probs[..., 3],
-                        m_probs[..., 2] + m_probs[..., 3]),
-                        dim=-1).squeeze(dim=-2).cpu().data
-"""
 
 
 def theta_trans_calc(A, K, S):
