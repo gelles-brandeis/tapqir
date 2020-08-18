@@ -8,12 +8,12 @@ from pyro import param
 from pyro import poutine
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
-from cosmos.models.helper import AffineBeta, ConvGamma
 import torch.distributions.constraints as constraints
 
-from cosmos.models.model import Model
-from cosmos.models.helper import pi_m_calc, pi_theta_calc
-from cosmos.models.helper import z_probs_calc
+from cosmos.models import Model
+from cosmos.distributions import AffineBeta, ConvolutedGamma
+from cosmos.models.utils import pi_m_calc, pi_theta_calc
+from cosmos.models.utils import z_probs_calc
 
 
 class Tracker(Model):
@@ -25,8 +25,10 @@ class Tracker(Model):
 
     @poutine.block(hide=["width_mode", "width_size"])
     def model(self):
-        pi_m = pi_m_calc(param("lamda"), self.S)
-        pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
+        pi = pyro.sample("pi", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        lamda = pyro.sample("lamda", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
+        pi_m = pi_m_calc(lamda, self.S)
+        pi_theta = pi_theta_calc(pi, self.K, self.S)
 
         with scope(prefix="d"):
             self.spot_model(self.data, self.data_loc, pi_m, pi_theta, prefix="d")
@@ -37,6 +39,9 @@ class Tracker(Model):
 
     @config_enumerate
     def guide(self):
+        pyro.sample("pi", dist.Dirichlet(param("pi_mode") * param("pi_size")))
+        pyro.sample("lamda", dist.Dirichlet(param("lamda_mode") * param("lamda_size")))
+
         with scope(prefix="d"):
             self.spot_guide(self.data, True, prefix="d")
 
@@ -53,7 +58,7 @@ class Tracker(Model):
             batch_idx = batch_idx[:, None]
             background = pyro.sample(
                 "background", dist.Gamma(
-                    Vindex(param(f"{prefix}/background_loc"))[batch_idx, 0]
+                    Vindex(param(f"{prefix}/background_loc"))[batch_idx]
                     * param("background_beta"), param("background_beta")))
             locs = background[..., None, None]
 
@@ -65,7 +70,7 @@ class Tracker(Model):
             for k_idx in K_plate:
                 theta_mask = Vindex(self.theta_matrix)[theta, k_idx]
                 m_mask = pyro.sample(f"m_{k_idx}", dist.Categorical(Vindex(pi_m)[theta_mask]))
-                with pyro.poutine.mask(mask=m_mask>0):
+                with pyro.poutine.mask(mask=m_mask > 0):
                     height = pyro.sample(
                         f"height_{k_idx}", dist.HalfNormal(10000.)
                     )
@@ -80,13 +85,13 @@ class Tracker(Model):
                         f"y_{k_idx}", AffineBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
 
-                    height = height.masked_fill(m_mask==0, 0.)
+                    height = height.masked_fill(m_mask == 0, 0.)
 
                     gaussian = data_loc(height, width, x, y, batch_idx, frame_idx)
                     locs = locs + gaussian
 
             pyro.sample(
-                "data", ConvGamma(
+                "data", ConvolutedGamma(
                     locs / param("gain"), 1 / param("gain"),
                     self.offset_samples, self.offset_weights.log()
                 ).to_event(2),
@@ -101,7 +106,6 @@ class Tracker(Model):
 
         with N_plate as batch_idx, F_plate as frame_idx:
             batch_idx = batch_idx[:, None]
-            self.batch_idx = batch_idx.cpu()
             pyro.sample(
                 "background", dist.Gamma(
                     Vindex(param(f"{prefix}/b_loc"))[batch_idx, frame_idx]
@@ -118,7 +122,7 @@ class Tracker(Model):
                 theta_mask = Vindex(self.theta_matrix)[theta, k_idx]
                 m_mask = pyro.sample(f"m_{k_idx}", dist.Categorical(
                     Vindex(param(f"{prefix}/m_probs"))[k_idx, batch_idx, frame_idx, theta_mask, :]))
-                with pyro.poutine.mask(mask=m_mask>0):
+                with pyro.poutine.mask(mask=m_mask > 0):
                     pyro.sample(
                         f"height_{k_idx}",
                         dist.Gamma(
@@ -151,7 +155,7 @@ class Tracker(Model):
 
     def spot_parameters(self, data, m, theta, prefix):
         param(f"{prefix}/background_loc",
-              (self.data_median - self.offset_median).repeat(data.N, 1),
+              torch.ones(data.N) * (self.data_median - self.offset_median),
               constraint=constraints.positive)
         param(f"{prefix}/b_loc",
               (self.data_median - self.offset_median).repeat(data.N, data.F),
@@ -200,14 +204,11 @@ class Tracker(Model):
         # Global Parameters
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
-        # param("height_loc", self.noise * 2,
-        # param("height_loc", torch.tensor([3000.]),
-        #       constraint=constraints.positive)
-        # param("height_beta", torch.tensor([0.001]),
-        #       constraint=constraints.positive)
         param("gain", torch.tensor(5.), constraint=constraints.positive)
-        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
-        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("pi_mode", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("lamda_mode", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("pi_size", torch.tensor([1000.]), constraint=constraints.positive)
+        param("lamda_size", torch.tensor([1000.]), constraint=constraints.positive)
         param("background_beta", torch.tensor([1.]),
               constraint=constraints.positive)
         param("width_mode", torch.tensor([1.3]),

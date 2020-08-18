@@ -7,8 +7,7 @@ from cliff.command import Command
 from PySide2.QtWidgets import QApplication
 from cosmos.ui.qtgui import MainWindow
 
-from cosmos.models.tracker import Tracker
-from cosmos.models.spot import Spot
+from cosmos.models import Spot, Tracker
 
 
 models = dict()

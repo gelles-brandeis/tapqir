@@ -41,6 +41,7 @@ setuptools.setup(
             "fit=cosmos.ui.fit:Fit",
             "show=cosmos.ui.show:Show",
             "glimpse=cosmos.ui.glimpse:Glimpse",
+            "elbo=cosmos.ui.elbo:ELBO",
         ]
     }
 )

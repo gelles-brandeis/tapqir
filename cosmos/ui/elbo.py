@@ -1,8 +1,11 @@
+import os
+import pyro
+import torch
+import numpy as np
+from tqdm import tqdm
+import configparser
 from cliff.command import Command
 
-import os
-import torch
-import configparser
 from cosmos.models import Spot, Tracker
 
 
@@ -11,15 +14,15 @@ models["tracker"] = Tracker
 models["spot"] = Spot
 
 
-class Fit(Command):
-    "Fit the data to the model"
+class ELBO(Command):
+    "Calculate ELBO estimate"
 
     def get_parser(self, prog_name):
-        parser = super(Fit, self).get_parser(prog_name)
+        parser = super(ELBO, self).get_parser(prog_name)
 
         parser.add_argument("model", default="tracker", type=str,
                             help="Choose the model: {}".format(", ".join(models.keys())))
-        parser.add_argument("dataset", default=".", type=str,
+        parser.add_argument("dataset", type=str,
                             help="Path to the dataset folder")
 
         parser.add_argument("-s", "--spot", type=int, metavar="\b",
@@ -35,8 +38,6 @@ class Fit(Command):
                             help="Analyze control dataset")
         parser.add_argument("-dev", "--device", type=str, metavar="\b",
                             help="Compute device")
-        parser.add_argument("--jit", action="store_true",
-                            help="Just in time compilation")
 
         return parser
 
@@ -61,4 +62,10 @@ class Fit(Command):
         model = models[args.model](spot)
         model.load(args.dataset, control, device)
         model.settings(learning_rate, batch_size)
-        model.run(num_iter)
+        losses = []
+        pyro.set_rng_seed(num_iter)
+        for i in tqdm(range(num_iter)):
+            losses.append(model.svi.evaluate_loss())
+        np.save(os.path.join(model.path, "elbo.npy"), np.array(losses))
+        print("mean: {:11.1f}".format(np.mean(losses)))
+        print("std:  {:11.1f}".format(np.std(losses) / np.sqrt(num_iter)))
