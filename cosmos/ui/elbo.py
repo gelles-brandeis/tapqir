@@ -2,6 +2,7 @@ import os
 import pyro
 import torch
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 import configparser
 from cliff.command import Command
@@ -57,10 +58,35 @@ class ELBO(Command):
         model = models[args.model](spot)
         model.load(args.dataset, control, device)
         model.settings(learning_rate, batch_size)
+
+        params_last = pd.read_csv(
+            os.path.join(model.path, "params_last.csv"),
+            header=None, squeeze=True, index_col=0)
+        if not "ELBO_mean" in params_last.index:
+            losses = []
+            for i in tqdm(range(1000)):
+                elbo = model.svi.evaluate_loss()
+                if not np.isnan(elbo):
+                    losses.append(elbo)
+            params_last["ELBO_mean"] = np.mean(losses)
+            params_last["ELBO_std"] = np.std(losses) / np.sqrt(len(losses))
+            params_last["ELBO_var"] = np.var(losses) / len(losses)
+            params_last["elbo_var"] = np.var(losses)
+            params_last.to_csv(os.path.join(model.path, "params_last.csv"))
+        print(params_last["ELBO_mean"])
+        print(params_last["ELBO_std"])
         losses = []
-        pyro.set_rng_seed(num_iter)
         for i in tqdm(range(num_iter)):
-            losses.append(model.svi.evaluate_loss())
-        np.save(os.path.join(model.path, "elbo.npy"), np.array(losses))
-        print("mean: {:11.1f}".format(np.mean(losses)))
-        print("std:  {:11.1f}".format(np.std(losses) / np.sqrt(num_iter)))
+            elbo = model.svi.evaluate_loss()
+            if not np.isnan(elbo):
+                losses.append(elbo)
+        
+        params_last["ELBO_mean"] = (
+            (params_last["ELBO_mean"] / params_last["ELBO_var"] + np.sum(losses) / params_last["elbo_var"])
+            / (1 / params_last["ELBO_var"] + len(losses) / params_last["elbo_var"]))
+        params_last["ELBO_var"] = 1 / (1 / params_last["ELBO_var"] + len(losses) / params_last["elbo_var"])
+        params_last["ELBO_std"] = np.sqrt(params_last["ELBO_var"])
+        print(params_last["ELBO_mean"])
+        print(params_last["ELBO_std"])
+        print(len(losses))
+        params_last.to_csv(os.path.join(model.path, "params_last.csv"))
