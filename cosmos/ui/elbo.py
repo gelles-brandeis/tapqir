@@ -1,5 +1,4 @@
 import os
-import pyro
 import torch
 import numpy as np
 import pandas as pd
@@ -62,7 +61,7 @@ class ELBO(Command):
         params_last = pd.read_csv(
             os.path.join(model.path, "params_last.csv"),
             header=None, squeeze=True, index_col=0)
-        if not "ELBO_mean" in params_last.index:
+        if "ELBO_mean" not in params_last.index:
             losses = []
             for i in tqdm(range(1000)):
                 elbo = model.svi.evaluate_loss()
@@ -80,7 +79,7 @@ class ELBO(Command):
             elbo = model.svi.evaluate_loss()
             if not np.isnan(elbo):
                 losses.append(elbo)
-        
+
         params_last["ELBO_mean"] = (
             (params_last["ELBO_mean"] / params_last["ELBO_var"] + np.sum(losses) / params_last["elbo_var"])
             / (1 / params_last["ELBO_var"] + len(losses) / params_last["elbo_var"]))

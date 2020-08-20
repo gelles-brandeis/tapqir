@@ -109,7 +109,7 @@ class Model(nn.Module):
 
         try:
             self.load_checkpoint()
-        except:
+        except FileNotFoundError:
             pyro.clear_param_store()
             self.model_parameters()
             self.guide_parameters()
@@ -146,7 +146,7 @@ class Model(nn.Module):
         self.path = os.path.join(
             self.data_path, "runs",
             "{}".format(self.__name__),
-            "{}".format(cosmos_version),
+            "{}".format(cosmos_version.split("+")[0]),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
@@ -179,8 +179,7 @@ class Model(nn.Module):
         # save only if no NaN values
         if any([torch.isnan(v).any()
                 for v in pyro.get_param_store().values()]):
-            self.logger.warning("Step #{}. Detected NaN values in parameters".format(self.iter))
-            return
+            raise ValueError("Step #{}. Detected NaN values in parameters".format(self.iter))
 
         self.optim.save(os.path.join(self.path, "optimizer"))
         pyro.get_param_store().save(os.path.join(self.path, "params"))
@@ -240,7 +239,8 @@ class Model(nn.Module):
     def load_checkpoint(self, path=None):
         if path is None:
             path = self.path
-        self.iter = int(np.loadtxt(os.path.join(path, "iter")))
+        params_last = pd.read_csv(os.path.join(path, "params_last.csv"), header=None, squeeze=True, index_col=0)
+        self.iter = int(params_last["iter"])
         self.optim.load(os.path.join(path, "optimizer"))
         pyro.clear_param_store()
         pyro.get_param_store().load(
