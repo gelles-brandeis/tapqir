@@ -77,7 +77,7 @@ class Tracker(Model):
                     width = pyro.sample(
                         f"width_{k_idx}", AffineBeta(
                             param("width_mode"),
-                            param("width_size"), 0.5, 2.5))
+                            param("width_size"), 0.75, 1.25))
                     x = pyro.sample(
                         f"x_{k_idx}", AffineBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
@@ -135,7 +135,7 @@ class Tracker(Model):
                         f"width_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/w_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/w_size"))[k_idx, batch_idx, frame_idx],
-                            0.5, 2.5))
+                            0.75, 1.25))
                     pyro.sample(
                         f"x_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/x_mode"))[k_idx, batch_idx, frame_idx],
@@ -171,7 +171,7 @@ class Tracker(Model):
               constraint=constraints.positive)
         param(f"{prefix}/w_mode",
               torch.ones(self.K, data.N, data.F) * 1.3,
-              constraint=constraints.interval(0.5, 3.))
+              constraint=constraints.interval(0.75, 2.))
         param(f"{prefix}/w_size",
               torch.ones(self.K, data.N, data.F) * 100.,
               constraint=constraints.greater_than(2.))
@@ -212,9 +212,9 @@ class Tracker(Model):
         param("background_beta", torch.tensor([1.]),
               constraint=constraints.positive)
         param("width_mode", torch.tensor([1.3]),
-              constraint=constraints.interval(0.5, 3.))
+              constraint=constraints.interval(0.75, 2.))
         param("width_size",
-              torch.tensor([10.]), constraint=constraints.positive)
+              torch.tensor([2.]), constraint=constraints.positive)
 
     def infer(self):
         z_probs = z_probs_calc(pyro.param("d/theta_probs"))
