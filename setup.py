@@ -42,6 +42,7 @@ setuptools.setup(
             "show=cosmos.ui.show:Show",
             "glimpse=cosmos.ui.glimpse:Glimpse",
             "elbo=cosmos.ui.elbo:ELBO",
+            "matlab=cosmos.ui.matlab:Matlab",
         ]
     }
 )

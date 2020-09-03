@@ -25,10 +25,8 @@ class Tracker(Model):
 
     @poutine.block(hide=["width_mode", "width_size"])
     def model(self):
-        pi = pyro.sample("pi", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
-        lamda = pyro.sample("lamda", dist.Dirichlet(0.5 * torch.ones(self.S+1)))
-        pi_m = pi_m_calc(lamda, self.S)
-        pi_theta = pi_theta_calc(pi, self.K, self.S)
+        pi_m = pi_m_calc(param("lamda"), self.S)
+        pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
 
         with scope(prefix="d"):
             self.spot_model(self.data, self.data_loc, pi_m, pi_theta, prefix="d")
@@ -39,9 +37,6 @@ class Tracker(Model):
 
     @config_enumerate
     def guide(self):
-        pyro.sample("pi", dist.Dirichlet(param("pi_mode") * param("pi_size")))
-        pyro.sample("lamda", dist.Dirichlet(param("lamda_mode") * param("lamda_size")))
-
         with scope(prefix="d"):
             self.spot_guide(self.data, True, prefix="d")
 
@@ -59,7 +54,8 @@ class Tracker(Model):
             background = pyro.sample(
                 "background", dist.Gamma(
                     Vindex(param(f"{prefix}/background_loc"))[batch_idx]
-                    * param("background_beta"), param("background_beta")))
+                    * Vindex(param(f"{prefix}/background_beta"))[batch_idx],
+                    Vindex(param(f"{prefix}/background_beta"))[batch_idx]))
             locs = background[..., None, None]
 
             if pi_theta is not None:
@@ -77,7 +73,7 @@ class Tracker(Model):
                     width = pyro.sample(
                         f"width_{k_idx}", AffineBeta(
                             param("width_mode"),
-                            param("width_size"), 0.5, 2.5))
+                            param("width_size"), 0.75, 1.5))
                     x = pyro.sample(
                         f"x_{k_idx}", AffineBeta(
                             0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
@@ -135,7 +131,7 @@ class Tracker(Model):
                         f"width_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/w_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/w_size"))[k_idx, batch_idx, frame_idx],
-                            0.5, 2.5))
+                            0.75, 1.5))
                     pyro.sample(
                         f"x_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/x_mode"))[k_idx, batch_idx, frame_idx],
@@ -157,6 +153,8 @@ class Tracker(Model):
         param(f"{prefix}/background_loc",
               torch.ones(data.N) * (self.data_median - self.offset_median),
               constraint=constraints.positive)
+        param(f"{prefix}/background_beta", torch.ones(data.N),
+              constraint=constraints.positive)
         param(f"{prefix}/b_loc",
               (self.data_median - self.offset_median).repeat(data.N, data.F),
               constraint=constraints.positive)
@@ -171,7 +169,7 @@ class Tracker(Model):
               constraint=constraints.positive)
         param(f"{prefix}/w_mode",
               torch.ones(self.K, data.N, data.F) * 1.3,
-              constraint=constraints.interval(0.5, 3.))
+              constraint=constraints.interval(0.75, 2.25))
         param(f"{prefix}/w_size",
               torch.ones(self.K, data.N, data.F) * 100.,
               constraint=constraints.greater_than(2.))
@@ -205,16 +203,12 @@ class Tracker(Model):
         # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
         #       constraint=constraints.greater_than(30.))
         param("gain", torch.tensor(5.), constraint=constraints.positive)
-        param("pi_mode", torch.ones(self.S+1), constraint=constraints.simplex)
-        param("lamda_mode", torch.ones(self.S+1), constraint=constraints.simplex)
-        param("pi_size", torch.tensor([1000.]), constraint=constraints.positive)
-        param("lamda_size", torch.tensor([1000.]), constraint=constraints.positive)
-        param("background_beta", torch.tensor([1.]),
-              constraint=constraints.positive)
+        param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
+        param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
         param("width_mode", torch.tensor([1.3]),
-              constraint=constraints.interval(0.5, 3.))
+              constraint=constraints.interval(0.75, 2.25))
         param("width_size",
-              torch.tensor([10.]), constraint=constraints.positive)
+              torch.tensor([2.]), constraint=constraints.positive)
 
     def infer(self):
         z_probs = z_probs_calc(pyro.param("d/theta_probs"))

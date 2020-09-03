@@ -146,7 +146,7 @@ class Model(nn.Module):
         self.path = os.path.join(
             self.data_path, "runs",
             "{}".format(self.__name__),
-            "{}".format(cosmos_version.split("+")[0]),
+            "{}flat".format(cosmos_version.split("+")[0]),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
