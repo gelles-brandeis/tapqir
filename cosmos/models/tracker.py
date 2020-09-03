@@ -168,7 +168,7 @@ class Tracker(Model):
               torch.ones(self.K, data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/w_mode",
-              torch.ones(self.K, data.N, data.F) * 1.3,
+              torch.ones(self.K, data.N, data.F) * 1.5,
               constraint=constraints.interval(0.75, 2.25))
         param(f"{prefix}/w_size",
               torch.ones(self.K, data.N, data.F) * 100.,
@@ -205,7 +205,7 @@ class Tracker(Model):
         param("gain", torch.tensor(5.), constraint=constraints.positive)
         param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
         param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
-        param("width_mode", torch.tensor([1.3]),
+        param("width_mode", torch.tensor([1.5]),
               constraint=constraints.interval(0.75, 2.25))
         param("width_size",
               torch.tensor([2.]), constraint=constraints.positive)
