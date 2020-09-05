@@ -1,3 +1,4 @@
+import torch
 from torch.distributions import constraints
 from torch.distributions.transforms import AffineTransform
 from pyro.distributions import Beta, TransformedDistribution
@@ -22,6 +23,38 @@ class AffineBeta(TransformedDistribution):
     def expand(self, batch_shape, _instance=None):
         new = self._get_checked_instance(AffineBeta, _instance)
         return super(AffineBeta, self).expand(batch_shape, _instance=new)
+
+    def sample(self, sample_shape=torch.Size()):
+        """
+        Generates a sample_shape shaped sample or sample_shape shaped batch of
+        samples if the distribution parameters are batched. Samples first from
+        base distribution and applies `transform()` for every transform in the
+        list.
+        """
+        with torch.no_grad():
+            x = self.base_dist.sample(sample_shape)
+            for transform in self.transforms:
+                x = transform(x)
+            # eps = torch.finfo(x.dtype).eps
+            eps = 1e-5
+            x = x.clamp(min=self.loc + eps, max=self.loc + self.scale - eps)
+            return x
+
+
+    def rsample(self, sample_shape=torch.Size()):
+        """
+        Generates a sample_shape shaped reparameterized sample or sample_shape
+        shaped batch of reparameterized samples if the distribution parameters
+        are batched. Samples first from base distribution and applies
+        `transform()` for every transform in the list.
+        """
+        x = self.base_dist.rsample(sample_shape)
+        for transform in self.transforms:
+            x = transform(x)
+        # eps = torch.finfo(x.dtype).eps
+        eps = 1e-5
+        x = x.clamp(min=self.loc + eps, max=self.loc + self.scale - eps)
+        return x
 
     @property
     def loc(self):
