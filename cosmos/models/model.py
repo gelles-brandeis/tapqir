@@ -133,6 +133,7 @@ class Model(nn.Module):
         raise NotImplementedError
 
     def run(self, num_iter):
+        # pyro.enable_validation()
         for i in tqdm(range(num_iter)):
             # with torch.autograd.detect_anomaly():
             # import pdb; pdb.set_trace()
