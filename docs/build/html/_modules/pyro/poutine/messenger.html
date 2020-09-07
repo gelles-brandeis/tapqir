@@ -1,0 +1,414 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>pyro.poutine.messenger &mdash; cosmos v1.1.3+13.gc4e9f02.dirty documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/language_data.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> cosmos
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">User guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../usage.html">Usage</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Documentation:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commands.html">Commands</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../distributions.html">Distributions</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Examples:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/experimental_data.html">Experimental data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/height_data.html">Height data</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">cosmos</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>pyro.poutine.messenger</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for pyro.poutine.messenger</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2017-2019 Uber Technologies, Inc.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+
+<span class="kn">from</span> <span class="nn">.runtime</span> <span class="kn">import</span> <span class="n">_PYRO_STACK</span>
+
+
+<span class="k">def</span> <span class="nf">_context_wrap</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">context</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">_bound_partial</span><span class="p">(</span><span class="n">partial</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Converts a (possibly) bound method into a partial function to</span>
+<span class="sd">    support class methods as arguments to handlers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__get__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instance</span><span class="p">,</span> <span class="n">owner</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">instance</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+        <span class="k">return</span> <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="p">,</span> <span class="n">instance</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">Messenger</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Context manager class that modifies behavior</span>
+<span class="sd">    and adds side effects to stochastic functions</span>
+<span class="sd">    i.e. callables containing Pyro primitive statements.</span>
+
+<span class="sd">    This is the base Messenger class.</span>
+<span class="sd">    It implements the default behavior for all Pyro primitives,</span>
+<span class="sd">    so that the joint distribution induced by a stochastic function fn</span>
+<span class="sd">    is identical to the joint distribution induced by ``Messenger()(fn)``.</span>
+
+<span class="sd">    Class of transformers for messages passed during inference.</span>
+<span class="sd">    Most inference operations are implemented in subclasses of this.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
+        <span class="n">wraps</span> <span class="o">=</span> <span class="n">_bound_partial</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">_context_wrap</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">wraps</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :returns: self</span>
+<span class="sd">        :rtype: pyro.poutine.Messenger</span>
+
+<span class="sd">        Installs this messenger at the bottom of the Pyro stack.</span>
+
+<span class="sd">        Can be overloaded to add any additional per-call setup functionality,</span>
+<span class="sd">        but the derived class must always push itself onto the stack, usually</span>
+<span class="sd">        by calling super().__enter__().</span>
+
+<span class="sd">        Derived versions cannot be overridden to take arguments</span>
+<span class="sd">        and must always return self.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span> <span class="ow">in</span> <span class="n">_PYRO_STACK</span><span class="p">):</span>
+            <span class="c1"># if this poutine is not already installed,</span>
+            <span class="c1"># put it on the bottom of the stack.</span>
+            <span class="n">_PYRO_STACK</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+            <span class="c1"># necessary to return self because the return value of __enter__</span>
+            <span class="c1"># is bound to VAR in with EXPR as VAR.</span>
+            <span class="k">return</span> <span class="bp">self</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># note: currently we raise an error if trying to install a poutine twice.</span>
+            <span class="c1"># However, this isn&#39;t strictly necessary,</span>
+            <span class="c1"># and blocks recursive poutine execution patterns like</span>
+            <span class="c1"># like calling self.__call__ inside of self.__call__</span>
+            <span class="c1"># or with Handler(...) as p: with p: &lt;BLOCK&gt;</span>
+            <span class="c1"># It&#39;s hard to imagine use cases for this pattern,</span>
+            <span class="c1"># but it could in principle be enabled...</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;cannot install a Messenger instance twice&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param exc_type: exception type, e.g. ValueError</span>
+<span class="sd">        :param exc_value: exception instance?</span>
+<span class="sd">        :param traceback: traceback for exception handling</span>
+<span class="sd">        :returns: None</span>
+<span class="sd">        :rtype: None</span>
+
+<span class="sd">        Removes this messenger from the bottom of the Pyro stack.</span>
+<span class="sd">        If an exception is raised, removes this messenger and everything below it.</span>
+<span class="sd">        Always called after every execution of self.fn via self.__call__.</span>
+
+<span class="sd">        Can be overloaded by derived classes to add any other per-call teardown functionality,</span>
+<span class="sd">        but the stack must always be popped by the derived class,</span>
+<span class="sd">        usually by calling super().__exit__(*args).</span>
+
+<span class="sd">        Derived versions cannot be overridden to take other arguments,</span>
+<span class="sd">        and must always return None or False.</span>
+
+<span class="sd">        The arguments are the mandatory arguments used by a with statement.</span>
+<span class="sd">        Users should never be specifying these.</span>
+<span class="sd">        They are all None unless the body of the with statement raised an exception.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">exc_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># callee or enclosed block returned successfully</span>
+            <span class="c1"># if the callee or enclosed block returned successfully,</span>
+            <span class="c1"># this poutine should be on the bottom of the stack.</span>
+            <span class="c1"># If so, remove it from the stack.</span>
+            <span class="c1"># if not, raise a ValueError because something really weird happened.</span>
+            <span class="k">if</span> <span class="n">_PYRO_STACK</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="bp">self</span><span class="p">:</span>
+                <span class="n">_PYRO_STACK</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># should never get here, but just in case...</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;This Messenger is not on the bottom of the stack&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># the wrapped function or block raised an exception</span>
+            <span class="c1"># poutine exception handling:</span>
+            <span class="c1"># when the callee or enclosed block raises an exception,</span>
+            <span class="c1"># find this poutine&#39;s position in the stack,</span>
+            <span class="c1"># then remove it and everything below it in the stack.</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="ow">in</span> <span class="n">_PYRO_STACK</span><span class="p">:</span>
+                <span class="n">loc</span> <span class="o">=</span> <span class="n">_PYRO_STACK</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">_PYRO_STACK</span><span class="p">)):</span>
+                    <span class="n">_PYRO_STACK</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">_process_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param msg: current message at a trace site</span>
+<span class="sd">        :returns: None</span>
+
+<span class="sd">        Process the message by calling appropriate method of itself based</span>
+<span class="sd">        on message type. The message is updated in place.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">method_name</span> <span class="o">=</span> <span class="s2">&quot;_pyro_</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method_name</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method_name</span><span class="p">)(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">_postprocess_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="n">method_name</span> <span class="o">=</span> <span class="s2">&quot;_pyro_post_</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method_name</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method_name</span><span class="p">)(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">register</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">fn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param fn: function implementing operation</span>
+<span class="sd">        :param str type: name of the operation</span>
+<span class="sd">            (also passed to :func:`~pyro.poutine.runtime.effectful`)</span>
+<span class="sd">        :param bool post: if `True`, use this operation as postprocess</span>
+
+<span class="sd">        Dynamically add operations to an effect.</span>
+<span class="sd">        Useful for generating wrappers for libraries.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            @SomeMessengerClass.register</span>
+<span class="sd">            def some_function(msg)</span>
+<span class="sd">                ...do_something...</span>
+<span class="sd">                return msg</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">fn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">type</span><span class="p">,</span> <span class="n">post</span><span class="o">=</span><span class="n">post</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;An operation type name must be provided&quot;</span><span class="p">)</span>
+
+        <span class="nb">setattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;_pyro_&quot;</span> <span class="o">+</span> <span class="p">(</span><span class="s2">&quot;post_&quot;</span> <span class="k">if</span> <span class="n">post</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="nb">type</span><span class="p">,</span> <span class="nb">staticmethod</span><span class="p">(</span><span class="n">fn</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">fn</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">unregister</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">fn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param fn: function implementing operation</span>
+<span class="sd">        :param str type: name of the operation</span>
+<span class="sd">            (also passed to :func:`~pyro.poutine.runtime.effectful`)</span>
+
+<span class="sd">        Dynamically remove operations from an effect.</span>
+<span class="sd">        Useful for removing wrappers from libraries.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            SomeMessengerClass.unregister(some_function, &quot;name&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;An operation type name must be provided&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">delattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;_pyro_post_&quot;</span> <span class="o">+</span> <span class="nb">type</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">delattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;_pyro_&quot;</span> <span class="o">+</span> <span class="nb">type</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="k">return</span> <span class="n">fn</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Yerdos Ordabayev
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

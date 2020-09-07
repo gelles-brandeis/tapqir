@@ -1,0 +1,537 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Models &mdash; cosmos v1.1.3+13.gc4e9f02.dirty documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Distributions" href="distributions.html" />
+    <link rel="prev" title="Commands" href="commands.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> cosmos
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">User guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Documentation:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="commands.html">Commands</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#cosmos-models">Cosmos Models</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="distributions.html">Distributions</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Examples:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/experimental_data.html">Experimental data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/height_data.html">Height data</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">cosmos</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Models</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/models.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<div class="section" id="models">
+<span id="id1"></span><h1>Models<a class="headerlink" href="#models" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="cosmos-models">
+<h2>Cosmos Models<a class="headerlink" href="#cosmos-models" title="Permalink to this headline">¶</a></h2>
+<p>Models</p>
+<span class="target" id="module-cosmos.models"></span><dl class="py class">
+<dt id="cosmos.models.GaussianSpot">
+<em class="property">class </em><code class="sig-prename descclassname">cosmos.models.</code><code class="sig-name descname">GaussianSpot</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">target</span></em>, <em class="sig-param"><span class="n">drift</span></em>, <em class="sig-param"><span class="n">D</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#GaussianSpot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.GaussianSpot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
+<p>Calculates ideal shape of the 2D-Gaussian spot given spot parameters,
+target positions, and drift list.</p>
+<blockquote>
+<div><p><span class="math notranslate nohighlight">\(\dfrac{h_{knf}}{2 \pi w^2_{nfk}} \exp{\left ( -\dfrac{(i-x_{nfk})^2 + (j-y_{nfk})^2}{2w^2_{nfk}} \right)}\)</span></p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target</strong> – AoI target positions.</p></li>
+<li><p><strong>drift</strong> – Frame drift list.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt id="cosmos.models.GaussianSpot.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">height</span></em>, <em class="sig-param"><span class="n">width</span></em>, <em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">n_idx</span></em>, <em class="sig-param"><span class="n">f_idx</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#GaussianSpot.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.GaussianSpot.forward" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>height</strong> – integrated spot intensity.</p></li>
+<li><p><strong>width</strong> – width of the 2D-Gaussian spot.</p></li>
+<li><p><strong>x</strong> – relative <span class="math notranslate nohighlight">\(x\)</span>-axis position relative to the target.</p></li>
+<li><p><strong>y</strong> – relative <span class="math notranslate nohighlight">\(y\)</span>-axis position relative to the target.</p></li>
+<li><p><strong>n_idx</strong> – AoI indices.</p></li>
+<li><p><strong>f_idx</strong> – Frame indices.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Ideal shape 2D-Gaussian spot.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>Categorical</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="cosmos.models.GaussianSpot.training">
+<code class="sig-name descname">training</code><em class="property">: bool</em><a class="headerlink" href="#cosmos.models.GaussianSpot.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="cosmos.models.Model">
+<em class="property">class </em><code class="sig-prename descclassname">cosmos.models.</code><code class="sig-name descname">Model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">S</span></em>, <em class="sig-param"><span class="n">K</span><span class="o">=</span><span class="default_value">2</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
+<p>Base class for cosmos models.</p>
+<p><strong>Implementing New Models</strong>:</p>
+<p>Derived models must implement the methods
+<a class="reference internal" href="#cosmos.models.Model.model" title="cosmos.models.Model.model"><code class="xref py py-meth docutils literal notranslate"><span class="pre">model()</span></code></a>
+<a class="reference internal" href="#cosmos.models.Model.guide" title="cosmos.models.Model.guide"><code class="xref py py-meth docutils literal notranslate"><span class="pre">guide()</span></code></a></p>
+<dl class="py method">
+<dt id="cosmos.models.Model.load">
+<code class="sig-name descname">load</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span></em>, <em class="sig-param"><span class="n">control</span></em>, <em class="sig-param"><span class="n">device</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.load"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.load" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.settings">
+<code class="sig-name descname">settings</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">lr</span></em>, <em class="sig-param"><span class="n">batch_size</span></em>, <em class="sig-param"><span class="n">jit</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.settings"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.settings" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.model">
+<code class="sig-name descname">model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generative Model</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.guide">
+<code class="sig-name descname">guide</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.guide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.guide" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variational Guide</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.run">
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">num_iter</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.run" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.log">
+<code class="sig-name descname">log</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.log"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.log" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.save_checkpoint">
+<code class="sig-name descname">save_checkpoint</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.save_checkpoint"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.save_checkpoint" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.load_checkpoint">
+<code class="sig-name descname">load_checkpoint</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.load_checkpoint"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.load_checkpoint" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Model.load_parameters">
+<code class="sig-name descname">load_parameters</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/model.html#Model.load_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Model.load_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt id="cosmos.models.Model.training">
+<code class="sig-name descname">training</code><em class="property">: bool</em><a class="headerlink" href="#cosmos.models.Model.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="cosmos.models.Spot">
+<em class="property">class </em><code class="sig-prename descclassname">cosmos.models.</code><code class="sig-name descname">Spot</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">S</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">cosmos.models.model.Model</span></code></p>
+<p>Track on-target Spot</p>
+<dl class="py method">
+<dt id="cosmos.models.Spot.model">
+<code class="sig-name descname">model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cosmos.models.Spot.model" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Spot.guide">
+<code class="sig-name descname">guide</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot.guide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot.guide" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variational Guide</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Spot.spot_model">
+<code class="sig-name descname">spot_model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">data_loc</span></em>, <em class="sig-param"><span class="n">pi_m</span></em>, <em class="sig-param"><span class="n">pi_theta</span></em>, <em class="sig-param"><span class="n">height_loc</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot.spot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot.spot_model" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Spot.spot_guide">
+<code class="sig-name descname">spot_guide</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot.spot_guide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot.spot_guide" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Spot.guide_parameters">
+<code class="sig-name descname">guide_parameters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot.guide_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot.guide_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Spot.spot_parameters">
+<code class="sig-name descname">spot_parameters</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">m</span></em>, <em class="sig-param"><span class="n">theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot.spot_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot.spot_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Spot.model_parameters">
+<code class="sig-name descname">model_parameters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot.model_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot.model_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Spot.infer">
+<code class="sig-name descname">infer</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/spot.html#Spot.infer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Spot.infer" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt id="cosmos.models.Spot.training">
+<code class="sig-name descname">training</code><em class="property">: bool</em><a class="headerlink" href="#cosmos.models.Spot.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="cosmos.models.Tracker">
+<em class="property">class </em><code class="sig-prename descclassname">cosmos.models.</code><code class="sig-name descname">Tracker</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">S</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">cosmos.models.model.Model</span></code></p>
+<p>for <span class="math notranslate nohighlight">\(n=1\)</span> to <span class="math notranslate nohighlight">\(N\)</span>:</p>
+<blockquote>
+<div><p>for <span class="math notranslate nohighlight">\(n=1\)</span> to <span class="math notranslate nohighlight">\(F\)</span>:</p>
+<blockquote>
+<div><p><span class="math notranslate nohighlight">\(b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)\)</span></p>
+<p><span class="math notranslate nohighlight">\(b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)\)</span></p>
+</div></blockquote>
+</div></blockquote>
+<dl class="py method">
+<dt id="cosmos.models.Tracker.model">
+<code class="sig-name descname">model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cosmos.models.Tracker.model" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Tracker.guide">
+<code class="sig-name descname">guide</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker.guide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker.guide" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variational Guide</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Tracker.spot_model">
+<code class="sig-name descname">spot_model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">data_loc</span></em>, <em class="sig-param"><span class="n">pi_m</span></em>, <em class="sig-param"><span class="n">pi_theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker.spot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker.spot_model" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Tracker.spot_guide">
+<code class="sig-name descname">spot_guide</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker.spot_guide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker.spot_guide" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Tracker.guide_parameters">
+<code class="sig-name descname">guide_parameters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker.guide_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker.guide_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Tracker.spot_parameters">
+<code class="sig-name descname">spot_parameters</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">m</span></em>, <em class="sig-param"><span class="n">theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker.spot_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker.spot_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Tracker.model_parameters">
+<code class="sig-name descname">model_parameters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker.model_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker.model_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Tracker.infer">
+<code class="sig-name descname">infer</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/tracker.html#Tracker.infer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Tracker.infer" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt id="cosmos.models.Tracker.training">
+<code class="sig-name descname">training</code><em class="property">: bool</em><a class="headerlink" href="#cosmos.models.Tracker.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="cosmos.models.Test">
+<em class="property">class </em><code class="sig-prename descclassname">cosmos.models.</code><code class="sig-name descname">Test</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">S</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">cosmos.models.model.Model</span></code></p>
+<p>Track on-target Spot</p>
+<dl class="py method">
+<dt id="cosmos.models.Test.model">
+<code class="sig-name descname">model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cosmos.models.Test.model" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Test.guide">
+<code class="sig-name descname">guide</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test.guide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test.guide" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variational Guide</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Test.spot_model">
+<code class="sig-name descname">spot_model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">data_loc</span></em>, <em class="sig-param"><span class="n">pi_m</span></em>, <em class="sig-param"><span class="n">pi_theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test.spot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test.spot_model" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Test.spot_guide">
+<code class="sig-name descname">spot_guide</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test.spot_guide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test.spot_guide" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Test.guide_parameters">
+<code class="sig-name descname">guide_parameters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test.guide_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test.guide_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Test.spot_parameters">
+<code class="sig-name descname">spot_parameters</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">m</span></em>, <em class="sig-param"><span class="n">theta</span></em>, <em class="sig-param"><span class="n">prefix</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test.spot_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test.spot_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Test.model_parameters">
+<code class="sig-name descname">model_parameters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test.model_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test.model_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="cosmos.models.Test.infer">
+<code class="sig-name descname">infer</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cosmos/models/test.html#Test.infer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cosmos.models.Test.infer" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt id="cosmos.models.Test.training">
+<code class="sig-name descname">training</code><em class="property">: bool</em><a class="headerlink" href="#cosmos.models.Test.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="distributions.html" class="btn btn-neutral float-right" title="Distributions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="commands.html" class="btn btn-neutral float-left" title="Commands" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Yerdos Ordabayev
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

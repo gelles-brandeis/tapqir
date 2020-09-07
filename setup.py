@@ -35,14 +35,14 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     entry_points={
-        "console_scripts": ["cosmos=cosmos.ui.app:main"],
+        "console_scripts": ["cosmos=cosmos.commands.app:main"],
         "cosmos.app": [
-            "config=cosmos.ui.config:Config",
-            "fit=cosmos.ui.fit:Fit",
-            "show=cosmos.ui.show:Show",
-            "glimpse=cosmos.ui.glimpse:Glimpse",
-            "elbo=cosmos.ui.elbo:ELBO",
-            "matlab=cosmos.ui.matlab:Matlab",
+            "config=cosmos.commands.config:Config",
+            "fit=cosmos.commands.fit:Fit",
+            "show=cosmos.commands.show:Show",
+            "glimpse=cosmos.commands.glimpse:Glimpse",
+            "elbo=cosmos.commands.elbo:ELBO",
+            "matlab=cosmos.commands.matlab:Matlab",
         ]
     }
 )
