@@ -5,31 +5,41 @@ from pyro.distributions import Beta, TransformedDistribution
 
 
 class AffineBeta(TransformedDistribution):
-    arg_constraints = {
-        "size": constraints.positive,
-        "loc": constraints.real,
-        "scale": constraints.positive
-    }
+    r"""
+    Beta distribution shifted by :attr:`loc` and scaled by :attr:`scale`::
+
+        concentration1 = size * (mean - loc) / scale
+        concentration0 = size * (loc - mean) / scale
+        X ~ Beta(concentration1, concentration0)
+        f(X) = loc + scale * X
+        Y = f(X) ~ AffineBeta(mean, size, loc, scale)
+
+    :param mean: mean of the distribution.
+    :param size: size parameter of the Beta distribution.
+    :param loc: loc parameter.
+    :param scale: scale parameter.
+    """
+
     has_rsample = True
 
     def __init__(self, mean, size, loc, scale, validate_args=None):
-        mean = (mean - loc) / scale
-        concentration1 = mean * size
-        concentration0 = (1 - mean) * size
+        concentration1 = size * (mean - loc) / scale
+        concentration0 = size * (loc - mean) / scale
         base_dist = Beta(concentration1, concentration0)
         super(AffineBeta, self).__init__(base_dist, AffineTransform(loc=loc, scale=scale),
                                          validate_args=validate_args)
 
     def expand(self, batch_shape, _instance=None):
+        """
+        """
         new = self._get_checked_instance(AffineBeta, _instance)
         return super(AffineBeta, self).expand(batch_shape, _instance=new)
 
     def sample(self, sample_shape=torch.Size()):
         """
-        Generates a sample_shape shaped sample or sample_shape shaped batch of
-        samples if the distribution parameters are batched. Samples first from
-        base distribution and applies `transform()` for every transform in the
-        list.
+        Generates a sample from `Beta` distribution and applies `AffineTransform`.
+        Additionally clamps the output in order to avoid `NaN` and `Inf` values
+        in the gradients.
         """
         with torch.no_grad():
             x = self.base_dist.sample(sample_shape)
@@ -40,13 +50,11 @@ class AffineBeta(TransformedDistribution):
             x = x.clamp(min=self.loc + eps, max=self.loc + self.scale - eps)
             return x
 
-
     def rsample(self, sample_shape=torch.Size()):
         """
-        Generates a sample_shape shaped reparameterized sample or sample_shape
-        shaped batch of reparameterized samples if the distribution parameters
-        are batched. Samples first from base distribution and applies
-        `transform()` for every transform in the list.
+        Generates a sample from `Beta` distribution and applies `AffineTransform`.
+        Additionally clamps the output in order to avoid `NaN` and `Inf` values
+        in the gradients.
         """
         x = self.base_dist.rsample(sample_shape)
         for transform in self.transforms:
@@ -67,7 +75,3 @@ class AffineBeta(TransformedDistribution):
     @property
     def mean(self):
         return self.loc + self.scale * self.base_dist.mean
-
-    @property
-    def variance(self):
-        return self.scale.pow(2) * self.base_dist.variance

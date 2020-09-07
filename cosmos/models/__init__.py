@@ -1,9 +1,11 @@
+from cosmos.models.model import GaussianSpot
 from cosmos.models.model import Model
 from cosmos.models.tracker import Tracker
 from cosmos.models.spot import Spot
 from cosmos.models.test import Test
 
 __all__ = [
+    "GaussianSpot",
     "models",
     "Model",
     "Spot",

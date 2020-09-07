@@ -18,6 +18,16 @@ from cosmos.utils.dataset import load_data
 
 
 class GaussianSpot(nn.Module):
+    r"""
+    Calculates ideal shape of the 2D-Gaussian spot given spot parameters,
+    target positions, and drift list.
+
+        :math:`\dfrac{h_{knf}}{2 \pi w^2_{nfk}} \exp{\left ( -\dfrac{(i-x_{nfk})^2 + (j-y_{nfk})^2}{2w^2_{nfk}} \right)}`
+
+    :param target: AoI target positions.
+    :param drift: Frame drift list.
+    """
+
     def __init__(self, target, drift, D):
         super().__init__()
         # create meshgrid of DxD pixel positions
@@ -33,6 +43,17 @@ class GaussianSpot(nn.Module):
 
     # Ideal 2D gaussian spots
     def forward(self, height, width, x, y, n_idx, f_idx):
+        r"""
+        :param height: integrated spot intensity.
+        :param width: width of the 2D-Gaussian spot.
+        :param x: relative :math:`x`-axis position relative to the target.
+        :param y: relative :math:`y`-axis position relative to the target.
+        :param n_idx: AoI indices.
+        :param f_idx: Frame indices.
+        :return: Ideal shape 2D-Gaussian spot.
+        :rtype: ~pyro.distributions.Categorical
+        """
+
         spot_locs = Vindex(self.target_locs)[n_idx, f_idx, :] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
@@ -43,7 +64,15 @@ class GaussianSpot(nn.Module):
 
 
 class Model(nn.Module):
-    """ Gaussian Spot Model """
+    r"""
+    Base class for cosmos models.
+
+    **Implementing New Models**:
+
+    Derived models must implement the methods
+    :meth:`model`
+    :meth:`guide`
+    """
 
     def __init__(self, S, K=2):
         super().__init__()
@@ -127,9 +156,15 @@ class Model(nn.Module):
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
     def model(self):
+        r"""
+        Generative Model
+        """
         raise NotImplementedError
 
     def guide(self):
+        r"""
+        Variational Guide
+        """
         raise NotImplementedError
 
     def run(self, num_iter):

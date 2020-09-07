@@ -1,0 +1,65 @@
+from cliff.command import Command
+
+import os
+import torch
+import configparser
+from cosmos.models import models
+
+
+class Fit(Command):
+    r"""
+    Fit the data to the model
+
+    Example::
+
+        cosmos fit tracker path/to/dataset
+    """
+
+    def get_parser(self, prog_name):
+        parser = super(Fit, self).get_parser(prog_name)
+
+        parser.add_argument("model", default="tracker", type=str,
+                            help="Choose the model: {}".format(", ".join(models.keys())))
+        parser.add_argument("dataset", default=".", type=str,
+                            help="Path to the dataset folder")
+
+        parser.add_argument("-s", "--spot", type=int, metavar="\b",
+                            help="Max. number of molecules per spot")
+        parser.add_argument("-it", "--num-iter", type=int, metavar="\b",
+                            help="Number of iterations")
+        parser.add_argument("-bs", "--batch-size", type=int, metavar="\b",
+                            help="Batch size")
+        parser.add_argument("-lr", "--learning-rate", type=float, metavar="\b",
+                            help="Learning rate")
+
+        parser.add_argument("-c", "--control", type=bool,
+                            help="Analyze control dataset")
+        parser.add_argument("-dev", "--device", type=str, metavar="\b",
+                            help="Compute device")
+        parser.add_argument("--jit", action="store_true",
+                            help="Just in time compilation")
+
+        return parser
+
+    def take_action(self, args):
+        # read options.cfg fiel
+        config = configparser.ConfigParser(allow_no_value=True)
+        cfg_file = os.path.join(args.dataset, "options.cfg")
+        config.read(cfg_file)
+
+        spot = args.spot or config["fit"].getint("spot")
+        num_iter = args.num_iter or config["fit"].getint("num_iter")
+        batch_size = args.batch_size or config["fit"].getint("batch_size")
+        learning_rate = args.learning_rate or config["fit"].getfloat("learning_rate")
+        control = args.control or config["fit"].getboolean("control")
+        device = args.device or config["fit"].get("device")
+
+        if device == "cuda":
+            torch.set_default_tensor_type("torch.cuda.FloatTensor")
+        else:
+            torch.set_default_tensor_type("torch.FloatTensor")
+
+        model = models[args.model](spot)
+        model.load(args.dataset, control, device)
+        model.settings(learning_rate, batch_size)
+        model.run(num_iter)

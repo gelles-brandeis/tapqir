@@ -1,4 +1,3 @@
-Thumbs.db
 *.asv
 *.lnk
 *.o
@@ -7,25 +6,7 @@ cosmos/__pycache__/
 cosmos/utils/__pycache__/
 cosmos/models/__pycache__/
 .ipynb_checkpoints/
-notebooks/
-log
-old/
-bashrun.sh
 cosmos.egg-info/
-example/
-cosmos/.app*
 
-singmol_mex.mexmaci64
-
-singmol_mex.mexmaci64
-
-singmol_mex.mexmaci64
-
-singmol_new/singmol
-
-singmol_new/singmol.mexmaci64
-
-*.m~
-
-singmol.mexmaci64
-.DS_Store
+# sphinx documentation
+# docs/build/

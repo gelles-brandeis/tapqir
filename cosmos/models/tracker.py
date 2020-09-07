@@ -17,7 +17,15 @@ from cosmos.models.utils import z_probs_calc
 
 
 class Tracker(Model):
-    """ Track on-target Spot """
+    r"""
+    for :math:`n=1` to :math:`N`:
+
+        for :math:`n=1` to :math:`F`:
+
+            :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
+
+            :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
+    """
 
     def __init__(self, S):
         self.__name__ = "tracker"
