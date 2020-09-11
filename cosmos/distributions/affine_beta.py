@@ -24,7 +24,7 @@ class AffineBeta(TransformedDistribution):
 
     def __init__(self, mean, size, loc, scale, validate_args=None):
         concentration1 = size * (mean - loc) / scale
-        concentration0 = size * (loc - mean) / scale
+        concentration0 = size * (1 - (mean - loc) / scale)
         base_dist = Beta(concentration1, concentration0)
         super(AffineBeta, self).__init__(base_dist, AffineTransform(loc=loc, scale=scale),
                                          validate_args=validate_args)

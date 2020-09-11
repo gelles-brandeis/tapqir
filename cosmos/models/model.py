@@ -118,8 +118,8 @@ class Model(nn.Module):
         else:
             self.control = control
 
-        self.size = torch.ones(self.S+1) * (((self.data.D+1) / (2*0.5)) ** 2 - 1)
-        self.size[0] = 2.
+        # self.size = torch.ones(self.S+1) * (((self.data.D+1) / (2*0.5)) ** 2 - 1)
+        # self.size[0] = 2.
         self.theta_matrix = torch.zeros(1 + self.K * self.S, self.K).long()
         for s in range(self.S):
             for k in range(self.K):
@@ -140,8 +140,6 @@ class Model(nn.Module):
             self.load_checkpoint()
         except FileNotFoundError:
             pyro.clear_param_store()
-            self.model_parameters()
-            self.guide_parameters()
 
             self.iter = 0
 
@@ -182,7 +180,7 @@ class Model(nn.Module):
         self.path = os.path.join(
             self.data_path, "runs",
             "{}".format(self.__name__),
-            "{}flat".format(cosmos_version.split("+")[0]),
+            "{}prox".format(cosmos_version.split("+")[0]),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),

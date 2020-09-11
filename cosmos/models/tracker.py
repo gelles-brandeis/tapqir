@@ -33,8 +33,10 @@ class Tracker(Model):
 
     @poutine.block(hide=["width_mode", "width_size"])
     def model(self):
+        self.model_parameters()
         pi_m = pi_m_calc(param("lamda"), self.S)
         pi_theta = pi_theta_calc(param("pi"), self.K, self.S)
+        self.size = torch.cat((torch.tensor([2.]), (((self.data.D+1) / (2 * param("proximity"))) ** 2 - 1)), dim=-1)
 
         with scope(prefix="d"):
             self.spot_model(self.data, self.data_loc, pi_m, pi_theta, prefix="d")
@@ -45,6 +47,7 @@ class Tracker(Model):
 
     @config_enumerate
     def guide(self):
+        self.guide_parameters()
         with scope(prefix="d"):
             self.spot_guide(self.data, True, prefix="d")
 
@@ -208,8 +211,9 @@ class Tracker(Model):
 
     def model_parameters(self):
         # Global Parameters
-        # param("proximity", torch.tensor([(((self.D+1)/(2*0.5))**2 - 1)]),
-        #       constraint=constraints.greater_than(30.))
+        #param("proximity", torch.tensor([(((self.data.D+1) / (2*0.5)) ** 2 - 1)]),
+        param("proximity", torch.tensor([0.5]),
+              constraint=constraints.interval(0.01, 2.))
         param("gain", torch.tensor(5.), constraint=constraints.positive)
         param("pi", torch.ones(self.S+1), constraint=constraints.simplex)
         param("lamda", torch.ones(self.S+1), constraint=constraints.simplex)
