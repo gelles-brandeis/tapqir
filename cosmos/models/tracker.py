@@ -31,7 +31,8 @@ class Tracker(Model):
         self.__name__ = "tracker"
         super().__init__(S)
 
-    @poutine.block(hide=["width_mode", "width_size"])
+    @poutine.block(hide=["width_mode", "width_size", "proximity",
+                         "offset_samples", "offset_weights"])
     def model(self):
         self.model_parameters()
         pi_m = pi_m_calc(param("lamda"), self.S)
@@ -84,13 +85,13 @@ class Tracker(Model):
                     width = pyro.sample(
                         f"width_{k_idx}", AffineBeta(
                             param("width_mode"),
-                            param("width_size"), 0.75, 1.5))
+                            param("width_size"), 0.75, 2.25))
                     x = pyro.sample(
                         f"x_{k_idx}", AffineBeta(
-                            0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+                            0, self.size[theta_mask], -(data.D+1)/2, (data.D+1)/2))
                     y = pyro.sample(
                         f"y_{k_idx}", AffineBeta(
-                            0, self.size[theta_mask], -(data.D+1)/2, data.D+1))
+                            0, self.size[theta_mask], -(data.D+1)/2, (data.D+1)/2))
 
                     height = height.masked_fill(m_mask == 0, 0.)
 
@@ -100,7 +101,7 @@ class Tracker(Model):
             pyro.sample(
                 "data", ConvolutedGamma(
                     locs / param("gain"), 1 / param("gain"),
-                    self.offset_samples, self.offset_weights.log()
+                    param("offset_samples"), param("offset_weights").log()
                 ).to_event(2),
                 obs=Vindex(data.data)[batch_idx, frame_idx, :, :]
             )
@@ -142,17 +143,17 @@ class Tracker(Model):
                         f"width_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/w_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/w_size"))[k_idx, batch_idx, frame_idx],
-                            0.75, 1.5))
+                            0.75, 2.25))
                     pyro.sample(
                         f"x_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/x_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
-                            -(data.D+1)/2, data.D+1))
+                            -(data.D+1)/2, (data.D+1)/2))
                     pyro.sample(
                         f"y_{k_idx}", AffineBeta(
                             Vindex(param(f"{prefix}/y_mode"))[k_idx, batch_idx, frame_idx],
                             Vindex(param(f"{prefix}/size"))[k_idx, batch_idx, frame_idx],
-                            -(data.D+1)/2, data.D+1))
+                            -(data.D+1)/2, (data.D+1)/2))
 
     def guide_parameters(self):
         self.spot_parameters(self.data, True, True, prefix="d")
@@ -221,6 +222,12 @@ class Tracker(Model):
               constraint=constraints.interval(0.75, 2.25))
         param("width_size",
               torch.tensor([2.]), constraint=constraints.positive)
+        param("offset_samples",
+              self.offset_samples,
+              constraint=constraints.positive)
+        param("offset_weights",
+              self.offset_weights,
+              constraint=constraints.positive)
 
     def infer(self):
         z_probs = z_probs_calc(pyro.param("d/theta_probs"))

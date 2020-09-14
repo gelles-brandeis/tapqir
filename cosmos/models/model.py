@@ -5,10 +5,12 @@ import pandas as pd
 import os
 import pyro
 import pyro.distributions as dist
+from pyro import param
 from pyro.infer import SVI
 from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
 from torch.utils.tensorboard import SummaryWriter
+import torch.distributions.constraints as constraints
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
@@ -108,6 +110,8 @@ class Model(nn.Module):
         offset_samples = offset_samples[:-1]
         self.offset_samples = torch.from_numpy(offset_samples).float().to(device)
         self.offset_weights = torch.from_numpy(offset_weights).float().to(device)
+        self.offset_mean = torch.sum(self.offset_samples * self.offset_weights)
+        self.offset_var = torch.sum(self.offset_samples ** 2 * self.offset_weights) - self.offset_mean ** 2
 
         # load control data
         if control:
@@ -295,3 +299,34 @@ class Model(nn.Module):
             os.path.join(path, "params"),
             map_location=self.device)
         self.predictions = np.load(os.path.join(path, "predictions.npy"))
+
+    def snr(self):
+        r"""
+        Calculate the signal-to-noise ratio.
+
+        Total signal:
+
+            :math:`\mu_{knf} =  \sum_{ij} I_{nfij} \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
+
+        Noise:
+
+            :math:`\sigma^2_{knf} = \sigma^2_{\text{offset}} + \mu_{knf} \text{gain}`
+
+        Signal-to-noise ratio:
+
+            :math:`\text{SNR}_{knf} = \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}} \text{ for } \theta_{nf} = k`
+        """
+        with torch.no_grad():
+            weights = self.data_loc(
+                torch.ones(1),
+                param("d/w_mode"),
+                param("d/x_mode"),
+                param("d/y_mode"),
+                torch.arange(self.data.N)[:, None],
+                torch.arange(self.data.F))
+            signal = (self.data.data * weights).sum(dim=(-2, -1))
+            noise = (self.offset_var + signal * param("gain")).sqrt()
+            result = (signal - param("d/b_loc") - self.offset_mean) / noise
+            mask = param("d/theta_probs")[..., 1:] > 0.5
+            mask = mask.permute(2, 0, 1)
+            return result[mask]
