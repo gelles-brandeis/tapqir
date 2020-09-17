@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Signal-to-noise ratio calculation &mdash; cosmos v1.1.3+21.geee6c9d.dirty documentation</title>
+  <title>Signal-to-noise ratio calculation &mdash; cosmos v1.1.4+0.g47fa3c5.dirty documentation</title>
   
 
   
@@ -38,7 +38,9 @@
 
     
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" /> 
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Height data" href="height_data.html" />
+    <link rel="prev" title="Height Simulation" href="height_simulation.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -96,10 +98,21 @@
 <li class="toctree-l1"><a class="reference internal" href="../distributions.html">Distributions</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Examples:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="index.html">Examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="experimental_data.html">Experimental data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="height_data.html">Height data</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Examples</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#core-tutorials">Core tutorials:</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="height_simulation.html">Height Simulation</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Signal-to-noise ratio calculation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#Theoretical-calculation">Theoretical calculation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="height_data.html">Height data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="experimental_data.html">Experimental data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="lamda_simulation.html">Lamda Simulation</a></li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 
             
@@ -145,6 +158,8 @@
   <ul class="wy-breadcrumbs">
     
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Examples</a> &raquo;</li>
         
       <li>Signal-to-noise ratio calculation</li>
     
@@ -424,67 +439,111 @@ div.rendered_html tbody tr:hover {
 <h1>Signal-to-noise ratio calculation<a class="headerlink" href="#Signal-to-noise-ratio-calculation" title="Permalink to this headline">¶</a></h1>
 <p>Signal</p>
 <div class="math notranslate nohighlight">
-\[\mu =
-   \sum_{knf, \theta_{nf} = k} \sum_{ij} I_{nfij} \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf}) - b_{nf}\]</div>
+\[\mu_{knf} =  \sum_{ij} I_{nfij} \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})\]</div>
 <p>Noise</p>
 <div class="math notranslate nohighlight">
-\[\sigma^2 =
-   \sigma^2_{\text{offset}} +
-   \text{gain} \mu\]</div>
+\[\sigma^2_{knf} = \sigma^2_{\text{offset}} + \mu_{knf} \text{gain}\]</div>
 <p>Signal-to-noise ratio</p>
 <div class="math notranslate nohighlight">
-\[\text{SNR} = \dfrac{\mu}{\sigma}\]</div>
-<p>$ <span class="math">\mathop{\sum_{i<j ; m\in\mathbf{Z}}}</span>_{d:nbsphinx-math:<cite>in</cite><span class="math">\mathcal{N}</span>} $</p>
+\[\text{SNR}_{knf} = \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}} \text{ for } \theta_{nf} = k\]</div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">cosmos.models</span> <span class="kn">import</span> <span class="n">Tracker</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<span></span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;h3000pi15lamda15&quot;</span>
+<span class="n">path_data</span> <span class="o">=</span> <span class="s2">&quot;/shared/centaur/data/height_data/</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+<span class="n">path_params</span> <span class="o">=</span> <span class="s2">&quot;/shared/centaur/data/height_data/</span><span class="si">{}</span><span class="s2">/runs/tracker/v1.1.4prox/S1/control/lr0.005/bs5&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<span></span><span class="n">model</span> <span class="o">=</span> <span class="n">Tracker</span><span class="p">(</span><span class="n">S</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">path_data</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">load_parameters</span><span class="p">(</span><span class="n">path_params</span><span class="p">)</span>
+<span class="n">snr</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">snr</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<span></span><span class="n">snr</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+tensor(2.7870)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<span></span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">snr</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">(</span><span class="mi">0</span><span class="p">,)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;probability density&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;SNR&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/examples_signal-to-noise_6_0.png" src="../_images/examples_signal-to-noise_6_0.png" />
+</div>
+</div>
+<div class="section" id="Theoretical-calculation">
+<h2>Theoretical calculation<a class="headerlink" href="#Theoretical-calculation" title="Permalink to this headline">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">pyro</span>
 <span class="kn">import</span> <span class="nn">pyro.distributions</span> <span class="k">as</span> <span class="nn">dist</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
-<span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 </pre></div>
 </div>
 </div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">heights</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;0300&quot;</span><span class="p">,</span> <span class="s2">&quot;0500&quot;</span><span class="p">,</span> <span class="s2">&quot;0750&quot;</span><span class="p">,</span> <span class="s2">&quot;1000&quot;</span><span class="p">,</span> <span class="s2">&quot;1500&quot;</span><span class="p">,</span> <span class="s2">&quot;2000&quot;</span><span class="p">,</span> <span class="s2">&quot;3000&quot;</span><span class="p">]</span>
-<span class="n">pi_z</span> <span class="o">=</span> <span class="s2">&quot;15&quot;</span>
-<span class="n">lamda_j</span> <span class="o">=</span> <span class="s2">&quot;15&quot;</span>
-</pre></div>
-</div>
-</div>
-<div class="section" id="Results">
-<h2>Results<a class="headerlink" href="#Results" title="Permalink to this headline">¶</a></h2>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;0300&quot;</span><span class="p">,</span> <span class="s2">&quot;0500&quot;</span><span class="p">,</span> <span class="s2">&quot;0750&quot;</span><span class="p">,</span> <span class="s2">&quot;1000&quot;</span><span class="p">,</span> <span class="s2">&quot;1500&quot;</span><span class="p">,</span> <span class="s2">&quot;2000&quot;</span><span class="p">,</span> <span class="s2">&quot;3000&quot;</span><span class="p">]</span>
-<span class="c1"># snr = [float(name) for name in names]</span>
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
 <span></span><span class="n">D</span> <span class="o">=</span> <span class="mi">14</span>
 <span class="n">background</span> <span class="o">=</span> <span class="mi">150</span>
 <span class="n">gain</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">7.</span><span class="p">)</span>
+<span class="n">width</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.4</span><span class="p">])</span>
 
 <span class="n">rv</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">6.5</span><span class="p">,</span> <span class="mf">6.5</span><span class="p">]),</span>
-    <span class="n">scale_tril</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.4</span><span class="p">])[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span>
+    <span class="n">scale_tril</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">width</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span>
 
 <span class="n">D_range</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">)</span>
 <span class="n">i_pixel</span><span class="p">,</span> <span class="n">j_pixel</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">D_range</span><span class="p">,</span> <span class="n">D_range</span><span class="p">)</span>
@@ -493,22 +552,23 @@ div.rendered_html tbody tr:hover {
 </div>
 </div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
 <span></span><span class="c1"># calculate signal-to-noise ratio</span>
+<span class="n">heights</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;0300&quot;</span><span class="p">,</span> <span class="s2">&quot;0500&quot;</span><span class="p">,</span> <span class="s2">&quot;0750&quot;</span><span class="p">,</span> <span class="s2">&quot;1000&quot;</span><span class="p">,</span> <span class="s2">&quot;1500&quot;</span><span class="p">,</span> <span class="s2">&quot;2000&quot;</span><span class="p">,</span> <span class="s2">&quot;3000&quot;</span><span class="p">]</span>
 <span class="n">snr</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">heights</span><span class="p">:</span>
-    <span class="n">spot</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">ij_pixel</span><span class="p">)</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
-    <span class="n">signal</span> <span class="o">=</span> <span class="p">(</span><span class="n">spot</span> <span class="o">*</span> <span class="n">rv</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">ij_pixel</span><span class="p">)</span><span class="o">.</span><span class="n">exp</span><span class="p">())</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-    <span class="n">noise</span> <span class="o">=</span> <span class="p">(</span><span class="n">background</span> <span class="o">*</span> <span class="n">gain</span><span class="p">)</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">ij_pixel</span><span class="p">)</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span>
+    <span class="n">signal</span> <span class="o">=</span> <span class="p">(</span><span class="n">weights</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">h</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">noise</span> <span class="o">=</span> <span class="p">((</span><span class="n">signal</span><span class="o">+</span><span class="n">background</span><span class="p">)</span> <span class="o">*</span> <span class="n">gain</span><span class="p">)</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span>
     <span class="n">snr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">signal</span> <span class="o">/</span> <span class="n">noise</span><span class="p">))</span>
 </pre></div>
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
@@ -517,167 +577,19 @@ div.rendered_html tbody tr:hover {
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-[0.37588992714881897,
- 0.6264832615852356,
- 0.9397249221801758,
- 1.2529665231704712,
- 1.8794498443603516,
- 2.5059330463409424,
- 3.758899688720703]
+[0.36149922013282776,
+ 0.5879592895507812,
+ 0.8567758202552795,
+ 1.1115339994430542,
+ 1.585027813911438,
+ 2.018458127975464,
+ 2.7924139499664307]
 </pre></div></div>
-</div>
-<p>Tracker v1.1.3flat</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">cosmos.models</span> <span class="kn">import</span> <span class="n">Tracker</span>
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;h3000pi15lamda15&quot;</span>
-<span class="n">path_data</span> <span class="o">=</span> <span class="s2">&quot;/shared/centaur/data/height_data/</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-<span class="n">path_params</span> <span class="o">=</span> <span class="s2">&quot;/shared/centaur/data/height_data/</span><span class="si">{}</span><span class="s2">/runs/tracker/v1.1.3flat/S1/control/lr0.005/bs5&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">model</span> <span class="o">=</span> <span class="n">Tracker</span><span class="p">(</span><span class="n">S</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">path_data</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
-<span class="n">model</span><span class="o">.</span><span class="n">load_parameters</span><span class="p">(</span><span class="n">path_params</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">model</span><span class="o">.</span><span class="n">offset_samples</span>
-</pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
-</pre></div>
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-tensor([89.5000])
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">model</span><span class="o">.</span><span class="n">offset_mean</span>
-</pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
-</pre></div>
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-tensor(89.5000)
-</pre></div></div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">snr</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">snr</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">snr</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
-</pre></div>
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-tensor(2.4466)
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[27]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">))</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">221</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">height</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-
-<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">222</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">width</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-
-<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">223</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-
-<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">224</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">snr</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">RuntimeError</span>                              Traceback (most recent call last)
-<span class="ansi-green-fg">&lt;ipython-input-27-15b2e631cdbd&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span>
-<span class="ansi-green-intense-fg ansi-bold">     10</span>
-<span class="ansi-green-intense-fg ansi-bold">     11</span> plt<span class="ansi-blue-fg">.</span>subplot<span class="ansi-blue-fg">(</span><span class="ansi-cyan-fg">224</span><span class="ansi-blue-fg">)</span>
-<span class="ansi-green-fg">---&gt; 12</span><span class="ansi-red-fg"> </span>plt<span class="ansi-blue-fg">.</span>hist<span class="ansi-blue-fg">(</span>snr<span class="ansi-blue-fg">.</span>numpy<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">,</span> bins<span class="ansi-blue-fg">=</span><span class="ansi-cyan-fg">20</span><span class="ansi-blue-fg">)</span>
-<span class="ansi-green-intense-fg ansi-bold">     13</span> plt<span class="ansi-blue-fg">.</span>show<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">)</span>
-
-<span class="ansi-red-fg">RuntimeError</span>: Can&#39;t call numpy() on Tensor that requires grad. Use tensor.detach().numpy() instead.
-</pre></div></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/examples_signal-to-noise_18_1.png" src="../_images/examples_signal-to-noise_18_1.png" />
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">snr</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-</pre></div>
-</div>
 </div>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
@@ -696,6 +608,15 @@ tensor(2.4466)
            
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="height_data.html" class="btn btn-neutral float-right" title="Height data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="height_simulation.html" class="btn btn-neutral float-left" title="Height Simulation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>

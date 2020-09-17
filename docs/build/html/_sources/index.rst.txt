@@ -27,8 +27,6 @@ Welcome to cosmos's documentation!
    :caption: Examples:
 
    examples/index
-   examples/experimental_data
-   examples/height_data
 
 
 
