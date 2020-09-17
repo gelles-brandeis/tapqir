@@ -9,4 +9,4 @@ cosmos/models/__pycache__/
 cosmos.egg-info/
 
 # sphinx documentation
-# docs/build/
+docs/build/

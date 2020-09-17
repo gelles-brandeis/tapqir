@@ -122,13 +122,6 @@ class Model(nn.Module):
         else:
             self.control = control
 
-        # self.size = torch.ones(self.S+1) * (((self.data.D+1) / (2*0.5)) ** 2 - 1)
-        # self.size[0] = 2.
-        self.theta_matrix = torch.zeros(1 + self.K * self.S, self.K).long()
-        for s in range(self.S):
-            for k in range(self.K):
-                self.theta_matrix[1 + s*self.K + k, k] = s + 1
-
     def settings(self, lr, batch_size, jit=False):
         # K - max number of spots
         self.lr = lr
@@ -156,6 +149,37 @@ class Model(nn.Module):
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+
+    @property
+    def theta_matrix(self):
+        theta_matrix = torch.zeros(1 + self.K * self.S, self.K).long()
+        for s in range(self.S):
+            for k in range(self.K):
+                theta_matrix[1 + s*self.K + k, k] = s + 1
+
+        return theta_matrix
+
+    @property
+    def theta_probs(self):
+        r"""
+        Probability of an on-target spot :math:`p(z_{knf})`.
+        """
+        transform = torch.stack((1 - self.theta_matrix, self.theta_matrix), dim=-1).float()
+        return torch.einsum("nfi,iks->knfs", param("d/theta_probs").data, transform)
+
+    @property
+    def m_probs(self):
+        r"""
+        Probability of a spot :math:`p(m_{knf})`.
+        """
+        return torch.einsum("knfi,knfis->knfs", self.theta_probs, param("d/m_probs").data)
+
+    @property
+    def j_probs(self):
+        r"""
+        Probability of an off-target spot :math:`p(j_{knf})`.
+        """
+        return self.m_probs - self.theta_probs
 
     def model(self):
         r"""
@@ -325,7 +349,7 @@ class Model(nn.Module):
                 torch.arange(self.data.N)[:, None],
                 torch.arange(self.data.F))
             signal = (self.data.data * weights).sum(dim=(-2, -1))
-            noise = (self.offset_var + signal * param("gain")).sqrt()
+            noise = (self.offset_var + (signal - self.offset_mean) * param("gain")).sqrt()
             result = (signal - param("d/b_loc") - self.offset_mean) / noise
             mask = param("d/theta_probs")[..., 1:] > 0.5
             mask = mask.permute(2, 0, 1)
