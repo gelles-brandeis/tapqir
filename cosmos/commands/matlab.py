@@ -42,15 +42,22 @@ class Matlab(Command):
         model.frames = torch.arange(model.data.F)
         trace = poutine.trace(model.guide).get_trace()
 
-        items = ["z", "height_0", "height_1", "width_0", "width_1",
+        items = ["z", "theta", "height_0", "height_1", "width_0", "width_1",
                       "x_0", "x_1", "y_0", "y_1", "background"]
         params_dict = {}
         params_dict["aoilist"] = model.data.target.index.values
+        params_dict["aoilistDescription"] = "aoi numbering from aoiinfo"
         params_dict["framelist"] = model.data.drift.index.values
+        params_dict["framelistDescription"] = "frame numbering from driftlist"
+        params_dict["foo_low_description"] = "95% confidence interval lower bound"
+        params_dict["foo_high_description"] = "95% confidence interval upper bound"
+        params_dict["foo_mean_description"] = "parameter mean value"
         for p in items:
             if p == "z":
                 params_dict[f"{p}_probs"] = model.predictions["z_prob"]
                 params_dict[f"{p}_binary"] = model.predictions["z"]
+            elif p == "theta":
+                params_dict[f"{p}_probs"] = trace.nodes[f"d/{p}"]["fn"].probs.data.cpu().numpy()
             else:
                 hpd = pi(trace.nodes[f"d/{p}"]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
                 mean = trace.nodes[f"d/{p}"]["fn"].mean.data.squeeze().cpu()

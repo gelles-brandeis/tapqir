@@ -10,7 +10,9 @@ import pyqtgraph as pg
 import torch
 import numpy as np
 import pyro
+from pyro import param
 from pyro.ops.stats import pi
+from pyro.ops.indexing import Vindex
 
 C = {}
 C[0] = (31, 119, 180)
@@ -97,6 +99,8 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
         self.scroll = QScrollArea()
         self.widget = QWidget()
         self.vbox = QVBoxLayout()
@@ -115,7 +119,7 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(self.scroll)
 
-        self.resize(1000, 1000)
+        self.resize(1200, 1000)
         self.setWindowTitle("CoSMoS Params")
         self.show()
 
@@ -145,7 +149,7 @@ class MainWindow(QMainWindow):
         self.hspacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.w = None
-        self.images = QPushButton("toggle images")
+        self.images = QPushButton("Zoom/Images")
         self.images.clicked.connect(self.show_new_window)
 
         self.refresh = QPushButton("refresh")
@@ -168,19 +172,27 @@ class MainWindow(QMainWindow):
         self.Model.load_parameters(self.parameters)
         self.updateParams(0)
 
+    def updateRange(self):
+        for p in self.params:
+            self.plot[p].setXRange(*self.lr.getRegion(), padding=0.01)
+
     def show_new_window(self, checked):
         if self.w is None:
             self.lr = pg.LinearRegionItem([400, 500])
-            self.plot["z"].addItem(self.lr)
+            self.plot["zoom"].addItem(self.lr)
             self.w = ImagesWindow()
             self.initImages()
             self.updateImages()
+            self.updateRange()
             self.hist.regionChanged()
             self.lr.sigRegionChangeFinished.connect(self.updateImages)
+            self.lr.sigRegionChanged.connect(self.updateRange)
             # self.w.show()
 
         else:
-            self.plot["z"].removeItem(self.lr)
+            self.plot["zoom"].removeItem(self.lr)
+            for p in self.params:
+                self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
             self.w.close()  # Close window.
             self.w = None  # Discard reference.
 
@@ -190,17 +202,23 @@ class MainWindow(QMainWindow):
 
         # create plots and items
         self.box = {}
+        self.box_ideal = {}
         self.img = {}
+        self.img_ideal = {}
         self.label = {}
         self.prob = {}
         for i in range(100):
             r, c = divmod(i, 20)
-            self.label[i] = widget.addLabel(text=str(i), row=2*r, col=c)
-            self.box[i] = widget.addViewBox(lockAspect=True, row=2*r+1, col=c)
+            self.label[i] = widget.addLabel(text=str(i), row=3*r, col=c)
+            self.box[i] = widget.addViewBox(lockAspect=True, row=3*r+1, col=c)
             self.img[i] = pg.ImageItem()
             self.box[i].addItem(self.img[i])
             self.prob[i] = pg.BarGraphItem(x=(-1.,), height=(14.), width=1, pen=C[2], brush=C[2])
             self.box[i].addItem(self.prob[i])
+            # plot ideal image
+            self.box_ideal[i] = widget.addViewBox(lockAspect=True, row=3*r+2, col=c)
+            self.img_ideal[i] = pg.ImageItem()
+            self.box_ideal[i].addItem(self.img_ideal[i])
 
         img = pg.ImageItem(self.Model.data.data.cpu().numpy())
         range_min = np.percentile(self.Model.data.data.cpu().numpy(), 0.5)
@@ -216,9 +234,20 @@ class MainWindow(QMainWindow):
         self.w.vbox.addWidget(widget)
 
     def updateImages(self):
+        n = int(self.aoiNumber.text())
         f1, f2 = self.lr.getRegion()
         f1 = int(f1)
         f2 = int(f2)
+        frames = torch.arange(f1, f2)
+        img_ideal = self.Model.offset_mean + Vindex(param("d/b_loc").data)[n, frames][..., None, None]
+        for k in range(self.Model.K):
+            gaussian = self.Model.data_loc(
+                Vindex(param("d/h_loc").data)[k, n, frames],
+                Vindex(param("d/w_mode").data)[k, n, frames],
+                Vindex(param("d/x_mode").data)[k, n, frames],
+                Vindex(param("d/y_mode").data)[k, n, frames],
+                n, frames)
+            img_ideal = img_ideal + gaussian
         for f in range(f1, f2):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
@@ -227,12 +256,21 @@ class MainWindow(QMainWindow):
             self.prob[(f - f1) % 100].setOpts(
                 height=(self.Model.predictions["z_prob"][int(self.aoiNumber.text()), f]*self.Model.data.D,)
             )
+            # ideal image
+            self.img_ideal[(f - f1) % 100].setImage(img_ideal[f - f1].cpu().numpy())
 
             self.img[(f - f1) % 100].setLevels(self.hist.getLevels())
+            self.img_ideal[(f - f1) % 100].setLevels(self.hist.getLevels())
 
     def initParams(self):
         widget = pg.GraphicsLayoutWidget()
-        widget.setMinimumSize(900, 150 * 6)
+        widget.setMinimumSize(1080, 150 * 6)
+        widget.addLabel("", row=0, col=1)
+        widget.addLabel("", row=0, col=2)
+        widget.addLabel("Parameters", row=0, col=0)
+        widget.addLabel("", row=0, col=3)
+        widget.addLabel("", row=0, col=4)
+        widget.addLabel("Histogram", row=0, col=5)
 
         # create plots and items
         self.params = ["z", "d/height", "d/width", "d/x", "d/y", "d/background"]
@@ -240,13 +278,93 @@ class MainWindow(QMainWindow):
                       "d/x_0", "d/x_1", "d/y_0", "d/y_1", "d/background"]
         self.plot = {}
         self.item = {}
+        self.plot["zoom"] = widget.addPlot(row=1, col=0, colspan=5)
+        self.plot["zoom"].setLabel("left", "zoom")
+        self.plot["zoom"].setXRange(0, self.Model.data.F, padding=0.01)
+        self.item["zoom"] = pg.PlotDataItem(
+                    pen=C[2], symbol="o", symbolBrush=C[2],
+                    symbolPen=None, symbolSize=5
+                )
+        offset_max = np.percentile(self.Model.data.offset.cpu().numpy(), 99.5)
+        offset_min = np.percentile(self.Model.data.offset.cpu().numpy(), 0.5)
+        y, x = np.histogram(self.Model.data.offset.cpu().numpy(),
+                              range=(offset_min, offset_max),
+                              bins=max(1, int(offset_max - offset_min)),
+                              density=True)
+        plt = widget.addPlot(row=1, col=5)
+        plt.plot(x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0,0,255,70))
         for i, p in enumerate(self.params):
-            self.plot[p] = widget.addPlot(row=i, col=0)
+            self.plot[p] = widget.addPlot(row=i+2, col=0, colspan=5)
             self.plot[p].addLegend()
             self.plot[p].setLabel("left", p)
             self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
             self.plot[p].getViewBox().setMouseMode(pg.ViewBox.RectMode)
-        for i, p in enumerate(self.items):
+
+            self.plot[f"{p}Hist"] = widget.addPlot(row=i+2, col=5)
+            if p == "z":
+                y, x = np.histogram(self.Model.predictions["z_prob"].reshape(-1), bins=50) 
+            elif p == "d/height":
+                y, x = np.histogram(
+                    param("d/h_loc").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+            elif p == "d/width":
+                y, x = np.histogram(
+                    param("d/w_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+            elif p == "d/x":
+                y, x = np.histogram(
+                    param("d/x_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+            elif p == "d/y":
+                y, x = np.histogram(
+                    param("d/y_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+            elif p == "d/background":
+                y, x = np.histogram(param("d/b_loc").data.reshape(-1).numpy(), bins=50) 
+            self.item[f"{p}Hist_m"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0,0,255,30))
+
+            if p == "d/height":
+                y, x = np.histogram(
+                    param("d/h_loc").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+
+                y, x = np.histogram(
+                    param("d/h_loc").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
+            elif p == "d/width":
+                y, x = np.histogram(
+                    param("d/w_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+
+                y, x = np.histogram(
+                    param("d/w_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
+            elif p == "d/x":
+                y, x = np.histogram(
+                    param("d/x_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+
+                y, x = np.histogram(
+                    param("d/x_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
+            elif p == "d/y":
+                y, x = np.histogram(
+                    param("d/y_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+
+                y, x = np.histogram(
+                    param("d/y_mode").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
+
+        for p in self.items:
             if p == "z":
                 self.item[f"{p}_probs"] = pg.PlotDataItem(
                     pen=C[2], symbol="o", symbolBrush=C[2],
@@ -292,7 +410,8 @@ class MainWindow(QMainWindow):
         trace = pyro.poutine.trace(self.Model.guide).get_trace()
         self.Model.n = None
         self.Model.frames = None
-        for i, p in enumerate(self.items):
+        self.item["zoom"].setData(self.Model.predictions["z_prob"][n])
+        for p in self.items:
             if p == "z":
                 self.item[f"{p}_probs"].setData(self.Model.predictions["z_prob"][n])
                 self.item[f"{p}_binary"].setData(self.Model.predictions["z"][n])
@@ -302,6 +421,10 @@ class MainWindow(QMainWindow):
                 self.item[f"{p}_high"].setData(hpd[0])
                 self.item[f"{p}_low"].setData(hpd[1])
                 self.item[f"{p}_mean"].setData(mean)
+        #for p in self.params:
+        #    if p == "z":
+        #        y, x = np.histogram(self.Model.predictions["z_prob"].reshape(-1), bins=np.linspace(0, 1, 10)) 
+        #        self.item[f"{p}Hist_theta"].setData(x, y)
 
         if self.w is not None:
             self.updateImages()

@@ -17,7 +17,10 @@ class CoSMoSDataset(Dataset):
         self.drift = drift
         if dtype == "test":
             self.labels = labels
-            self.offset = offset.to(device)
+            if offset is not None:
+                self.offset = offset.to(device)
+            else:
+                self.offset = offset
         assert self.N == len(self.target)
         assert self.F == len(self.drift)
         self.dtype = dtype
@@ -45,8 +48,9 @@ class CoSMoSDataset(Dataset):
         self.drift.to_csv(os.path.join(
             path, "drift.csv"))
         if self.dtype == "test":
-            torch.save(self.offset, os.path.join(
-                path, "offset.pt"))
+            if self.offset is not None:
+                torch.save(self.offset, os.path.join(
+                    path, "offset.pt"))
             if self.labels is not None:
                 np.save(os.path.join(path, "labels.npy"),
                         self.labels)
