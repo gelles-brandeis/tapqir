@@ -3,6 +3,7 @@ from cosmos.models.model import Model
 from cosmos.models.tracker import Tracker
 from cosmos.models.spot import Spot
 from cosmos.models.test import Test
+from cosmos.models.mask import Masked
 
 __all__ = [
     "GaussianSpot",
@@ -15,6 +16,7 @@ __all__ = [
 
 models = {
     "spot": Spot,
-    "tracker": Tracker,
+    Tracker.name: Tracker,
+    Masked.name: Masked,
     "test": Test
 }
