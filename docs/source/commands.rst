@@ -9,7 +9,5 @@ Cosmos commands
 
 commands
 
-.. automodule:: cosmos.commands
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. autoprogram-cliff:: cosmos.app
+   :application: cosmos

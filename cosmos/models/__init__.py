@@ -1,20 +1,17 @@
 from cosmos.models.model import GaussianSpot
 from cosmos.models.model import Model
-from cosmos.models.tracker import Tracker
-from cosmos.models.spot import Spot
-from cosmos.models.test import Test
+from cosmos.models.spotdetection import SpotDetection
+from cosmos.models.fixedoffset import FixedOffset
 
 __all__ = [
     "GaussianSpot",
     "models",
     "Model",
-    "Spot",
-    "Tracker",
-    "Test"
+    "SpotDetection",
+    "FixedOffset",
 ]
 
 models = {
-    "spot": Spot,
-    "tracker": Tracker,
-    "test": Test
+    SpotDetection.name: SpotDetection,
+    FixedOffset.name: FixedOffset,
 }

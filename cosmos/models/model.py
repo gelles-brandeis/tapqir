@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import numpy as np
 import pandas as pd
 import os
@@ -9,24 +8,25 @@ from pyro import param
 from pyro.infer import SVI
 from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
+from pyro.ops.stats import quantile
 from torch.utils.tensorboard import SummaryWriter
-import torch.distributions.constraints as constraints
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
 from cosmos import __version__ as cosmos_version
 from tqdm import tqdm
 from cosmos.utils.dataset import load_data
+from scipy.io import savemat
 
 
-class GaussianSpot(nn.Module):
+class GaussianSpot:
     r"""
     Calculates ideal shape of the 2D-Gaussian spot given spot parameters,
     target positions, and drift list.
 
         :math:`\dfrac{h_{knf}}{2 \pi w^2_{nfk}} \exp{\left ( -\dfrac{(i-x_{nfk})^2 + (j-y_{nfk})^2}{2w^2_{nfk}} \right)}`
 
-    :param target: AoI target positions.
+    :param target: Target positions.
     :param drift: Frame drift list.
     """
 
@@ -39,24 +39,26 @@ class GaussianSpot(nn.Module):
 
         # drift locs for 2D gaussian spot
         self.target_locs = torch.tensor(
-            drift[["dx", "dy"]].values.reshape(-1, 2)
-            + target[["x", "y"]].values.reshape(-1, 1, 2),
+            drift[["dx", "dy"]].values.reshape(-1, 1, 2)
+            + target[["x", "y"]].values.reshape(-1, 1, 1, 2),
         ).float()
 
     # Ideal 2D gaussian spots
-    def forward(self, height, width, x, y, n_idx, f_idx):
+    def __call__(self, height, width, x, y, ndx, fdx=None):
         r"""
         :param height: integrated spot intensity.
         :param width: width of the 2D-Gaussian spot.
         :param x: relative :math:`x`-axis position relative to the target.
         :param y: relative :math:`y`-axis position relative to the target.
-        :param n_idx: AoI indices.
-        :param f_idx: Frame indices.
+        :param ndx: AoI indices.
+        :param fdx: Frame indices.
         :return: Ideal shape 2D-Gaussian spot.
-        :rtype: ~pyro.distributions.Categorical
         """
 
-        spot_locs = Vindex(self.target_locs)[n_idx, f_idx, :] + torch.stack((x, y), -1)
+        if fdx is not None:
+            spot_locs = Vindex(self.target_locs)[ndx, fdx] + torch.stack((x, y), -1)
+        else:
+            spot_locs = Vindex(self.target_locs)[ndx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2) * width[..., None, None, None, None]
@@ -65,7 +67,7 @@ class GaussianSpot(nn.Module):
         return height[..., None, None] * gaussian_spot
 
 
-class Model(nn.Module):
+class Model:
     r"""
     Base class for cosmos models.
 
@@ -78,12 +80,25 @@ class Model(nn.Module):
 
     def __init__(self, S, K=2):
         super().__init__()
-        self.K = K
-        self.S = S
+        self._S = S
+        self._K = K
         self.batch_size = None
         # for plotting
         self.n = None
-        self.frames = None
+
+    @property
+    def S(self):
+        r"""
+        Number of distinct molecular states for the binder molecules.
+        """
+        return self._S
+
+    @property
+    def K(self):
+        r"""
+        Maximum number of spots that can be present in a single image.
+        """
+        return self._K
 
     def load(self, path, control, device):
         # set path
@@ -101,15 +116,11 @@ class Model(nn.Module):
         self.data_median = torch.median(self.data.data)
         self.offset_median = torch.median(self.data.offset)
         self.noise = (self.data.data.std(dim=(1, 2, 3)).mean() - self.data.offset.std()) * np.pi * (2 * 1.3) ** 2
-        offset_max = np.percentile(self.data.offset.cpu().numpy(), 99.5)
-        offset_min = np.percentile(self.data.offset.cpu().numpy(), 0.5)
-        offset_weights, offset_samples = np.histogram(self.data.offset.cpu().numpy(),
-                                                      range=(offset_min, offset_max),
-                                                      bins=max(1, int(offset_max - offset_min)),
-                                                      density=True)
-        offset_samples = offset_samples[:-1]
-        self.offset_samples = torch.from_numpy(offset_samples).float().to(device)
-        self.offset_weights = torch.from_numpy(offset_weights).float().to(device)
+        offset_max = quantile(self.data.offset.flatten(), 0.995).item()
+        offset_min = quantile(self.data.offset.flatten(), 0.005).item()
+        self.data.offset = torch.clamp(self.data.offset, offset_min, offset_max)
+        self.offset_samples, self.offset_weights = torch.unique(self.data.offset, sorted=True, return_counts=True)
+        self.offset_weights = self.offset_weights.float() / self.offset_weights.sum()
         self.offset_mean = torch.sum(self.offset_samples * self.offset_weights)
         self.offset_var = torch.sum(self.offset_samples ** 2 * self.offset_weights) - self.offset_mean ** 2
 
@@ -150,37 +161,6 @@ class Model(nn.Module):
             max_plate_nesting=2, ignore_jit_warnings=True)
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
-    @property
-    def theta_matrix(self):
-        theta_matrix = torch.zeros(1 + self.K * self.S, self.K).long()
-        for s in range(self.S):
-            for k in range(self.K):
-                theta_matrix[1 + s*self.K + k, k] = s + 1
-
-        return theta_matrix
-
-    @property
-    def theta_probs(self):
-        r"""
-        Probability of an on-target spot :math:`p(z_{knf})`.
-        """
-        transform = torch.stack((1 - self.theta_matrix, self.theta_matrix), dim=-1).float()
-        return torch.einsum("nfi,iks->knfs", param("d/theta_probs").data, transform)
-
-    @property
-    def m_probs(self):
-        r"""
-        Probability of a spot :math:`p(m_{knf})`.
-        """
-        return torch.einsum("knfi,knfis->knfs", self.theta_probs, param("d/m_probs").data)
-
-    @property
-    def j_probs(self):
-        r"""
-        Probability of an off-target spot :math:`p(j_{knf})`.
-        """
-        return self.m_probs - self.theta_probs
-
     def model(self):
         r"""
         Generative Model
@@ -200,15 +180,14 @@ class Model(nn.Module):
             # import pdb; pdb.set_trace()
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
-                self.infer()
                 self.save_checkpoint()
             self.iter += 1
 
     def log(self):
         self.path = os.path.join(
             self.data_path, "runs",
-            "{}".format(self.__name__),
-            "{}prox".format(cosmos_version.split("+")[0]),
+            "{}".format(self.name),
+            "{}state".format(cosmos_version.split("+")[0]),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
@@ -243,28 +222,53 @@ class Model(nn.Module):
                 for v in pyro.get_param_store().values()]):
             raise ValueError("Step #{}. Detected NaN values in parameters".format(self.iter))
 
-        self.optim.save(os.path.join(self.path, "optimizer"))
+        # save parameters and optimizer state
         pyro.get_param_store().save(os.path.join(self.path, "params"))
-        np.savetxt(os.path.join(self.path, "iter"),
-                   np.array([self.iter]))
-        params_last = pd.Series(data={"iter": self.iter})
+        self.optim.save(os.path.join(self.path, "optimizer"))
+
+        # save parameters in matlab format
+        keys = ["h_loc", "w_mean", "x_mean", "y_mean"]
+        matlab = {k: param(f"d/{k}").data.cpu().numpy() for k in keys}
+        matlab["parametersDescription"] = \
+            "Parameters for N x F x K spots. \
+            N - target sites, F - frames, K - max number of spots in the image. \
+            h_loc - mean intensity, w_mean - mean spot width, \
+            x_mean - x position, y_mean - y position."
+        matlab["z_probs"] = self.z_probs[..., 1].cpu().numpy()
+        matlab["j_probs"] = self.j_probs[..., 1].cpu().numpy()
+        matlab["m_probs"] = self.m_probs[..., 1].cpu().numpy()
+        matlab["z_marginal"] = self.z_marginal.cpu().numpy()
+        matlab["probabilitiesDescription"] = \
+            "Probabilities for N x F x K spots. \
+            z_probs - on-target spot probability, \
+            j_probs - off-target spot probability, \
+            m_probs - spot probability (on-target + off-target), \
+            z_marginal - total on-target spot probability (sum of z_probs)."
+        matlab["aoilist"] = self.data.target.index.values
+        matlab["aoilistDescription"] = "aoi numbering from aoiinfo"
+        matlab["framelist"] = self.data.drift.index.values
+        matlab["framelistDescription"] = "frame numbering from driftlist"
+        savemat(os.path.join(self.path, "parameters.mat"), matlab)
+
+        # save global paramters in csv file and for tensorboard
+        global_params = pd.Series(data={"iter": self.iter})
 
         self.writer.add_scalar(
             "-ELBO", self.iter_loss, self.iter)
-        params_last["-ELBO"] = self.iter_loss
+        global_params["-ELBO"] = self.iter_loss
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
                 self.writer.add_scalar(name, val.item(), self.iter)
-                params_last[name] = val.item()
+                global_params[name] = val.item()
             elif val.dim() == 1 and len(val) <= self.S+1:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 self.writer.add_scalars(name, scalars, self.iter)
                 for key, value in scalars.items():
-                    params_last["{}_{}".format(name, key)] = value
+                    global_params["{}_{}".format(name, key)] = value
 
         if self.data.labels is not None:
             mask = self.data.labels["z"] < 2
-            pred_labels = self.predictions["z"][mask]
+            pred_labels = (self.z_marginal > 0.5).cpu().numpy()[mask]
             true_labels = self.data.labels["z"][mask]
 
             metrics = {}
@@ -284,31 +288,31 @@ class Model(nn.Module):
             self.writer.add_scalars(
                 "POSITIVES", pos, self.iter)
             for key, value in {**metrics, **pos, **neg}.items():
-                params_last[key] = value
+                global_params[key] = value
             try:
                 atten_labels = np.copy(self.data.labels)
                 atten_labels["z"][
-                    self.data.labels["spotpicker"] != self.predictions["z"]] = 2
+                    self.data.labels["spotpicker"] != (self.z_marginal > 0.5)] = 2
                 atten_labels["spotpicker"] = 0
                 np.save(os.path.join(self.path, "atten_labels.npy"),
                         atten_labels)
             except:
                 pass
 
-        params_last.to_csv(os.path.join(self.path, "params_last.csv"))
+        global_params.to_csv(os.path.join(self.path, "global_params.csv"))
         self.logger.info("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
         if path is None:
             path = self.path
-        params_last = pd.read_csv(os.path.join(path, "params_last.csv"), header=None, squeeze=True, index_col=0)
-        self.iter = int(params_last["iter"])
+        global_params = pd.read_csv(os.path.join(path, "global_params.csv"), header=None, squeeze=True, index_col=0)
+        self.iter = int(global_params["iter"])
         self.optim.load(os.path.join(path, "optimizer"))
         pyro.clear_param_store()
         pyro.get_param_store().load(
             os.path.join(path, "params"),
             map_location=self.device)
-        self.predictions = np.load(os.path.join(path, "predictions.npy"))
+        # self.predictions = np.load(os.path.join(path, "predictions.npy"))
         self.logger.info(
             "Step #{}. Loaded model params and optimizer state from {}"
             .format(self.iter, path))
@@ -316,13 +320,13 @@ class Model(nn.Module):
     def load_parameters(self, path=None):
         if path is None:
             path = self.path
-        self.iter = int(
-            np.loadtxt(os.path.join(path, "iter")))
         pyro.clear_param_store()
         pyro.get_param_store().load(
             os.path.join(path, "params"),
             map_location=self.device)
-        self.predictions = np.load(os.path.join(path, "predictions.npy"))
+        self._K = param("d/h_loc").shape[-1]
+        self._S = len(param("logits_z")) - 1
+        # self.predictions = np.load(os.path.join(path, "predictions.npy"))
 
     def snr(self):
         r"""
@@ -346,11 +350,9 @@ class Model(nn.Module):
                 param("d/w_mode"),
                 param("d/x_mode"),
                 param("d/y_mode"),
-                torch.arange(self.data.N)[:, None],
-                torch.arange(self.data.F))
+                torch.arange(self.data.N))
             signal = (self.data.data * weights).sum(dim=(-2, -1))
             noise = (self.offset_var + (signal - self.offset_mean) * param("gain")).sqrt()
             result = (signal - param("d/b_loc") - self.offset_mean) / noise
-            mask = param("d/theta_probs")[..., 1:] > 0.5
-            mask = mask.permute(2, 0, 1)
+            mask = self.z_probs > 0.5
             return result[mask]

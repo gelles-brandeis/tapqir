@@ -5,9 +5,9 @@ import torch
 from torch.utils.data import Dataset
 
 
-class CoSMoSDataset(Dataset):
+class CosmosDataset(Dataset):
     """
-    CoSMoS Dataset
+    Cosmos Dataset
     """
 
     def __init__(self, data=None, target=None, drift=None, dtype=None, device=None, offset=None, labels=None):
@@ -74,6 +74,6 @@ def load_data(path, dtype, device=None):
         if os.path.isfile(os.path.join(path, "labels.npy")):
             labels = np.load(os.path.join(
                 path, "labels.npy"))
-        return CoSMoSDataset(data, target, drift, dtype, device, offset, labels)
+        return CosmosDataset(data, target, drift, dtype, device, offset, labels)
 
-    return CoSMoSDataset(data, target, drift, dtype, device)
+    return CosmosDataset(data, target, drift, dtype, device)

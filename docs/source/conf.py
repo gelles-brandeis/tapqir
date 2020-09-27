@@ -37,6 +37,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.intersphinx',
+    'cliff.sphinxext',
     'sphinx.ext.viewcode'
 ]
 
@@ -64,3 +65,5 @@ html_static_path = ['_static']
 autodoc_default_options = {
     'member-order': 'bysource'
 }
+
+autoprogram_cliff_application = 'cosmos'

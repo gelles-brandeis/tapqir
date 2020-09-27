@@ -3,6 +3,20 @@
 Usage
 =====
 
+Create a configuration file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To begin the analysis first create an empty directory at ``dataset_path`` and run::
+
+    cosmos config dataset_path
+
+which will create a file named ``options.cfg`` containing command options.
+
+.. note::
+
+    ``dataset_path`` can be an absolute path or a relative path. For example, from
+    inside of the created directory, the command can be run as :code:`cosmos config .`
+
 Importing experimental data into **cosmos**
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -13,17 +27,12 @@ Analyzing data acquired with `Glimpse <https://github.com/gelles-brandeis/Glimps
 the **imscroll** program (see `CoSMoS_Analysis <https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki>`_)
 will require the following files:
 
-* image data folder in glimpse format
-* aoiinfo file designating the areas of interest (aois) corresponfing to target molecules to be analyzed
-* (optional) aoiinfo file designating the areas of interest corresponding to locations that do not contain target molecules  (negative control)
-* driftlist file recording the stage movement that took place during the experiment
+- image data folder in glimpse format
+- aoiinfo file designating the areas of interest (aois) corresponfing to target molecules to be analyzed
+- (optional) aoiinfo file designating the areas of interest corresponding to locations that do not contain target molecules  (negative control)
+- driftlist file recording the stage movement that took place during the experiment
 
-To import the needed data from these files, make an empty directory and run::
-
-    cosmos config pathname
-
-which will create a file named **options.cfg** containing command options.
-`[glimpse]` section contains the names of your folder/files::
+Enter the names of your folder/files under the ``[glimpse]`` section of the ``options.cfg`` file::
 
     [glimpse]
     dir = /home/ordabayev/Documents/Datasets/Grace_article_data/glimpse_sequence_for_Pol_II_and_Spt5/garosen00267
@@ -33,37 +42,75 @@ which will create a file named **options.cfg** containing command options.
     labels = 
     labeltype = 
     
-(Ignore labels and labeltype for now.)
+(Leave ``labels`` and ``labeltype`` blank)
 
-To import your data from inside the directory containing options.cfg, run::
+To import your data run::
 
-    cosmos glimpse .
+    cosmos glimpse dataset_path
     
 The program will create the files containing the digested data in the format needed for fitting:
 
-.. image:: 182528.png
+- ``drift.csv`` contains drift list
+- ``test_data.pt`` contains cropped images at target sites
+- ``test_target.csv`` contains target site positions
+- ``offset.pt`` contains cropped images of offset sites
+- ``control_data.pt`` contains cropped images at dark sites
+- ``control_target.csv`` contains dark site positions
 
-Using **cosmos** to fit experimental data to a model
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fit experimental data to a model
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Edit **options.cfg** file::
+To adjust fitting parameters edit ``[fit]`` section of the ``options.cfg`` file::
 
-    cosmos fit tracker .
+    [fit]
+    spot = 1
+    num_iter = 25000
+    batch_size = 5
+    learning_rate = 0.005
+    control = False
+    device = cuda
 
-Set visible cuda devices::
+Then run::
 
-    CUDA_VISIBLE_DEVICES=1 cosmos fit tracker .
+    cosmos fit spotdetection dataset_path
+
+.. note::
+
+    To use different CUDA device run::
+
+        CUDA_VISIBLE_DEVICES=1 cosmos fit spotdetection dataset_path
+
+Results
+~~~~~~~
+
+Output files of the analysis are saved in ``runs/model/version/S/control/learning-rate/batch-size/`` (``parameters_path``):
+
+- ``params`` and ``optimizer`` are model parameters and optimizer state saved in PyTorch format
+- ``global_params.csv`` contains values of global parameters
+- ``parameters.mat`` contains MAP estimate of parameters in MATLAB format
+- ``scalar`` folder containing global parameter values over iterations
+- ``run.log`` log file
 
 Tensorboard
 -----------
 
-.. code-block:: bash
+Fitting progress saved in ``scalar`` can be visualized using tensorboard program::
 
-    tensorboard --logdir=runs/trackerv1.1.3/nocontrol/lr0.005/bs8/
+    tensorboard --logdir=parameters_path
 
-cosmos show
------------
+which will open the window in the browser:
 
-.. code-block:: bash
+.. image:: tensorboard.png
 
-    cosmos show tracker . runs/trackerv1.1.3/nocontrol/lr0.005/bs8/
+Posterior Distributions
+-----------------------
+
+Posterior distributions of the local parameters can be visualized by running ``show`` command::
+
+    cosmos show spotdetection dataset_path parameters_path
+
+which will display parameter values, original images along with best estimates:
+
+.. image:: parameters.png
+
+.. image:: images.png

@@ -1,5 +1,4 @@
 import torch
-from torch.distributions import constraints
 from torch.distributions.transforms import AffineTransform
 from pyro.distributions import Beta, TransformedDistribution
 
@@ -8,16 +7,16 @@ class AffineBeta(TransformedDistribution):
     r"""
     Beta distribution shifted by :attr:`loc` and scaled by :attr:`scale`::
 
-        concentration1 = size * (mean - loc) / scale
-        concentration0 = size * (loc - mean) / scale
+        concentration1 = size * (mean - a) / (b - a)
+        concentration0 = size * (b - mean) / (b - a)
         X ~ Beta(concentration1, concentration0)
-        f(X) = loc + scale * X
-        Y = f(X) ~ AffineBeta(mean, size, loc, scale)
+        f(X) = a + (b - a) * X
+        Y = f(X) ~ AffineBeta(mean, size, a, b)
 
     :param mean: mean of the distribution.
     :param size: size parameter of the Beta distribution.
-    :param loc: loc parameter.
-    :param scale: scale parameter.
+    :param a: min parameter.
+    :param b: max parameter.
     """
 
     has_rsample = True

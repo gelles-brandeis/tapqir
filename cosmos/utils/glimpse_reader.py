@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
-from cosmos.utils.dataset import CoSMoSDataset
+from cosmos.utils.dataset import CosmosDataset
 
 
 def read_glimpse(path, D):
@@ -168,5 +168,5 @@ def read_glimpse(path, D):
                 - int((aoi_df[dtype].at[aoi, "y"] - D * 0.5) // 1) - 1
         # convert data into torch tensor
         data[dtype] = torch.tensor(data[dtype], dtype=torch.float32)
-        dataset = CoSMoSDataset(data[dtype], target[dtype], drift, dtype, device, offset, labels)
+        dataset = CosmosDataset(data[dtype], target[dtype], drift, dtype, device, offset, labels)
         dataset.save(path)

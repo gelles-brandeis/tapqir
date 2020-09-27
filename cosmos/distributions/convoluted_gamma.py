@@ -10,7 +10,7 @@ class ConvolutedGamma(TorchDistribution):
         X ~ P(samples, log_weights)
         Y ~ Gamma(concentration, rate)
         Z = X + Y ~ OffsetedGamma(convolution, rate, samples, log_weights)
-    
+
     :meth:`log_prob` is calculated as the convolution of the offset probability
     and the Gamma distribution:
 

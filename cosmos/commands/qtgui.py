@@ -12,7 +12,6 @@ import numpy as np
 import pyro
 from pyro import param
 from pyro.ops.stats import pi
-from pyro.ops.indexing import Vindex
 
 C = {}
 C[0] = (31, 119, 180)
@@ -239,22 +238,21 @@ class MainWindow(QMainWindow):
         f1 = int(f1)
         f2 = int(f2)
         frames = torch.arange(f1, f2)
-        img_ideal = self.Model.offset_mean + Vindex(param("d/b_loc").data)[n, frames][..., None, None]
-        for k in range(self.Model.K):
-            gaussian = self.Model.data_loc(
-                Vindex(param("d/h_loc").data)[k, n, frames],
-                Vindex(param("d/w_mode").data)[k, n, frames],
-                Vindex(param("d/x_mode").data)[k, n, frames],
-                Vindex(param("d/y_mode").data)[k, n, frames],
-                n, frames)
-            img_ideal = img_ideal + gaussian
+        img_ideal = self.Model.offset_mean + param("d/b_loc").data[n, frames, None, None]
+        gaussian = self.Model.data_loc(
+            param("d/h_loc").data[n, frames].masked_fill(self.Model.m_probs[n, frames, :, 1] < 0.5, 0.),
+            param("d/w_mean").data[n, frames],
+            param("d/x_mean").data[n, frames],
+            param("d/y_mean").data[n, frames],
+            n, frames)
+        img_ideal = img_ideal + gaussian.sum(-3)
         for f in range(f1, f2):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
                 self.Model.data[int(self.aoiNumber.text()), f].cpu().numpy()
             )
             self.prob[(f - f1) % 100].setOpts(
-                height=(self.Model.predictions["z_prob"][int(self.aoiNumber.text()), f]*self.Model.data.D,)
+                height=(self.Model.z_probs[int(self.aoiNumber.text()), f, :, 1].sum()*self.Model.data.D,)
             )
             # ideal image
             self.img_ideal[(f - f1) % 100].setImage(img_ideal[f - f1].cpu().numpy())
@@ -274,8 +272,6 @@ class MainWindow(QMainWindow):
 
         # create plots and items
         self.params = ["z", "d/height", "d/width", "d/x", "d/y", "d/background"]
-        self.items = ["z", "d/height_0", "d/height_1", "d/width_0", "d/width_1",
-                      "d/x_0", "d/x_1", "d/y_0", "d/y_1", "d/background"]
         self.plot = {}
         self.item = {}
         self.plot["zoom"] = widget.addPlot(row=1, col=0, colspan=5)
@@ -288,11 +284,11 @@ class MainWindow(QMainWindow):
         offset_max = np.percentile(self.Model.data.offset.cpu().numpy(), 99.5)
         offset_min = np.percentile(self.Model.data.offset.cpu().numpy(), 0.5)
         y, x = np.histogram(self.Model.data.offset.cpu().numpy(),
-                              range=(offset_min, offset_max),
-                              bins=max(1, int(offset_max - offset_min)),
-                              density=True)
+                            range=(offset_min, offset_max),
+                            bins=max(1, int(offset_max - offset_min)),
+                            density=True)
         plt = widget.addPlot(row=1, col=5)
-        plt.plot(x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0,0,255,70))
+        plt.plot(x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0, 0, 255, 70))
         for i, p in enumerate(self.params):
             self.plot[p] = widget.addPlot(row=i+2, col=0, colspan=5)
             self.plot[p].addLegend()
@@ -302,81 +298,81 @@ class MainWindow(QMainWindow):
 
             self.plot[f"{p}Hist"] = widget.addPlot(row=i+2, col=5)
             if p == "z":
-                y, x = np.histogram(self.Model.predictions["z_prob"].reshape(-1), bins=50) 
+                y, x = np.histogram(self.Model.z_probs[..., 1].sum(-1).numpy(), bins=50)
             elif p == "d/height":
                 y, x = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
             elif p == "d/width":
                 y, x = np.histogram(
-                    param("d/w_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+                    param("d/w_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
             elif p == "d/x":
                 y, x = np.histogram(
-                    param("d/x_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+                    param("d/x_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
             elif p == "d/y":
                 y, x = np.histogram(
-                    param("d/y_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy()) 
+                    param("d/y_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
             elif p == "d/background":
-                y, x = np.histogram(param("d/b_loc").data.reshape(-1).numpy(), bins=50) 
-            self.item[f"{p}Hist_m"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0,0,255,30))
+                y, x = np.histogram(param("d/b_loc").data.reshape(-1).numpy(), bins=50)
+            self.item[f"{p}Hist_m"] = pg.PlotDataItem(
+                x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0, 0, 255, 30))
 
             if p == "d/height":
                 y, x = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
-                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
 
                 y, x = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
                 self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
             elif p == "d/width":
                 y, x = np.histogram(
-                    param("d/w_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
-                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+                    param("d/w_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
 
                 y, x = np.histogram(
-                    param("d/w_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                    param("d/w_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
                 self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
             elif p == "d/x":
                 y, x = np.histogram(
-                    param("d/x_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
-                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+                    param("d/x_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
 
                 y, x = np.histogram(
-                    param("d/x_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                    param("d/x_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
                 self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
             elif p == "d/y":
                 y, x = np.histogram(
-                    param("d/y_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.theta_probs[..., 1].reshape(-1).numpy()) 
-                self.item[f"{p}Hist_theta"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+                    param("d/y_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
 
                 y, x = np.histogram(
-                    param("d/y_mode").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy()) 
+                    param("d/y_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
                 self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
 
-        for p in self.items:
+        for p in self.params:
             if p == "z":
                 self.item[f"{p}_probs"] = pg.PlotDataItem(
                     pen=C[2], symbol="o", symbolBrush=C[2],
                     symbolPen=None, symbolSize=5, name="z_probs"
                 )
-                self.item[f"{p}_binary"] = pg.PlotDataItem(
-                    pen=C[3], symbol=None,
-                    symbolPen=None, name="z_binary"
-                )
-            else:
-                k = 0 if p.endswith("background") else int(p.split("_")[-1])
-
+                # self.item[f"{p}_binary"] = pg.PlotDataItem(
+                #     pen=C[3], symbol=None,
+                #     symbolPen=None, name="z_binary"
+                # )
+            elif p.endswith("background"):
+                k = 0
                 self.item[f"{p}_mean"] = pg.PlotDataItem(
                     pen=C[k], symbol="o", symbolBrush=C[k],
                     symbolPen=None, symbolSize=5, name=k
@@ -387,6 +383,19 @@ class MainWindow(QMainWindow):
                     self.item[f"{p}_high"], self.item[f"{p}_low"],
                     brush=(*C[k], 70)
                 )
+            else:
+
+                for k in range(self.Model.K):
+                    self.item[f"{p}_{k}_mean"] = pg.PlotDataItem(
+                        pen=C[k], symbol="o", symbolBrush=C[k],
+                        symbolPen=None, symbolSize=5, name=k
+                    )
+                    self.item[f"{p}_{k}_high"] = pg.PlotDataItem(pen=(*C[k], 70))
+                    self.item[f"{p}_{k}_low"] = pg.PlotDataItem(pen=(*C[k], 70))
+                    self.item[f"{p}_{k}_fill"] = pg.FillBetweenItem(
+                        self.item[f"{p}_{k}_high"], self.item[f"{p}_{k}_low"],
+                        brush=(*C[k], 70)
+                    )
 
         # add items to plots
         for key, value in self.item.items():
@@ -406,25 +415,25 @@ class MainWindow(QMainWindow):
         self.aoiNumber.setText(str(n))
 
         self.Model.n = torch.tensor([n])
-        self.Model.frames = torch.arange(self.Model.data.F)
         trace = pyro.poutine.trace(self.Model.guide).get_trace()
-        self.Model.n = None
-        self.Model.frames = None
-        self.item["zoom"].setData(self.Model.predictions["z_prob"][n])
-        for p in self.items:
+        self.item["zoom"].setData(self.Model.z_probs[n, :, :, 1].sum(-1))
+        for p in self.params:
             if p == "z":
-                self.item[f"{p}_probs"].setData(self.Model.predictions["z_prob"][n])
-                self.item[f"{p}_binary"].setData(self.Model.predictions["z"][n])
-            else:
+                self.item[f"{p}_probs"].setData(self.Model.z_probs[n, :, :, 1].sum(-1))
+            elif p == "d/background":
+                k = 0
                 hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
                 mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()
                 self.item[f"{p}_high"].setData(hpd[0])
                 self.item[f"{p}_low"].setData(hpd[1])
                 self.item[f"{p}_mean"].setData(mean)
-        #for p in self.params:
-        #    if p == "z":
-        #        y, x = np.histogram(self.Model.predictions["z_prob"].reshape(-1), bins=np.linspace(0, 1, 10)) 
-        #        self.item[f"{p}Hist_theta"].setData(x, y)
+            else:
+                for k in range(self.Model.K):
+                    hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
+                    mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()
+                    self.item[f"{p}_{k}_high"].setData(hpd[0][..., k])
+                    self.item[f"{p}_{k}_low"].setData(hpd[1][..., k])
+                    self.item[f"{p}_{k}_mean"].setData(mean[..., k])
 
         if self.w is not None:
             self.updateImages()
