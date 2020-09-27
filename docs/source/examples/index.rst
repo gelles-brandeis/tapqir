@@ -17,3 +17,4 @@ Intro
    height_data
    experimental_data
    lamda_simulation
+   lamda_data

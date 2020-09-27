@@ -4,157 +4,100 @@ Installation
 ============
 
 
-**cosmos** is a python program that will run in both Windows (we've tested it in Windows 10) and linux (we've tested it in Arch linux).  
+**Cosmos** is a python program that will run in both Windows (we've tested it in Windows 10)
+and Linux (we've tested it in Arch and Manjaro Distros).  
 
-Practical use requires a computer with an NVIDIA GPU capable of running **cuda**.
+.. note::
 
-Follow these steps to install the software: 
+    Practical use of Cosmos requires a computer with a CUDA-capable GPU.
+    Follow NVIDIA CUDA Installation Guide for your OS:
 
-Install Nvidia drivers and cuda
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    * `CUDA Installation Guide for Microsoft Windows <https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html>`_
+    * `NVIDIA Arch Wiki <https://wiki.archlinux.org/index.php/NVIDIA>`_ and `cuda <https://www.archlinux.org/packages/community/x86_64/cuda/>`_:sup:`AUR`
 
-**Linux**
+.. note::
 
-First install nvidia drivers (`Arch linux <https://wiki.archlinux.org/index.php/NVIDIA#Installation>`_ or `Manjaro <https://wiki.manjaro.org/index.php?title=Configure_NVIDIA_(non-free)_settings_and_load_them_on_Startup#Install_NVIDIA_Drivers>`_) and then install cuda:
+    We recommend to use Anaconda package manager to create virtual environment and install Cosmos in the virtual environment.
+    After Anaconda installation create and activate a new environment in Anaconda Prompt:
 
-.. code-block:: bash
+    .. code-block:: bash
 
-    sudo pacman -S cuda
+        conda create --name myenv python
+        conda activate myenv
 
-**Windows**
+If you are using Anaconda package manager make sure that your created environment is activated (you should see the environment name (e.g., "myenv") in the command prompt.
 
-Follow nvidia/cuda installation `instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html>`_.
+Installation on Linux
+~~~~~~~~~~~~~~~~~~~~~
 
-Create virtual environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using pip::
 
-**Linux**
+    pip install git+https://github.com/gelles-brandeis/cosmos.git
 
-Install Anaconda from Arch linux aur `repository <https://aur.archlinux.org/packages/anaconda/>`_:
-
-.. code-block:: bash
-
-    git clone https://aur.archlinux.org/anaconda.git
-    cd anaconda
-    makepkg -si
-    source /opt/anaconda/bin/activate root  # activates conda (do for each user)
-    conda init # adds autostart script to your ~/.bashrc (do for each user)
-
-**Windows**
-
-Install Anaconda for `Windows <https://docs.anaconda.com/anaconda/install/>`_.
-
-**Both OSs**
-
-After installation create and activate a new environment in anaconda prompt:
-
-.. code-block:: bash
-
-    conda create --name myenv python=3.7
-    conda activate myenv
-
-Install cosmos
-~~~~~~~~~~~~~~
-
-First, make sure that your created environment is activated (you should see the environment name (e.g., "myenv") in the command prompt. Then download and install the **cosmos** software:
-
-**Linux**
-
-.. code-block:: bash
+From source::
 
     git clone https://github.com/gelles-brandeis/cosmos.git
     cd cosmos
     pip install .
 
-**Windows**
+Installation on Windows
+~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: bash
+Using pip::
 
-    git clone https://github.com/gelles-brandeis/cosmos.git
-    cd cosmos
-    pip install . -f https://download.pytorch.org/whl/torch_stable.html
+    pip install git+https://github.com/gelles-brandeis/cosmos.git -f https://download.pytorch.org/whl/torch_stable.html
 
-Once **cosmos** has been installed:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Updating Cosmos
+~~~~~~~~~~~~~~~
 
-Update to latest verion of **cosmos**
--------------------------------------
-
-Go to cosmos repository and then run:
-
-.. code-block:: bash
-
-    git pull
-    pip install . -U
-
-Check cosmos version:
----------------------
-
-.. code-block:: bash
+To check cosmos version::
 
     cosmos --version
 
-Setting up **cosmos** Server (Arch Linux)
+Update to latest verion of **cosmos**::
+
+    pip install git+https://github.com/gelles-brandeis/cosmos.git -U
+
+Set up Cosmos Server (optional)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Linux machines can be set up to run as servers. Following is a short instruction for Arch Linux.
 
 Ssh server
 ----------
 
-**Install openssh**
-
-.. code-block:: bash
-
-    sudo pacman -S openssh
-
-**Configuration**
-
-In `/etc/ssh/sshd_config` add the following line to allow access only for some users:
-
-.. code-block:: bash
+Install `OpenSSH <https://wiki.archlinux.org/index.php/OpenSSH#Installation>`_.
+In ``/etc/ssh/sshd_config`` add the following line to allow access only for some users::
 
     AllowUsers    user1 user2
 
-Change the default port from 22 to a random higher one like this:
-
-.. code-block:: bash
+Change the default port from 22 to a random higher one like this::
 
     Port 39901
 
-**Start/enable daemon**
-
-.. code-block:: bash
-
-    sudo systemctl start sshd
-    sudo systemctl enable sshd
+`Start/enable <https://wiki.archlinux.org/index.php/Systemd#Using_units>`_ ``sshd.service``.
 
 Slurm server
 ------------
 
-Follow instructions on `arch wiki <https://wiki.archlinux.org/index.php/Slurm) and slurm [administrator guide](https://slurm.schedmd.com/quickstart_admin.html>`_.
+Follow instructions on `Slurm Arch Wiki <https://wiki.archlinux.org/index.php/Slurm>`_ and `Quick Start Administrator Guide <https://slurm.schedmd.com/quickstart_admin.html>`_. To create Slurm configuration file ``slurm.conf`` use the official `configurator <https://slurm.schedmd.com/configurator.easy.html>`_. Fill in the following options (same control and compute machines):
 
-Briefly, install `slurm-llnl` and `munge` packages. Create `slurm.conf` file using the official `configurator <https://slurm.schedmd.com/configurator.easy.html>`_. Fill in the following options (same control and compute machines):
-* **SlurmctldHost** - value returned by the `hostname -s` command in bash
-* **Compute Machines** - values returned by the `slurmd -C` command
-* **StateSaveLocation** - change to `/var/spool/slurm/slurmctld`
-* **ProctrackType** - select _LinuxProc_
-* **ClusterName** - change to the same value as **SlurmctldHost**
+* *SlurmctldHost* - value returned by the :code:`hostname -s` in bash
+* *Compute Machines* - values returned by the :code:`slurmd -C` command
+* *StateSaveLocation* - change to ``/var/spool/slurm/slurmctld``
+* *ProctrackType* - select ``LinuxProc``
+* *ClusterName* - change to the same value as *SlurmctldHost*
 
-Generate the file and copy it to `/etc/slurm-llnl/slurm.conf`. Add following lines before COMPUTE NODES:
-
-.. code-block:: bash
+Generate the file and copy it to ``/etc/slurm-llnl/slurm.conf``. Add following lines before COMPUTE NODES::
 
     # GENERAL RESOURCE
     GresType=gpu
 
-Add `Gres=gpu:x` (_x_ is the number of gpu devices) to the NodeName line like this:
-
-.. code-block:: bash
+Add ``Gres=gpu:x`` (``x`` is the number of gpu devices) to the NodeName line like this::
 
     NodeName=centaur Gres=gpu:2 CPUs=64 Sockets=1 CoresPerSocket=32 ThreadsPerCore=2 State=UNKNOWN RealMemory=64332
 
-Finally, create `/etc/slurm-llnl/gres.conf` file by listing all gpu devices:
-
-.. code-block:: bash
+Finally, create ``/etc/slurm-llnl/gres.conf`` file by listing all gpu devices::
 
     #################################################################
     # Slurm's Generic Resource (GRES) configuration file
@@ -163,27 +106,17 @@ Finally, create `/etc/slurm-llnl/gres.conf` file by listing all gpu devices:
     Name=gpu File=/dev/nvidia0 CPUs=0-4
     Name=gpu File=/dev/nvidia1 CPUs=5-9
 
-Start/enable `slurmd` and `slurmctld` services
+`Start/enable <https://wiki.archlinux.org/index.php/Systemd#Using_units>`_ ``slurmd.service`` and ``slurmctld.service``.
 
 
-Xrdp server (Remote Desktop for Linux)
---------------------------------------
+Remote Desktop Server
+------------------------
 
-**Server setup**
+Install `xrdp <https://wiki.archlinux.org/index.php/Xrdp>`_ package on the Linux server machine.
+`Start/enable <https://wiki.archlinux.org/index.php/Systemd#Using_units>`_ ``xrdp.service`` and ``xrdp-sesman.service``.
 
-Install `xrdp <https://wiki.archlinux.org/index.php/Xrdp>`_ package from the aur.
+.. note::
 
-Start/enable xrdp and xrdp-sesman services
-
-.. code-block:: bash
-
-    sudo systemctl start xrdp
-    sudo systemctl start xrdp-sesman
-    sudo systemctl enable xrdp
-    sudo systemctl enable xrdp-sesman
-
-**Client side**
-
-Connect from the University network or use VPN client. Use remote desktop program (Remmina on Linux) to connect to the computer.
-
-At the login screen select xvnc display session.
+    Connect from the University network or use VPN client.
+    Use remote desktop program (`Remmina <https://wiki.archlinux.org/index.php/Remmina>`_ on Linux) to connect to the computer.
+    At the login screen select xvnc display session.
