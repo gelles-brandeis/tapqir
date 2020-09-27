@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import numpy as np
 import pandas as pd
 import os
@@ -11,25 +10,23 @@ from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
 from pyro.ops.stats import quantile
 from torch.utils.tensorboard import SummaryWriter
-import torch.distributions.constraints as constraints
-from torch.distributions.utils import probs_to_logits, logits_to_probs
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
 from cosmos import __version__ as cosmos_version
 from tqdm import tqdm
 from cosmos.utils.dataset import load_data
-import itertools
+from scipy.io import savemat
 
 
-class GaussianSpot(nn.Module):
+class GaussianSpot:
     r"""
     Calculates ideal shape of the 2D-Gaussian spot given spot parameters,
     target positions, and drift list.
 
         :math:`\dfrac{h_{knf}}{2 \pi w^2_{nfk}} \exp{\left ( -\dfrac{(i-x_{nfk})^2 + (j-y_{nfk})^2}{2w^2_{nfk}} \right)}`
 
-    :param target: AoI target positions.
+    :param target: Target positions.
     :param drift: Frame drift list.
     """
 
@@ -47,7 +44,7 @@ class GaussianSpot(nn.Module):
         ).float()
 
     # Ideal 2D gaussian spots
-    def forward(self, height, width, x, y, ndx, fdx=None):
+    def __call__(self, height, width, x, y, ndx, fdx=None):
         r"""
         :param height: integrated spot intensity.
         :param width: width of the 2D-Gaussian spot.
@@ -56,7 +53,6 @@ class GaussianSpot(nn.Module):
         :param ndx: AoI indices.
         :param fdx: Frame indices.
         :return: Ideal shape 2D-Gaussian spot.
-        :rtype: ~pyro.distributions.Categorical
         """
 
         if fdx is not None:
@@ -84,12 +80,11 @@ class Model:
 
     def __init__(self, S, K=2):
         super().__init__()
-        self._K = K
         self._S = S
+        self._K = K
         self.batch_size = None
         # for plotting
         self.n = None
-        self.frames = None
 
     @property
     def S(self):
@@ -104,97 +99,6 @@ class Model:
         Maximum number of spots that can be present in a single image.
         """
         return self._K
-
-    @property
-    def num_states(self):
-        r"""
-        Total number of states for the image model given by:
-
-            :math:`2^K + S K 2^{K-1}`
-        """
-        return 2**self.K + self.S * self.K * 2**(self.K-1)
-
-    @property
-    def logits_j(self):
-        result = torch.zeros(2, self.K+1, dtype=torch.float)
-        result[0, :self.K] = dist.Poisson(param("rate_j")).log_prob(torch.arange(self.K).float())
-        result[0, -1] =  torch.log1p(-result[0, :self.K].exp().sum())
-        result[1, :self.K-1] = dist.Poisson(param("rate_j")).log_prob(torch.arange(self.K-1).float())
-        result[1, -2] = torch.log1p(-result[0, :self.K-1].exp().sum())
-        return result
-
-    @property
-    def logits_state(self):
-        logits_z = Vindex(param("logits_z"))[self.state_to_z.sum(-1)]
-        logits_j = Vindex(self.logits_j)[self.ontarget.sum(-1), self.state_to_j.sum(-1)]
-        _, idx, counts = torch.unique(
-            torch.stack((self.state_to_z.sum(-1), self.state_to_j.sum(-1)), -1),
-            return_counts=True, return_inverse=True, dim=0)
-        return logits_z + logits_j - torch.log(Vindex(counts)[idx].float())
-
-    @property
-    def state_to_z(self):
-        result = torch.zeros(self.num_states, self.K, dtype=torch.long)
-        for i in range(2**self.K, self.num_states):
-            s, r = divmod(i - 2**self.K, self.K * 2**(self.K-1))
-            k, t = divmod(r, 2**(self.K-1))
-            result[i, k] = s+1
-        return result
-
-    @property
-    def ontarget(self):
-        return torch.clamp(self.state_to_z, min=0, max=1)
-
-    @property
-    def state_to_j(self):
-        result = torch.zeros(self.num_states, self.K, dtype=torch.long)
-        k_lst = torch.tensor(list(itertools.product([0, 1], repeat=self.K)), dtype=torch.long)
-        km1_lst = torch.tensor(list(itertools.product([0, 1], repeat=self.K-1)), dtype=torch.long)
-        kdx = torch.arange(self.K)
-        result[:2**self.K] = k_lst
-        for s in range(self.S):
-            for k in range(self.K):
-                km1dx = torch.cat([kdx[:k], kdx[k+1:]])
-                result[2**self.K+(s*self.K+k)*2**(self.K-1):2**self.K+(s*self.K+k+1)*2**(self.K-1), km1dx] = km1_lst
-        return result
-
-    @property
-    def state_to_m(self):
-        return torch.clamp(self.state_to_z + self.state_to_j, min=0, max=1)
-
-    @property
-    def z_probs(self):
-        r"""
-        Probability of an on-target spot :math:`p(z_{knf})`.
-        """
-        return torch.einsum(
-            "nfi,iks->nfks",
-            logits_to_probs(param("d/logits_state").data),
-            torch.eye(self.S+1)[self.state_to_z])
-
-    @property
-    def j_probs(self):
-        r"""
-        Probability of an off-target spot :math:`p(j_{knf})`.
-        """
-        return torch.einsum(
-            "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
-            torch.eye(2)[self.state_to_j])
-
-    @property
-    def m_probs(self):
-        r"""
-        Probability of a spot :math:`p(m_{knf})`.
-        """
-        return torch.einsum(
-            "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
-            torch.eye(2)[self.state_to_m])
-
-    @property
-    def z_marginal(self):
-        return self.z_probs[..., 1:].sum(dim=(-2,-1))
 
     def load(self, path, control, device):
         # set path
@@ -276,7 +180,6 @@ class Model:
             # import pdb; pdb.set_trace()
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
-                self.infer()
                 self.save_checkpoint()
             self.iter += 1
 
@@ -319,28 +222,53 @@ class Model:
                 for v in pyro.get_param_store().values()]):
             raise ValueError("Step #{}. Detected NaN values in parameters".format(self.iter))
 
-        self.optim.save(os.path.join(self.path, "optimizer"))
+        # save parameters and optimizer state
         pyro.get_param_store().save(os.path.join(self.path, "params"))
-        np.savetxt(os.path.join(self.path, "iter"),
-                   np.array([self.iter]))
-        params_last = pd.Series(data={"iter": self.iter})
+        self.optim.save(os.path.join(self.path, "optimizer"))
+
+        # save parameters in matlab format
+        keys = ["h_loc", "w_mean", "x_mean", "y_mean"]
+        matlab = {k: param(f"d/{k}").data.cpu().numpy() for k in keys}
+        matlab["parametersDescription"] = \
+            "Parameters for N x F x K spots. \
+            N - target sites, F - frames, K - max number of spots in the image. \
+            h_loc - mean intensity, w_mean - mean spot width, \
+            x_mean - x position, y_mean - y position."
+        matlab["z_probs"] = self.z_probs[..., 1].cpu().numpy()
+        matlab["j_probs"] = self.j_probs[..., 1].cpu().numpy()
+        matlab["m_probs"] = self.m_probs[..., 1].cpu().numpy()
+        matlab["z_marginal"] = self.z_marginal.cpu().numpy()
+        matlab["probabilitiesDescription"] = \
+            "Probabilities for N x F x K spots. \
+            z_probs - on-target spot probability, \
+            j_probs - off-target spot probability, \
+            m_probs - spot probability (on-target + off-target), \
+            z_marginal - total on-target spot probability (sum of z_probs)."
+        matlab["aoilist"] = self.data.target.index.values
+        matlab["aoilistDescription"] = "aoi numbering from aoiinfo"
+        matlab["framelist"] = self.data.drift.index.values
+        matlab["framelistDescription"] = "frame numbering from driftlist"
+        savemat(os.path.join(self.path, "parameters.mat"), matlab)
+
+        # save global paramters in csv file and for tensorboard
+        global_params = pd.Series(data={"iter": self.iter})
 
         self.writer.add_scalar(
             "-ELBO", self.iter_loss, self.iter)
-        params_last["-ELBO"] = self.iter_loss
+        global_params["-ELBO"] = self.iter_loss
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
                 self.writer.add_scalar(name, val.item(), self.iter)
-                params_last[name] = val.item()
+                global_params[name] = val.item()
             elif val.dim() == 1 and len(val) <= self.S+1:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 self.writer.add_scalars(name, scalars, self.iter)
                 for key, value in scalars.items():
-                    params_last["{}_{}".format(name, key)] = value
+                    global_params["{}_{}".format(name, key)] = value
 
         if self.data.labels is not None:
             mask = self.data.labels["z"] < 2
-            pred_labels = (self.z_marginal > 0.5).cpu()[mask]
+            pred_labels = (self.z_marginal > 0.5).cpu().numpy()[mask]
             true_labels = self.data.labels["z"][mask]
 
             metrics = {}
@@ -360,7 +288,7 @@ class Model:
             self.writer.add_scalars(
                 "POSITIVES", pos, self.iter)
             for key, value in {**metrics, **pos, **neg}.items():
-                params_last[key] = value
+                global_params[key] = value
             try:
                 atten_labels = np.copy(self.data.labels)
                 atten_labels["z"][
@@ -371,20 +299,20 @@ class Model:
             except:
                 pass
 
-        params_last.to_csv(os.path.join(self.path, "params_last.csv"))
+        global_params.to_csv(os.path.join(self.path, "global_params.csv"))
         self.logger.info("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
         if path is None:
             path = self.path
-        params_last = pd.read_csv(os.path.join(path, "params_last.csv"), header=None, squeeze=True, index_col=0)
-        self.iter = int(params_last["iter"])
+        global_params = pd.read_csv(os.path.join(path, "global_params.csv"), header=None, squeeze=True, index_col=0)
+        self.iter = int(global_params["iter"])
         self.optim.load(os.path.join(path, "optimizer"))
         pyro.clear_param_store()
         pyro.get_param_store().load(
             os.path.join(path, "params"),
             map_location=self.device)
-        self.predictions = np.load(os.path.join(path, "predictions.npy"))
+        # self.predictions = np.load(os.path.join(path, "predictions.npy"))
         self.logger.info(
             "Step #{}. Loaded model params and optimizer state from {}"
             .format(self.iter, path))
@@ -392,12 +320,12 @@ class Model:
     def load_parameters(self, path=None):
         if path is None:
             path = self.path
-        self.iter = int(
-            np.loadtxt(os.path.join(path, "iter")))
         pyro.clear_param_store()
         pyro.get_param_store().load(
             os.path.join(path, "params"),
             map_location=self.device)
+        self._K = param("d/h_loc").shape[-1]
+        self._S = len(param("logits_z")) - 1
         # self.predictions = np.load(os.path.join(path, "predictions.npy"))
 
     def snr(self):

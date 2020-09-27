@@ -4,16 +4,16 @@ import torch.distributions.constraints as constraints
 from torch.distributions.utils import probs_to_logits, logits_to_probs
 
 from pyro import param, sample, plate, poutine
-from pyro.distributions import Categorical, Gamma, HalfNormal, Poisson
+from pyro.distributions import Categorical, Gamma, Poisson
 from pyro.infer import config_enumerate
 from pyro.ops.indexing import Vindex
 from pyro.contrib.autoname import scope
 
-from cosmos.distributions import AffineBeta, ConvolutedGamma
+from cosmos.distributions import AffineBeta, FixedOffsetGamma
 from cosmos.models import Model
 
 
-class SpotDetection(Model):
+class FixedOffset(Model):
     r"""
     for :math:`n=1` to :math:`N`:
 
@@ -23,7 +23,7 @@ class SpotDetection(Model):
 
             :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
     """
-    name = "spotdetection"
+    name = "fixedoffset"
 
     def __init__(self, S, K):
         super().__init__(S, K)
@@ -172,7 +172,7 @@ class SpotDetection(Model):
 
             # sample spot variables
             height = sample(
-                "height", HalfNormal(10000.).mask(m_mask).to_event(1)
+                "height", Gamma(param("height_loc") / param("gain"), 1 / param("gain")).mask(m_mask).to_event(1)
             )
             width = sample(
                 "width", AffineBeta(
@@ -194,11 +194,9 @@ class SpotDetection(Model):
 
             # observed data
             sample(
-                "data", ConvolutedGamma(
-                    locs / param("gain"), 1 / param("gain"),
-                    param("offset_samples"), probs_to_logits(param("offset_weights"))
+                "data", FixedOffsetGamma(
+                    locs, param("gain"), param("offset")
                 ).to_event(2),
-                obs=data[ndx]
             )
 
     def spot_guide(self, data, prefix):
@@ -269,14 +267,14 @@ class SpotDetection(Model):
               constraint=constraints.positive)
 
         param("d/background_loc",
-              torch.ones(self.data.N, 1) * (self.data_median - self.offset_median),
+              torch.ones(self.data.N, 1) * 150.,
               constraint=constraints.positive)
         param("d/background_beta", torch.ones(self.data.N, 1),
               constraint=constraints.positive)
 
         if self.control:
             param("c/background_loc",
-                  torch.ones(self.control.N, 1) * (self.data_median - self.offset_median),
+                  torch.ones(self.control.N, 1) * 150.,
                   constraint=constraints.positive)
             param("c/background_beta", torch.ones(self.control.N, 1),
                   constraint=constraints.positive)
@@ -288,11 +286,8 @@ class SpotDetection(Model):
               torch.tensor([2.]),
               constraint=constraints.positive)
 
-        param("offset_samples",
-              self.offset_samples,
-              constraint=constraints.positive)
-        param("offset_weights",
-              self.offset_weights,
+        param("offset",
+              torch.tensor(90.),
               constraint=constraints.positive)
 
     def guide_parameters(self):
@@ -337,3 +332,8 @@ class SpotDetection(Model):
             size[..., 2] = 3.
         param(f"{prefix}/size",
               size, constraint=constraints.greater_than(2.))
+
+    def infer(self):
+        self.predictions["z_prob"] = self.z_probs[..., 1].sum(-1).cpu().numpy()
+        self.predictions["z"] = \
+            self.predictions["z_prob"] > 0.5

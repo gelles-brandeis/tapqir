@@ -9,7 +9,7 @@ class ConvolutedNormal(TorchDistribution):
         X ~ P(samples, log_weights)
         Y ~ Normal(loc, scale)
         Z = X + Y ~ OffsetedNormal(loc, scale, samples, log_weights)
-    
+
     :meth:`log_prob` is calculated as the convolution of the offset probability
     and the Normal distribution:
 

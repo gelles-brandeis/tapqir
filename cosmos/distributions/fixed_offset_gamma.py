@@ -1,5 +1,3 @@
-import torch
-from torch.distributions import constraints
 from torch.distributions.transforms import AffineTransform
 from pyro.distributions import Gamma, TransformedDistribution
 
@@ -22,7 +20,7 @@ class FixedOffsetGamma(TransformedDistribution):
     def __init__(self, mean, gain, offset, validate_args=None):
         base_dist = Gamma(mean / gain, 1 / gain)
         super(FixedOffsetGamma, self).__init__(base_dist, AffineTransform(loc=offset, scale=1),
-                                         validate_args=validate_args)
+                                               validate_args=validate_args)
 
     def expand(self, batch_shape, _instance=None):
         """
