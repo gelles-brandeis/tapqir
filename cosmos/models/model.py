@@ -187,7 +187,7 @@ class Model:
         self.path = os.path.join(
             self.data_path, "runs",
             "{}".format(self.name),
-            "{}state".format(cosmos_version.split("+")[0]),
+            "{}".format(cosmos_version.split("+")[0]),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
@@ -227,13 +227,14 @@ class Model:
         self.optim.save(os.path.join(self.path, "optimizer"))
 
         # save parameters in matlab format
-        keys = ["h_loc", "w_mean", "x_mean", "y_mean"]
+        keys = ["h_loc", "w_mean", "x_mean", "y_mean", "b_loc"]
         matlab = {k: param(f"d/{k}").data.cpu().numpy() for k in keys}
         matlab["parametersDescription"] = \
             "Parameters for N x F x K spots. \
             N - target sites, F - frames, K - max number of spots in the image. \
             h_loc - mean intensity, w_mean - mean spot width, \
-            x_mean - x position, y_mean - y position."
+            x_mean - x position, y_mean - y position, \
+            b_loc - background intensity."
         matlab["z_probs"] = self.z_probs[..., 1].cpu().numpy()
         matlab["j_probs"] = self.j_probs[..., 1].cpu().numpy()
         matlab["m_probs"] = self.m_probs[..., 1].cpu().numpy()

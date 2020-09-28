@@ -63,7 +63,8 @@ Fit experimental data to a model
 To adjust fitting parameters edit ``[fit]`` section of the ``options.cfg`` file::
 
     [fit]
-    spot = 1
+    num_states = 1
+    k_max = 2
     num_iter = 25000
     batch_size = 5
     learning_rate = 0.005
