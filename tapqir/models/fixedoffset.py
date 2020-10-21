@@ -9,8 +9,8 @@ from pyro.infer import config_enumerate
 from pyro.ops.indexing import Vindex
 from pyro.contrib.autoname import scope
 
-from cosmos.distributions import AffineBeta, FixedOffsetGamma
-from cosmos.models import Model
+from tapqir.distributions import AffineBeta, FixedOffsetGamma
+from tapqir.models import Model
 
 
 class FixedOffset(Model):
@@ -38,22 +38,22 @@ class FixedOffset(Model):
         return 2**self.K + self.S * self.K * 2**(self.K-1)
 
     @property
-    def logits_j(self):
+    def probs_j(self):
         result = torch.zeros(2, self.K+1, dtype=torch.float)
-        result[0, :self.K] = Poisson(param("rate_j")).log_prob(torch.arange(self.K).float())
-        result[0, -1] = torch.log1p(-result[0, :self.K].exp().sum())
-        result[1, :self.K-1] = Poisson(param("rate_j")).log_prob(torch.arange(self.K-1).float())
-        result[1, -2] = torch.log1p(-result[0, :self.K-1].exp().sum())
+        result[0, :self.K] = Poisson(param("rate_j")).log_prob(torch.arange(self.K).float()).exp()
+        result[0, -1] = 1 - result[0, :self.K].sum()
+        result[1, :self.K-1] = Poisson(param("rate_j")).log_prob(torch.arange(self.K-1).float()).exp()
+        result[1, -2] = 1 - result[0, :self.K-1].sum()
         return result
 
     @property
-    def logits_state(self):
-        logits_z = Vindex(param("logits_z"))[self.state_to_z.sum(-1)]
-        logits_j = Vindex(self.logits_j)[self.ontarget.sum(-1), self.state_to_j.sum(-1)]
+    def probs_state(self):
+        probs_z = Vindex(param("probs_z"))[self.state_to_z.sum(-1)]
+        probs_j = Vindex(self.probs_j)[self.ontarget.sum(-1), self.state_to_j.sum(-1)]
         _, idx, counts = torch.unique(
             torch.stack((self.state_to_z.sum(-1), self.state_to_j.sum(-1)), -1),
             return_counts=True, return_inverse=True, dim=0)
-        return logits_z + logits_j - torch.log(Vindex(counts)[idx].float())
+        return probs_z * probs_j / Vindex(counts)[idx].float()
 
     @property
     def state_to_z(self):
@@ -92,7 +92,7 @@ class FixedOffset(Model):
         """
         return torch.einsum(
             "nfi,iks->nfks",
-            logits_to_probs(param("d/logits_state").data),
+            param("d/probs_state").data,
             torch.eye(self.S+1)[self.state_to_z])
 
     @property
@@ -102,7 +102,7 @@ class FixedOffset(Model):
         """
         return torch.einsum(
             "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
+            param("d/probs_state").data,
             torch.eye(2)[self.state_to_j])
 
     @property
@@ -112,7 +112,7 @@ class FixedOffset(Model):
         """
         return torch.einsum(
             "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
+            param("d/probs_state").data,
             torch.eye(2)[self.state_to_m])
 
     @property
@@ -165,7 +165,10 @@ class FixedOffset(Model):
             )
 
             # sample hidden model state
-            state = sample("state", Categorical(logits=self.logits_state))
+            if data.dtype == "test":
+                state = sample("state", Categorical(self.probs_state))
+            else:
+                state = sample("state", Categorical(self.probs_state[:2**self.K]))
 
             m_mask = self.state_to_m[state].bool()
             ontarget = self.ontarget[state]
@@ -216,8 +219,10 @@ class FixedOffset(Model):
                     param(f"{prefix}/b_beta")[ndx]))
 
             # sample hidden model state
-            state = sample("state", Categorical(
-                    logits=param(f"{prefix}/logits_state")[ndx]))
+            if data.dtype == "test":
+                state = sample("state", Categorical(param(f"{prefix}/probs_state")[ndx]))
+            else:
+                state = sample("state", Categorical(param(f"{prefix}/probs_state")[ndx]))
 
             m_mask = self.state_to_m[state].bool()
 
@@ -259,9 +264,9 @@ class FixedOffset(Model):
         param("gain",
               torch.tensor(10.),
               constraint=constraints.positive)
-        param("logits_z",
-              probs_to_logits(torch.ones(self.S+1) / (self.S+1)),
-              constraint=constraints.real)
+        param("probs_z",
+              torch.ones(self.S+1) / (self.S+1),
+              constraint=constraints.simplex)
         param("rate_j",
               torch.tensor(0.5),
               constraint=constraints.positive)
@@ -297,9 +302,14 @@ class FixedOffset(Model):
             self.spot_parameters(self.control, prefix="c")
 
     def spot_parameters(self, data, prefix):
-        param(f"{prefix}/logits_state",
-              torch.ones(data.N, data.F, self.num_states),
-              constraint=constraints.real)
+        if data.dtype == "test":
+            param(f"{prefix}/probs_state",
+                  torch.ones(data.N, data.F, self.num_states),
+                  constraint=constraints.simplex)
+        else:
+            param(f"{prefix}/probs_state",
+                  torch.ones(data.N, data.F, 2**self.K),
+                  constraint=constraints.simplex)
         param(f"{prefix}/b_loc",
               (self.data_median - self.offset_median).repeat(data.N, data.F),
               constraint=constraints.positive)
