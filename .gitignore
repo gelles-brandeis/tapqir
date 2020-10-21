@@ -2,11 +2,11 @@
 *.lnk
 *.o
 __pycache__/
-cosmos/__pycache__/
-cosmos/utils/__pycache__/
-cosmos/models/__pycache__/
+tapqir/__pycache__/
+tapqir/utils/__pycache__/
+tapqir/models/__pycache__/
 .ipynb_checkpoints/
-cosmos.egg-info/
+tapqir.egg-info/
 
 # sphinx documentation
 docs/build/

@@ -1,7 +1,7 @@
-from cosmos.commands.config import Config
-from cosmos.commands.fit import Fit
-from cosmos.commands.glimpse import Glimpse
-from cosmos.commands.show import Show
+from tapqir.commands.config import Config
+from tapqir.commands.fit import Fit
+from tapqir.commands.glimpse import Glimpse
+from tapqir.commands.show import Show
 
 __all__ = [
     "Config",

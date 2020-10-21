@@ -12,7 +12,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="cosmos",
+    name="tapqir",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     author="Yerdos Ordabayev",
@@ -20,7 +20,7 @@ setuptools.setup(
     description="Bayesian analysis of the single-molecule image data",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ordabayevy/cosmos",
+    url="https://github.com/ordabayevy/tapqir",
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
@@ -35,14 +35,14 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     entry_points={
-        "console_scripts": ["cosmos=cosmos.commands.app:main"],
-        "cosmos.app": [
-            "config=cosmos.commands.config:Config",
-            "fit=cosmos.commands.fit:Fit",
-            "show=cosmos.commands.show:Show",
-            "glimpse=cosmos.commands.glimpse:Glimpse",
-            "elbo=cosmos.commands.elbo:ELBO",
-            "matlab=cosmos.commands.matlab:Matlab",
+        "console_scripts": ["tapqir=tapqir.commands.app:main"],
+        "tapqir.app": [
+            "config=tapqir.commands.config:Config",
+            "fit=tapqir.commands.fit:Fit",
+            "show=tapqir.commands.show:Show",
+            "glimpse=tapqir.commands.glimpse:Glimpse",
+            "elbo=tapqir.commands.elbo:ELBO",
+            "matlab=tapqir.commands.matlab:Matlab",
         ]
     }
 )

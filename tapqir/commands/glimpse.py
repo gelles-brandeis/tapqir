@@ -1,6 +1,6 @@
 from cliff.command import Command
 
-from cosmos.utils.glimpse_reader import read_glimpse
+from tapqir.utils.glimpse_reader import read_glimpse
 
 
 class Glimpse(Command):

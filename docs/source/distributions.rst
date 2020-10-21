@@ -9,7 +9,7 @@ Cosmos Distributions
 
 For details on the Pyro distribution interface, see
 
-.. automodule:: cosmos.distributions
+.. automodule:: tapqir.distributions
     :members:
     :undoc-members:
     :show-inheritance:

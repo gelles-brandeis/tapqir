@@ -3,12 +3,12 @@
 Overview
 ========
 
-**cosmos** is software to analyze images from single-molecule fluorescence colocalization experiments 
+**tapqir** is software to analyze images from single-molecule fluorescence colocalization experiments 
 using a Bayesian statistics-based image classification method.
 
-**cosmos** is implemented using the **pyro** probabilistic programming package in Python.
+**tapqir** is implemented using the **pyro** probabilistic programming package in Python.
 
-**cosmos** is open source software licensed under the `GNU General Public License, version 3 <http://www.gnu.org/licenses/gpl-3.0.txt>`_.
+**tapqir** is open source software licensed under the `GNU General Public License, version 3 <http://www.gnu.org/licenses/gpl-3.0.txt>`_.
 
 **Author**:
 Yerdo Ordabayev;
@@ -20,4 +20,4 @@ ordabayev@brandeis.edu
 
 **Acknowledgements**:  Development was funded by grants from `NIGMS <http://www.nigms.nih.gov>`_.
 
-**Citation**:  If you publish research that uses this software, you can cite https://github.com/gelles-brandeis/cosmos
+**Citation**:  If you publish research that uses this software, you can cite https://github.com/gelles-brandeis/tapqir

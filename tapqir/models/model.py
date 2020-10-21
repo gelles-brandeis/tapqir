@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import numpy as np
 import pandas as pd
 import os
@@ -13,9 +14,9 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
-from cosmos import __version__ as cosmos_version
+from tapqir import __version__ as tapqir_version
 from tqdm import tqdm
-from cosmos.utils.dataset import load_data
+from tapqir.utils.dataset import load_data
 from scipy.io import savemat
 
 
@@ -67,9 +68,9 @@ class GaussianSpot:
         return height[..., None, None] * gaussian_spot
 
 
-class Model:
+class Model(nn.Module):
     r"""
-    Base class for cosmos models.
+    Base class for tapqir models.
 
     **Implementing New Models**:
 
@@ -187,7 +188,7 @@ class Model:
         self.path = os.path.join(
             self.data_path, "runs",
             "{}".format(self.name),
-            "{}".format(cosmos_version.split("+")[0]),
+            "{}".format(tapqir_version.split("+")[0]),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
@@ -218,9 +219,12 @@ class Model:
 
     def save_checkpoint(self):
         # save only if no NaN values
-        if any([torch.isnan(v).any()
-                for v in pyro.get_param_store().values()]):
-            raise ValueError("Step #{}. Detected NaN values in parameters".format(self.iter))
+        for k, v in pyro.get_param_store().items():
+            if torch.isnan(v).any() or torch.isinf(v).any():
+                # import pdb; pdb.set_trace()
+                raise ValueError("Step #{}. Detected NaN values in {}".format(self.iter, k))
+        # if any([torch.isnan(v).any()
+        #         for v in pyro.get_param_store().values()]):
 
         # save parameters and optimizer state
         pyro.get_param_store().save(os.path.join(self.path, "params"))
@@ -325,8 +329,9 @@ class Model:
         pyro.get_param_store().load(
             os.path.join(path, "params"),
             map_location=self.device)
-        self._K = param("d/h_loc").shape[-1]
-        self._S = len(param("logits_z")) - 1
+        self._K = 2 # param("d/h_loc").shape[-1]
+        self._S = 1
+        # self._S = len(param("probs_z")) - 1
         # self.predictions = np.load(os.path.join(path, "predictions.npy"))
 
     def snr(self):
