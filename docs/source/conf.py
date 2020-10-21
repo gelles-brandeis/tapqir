@@ -18,12 +18,12 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'cosmos'
+project = 'tapqir'
 copyright = '2020, Yerdos Ordabayev'
 author = 'Yerdos Ordabayev'
 
 # The full version, including alpha/beta/rc tags
-from cosmos import __version__
+from tapqir import __version__
 
 release = __version__
 
@@ -66,4 +66,4 @@ autodoc_default_options = {
     'member-order': 'bysource'
 }
 
-autoprogram_cliff_application = 'cosmos'
+autoprogram_cliff_application = 'tapqir'

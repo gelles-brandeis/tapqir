@@ -22,7 +22,7 @@ class ConvolutedGamma(TorchDistribution):
     :param ~torch.Tensor log_weights: log weights corresponding to the offset samples.
     """
 
-    arg_constraints = {'concentration': constraints.positive, 'rate': constraints.positive}
+    arg_constraints = {}
 
     def __init__(self, concentration, rate, samples, log_weights):
         self.dist = Gamma(concentration.unsqueeze(-1), rate)

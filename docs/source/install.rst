@@ -32,12 +32,12 @@ Installation on Linux
 
 Using pip::
 
-    pip install git+https://github.com/gelles-brandeis/cosmos.git
+    pip install git+https://github.com/gelles-brandeis/tapqir.git
 
 From source::
 
-    git clone https://github.com/gelles-brandeis/cosmos.git
-    cd cosmos
+    git clone https://github.com/gelles-brandeis/tapqir.git
+    cd tapqir
     pip install .
 
 Installation on Windows
@@ -45,18 +45,18 @@ Installation on Windows
 
 Using pip::
 
-    pip install git+https://github.com/gelles-brandeis/cosmos.git -f https://download.pytorch.org/whl/torch_stable.html
+    pip install git+https://github.com/gelles-brandeis/tapqir.git -f https://download.pytorch.org/whl/torch_stable.html
 
 Updating Cosmos
 ~~~~~~~~~~~~~~~
 
-To check cosmos version::
+To check tapqir version::
 
-    cosmos --version
+    tapqir --version
 
-Update to latest verion of **cosmos**::
+Update to latest verion of **tapqir**::
 
-    pip install git+https://github.com/gelles-brandeis/cosmos.git -U
+    pip install git+https://github.com/gelles-brandeis/tapqir.git -U
 
 Set up Cosmos Server (optional)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -9,5 +9,5 @@ Cosmos commands
 
 commands
 
-.. autoprogram-cliff:: cosmos.app
-   :application: cosmos
+.. autoprogram-cliff:: tapqir.app
+   :application: tapqir

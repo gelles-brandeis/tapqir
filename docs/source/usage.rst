@@ -8,16 +8,16 @@ Create a configuration file
 
 To begin the analysis first create an empty directory at ``dataset_path`` and run::
 
-    cosmos config dataset_path
+    tapqir config dataset_path
 
 which will create a file named ``options.cfg`` containing command options.
 
 .. note::
 
     ``dataset_path`` can be an absolute path or a relative path. For example, from
-    inside of the created directory, the command can be run as :code:`cosmos config .`
+    inside of the created directory, the command can be run as :code:`tapqir config .`
 
-Importing experimental data into **cosmos**
+Importing experimental data into **tapqir**
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Data from glimpse/imscroll
@@ -46,7 +46,7 @@ Enter the names of your folder/files under the ``[glimpse]`` section of the ``op
 
 To import your data run::
 
-    cosmos glimpse dataset_path
+    tapqir glimpse dataset_path
     
 The program will create the files containing the digested data in the format needed for fitting:
 
@@ -73,13 +73,13 @@ To adjust fitting parameters edit ``[fit]`` section of the ``options.cfg`` file:
 
 Then run::
 
-    cosmos fit spotdetection dataset_path
+    tapqir fit spotdetection dataset_path
 
 .. note::
 
     To use different CUDA device run::
 
-        CUDA_VISIBLE_DEVICES=1 cosmos fit spotdetection dataset_path
+        CUDA_VISIBLE_DEVICES=1 tapqir fit spotdetection dataset_path
 
 Results
 ~~~~~~~
@@ -108,7 +108,7 @@ Posterior Distributions
 
 Posterior distributions of the local parameters can be visualized by running ``show`` command::
 
-    cosmos show spotdetection dataset_path parameters_path
+    tapqir show spotdetection dataset_path parameters_path
 
 which will display parameter values, original images along with best estimates:
 

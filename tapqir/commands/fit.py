@@ -3,7 +3,7 @@ from cliff.command import Command
 import os
 import torch
 import configparser
-from cosmos.models import models
+from tapqir.models import models
 
 
 class Fit(Command):

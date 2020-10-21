@@ -3,17 +3,19 @@ import torch
 import torch.distributions.constraints as constraints
 from torch.distributions.utils import probs_to_logits, logits_to_probs
 
-from pyro import param, sample, plate, poutine
+from pyro import param, sample, plate, poutine, module
+import pyro.distributions as dist
 from pyro.distributions import Categorical, Gamma, HalfNormal, Poisson
+import pyro.distributions.transforms as T
 from pyro.infer import config_enumerate
 from pyro.ops.indexing import Vindex
 from pyro.contrib.autoname import scope
 
-from cosmos.distributions import AffineBeta, ConvolutedGamma
-from cosmos.models import Model
+from tapqir.distributions import AffineBeta, ConvolutedGamma, NormalKDE, MaskedNormalKDE
+from tapqir.models import Model
 
 
-class SpotDetection(Model):
+class Empirical(Model):
     r"""
     for :math:`n=1` to :math:`N`:
 
@@ -23,7 +25,7 @@ class SpotDetection(Model):
 
             :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
     """
-    name = "spotdetection"
+    name = "empirical"
 
     def __init__(self, S, K):
         super().__init__(S, K)
@@ -38,22 +40,22 @@ class SpotDetection(Model):
         return 2**self.K + self.S * self.K * 2**(self.K-1)
 
     @property
-    def logits_j(self):
+    def probs_j(self):
         result = torch.zeros(2, self.K+1, dtype=torch.float)
-        result[0, :self.K] = Poisson(param("rate_j")).log_prob(torch.arange(self.K).float())
-        result[0, -1] = torch.log1p(-result[0, :self.K].exp().sum())
-        result[1, :self.K-1] = Poisson(param("rate_j")).log_prob(torch.arange(self.K-1).float())
-        result[1, -2] = torch.log1p(-result[0, :self.K-1].exp().sum())
+        result[0, :self.K] = Poisson(param("rate_j")).log_prob(torch.arange(self.K).float()).exp()
+        result[0, -1] = 1 - result[0, :self.K].sum()
+        result[1, :self.K-1] = Poisson(param("rate_j")).log_prob(torch.arange(self.K-1).float()).exp()
+        result[1, -2] = 1 - result[0, :self.K-1].sum()
         return result
 
     @property
-    def logits_state(self):
-        logits_z = Vindex(param("logits_z"))[self.state_to_z.sum(-1)]
-        logits_j = Vindex(self.logits_j)[self.ontarget.sum(-1), self.state_to_j.sum(-1)]
+    def probs_state(self):
+        probs_z = Vindex(param("probs_z"))[self.state_to_z.sum(-1)]
+        probs_j = Vindex(self.probs_j)[self.ontarget.sum(-1), self.state_to_j.sum(-1)]
         _, idx, counts = torch.unique(
             torch.stack((self.state_to_z.sum(-1), self.state_to_j.sum(-1)), -1),
             return_counts=True, return_inverse=True, dim=0)
-        return logits_z + logits_j - torch.log(Vindex(counts)[idx].float())
+        return probs_z * probs_j / Vindex(counts)[idx].float()
 
     @property
     def state_to_z(self):
@@ -92,8 +94,18 @@ class SpotDetection(Model):
         """
         return torch.einsum(
             "nfi,iks->nfks",
-            logits_to_probs(param("d/logits_state").data),
+            param("d/probs_state").data,
             torch.eye(self.S+1)[self.state_to_z])
+
+    @property
+    def zc_probs(self):
+        r"""
+        Probability of an on-target spot :math:`p(z_{knf})`.
+        """
+        return torch.einsum(
+            "nfi,iks->nfks",
+            param("c/probs_state").data,
+            torch.eye(self.S+1)[self.state_to_z[:2**self.K]])
 
     @property
     def j_probs(self):
@@ -102,8 +114,18 @@ class SpotDetection(Model):
         """
         return torch.einsum(
             "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
+            param("d/probs_state").data,
             torch.eye(2)[self.state_to_j])
+
+    @property
+    def jc_probs(self):
+        r"""
+        Probability of an off-target spot :math:`p(j_{knf})`.
+        """
+        return torch.einsum(
+            "nfi,ikt->nfkt",
+            param("c/probs_state").data,
+            torch.eye(2)[self.state_to_j[:2**self.K]])
 
     @property
     def m_probs(self):
@@ -112,14 +134,15 @@ class SpotDetection(Model):
         """
         return torch.einsum(
             "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
+            param("d/probs_state").data,
             torch.eye(2)[self.state_to_m])
 
     @property
     def z_marginal(self):
         return self.z_probs[..., 1:].sum(dim=(-2, -1))
 
-    @poutine.block(hide=["width_mean", "width_size", "proximity",
+    # @poutine.block(hide=["width_mean", "width_size", "proximity",
+    @poutine.block(hide=["proximity",
                          "offset_samples", "offset_weights"])
     def model(self):
         # initialize model parameters
@@ -165,19 +188,42 @@ class SpotDetection(Model):
             )
 
             # sample hidden model state
-            state = sample("state", Categorical(logits=self.logits_state))
+            if data.dtype == "test":
+                state = sample("state", Categorical(self.probs_state))
+            else:
+                state = sample("state", Categorical(self.probs_state[:2**self.K]))
 
             m_mask = self.state_to_m[state].bool()
             ontarget = self.ontarget[state]
 
             # sample spot variables
             height = sample(
-                "height", HalfNormal(10000.).mask(m_mask).to_event(1)
+                "height", NormalKDE(
+                    param(f"{prefix}/h_loc").data,
+                    param(f"{prefix}/h_beta").data,
+                    probs_to_logits(self.m_probs[..., 1].data / self.m_probs[..., 1].data.sum())
+                # "height", MaskedNormalKDE(
+                #     ontarget.bool(),
+                #     param("d/h_loc").data,
+                #     param("d/h_beta").data,
+                #     probs_to_logits(
+                #         self.j_probs[..., 1].data / self.j_probs[..., 1].data.sum()),
+                #     probs_to_logits(
+                #         self.z_probs[..., 1].data / self.z_probs[..., 1].data.sum())
+                    # torch.cat((param("d/h_loc").data, param("c/h_loc")), 0),
+                    # torch.cat((param("d/h_beta").data, param("c/h_beta")), 0),
+                    # probs_to_logits(
+                    #     torch.cat((self.j_probs[..., 1].data, self.jc_probs[..., 1].data), 0) \
+                    #     / torch.cat((self.j_probs[..., 1].data, self.jc_probs[..., 1].data), 0).sum()),
+                    # probs_to_logits(
+                    #     torch.cat((self.z_probs[..., 1].data, self.zc_probs[..., 1].data), 0) \
+                    #     / torch.cat((self.z_probs[..., 1].data, self.zc_probs[..., 1].data), 0).sum())
+                ).mask(m_mask).to_event(1)
             )
             width = sample(
                 "width", AffineBeta(
-                    param("width_mean"),
-                    param("width_size"), 0.75, 2.25
+                    self.width_mean[0],
+                    self.width_size[0], 0.75, 2.25
                 ).mask(m_mask).to_event(1))
             x = sample(
                 "x", AffineBeta(
@@ -190,7 +236,7 @@ class SpotDetection(Model):
 
             # calculate image shape w/o offset
             height = height.masked_fill(~m_mask, 0.)
-            locs = background[..., None, None] + data_loc(height, width, x, y, ndx).sum(-3)
+            locs = background[..., None, None] * (1 + data_loc(height, width, x, y, ndx).sum(-3))
 
             # observed data
             sample(
@@ -218,8 +264,10 @@ class SpotDetection(Model):
                     param(f"{prefix}/b_beta")[ndx]))
 
             # sample hidden model state
-            state = sample("state", Categorical(
-                    logits=param(f"{prefix}/logits_state")[ndx]))
+            if data.dtype == "test":
+                state = sample("state", Categorical(param(f"{prefix}/probs_state")[ndx]))
+            else:
+                state = sample("state", Categorical(param(f"{prefix}/probs_state")[ndx]))
 
             m_mask = self.state_to_m[state].bool()
 
@@ -261,9 +309,9 @@ class SpotDetection(Model):
         param("gain",
               torch.tensor(10.),
               constraint=constraints.positive)
-        param("logits_z",
-              probs_to_logits(torch.ones(self.S+1) / (self.S+1)),
-              constraint=constraints.real)
+        param("probs_z",
+              torch.ones(self.S+1) / (self.S+1),
+              constraint=constraints.simplex)
         param("rate_j",
               torch.tensor(0.5),
               constraint=constraints.positive)
@@ -287,6 +335,10 @@ class SpotDetection(Model):
         param("width_size",
               torch.tensor([2.]),
               constraint=constraints.positive)
+        self.width_mean = torch.cat((
+            torch.tensor([1.5]), param("width_mean")), dim=-1)
+        self.width_size = torch.cat((
+            torch.tensor([2.]), param("width_size")), dim=-1)
 
         param("offset_samples",
               self.offset_samples,
@@ -295,6 +347,16 @@ class SpotDetection(Model):
               self.offset_weights,
               constraint=constraints.positive)
 
+        param("height_concentration",
+              torch.tensor([[2., 3., 5.], [2., 3., 5.]]),
+              constraint=constraints.positive)
+        param("height_beta",
+              torch.tensor([[0.001, 0.001, 0.001], [0.001, 0.001, 0.001]]),
+              constraint=constraints.positive)
+        param("height_pi",
+              torch.tensor([[0.33, 0.33, 0.34], [0.33, 0.33, 0.34]]),
+              constraint=constraints.simplex)
+
     def guide_parameters(self):
         self.spot_parameters(self.data, prefix="d")
 
@@ -302,9 +364,14 @@ class SpotDetection(Model):
             self.spot_parameters(self.control, prefix="c")
 
     def spot_parameters(self, data, prefix):
-        param(f"{prefix}/logits_state",
-              torch.ones(data.N, data.F, self.num_states),
-              constraint=constraints.real)
+        if data.dtype == "test":
+            param(f"{prefix}/probs_state",
+                  torch.ones(data.N, data.F, self.num_states),
+                  constraint=constraints.simplex)
+        else:
+            param(f"{prefix}/probs_state",
+                  torch.ones(data.N, data.F, 2**self.K),
+                  constraint=constraints.simplex)
         param(f"{prefix}/b_loc",
               (self.data_median - self.offset_median).repeat(data.N, data.F),
               constraint=constraints.positive)
@@ -312,7 +379,7 @@ class SpotDetection(Model):
               torch.ones(data.N, data.F) * 30,
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              (self.noise * 2).repeat(data.N, data.F, self.K),
+              (self.noise * 2).repeat(data.N, data.F, self.K) / (self.data_median - self.offset_median),
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(data.N, data.F, self.K),
@@ -329,9 +396,9 @@ class SpotDetection(Model):
         param(f"{prefix}/y_mean",
               torch.zeros(data.N, data.F, self.K),
               constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        size = torch.ones(data.N, data.F, self.K) * 200.
+        size = torch.ones(data.N, data.F, self.K) * 100.
         if self.K == 2:
-            size[..., 1] = 7.
+            size[..., 1] = 3.
         elif self.K == 3:
             size[..., 1] = 7.
             size[..., 2] = 3.

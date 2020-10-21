@@ -1,5 +1,5 @@
 import sys
-from cosmos import __version__ as cosmos_version
+from tapqir import __version__ as tapqir_version
 
 from cliff.app import App
 from cliff.commandmanager import CommandManager
@@ -10,8 +10,8 @@ class MyApp(App):
     def __init__(self):
         super().__init__(
             description="Bayesian analysis of single molecule image data",
-            version=cosmos_version,
-            command_manager=CommandManager("cosmos.app"),
+            version=tapqir_version,
+            command_manager=CommandManager("tapqir.app"),
             deferred_help=True,
         )
 

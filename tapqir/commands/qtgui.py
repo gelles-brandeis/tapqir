@@ -11,7 +11,7 @@ import torch
 import numpy as np
 import pyro
 from pyro import param
-from pyro.ops.stats import pi
+from pyro.ops.stats import pi, quantile
 
 C = {}
 C[0] = (31, 119, 180)
@@ -303,63 +303,65 @@ class MainWindow(QMainWindow):
                 y, x = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
                     weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+                self.plot[f"{p}Hist"].setXRange(0, quantile(param("d/h_loc").data.flatten(), 0.99).item()*1.3, padding=0.01)
+
+                yz, xz = np.histogram(
+                    param("d/h_loc").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+
+                yj, xj = np.histogram(
+                    param("d/h_loc").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+
             elif p == "d/width":
                 y, x = np.histogram(
                     param("d/w_mean").data.reshape(-1).numpy(), bins=50,
                     weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+
+                yz, xz = np.histogram(
+                    param("d/w_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+
+                yj, xj = np.histogram(
+                    param("d/w_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+
             elif p == "d/x":
                 y, x = np.histogram(
                     param("d/x_mean").data.reshape(-1).numpy(), bins=50,
                     weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+
+                yz, xz = np.histogram(
+                    param("d/x_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+
+                yj, xj = np.histogram(
+                    param("d/x_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+
             elif p == "d/y":
                 y, x = np.histogram(
                     param("d/y_mean").data.reshape(-1).numpy(), bins=50,
                     weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+
+                yz, xz = np.histogram(
+                    param("d/y_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+
+                yj, xj = np.histogram(
+                    param("d/y_mean").data.reshape(-1).numpy(), bins=50,
+                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+
             elif p == "d/background":
                 y, x = np.histogram(param("d/b_loc").data.reshape(-1).numpy(), bins=50)
+
             self.item[f"{p}Hist_m"] = pg.PlotDataItem(
                 x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0, 0, 255, 30))
-
-            if p == "d/height":
-                y, x = np.histogram(
-                    param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
-
-                y, x = np.histogram(
-                    param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
-            elif p == "d/width":
-                y, x = np.histogram(
-                    param("d/w_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
-
-                y, x = np.histogram(
-                    param("d/w_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
-            elif p == "d/x":
-                y, x = np.histogram(
-                    param("d/x_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
-
-                y, x = np.histogram(
-                    param("d/x_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
-            elif p == "d/y":
-                y, x = np.histogram(
-                    param("d/y_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_z"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
-
-                y, x = np.histogram(
-                    param("d/y_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
-                self.item[f"{p}Hist_j"] = pg.PlotDataItem(x, y, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
+            if p in ["d/height", "d/width", "d/x", "d/y"]:
+                self.item[f"{p}Hist_z"] = pg.PlotDataItem(
+                    xz, yz, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2])
+                self.item[f"{p}Hist_j"] = pg.PlotDataItem(
+                    xj, yj, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3])
 
         for p in self.params:
             if p == "z":
@@ -403,10 +405,11 @@ class MainWindow(QMainWindow):
 
         # set plot ranges
         self.plot["z"].setYRange(0, 1, padding=0.01)
-        # self.plot["d/height"].setYRange(0, 7000, padding=0.01)
+        # self.plot["d/height"].setYRange(0, 2000, padding=0.01)
+        # self.plot["d/height"].setYRange(0, quantile(param("d/h_loc").data.flatten(), 0.99).item()*1.3, padding=0.01)
         self.plot["d/x"].setYRange(-(self.Model.data.D+1)/2, (self.Model.data.D+1)/2, padding=0.01)
         self.plot["d/y"].setYRange(-(self.Model.data.D+1)/2, (self.Model.data.D+1)/2, padding=0.01)
-        self.plot["d/background"].setYRange(0, 300, padding=0.01)
+        self.plot["d/background"].setYRange(0, quantile(param("d/b_loc").data.flatten(), 0.99).item()*1.1, padding=0.01)
 
         self.vbox.addWidget(widget)
 
@@ -434,6 +437,9 @@ class MainWindow(QMainWindow):
                     self.item[f"{p}_{k}_high"].setData(hpd[0][..., k])
                     self.item[f"{p}_{k}_low"].setData(hpd[1][..., k])
                     self.item[f"{p}_{k}_mean"].setData(mean[..., k])
+                    # self.item[f"{p}_{k}_high"].setData(hpd[0][..., k] * (self.Model.m_probs[n, :, k, 1] > 0.5).cpu())
+                    # self.item[f"{p}_{k}_low"].setData(hpd[1][..., k] * (self.Model.m_probs[n, :, k, 1] > 0.5).cpu())
+                    # self.item[f"{p}_{k}_mean"].setData(mean[..., k] * (self.Model.m_probs[n, :, k, 1] > 0.5).cpu())
 
         if self.w is not None:
             self.updateImages()

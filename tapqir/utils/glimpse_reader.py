@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
-from cosmos.utils.dataset import CosmosDataset
+from tapqir.utils.dataset import CosmosDataset
 
 
 def read_glimpse(path, D):

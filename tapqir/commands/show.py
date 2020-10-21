@@ -3,9 +3,9 @@ import sys
 from cliff.command import Command
 
 from PySide2.QtWidgets import QApplication
-from cosmos.commands.qtgui import MainWindow
+from tapqir.commands.qtgui import MainWindow
 
-from cosmos.models import models
+from tapqir.models import models
 
 
 class Show(Command):
