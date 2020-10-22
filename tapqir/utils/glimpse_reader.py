@@ -42,10 +42,22 @@ def read_glimpse(path, D):
     aoi_mat = {}
     aoi_df = {}
     for dtype in dtypes:
-        aoi_mat[dtype] = loadmat(config["glimpse"]["{}_aoiinfo".format(dtype)])
-        aoi_df[dtype] = pd.DataFrame(
-            aoi_mat[dtype]["aoiinfo2"],
-            columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+        try:
+            aoi_mat[dtype] = loadmat(config["glimpse"]["{}_aoiinfo".format(dtype)])
+        except ValueError:
+            aoi_mat[dtype] = np.loadtxt(config["glimpse"]["{}_aoiinfo".format(dtype)])
+        try:
+            aoi_df[dtype] = pd.DataFrame(
+                aoi_mat[dtype]["aoiinfo2"],
+                columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+        except KeyError:
+            aoi_df[dtype] = pd.DataFrame(
+                aoi_mat[dtype]["aoifits"]["aoiinfo2"][0,0],
+                columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+        except IndexError:
+            aoi_df[dtype] = pd.DataFrame(
+                aoi_mat[dtype],
+                columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
         aoi_df[dtype] = aoi_df[dtype].astype({"aoi": int}).set_index("aoi")
         aoi_df[dtype]["x"] = aoi_df[dtype]["x"] \
             - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dx"]
