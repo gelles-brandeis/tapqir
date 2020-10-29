@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+import configparser
+from scipy.io import loadmat
 
 
 class CosmosDataset(Dataset):
@@ -77,3 +79,60 @@ def load_data(path, dtype, device=None):
         return CosmosDataset(data, target, drift, dtype, device, offset, labels)
 
     return CosmosDataset(data, target, drift, dtype, device)
+
+
+class GlimpseDataset(Dataset):
+    """
+    Glimpse Dataset
+    """
+
+    def __init__(self, path):
+        # read options.cfg file
+        self.config = configparser.ConfigParser(allow_no_value=True)
+        cfg_file = os.path.join(path, "options.cfg")
+        self.config.read(cfg_file)
+        # convert header into dict format
+        mat_header = loadmat(os.path.join(self.config["glimpse"]["dir"], "header.mat"))
+        self.header = dict()
+        for i, dt in enumerate(mat_header["vid"].dtype.names):
+            self.header[dt] = np.squeeze(mat_header["vid"][0, 0][i])
+        self.height, self.width = int(self.header["height"]), int(self.header["width"])
+
+    def __len__(self):
+        return self.N
+
+    def __getitem__(self, frame):
+        # read the entire frame image
+        glimpse_number = self.header["filenumber"][frame - 1]
+        glimpse_path = os.path.join(
+            self.config["glimpse"]["dir"], "{}.glimpse".format(glimpse_number))
+        offset = self.header["offset"][frame - 1]
+        with open(glimpse_path, "rb") as fid:
+            fid.seek(offset)
+            img = np.fromfile(
+                fid, dtype='>i2',
+                count=self.height*self.width) \
+                .reshape(self.height, self.width)
+        return img + 2**15
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}" \
+               + f"\nN={self.N!r}, F={self.F!r}, D={self.D!r}" \
+               + f"\ndtype={self.dtype!r}"
+
+    def save(self, path):
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        torch.save(self.data, os.path.join(
+            path, "{}_data.pt".format(self.dtype)))
+        self.target.to_csv(os.path.join(
+            path, "{}_target.csv".format(self.dtype)))
+        self.drift.to_csv(os.path.join(
+            path, "drift.csv"))
+        if self.dtype == "test":
+            if self.offset is not None:
+                torch.save(self.offset, os.path.join(
+                    path, "offset.pt"))
+            if self.labels is not None:
+                np.save(os.path.join(path, "labels.npy"),
+                        self.labels)
