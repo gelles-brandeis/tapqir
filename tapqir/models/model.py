@@ -40,8 +40,8 @@ class GaussianSpot:
 
         # drift locs for 2D gaussian spot
         self.target_locs = torch.tensor(
-            drift[["dx", "dy"]].values.reshape(-1, 1, 2)
-            + target[["x", "y"]].values.reshape(-1, 1, 1, 2),
+            drift[["dx", "dy"]].values.reshape(-1, 2)
+            + target[["x", "y"]].values.reshape(-1, 1, 2),
         ).float()
 
     # Ideal 2D gaussian spots
@@ -239,9 +239,9 @@ class Model(nn.Module):
             h_loc - mean intensity, w_mean - mean spot width, \
             x_mean - x position, y_mean - y position, \
             b_loc - background intensity."
-        matlab["z_probs"] = self.z_probs[..., 1].cpu().numpy()
-        matlab["j_probs"] = self.j_probs[..., 1].cpu().numpy()
-        matlab["m_probs"] = self.m_probs[..., 1].cpu().numpy()
+        matlab["z_probs"] = self.z_probs.cpu().numpy()
+        matlab["j_probs"] = self.j_probs.cpu().numpy()
+        matlab["m_probs"] = self.m_probs.cpu().numpy()
         matlab["z_marginal"] = self.z_marginal.cpu().numpy()
         matlab["probabilitiesDescription"] = \
             "Probabilities for N x F x K spots. \
