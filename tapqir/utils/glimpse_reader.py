@@ -12,7 +12,7 @@ def read_glimpse(path, D):
     """ Read Glimpse files """
 
     device = torch.device("cpu")
-    # read options.cfg fiel
+    # read options.cfg file
     config = configparser.ConfigParser(allow_no_value=True)
     cfg_file = os.path.join(path, "options.cfg")
     config.read(cfg_file)
@@ -37,6 +37,11 @@ def read_glimpse(path, D):
         drift_mat["driftlist"][:, :3],
         columns=["frame", "dx", "dy"])
     drift_df = drift_df.astype({"frame": int}).set_index("frame")
+
+    if config["glimpse"]["frame_start"] and config["glimpse"]["frame_end"]:
+        f1 = int(config["glimpse"]["frame_start"])
+        f2 = int(config["glimpse"]["frame_end"])
+        drift_df = drift_df.loc[f1:f2]
 
     # load aoiinfo mat file
     aoi_mat = {}
