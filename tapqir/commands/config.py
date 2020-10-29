@@ -23,6 +23,8 @@ class Config(Command):
         config["glimpse"]["test_aoiinfo"] = "/path/to/test_aoiinfo_file"
         config["glimpse"]["control_aoiinfo"] = "/path/to/control_aoiinfo_file"
         config["glimpse"]["driftlist"] = "/path/to/driftlist_file"
+        config["glimpse"]["frame_start"] = None
+        config["glimpse"]["frame_end"] = None
         config["glimpse"]["labels"] = None
         config["glimpse"]["labeltype"] = None
 
