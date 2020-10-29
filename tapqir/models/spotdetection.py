@@ -33,77 +33,66 @@ class SpotDetection(Model):
         r"""
         Total number of states for the image model given by:
 
-            :math:`2^K + S K 2^{K-1}`
+            :math:`2 (1+SK) K`
         """
-        return 2**self.K + self.S * self.K * 2**(self.K-1)
+        return 2*(1+self.K*self.S)*self.K
 
     @property
-    def logits_j(self):
+    def probs_j(self):
         result = torch.zeros(2, self.K+1, dtype=torch.float)
-        result[0, :self.K] = Poisson(param("rate_j")).log_prob(torch.arange(self.K).float())
-        result[0, -1] = torch.log1p(-result[0, :self.K].exp().sum())
-        result[1, :self.K-1] = Poisson(param("rate_j")).log_prob(torch.arange(self.K-1).float())
-        result[1, -2] = torch.log1p(-result[0, :self.K-1].exp().sum())
+        result[0, :self.K] = Poisson(param("rate_j")).log_prob(torch.arange(self.K).float()).exp()
+        result[0, -1] = 1 - result[0, :self.K].sum()
+        result[1, :self.K-1] = Poisson(param("rate_j")).log_prob(torch.arange(self.K-1).float()).exp()
+        result[1, -2] = 1 - result[0, :self.K-1].sum()
         return result
 
     @property
-    def logits_state(self):
-        logits_z = Vindex(param("logits_z"))[self.state_to_z.sum(-1)]
-        logits_j = Vindex(self.logits_j)[self.ontarget.sum(-1), self.state_to_j.sum(-1)]
-        _, idx, counts = torch.unique(
-            torch.stack((self.state_to_z.sum(-1), self.state_to_j.sum(-1)), -1),
-            return_counts=True, return_inverse=True, dim=0)
-        return logits_z + logits_j - torch.log(Vindex(counts)[idx].float())
+    def probs_m(self):
+        # this only works for K=2
+        result = torch.zeros(1+self.K*self.S, self.K, 2, dtype=torch.float)
+        result[0, :, 0] = self.probs_j[0, 0] + self.probs_j[0, 1] / 2
+        result[0, :, 1] = self.probs_j[0, 2] + self.probs_j[0, 1] / 2
+        result[1, 0, 1] = 1
+        result[1, 1, 0] = self.probs_j[1, 0]
+        result[1, 1, 1] = self.probs_j[1, 1]
+        result[2, 0, 0] = self.probs_j[1, 0]
+        result[2, 0, 1] = self.probs_j[1, 1]
+        result[2, 1, 1] = 1
+        return result
 
     @property
-    def state_to_z(self):
-        result = torch.zeros(self.num_states, self.K, dtype=torch.long)
-        for i in range(2**self.K, self.num_states):
-            s, r = divmod(i - 2**self.K, self.K * 2**(self.K-1))
-            k, t = divmod(r, 2**(self.K-1))
-            result[i, k] = s+1
+    def probs_theta(self):
+        result = torch.zeros(self.K*self.S+1, dtype=torch.float)
+        result[0] = param("probs_z")[0]
+        for s in range(self.S):
+            for k in range(self.K):
+                result[self.K*s + k + 1] = param("probs_z")[s + 1] / self.K
+        return result
+
+    @property
+    def theta_to_z(self):
+        result = torch.zeros(self.K*self.S+1, self.K, dtype=torch.long)
+        for s in range(self.S):
+            result[1+s*self.K:1+(s+1)*self.K] = torch.eye(self.K) * (s+1)
         return result
 
     @property
     def ontarget(self):
-        return torch.clamp(self.state_to_z, min=0, max=1)
-
-    @property
-    def state_to_j(self):
-        result = torch.zeros(self.num_states, self.K, dtype=torch.long)
-        k_lst = torch.tensor(list(itertools.product([0, 1], repeat=self.K)), dtype=torch.long)
-        km1_lst = torch.tensor(list(itertools.product([0, 1], repeat=self.K-1)), dtype=torch.long)
-        kdx = torch.arange(self.K)
-        result[:2**self.K] = k_lst
-        for s in range(self.S):
-            for k in range(self.K):
-                km1dx = torch.cat([kdx[:k], kdx[k+1:]])
-                result[2**self.K+(s*self.K+k)*2**(self.K-1):2**self.K+(s*self.K+k+1)*2**(self.K-1), km1dx] = km1_lst
-        return result
-
-    @property
-    def state_to_m(self):
-        return torch.clamp(self.state_to_z + self.state_to_j, min=0, max=1)
+        return torch.clamp(self.theta_to_z, min=0, max=1)
 
     @property
     def z_probs(self):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return torch.einsum(
-            "nfi,iks->nfks",
-            logits_to_probs(param("d/logits_state").data),
-            torch.eye(self.S+1)[self.state_to_z])
+        return param("d/theta_probs").data[..., 1:].permute(2,0,1)
 
     @property
     def j_probs(self):
         r"""
         Probability of an off-target spot :math:`p(j_{knf})`.
         """
-        return torch.einsum(
-            "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
-            torch.eye(2)[self.state_to_j])
+        return self.m_probs - self.z_probs
 
     @property
     def m_probs(self):
@@ -111,16 +100,15 @@ class SpotDetection(Model):
         Probability of a spot :math:`p(m_{knf})`.
         """
         return torch.einsum(
-            "nfi,ikt->nfkt",
-            logits_to_probs(param("d/logits_state").data),
-            torch.eye(2)[self.state_to_m])
+            "sknf,nfs->knf",
+            param("d/m_probs").data[..., 1],
+            param("d/theta_probs").data)
 
     @property
     def z_marginal(self):
-        return self.z_probs[..., 1:].sum(dim=(-2, -1))
+        return self.z_probs.sum(-3)
 
-    @poutine.block(hide=["width_mean", "width_size", "proximity",
-                         "offset_samples", "offset_weights"])
+    @poutine.block(hide=["width_mean", "width_size", "proximity"])
     def model(self):
         # initialize model parameters
         self.model_parameters()
@@ -149,6 +137,8 @@ class SpotDetection(Model):
                 self.spot_guide(self.control, prefix="c")
 
     def spot_model(self, data, data_loc, prefix):
+        # max number of spots
+        K_plate = plate("K_plate", self.K)
         # target sites
         N_plate = plate("N_plate", data.N, dim=-2)
         # time frames
@@ -163,45 +153,50 @@ class SpotDetection(Model):
                     param(f"{prefix}/background_beta")[ndx]
                 )
             )
+            locs = background[..., None, None]
 
-            # sample hidden model state
-            state = sample("state", Categorical(logits=self.logits_state))
+            # sample hidden model state (1+K*S,)
+            theta = sample("theta", Categorical(self.probs_theta))
 
-            m_mask = self.state_to_m[state].bool()
-            ontarget = self.ontarget[state]
+            for kdx in K_plate:
+                ontarget = Vindex(self.ontarget)[theta, kdx]
+                m = sample(f"m_{kdx}", Categorical(Vindex(self.probs_m)[theta, kdx]))
+                with poutine.mask(mask=m>0):
+                    # sample spot variables
+                    height = sample(
+                        f"height_{kdx}", HalfNormal(10000.)
+                    )
+                    width = sample(
+                        f"width_{kdx}", AffineBeta(
+                            param("width_mean"),
+                            param("width_size"), 0.75, 2.25
+                        ))
+                    x = sample(
+                        f"x_{kdx}", AffineBeta(
+                            0, self.size[ontarget], -(data.D+1)/2, (data.D+1)/2
+                        ))
+                    y = sample(
+                        f"y_{kdx}", AffineBeta(
+                            0, self.size[ontarget], -(data.D+1)/2, (data.D+1)/2
+                        ))
 
-            # sample spot variables
-            height = sample(
-                "height", HalfNormal(10000.).mask(m_mask).to_event(1)
-            )
-            width = sample(
-                "width", AffineBeta(
-                    param("width_mean"),
-                    param("width_size"), 0.75, 2.25
-                ).mask(m_mask).to_event(1))
-            x = sample(
-                "x", AffineBeta(
-                    0, self.size[ontarget], -(data.D+1)/2, (data.D+1)/2
-                ).mask(m_mask).to_event(1))
-            y = sample(
-                "y", AffineBeta(
-                    0, self.size[ontarget], -(data.D+1)/2, (data.D+1)/2
-                ).mask(m_mask).to_event(1))
-
-            # calculate image shape w/o offset
-            height = height.masked_fill(~m_mask, 0.)
-            locs = background[..., None, None] + data_loc(height, width, x, y, ndx).sum(-3)
+                # calculate image shape w/o offset
+                height = height.masked_fill(m==0, 0.)
+                gaussian = data_loc(height, width, x, y, ndx)
+                locs = locs + gaussian
 
             # observed data
             sample(
                 "data", ConvolutedGamma(
                     locs / param("gain"), 1 / param("gain"),
-                    param("offset_samples"), probs_to_logits(param("offset_weights"))
+                    self.offset_samples, probs_to_logits(self.offset_weights)
                 ).to_event(2),
                 obs=data[ndx]
             )
 
     def spot_guide(self, data, prefix):
+        # max number of spots
+        K_plate = plate("K_plate", self.K)
         # target sites
         N_plate = plate("N_plate", data.N,
                         subsample_size=self.batch_size,
@@ -209,7 +204,7 @@ class SpotDetection(Model):
         # time frames
         F_plate = plate("F_plate", data.F, dim=-1)
 
-        with N_plate as ndx, F_plate:
+        with N_plate as ndx, F_plate as fdx:
             # sample background intensity
             sample(
                 "background", Gamma(
@@ -217,38 +212,41 @@ class SpotDetection(Model):
                     * param(f"{prefix}/b_beta")[ndx],
                     param(f"{prefix}/b_beta")[ndx]))
 
-            # sample hidden model state
-            state = sample("state", Categorical(
-                    logits=param(f"{prefix}/logits_state")[ndx]))
+            # sample hidden model state (3,1,1,1)
+            theta = sample("theta", Categorical(
+                    param(f"{prefix}/theta_probs")[ndx]))
 
-            m_mask = self.state_to_m[state].bool()
-
-            # sample spot variables
-            sample(
-                "height", Gamma(
-                    param(f"{prefix}/h_loc")[ndx] * param(f"{prefix}/h_beta")[ndx],
-                    param(f"{prefix}/h_beta")[ndx]
-                ).mask(m_mask).to_event(1)
-            )
-            sample(
-                "width", AffineBeta(
-                    param(f"{prefix}/w_mean")[ndx],
-                    param(f"{prefix}/w_size")[ndx],
-                    0.75, 2.25
-                ).mask(m_mask).to_event(1)
-            )
-            sample(
-                "x", AffineBeta(
-                    param(f"{prefix}/x_mean")[ndx],
-                    param(f"{prefix}/size")[ndx],
-                    -(data.D+1)/2, (data.D+1)/2
-                ).mask(m_mask).to_event(1))
-            sample(
-                "y", AffineBeta(
-                    param(f"{prefix}/y_mean")[ndx],
-                    param(f"{prefix}/size")[ndx],
-                    -(data.D+1)/2, (data.D+1)/2
-                ).mask(m_mask).to_event(1))
+            for kdx in K_plate:
+                m = sample(f"m_{kdx}", Categorical(
+                    Vindex(param(f"{prefix}/m_probs"))[theta, kdx, ndx[:, None], fdx]))
+                with poutine.mask(mask=m>0):
+                    # sample spot variables
+                    sample(
+                        f"height_{kdx}", Gamma(
+                            param(f"{prefix}/h_loc")[kdx, ndx]
+                            * param(f"{prefix}/h_beta")[kdx, ndx],
+                            param(f"{prefix}/h_beta")[kdx, ndx]
+                        )
+                    )
+                    sample(
+                        f"width_{kdx}", AffineBeta(
+                            param(f"{prefix}/w_mean")[kdx, ndx],
+                            param(f"{prefix}/w_size")[kdx, ndx],
+                            0.75, 2.25
+                        )
+                    )
+                    sample(
+                        f"x_{kdx}", AffineBeta(
+                            param(f"{prefix}/x_mean")[kdx, ndx],
+                            param(f"{prefix}/size")[kdx, ndx],
+                            -(data.D+1)/2, (data.D+1)/2
+                        ))
+                    sample(
+                                f"y_{kdx}", AffineBeta(
+                            param(f"{prefix}/y_mean")[kdx, ndx],
+                            param(f"{prefix}/size")[kdx, ndx],
+                            -(data.D+1)/2, (data.D+1)/2
+                        ))
 
     def model_parameters(self):
         param("proximity",
@@ -259,11 +257,11 @@ class SpotDetection(Model):
             (((self.data.D+1) / (2*param("proximity"))) ** 2 - 1)
         ), dim=-1)
         param("gain",
-              torch.tensor(10.),
+              torch.tensor(5.),
               constraint=constraints.positive)
-        param("logits_z",
-              probs_to_logits(torch.ones(self.S+1) / (self.S+1)),
-              constraint=constraints.real)
+        param("probs_z",
+              torch.ones(self.S+1),
+              constraint=constraints.simplex)
         param("rate_j",
               torch.tensor(0.5),
               constraint=constraints.positive)
@@ -288,13 +286,6 @@ class SpotDetection(Model):
               torch.tensor([2.]),
               constraint=constraints.positive)
 
-        param("offset_samples",
-              self.offset_samples,
-              constraint=constraints.positive)
-        param("offset_weights",
-              self.offset_weights,
-              constraint=constraints.positive)
-
     def guide_parameters(self):
         self.spot_parameters(self.data, prefix="d")
 
@@ -302,38 +293,44 @@ class SpotDetection(Model):
             self.spot_parameters(self.control, prefix="c")
 
     def spot_parameters(self, data, prefix):
-        param(f"{prefix}/logits_state",
-              torch.ones(data.N, data.F, self.num_states),
-              constraint=constraints.real)
+        param(f"{prefix}/theta_probs",
+              torch.ones(data.N, data.F, 1+self.K*self.S),
+              constraint=constraints.simplex)
+        m_probs = torch.ones(1+self.K*self.S, self.K, data.N, data.F, 2)
+        m_probs[1, 0, :, :, 0] = 0
+        m_probs[2, 1, :, :, 0] = 0
+        param(f"{prefix}/m_probs",
+              m_probs,
+              constraint=constraints.simplex)
         param(f"{prefix}/b_loc",
               (self.data_median - self.offset_median).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
-              torch.ones(data.N, data.F) * 30,
+              torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              (self.noise * 2).repeat(data.N, data.F, self.K),
+              (self.noise * 2).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
-              torch.ones(data.N, data.F, self.K),
+              torch.ones(self.K, data.N, data.F) * 0.01,
               constraint=constraints.positive)
         param(f"{prefix}/w_mean",
-              torch.ones(data.N, data.F, self.K) * 1.5,
+              torch.ones(self.K, data.N, data.F) * 1.5,
               constraint=constraints.interval(0.75, 2.25))
         param(f"{prefix}/w_size",
-              torch.ones(data.N, data.F, self.K) * 100.,
+              torch.ones(self.K, data.N, data.F) * 100.,
               constraint=constraints.greater_than(2.))
         param(f"{prefix}/x_mean",
-              torch.zeros(data.N, data.F, self.K),
+              torch.zeros(self.K, data.N, data.F),
               constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
         param(f"{prefix}/y_mean",
-              torch.zeros(data.N, data.F, self.K),
+              torch.zeros(self.K, data.N, data.F),
               constraint=constraints.interval(-(data.D+1)/2, (data.D+1)/2))
-        size = torch.ones(data.N, data.F, self.K) * 200.
+        size = torch.ones(self.K, data.N, data.F) * 200.
         if self.K == 2:
-            size[..., 1] = 7.
+            size[1] = 7.
         elif self.K == 3:
-            size[..., 1] = 7.
-            size[..., 2] = 3.
+            size[1] = 7.
+            size[2] = 3.
         param(f"{prefix}/size",
               size, constraint=constraints.greater_than(2.))

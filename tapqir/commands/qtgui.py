@@ -240,19 +240,19 @@ class MainWindow(QMainWindow):
         frames = torch.arange(f1, f2)
         img_ideal = self.Model.offset_mean + param("d/b_loc").data[n, frames, None, None]
         gaussian = self.Model.data_loc(
-            param("d/h_loc").data[n, frames].masked_fill(self.Model.m_probs[n, frames, :, 1] < 0.5, 0.),
-            param("d/w_mean").data[n, frames],
-            param("d/x_mean").data[n, frames],
-            param("d/y_mean").data[n, frames],
+            param("d/h_loc").data[:, n, frames].masked_fill(self.Model.m_probs[:, n, frames] < 0.5, 0.),
+            param("d/w_mean").data[:, n, frames],
+            param("d/x_mean").data[:, n, frames],
+            param("d/y_mean").data[:, n, frames],
             n, frames)
-        img_ideal = img_ideal + gaussian.sum(-3)
+        img_ideal = img_ideal + gaussian.sum(-4)
         for f in range(f1, f2):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
                 self.Model.data[int(self.aoiNumber.text()), f].cpu().numpy()
             )
             self.prob[(f - f1) % 100].setOpts(
-                height=(self.Model.z_probs[int(self.aoiNumber.text()), f, :, 1].sum()*self.Model.data.D,)
+                height=(self.Model.z_probs[:, int(self.aoiNumber.text()), f].sum()*self.Model.data.D,)
             )
             # ideal image
             self.img_ideal[(f - f1) % 100].setImage(img_ideal[f - f1].cpu().numpy())
@@ -298,59 +298,59 @@ class MainWindow(QMainWindow):
 
             self.plot[f"{p}Hist"] = widget.addPlot(row=i+2, col=5)
             if p == "z":
-                y, x = np.histogram(self.Model.z_probs[..., 1].sum(-1).numpy(), bins=50)
+                y, x = np.histogram(self.Model.z_probs.numpy(), bins=50)
             elif p == "d/height":
                 y, x = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.m_probs.reshape(-1).numpy())
                 self.plot[f"{p}Hist"].setXRange(0, quantile(param("d/h_loc").data.flatten(), 0.99).item()*1.3, padding=0.01)
 
                 yz, xz = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.z_probs.reshape(-1).numpy())
 
                 yj, xj = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.j_probs.reshape(-1).numpy())
 
             elif p == "d/width":
                 y, x = np.histogram(
                     param("d/w_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.m_probs.reshape(-1).numpy())
 
                 yz, xz = np.histogram(
                     param("d/w_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.z_probs.reshape(-1).numpy())
 
                 yj, xj = np.histogram(
                     param("d/w_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.j_probs.reshape(-1).numpy())
 
             elif p == "d/x":
                 y, x = np.histogram(
                     param("d/x_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.m_probs.reshape(-1).numpy())
 
                 yz, xz = np.histogram(
                     param("d/x_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.z_probs.reshape(-1).numpy())
 
                 yj, xj = np.histogram(
                     param("d/x_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.j_probs.reshape(-1).numpy())
 
             elif p == "d/y":
                 y, x = np.histogram(
                     param("d/y_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.m_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.m_probs.reshape(-1).numpy())
 
                 yz, xz = np.histogram(
                     param("d/y_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.z_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.z_probs.reshape(-1).numpy())
 
                 yj, xj = np.histogram(
                     param("d/y_mean").data.reshape(-1).numpy(), bins=50,
-                    weights=self.Model.j_probs[..., 1].reshape(-1).numpy())
+                    weights=self.Model.j_probs.reshape(-1).numpy())
 
             elif p == "d/background":
                 y, x = np.histogram(param("d/b_loc").data.reshape(-1).numpy(), bins=50)
@@ -419,10 +419,10 @@ class MainWindow(QMainWindow):
 
         self.Model.n = torch.tensor([n])
         trace = pyro.poutine.trace(self.Model.guide).get_trace()
-        self.item["zoom"].setData(self.Model.z_probs[n, :, :, 1].sum(-1))
+        self.item["zoom"].setData(self.Model.z_marginal[n])
         for p in self.params:
             if p == "z":
-                self.item[f"{p}_probs"].setData(self.Model.z_probs[n, :, :, 1].sum(-1))
+                self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
             elif p == "d/background":
                 k = 0
                 hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
@@ -432,14 +432,11 @@ class MainWindow(QMainWindow):
                 self.item[f"{p}_mean"].setData(mean)
             else:
                 for k in range(self.Model.K):
-                    hpd = pi(trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
-                    mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()
-                    self.item[f"{p}_{k}_high"].setData(hpd[0][..., k])
-                    self.item[f"{p}_{k}_low"].setData(hpd[1][..., k])
-                    self.item[f"{p}_{k}_mean"].setData(mean[..., k])
-                    # self.item[f"{p}_{k}_high"].setData(hpd[0][..., k] * (self.Model.m_probs[n, :, k, 1] > 0.5).cpu())
-                    # self.item[f"{p}_{k}_low"].setData(hpd[1][..., k] * (self.Model.m_probs[n, :, k, 1] > 0.5).cpu())
-                    # self.item[f"{p}_{k}_mean"].setData(mean[..., k] * (self.Model.m_probs[n, :, k, 1] > 0.5).cpu())
+                    hpd = pi(trace.nodes[f"{p}_{k}"]["fn"].sample((500,)).data.squeeze().cpu(), 0.95, dim=0)
+                    mean = trace.nodes[f"{p}_{k}"]["fn"].mean.data.squeeze().cpu()
+                    self.item[f"{p}_{k}_high"].setData(hpd[0])
+                    self.item[f"{p}_{k}_low"].setData(hpd[1])
+                    self.item[f"{p}_{k}_mean"].setData(mean)
 
         if self.w is not None:
             self.updateImages()
