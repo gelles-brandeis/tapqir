@@ -12,9 +12,6 @@ Intro
    :maxdepth: 1
    :caption: Contents:
 
-   height_simulation
+   larrycy3sigma54
+   gracearticlecy3
    signal-to-noise
-   height_data
-   experimental_data
-   lamda_simulation
-   lamda_data
