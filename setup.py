@@ -11,6 +11,12 @@ __version__ = '{}'
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+# examples/tutorials
+EXTRAS_REQUIRE = [
+    "notebook",
+    "matplotlib",
+]
+
 setuptools.setup(
     name="tapqir",
     version=versioneer.get_version(),
@@ -24,10 +30,18 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy", "scipy", "pandas", "matplotlib", "tqdm", "scikit-learn", "future", "configparser",
-        "torch", "torchvision", "cliff", "PySide2", "pyqtgraph",
+        "numpy", "scipy", "pandas", "tqdm", "scikit-learn", "future", "configparser",
+        "torch", "cliff", "PySide2", "pyqtgraph",
         "pyro-ppl", "tb-nightly",
     ],
+    extras_require={
+        "extras": EXTRAS_REQUIRE,
+        "dev": EXTRAS_REQUIRE + [
+            "flake8",
+            "sphinx",
+            "funsor",
+        ],
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

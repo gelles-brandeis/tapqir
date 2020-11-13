@@ -1,6 +1,6 @@
 import torch
 from torch.distributions import constraints
-from pyro.distributions import TorchDistribution, Gamma
+from pyro.distributions import TorchDistribution, Gamma, Categorical
 
 
 class ConvolutedGamma(TorchDistribution):
@@ -22,18 +22,37 @@ class ConvolutedGamma(TorchDistribution):
     :param ~torch.Tensor log_weights: log weights corresponding to the offset samples.
     """
 
-    arg_constraints = {}
+    arg_constraints = {
+        "concentration": constraints.positive,
+        "rate": constraints.positive,
+        "samples": constraints.real_vector,
+        "log_weights": constraints.real_vector
+    }
+    support = constraints.positive
 
-    def __init__(self, concentration, rate, samples, log_weights):
-        self.dist = Gamma(concentration.unsqueeze(-1), rate)
+    def __init__(self, concentration, rate, samples, log_weights, validate_args=None):
+        self.concentration = concentration
+        self.rate = rate
+        self.samples = samples
+        self.log_weights = log_weights
+        if isinstance(concentration, torch.Tensor):
+            concentration = concentration.unsqueeze(-1)
+        self.dist = Gamma(concentration, rate)
         self.samples = samples
         self.log_weights = log_weights
         batch_shape = self.dist.batch_shape[:-1]
         event_shape = self.dist.event_shape
-        super().__init__(batch_shape, event_shape)
+        super().__init__(batch_shape, event_shape, validate_args=validate_args)
+
+    def sample(self, sample_shape=torch.Size()):
+        odx = Categorical(logits=self.log_weights).expand(self.batch_shape).sample()
+        offset = self.samples[odx]
+        signal = self.dist.sample().squeeze(-1)
+        return signal + offset
 
     def log_prob(self, value):
-        value = value.unsqueeze(-1)
+        if isinstance(value, torch.Tensor):
+            value = value.unsqueeze(-1)
         mask = value > self.samples
         value = torch.where(mask, value - self.samples, value.new_ones(()))
 
