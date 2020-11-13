@@ -239,16 +239,17 @@ class Model(nn.Module):
             h_loc - mean intensity, w_mean - mean spot width, \
             x_mean - x position, y_mean - y position, \
             b_loc - background intensity."
-        matlab["z_probs"] = self.z_probs.cpu().numpy()
-        matlab["j_probs"] = self.j_probs.cpu().numpy()
-        matlab["m_probs"] = self.m_probs.cpu().numpy()
-        matlab["z_marginal"] = self.z_marginal.cpu().numpy()
-        matlab["probabilitiesDescription"] = \
-            "Probabilities for N x F x K spots. \
-            z_probs - on-target spot probability, \
-            j_probs - off-target spot probability, \
-            m_probs - spot probability (on-target + off-target), \
-            z_marginal - total on-target spot probability (sum of z_probs)."
+        if self.name == "spotdetection":
+            matlab["z_probs"] = self.z_probs.cpu().numpy()
+            matlab["j_probs"] = self.j_probs.cpu().numpy()
+            matlab["m_probs"] = self.m_probs.cpu().numpy()
+            matlab["z_marginal"] = self.z_marginal.cpu().numpy()
+            matlab["probabilitiesDescription"] = \
+                "Probabilities for N x F x K spots. \
+                z_probs - on-target spot probability, \
+                j_probs - off-target spot probability, \
+                m_probs - spot probability (on-target + off-target), \
+                z_marginal - total on-target spot probability (sum of z_probs)."
         matlab["aoilist"] = self.data.target.index.values
         matlab["aoilistDescription"] = "aoi numbering from aoiinfo"
         matlab["framelist"] = self.data.drift.index.values
@@ -271,7 +272,7 @@ class Model(nn.Module):
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.labels is not None:
+        if self.data.labels is not None and self.name == "spotdetection":
             mask = self.data.labels["z"] < 2
             pred_labels = (self.z_marginal > 0.5).cpu().numpy()[mask]
             true_labels = self.data.labels["z"][mask]
