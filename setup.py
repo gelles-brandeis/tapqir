@@ -40,6 +40,7 @@ setuptools.setup(
             "flake8",
             "sphinx",
             "funsor",
+            "pytest",
         ],
     },
     classifiers=[
