@@ -11,7 +11,7 @@ from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
 from pyro.ops.stats import quantile
 from torch.utils.tensorboard import SummaryWriter
-from torch.distributions.utils import probs_to_logits, logits_to_probs
+from torch.distributions.utils import probs_to_logits, logits_to_probs, lazy_property
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
@@ -88,14 +88,14 @@ class Model(nn.Module):
         # for plotting
         self.n = None
 
-    @property
+    @lazy_property
     def S(self):
         r"""
         Number of distinct molecular states for the binder molecules.
         """
         return self._S
 
-    @property
+    @lazy_property
     def K(self):
         r"""
         Maximum number of spots that can be present in a single image.
@@ -228,7 +228,6 @@ class Model(nn.Module):
         # save only if no NaN values
         for k, v in pyro.get_param_store().items():
             if torch.isnan(v).any() or torch.isinf(v).any():
-                # import pdb; pdb.set_trace()
                 raise ValueError("Step #{}. Detected NaN values in {}".format(self.iter, k))
 
         # save parameters and optimizer state
