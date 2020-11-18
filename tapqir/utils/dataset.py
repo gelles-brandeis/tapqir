@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+from pyro.ops.stats import quantile
+from torch.distributions.utils import probs_to_logits, lazy_property
 import configparser
 from scipy.io import loadmat
 
@@ -28,6 +30,51 @@ class CosmosDataset(Dataset):
         self.dtype = dtype
         self.vmin = np.percentile(self.data.cpu().numpy(), 5)
         self.vmax = np.percentile(self.data.cpu().numpy(), 99)
+
+    @lazy_property
+    def data_median(self):
+        return torch.median(self.data)
+
+    @lazy_property
+    def offset_median(self):
+        return torch.median(self.offset)
+
+    @lazy_property
+    def noise(self):
+        return (self.data.std(dim=(1, 2, 3)).mean()
+                - self.offset.std()) * np.pi * (2 * 1.3) ** 2
+
+    @lazy_property
+    def offset_max(self):
+        return quantile(self.offset.flatten(), 0.995).item()
+
+    @lazy_property
+    def offset_min(self):
+        return quantile(self.offset.flatten(), 0.005).item()
+
+    @lazy_property
+    def offset_samples(self):
+        clamped_offset = torch.clamp(self.offset, self.offset_min, self.offset_max)
+        offset_samples, offset_weights = torch.unique(clamped_offset, sorted=True, return_counts=True)
+        return offset_samples
+
+    @lazy_property
+    def offset_weights(self):
+        clamped_offset = torch.clamp(self.offset, self.offset_min, self.offset_max)
+        offset_samples, offset_weights = torch.unique(clamped_offset, sorted=True, return_counts=True)
+        return offset_weights.float() / offset_weights.sum()
+
+    @lazy_property
+    def offset_logits(self):
+        return probs_to_logits(self.offset_weights)
+
+    @lazy_property
+    def offset_mean(self):
+        return torch.sum(self.offset_samples * self.offset_weights)
+
+    @lazy_property
+    def offset_var(self):
+        return torch.sum(self.offset_samples ** 2 * self.offset_weights) - self.offset_mean ** 2
 
     def __len__(self):
         return self.N

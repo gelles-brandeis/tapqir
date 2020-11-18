@@ -9,9 +9,8 @@ from pyro import param
 from pyro.infer import SVI
 from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
-from pyro.ops.stats import quantile
 from torch.utils.tensorboard import SummaryWriter
-from torch.distributions.utils import probs_to_logits, lazy_property
+from torch.distributions.utils import lazy_property
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
@@ -115,18 +114,6 @@ class Model(nn.Module):
         self.data_loc = GaussianSpot(
             self.data.target, self.data.drift,
             self.data.D)
-
-        self.data_median = torch.median(self.data.data)
-        self.offset_median = torch.median(self.data.offset)
-        self.noise = (self.data.data.std(dim=(1, 2, 3)).mean() - self.data.offset.std()) * np.pi * (2 * 1.3) ** 2
-        offset_max = quantile(self.data.offset.flatten(), 0.995).item()
-        offset_min = quantile(self.data.offset.flatten(), 0.005).item()
-        self.data.offset = torch.clamp(self.data.offset, offset_min, offset_max)
-        self.offset_samples, self.offset_weights = torch.unique(self.data.offset, sorted=True, return_counts=True)
-        self.offset_weights = self.offset_weights.float() / self.offset_weights.sum()
-        self.offset_logits = probs_to_logits(self.offset_weights)
-        self.offset_mean = torch.sum(self.offset_samples * self.offset_weights)
-        self.offset_var = torch.sum(self.offset_samples ** 2 * self.offset_weights) - self.offset_mean ** 2
 
         # load control data
         if control:
