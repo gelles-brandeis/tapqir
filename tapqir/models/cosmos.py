@@ -210,7 +210,7 @@ class Cosmos(Model):
             sample(
                 "data", ConvolutedGamma(
                     locs / param("gain"), 1 / param("gain"),
-                    self.offset_samples, self.offset_logits
+                    self.data.offset_samples, self.data.offset_logits
                 ).to_event(2),
                 obs=data[ndx]
             )
@@ -296,14 +296,14 @@ class Cosmos(Model):
               constraint=constraints.positive)
 
         param("d/background_loc",
-              torch.ones(self.data.N, 1) * (self.data_median - self.offset_median),
+              torch.ones(self.data.N, 1) * (self.data.data_median - self.data.offset_median),
               constraint=constraints.positive)
         param("d/background_beta", torch.ones(self.data.N, 1),
               constraint=constraints.positive)
 
         if self.control:
             param("c/background_loc",
-                  torch.ones(self.control.N, 1) * (self.data_median - self.offset_median),
+                  torch.ones(self.control.N, 1) * (self.data.data_median - self.data.offset_median),
                   constraint=constraints.positive)
             param("c/background_beta", torch.ones(self.control.N, 1),
                   constraint=constraints.positive)
@@ -338,13 +338,13 @@ class Cosmos(Model):
               torch.ones(self.K, data.N, data.F, 2),
               constraint=constraints.simplex)
         param(f"{prefix}/b_loc",
-              (self.data_median - self.offset_median).repeat(data.N, data.F),
+              (self.data.data_median - self.data.offset_median).repeat(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/b_beta",
               torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              (self.noise * 2).repeat(self.K, data.N, data.F),
+              (self.data.noise * 2).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
               torch.ones(self.K, data.N, data.F) * 0.01,
