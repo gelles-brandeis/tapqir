@@ -303,7 +303,9 @@ class MainWindow(QMainWindow):
                 y, x = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,
                     weights=self.Model.m_probs.reshape(-1).numpy())
-                self.plot[f"{p}Hist"].setXRange(0, quantile(param("d/h_loc").data.flatten(), 0.99).item()*1.3, padding=0.01)
+                self.plot[f"{p}Hist"].setXRange(
+                        0, quantile(param("d/h_loc").data.flatten(), 0.99).item()*1.3,
+                        padding=0.01)
 
                 yz, xz = np.histogram(
                     param("d/h_loc").data.reshape(-1).numpy(), bins=50,

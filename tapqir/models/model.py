@@ -11,7 +11,7 @@ from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
 from pyro.ops.stats import quantile
 from torch.utils.tensorboard import SummaryWriter
-from torch.distributions.utils import probs_to_logits, logits_to_probs, lazy_property
+from torch.distributions.utils import probs_to_logits, lazy_property
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
@@ -26,7 +26,8 @@ class GaussianSpot:
     Calculates ideal shape of the 2D-Gaussian spot given spot parameters,
     target positions, and drift list.
 
-        :math:`\dfrac{h_{knf}}{2 \pi w^2_{nfk}} \exp{\left ( -\dfrac{(i-x_{nfk})^2 + (j-y_{nfk})^2}{2w^2_{nfk}} \right)}`
+        :math:`\dfrac{h_{knf}}{2 \pi w^2_{nfk}}
+        \exp{\left ( -\dfrac{(i-x_{nfk})^2 + (j-y_{nfk})^2}{2w^2_{nfk}} \right)}`
 
     :param target: Target positions.
     :param drift: Frame drift list.
@@ -299,15 +300,6 @@ class Model(nn.Module):
                 "POSITIVES", pos, self.iter)
             for key, value in {**metrics, **pos, **neg}.items():
                 global_params[key] = value
-            try:
-                atten_labels = np.copy(self.data.labels)
-                atten_labels["z"][
-                    self.data.labels["spotpicker"] != self.z_map] = 2
-                atten_labels["spotpicker"] = 0
-                np.save(os.path.join(self.path, "atten_labels.npy"),
-                        atten_labels)
-            except:
-                pass
 
         global_params.to_csv(os.path.join(self.path, "global_params.csv"))
         self.logger.info("Step #{}.".format(self.iter))
@@ -343,15 +335,19 @@ class Model(nn.Module):
 
         Total signal:
 
-            :math:`\mu_{knf} =  \sum_{ij} I_{nfij} \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
+            :math:`\mu_{knf} =  \sum_{ij} I_{nfij}
+            \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
 
         Noise:
 
-            :math:`\sigma^2_{knf} = \sigma^2_{\text{offset}} + \mu_{knf} \text{gain}`
+            :math:`\sigma^2_{knf} = \sigma^2_{\text{offset}}
+            + \mu_{knf} \text{gain}`
 
         Signal-to-noise ratio:
 
-            :math:`\text{SNR}_{knf} = \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}} \text{ for } \theta_{nf} = k`
+            :math:`\text{SNR}_{knf} =
+            \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
+            \text{ for } \theta_{nf} = k`
         """
         with torch.no_grad():
             weights = self.data_loc(

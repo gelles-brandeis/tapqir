@@ -1,11 +1,9 @@
-import itertools
 import torch
 import torch.distributions.constraints as constraints
 from torch.distributions.utils import lazy_property
 
 from pyro import param, sample, plate, poutine
-from pyro.infer import infer_discrete
-from pyro.distributions import Categorical, Gamma, HalfNormal, Poisson, LogNormal
+from pyro.distributions import Categorical, Gamma, HalfNormal, Poisson
 from pyro.ops.indexing import Vindex
 from pyro.contrib.autoname import scope
 
@@ -86,7 +84,7 @@ class Cosmos(Model):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return param("d/theta_probs").data[..., 1:].permute(2,0,1)
+        return param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
 
     @property
     def j_probs(self):
@@ -204,7 +202,7 @@ class Cosmos(Model):
                         ))
 
                 # calculate image shape w/o offset
-                height = height.masked_fill(m==0, 0.)
+                height = height.masked_fill(m == 0, 0.)
                 gaussian = data_loc(height, width, x, y, ndx)
                 locs = locs + gaussian
 
@@ -250,7 +248,7 @@ class Cosmos(Model):
                 else:
                     m_probs = Vindex(param(f"{prefix}/m_prob"))[kdx, ndx[:, None], fdx]
                 m = sample(f"m_{kdx}", Categorical(m_probs), infer={"enumerate": "parallel"})
-                with poutine.mask(mask=m>0):
+                with poutine.mask(mask=m > 0):
                     # sample spot variables
                     sample(
                         f"height_{kdx}", Gamma(

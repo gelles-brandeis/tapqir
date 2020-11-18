@@ -57,7 +57,7 @@ def read_glimpse(path, D):
                 columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
         except KeyError:
             aoi_df[dtype] = pd.DataFrame(
-                aoi_mat[dtype]["aoifits"]["aoiinfo2"][0,0],
+                aoi_mat[dtype]["aoifits"]["aoiinfo2"][0, 0],
                 columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
         except IndexError:
             aoi_df[dtype] = pd.DataFrame(

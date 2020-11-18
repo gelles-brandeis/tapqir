@@ -1,5 +1,4 @@
 import torch
-from torch.distributions import constraints
 from pyro.distributions import TorchDistribution, Gamma
 
 

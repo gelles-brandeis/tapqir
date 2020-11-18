@@ -1,5 +1,4 @@
 import torch
-from torch.distributions import constraints
 from pyro.distributions import TorchDistribution, Gamma
 from pykeops.torch import Genred
 import math
@@ -22,7 +21,7 @@ class NormalKDE(TorchDistribution):
             self.p = torch.tensor([math.log(math.sqrt(2 * math.pi))]).cuda()
         else:
             self.p = torch.tensor([math.log(math.sqrt(2 * math.pi))])
-        #self.dist = Gamma(concentration, rate)
+        # self.dist = Gamma(concentration, rate)
         # batch_shape = loc.shape[:-1]
         batch_shape = torch.Size([])
         event_shape = torch.Size([])
