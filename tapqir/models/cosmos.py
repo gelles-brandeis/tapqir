@@ -1,11 +1,10 @@
 import itertools
 import torch
 import torch.distributions.constraints as constraints
-from torch.distributions.utils import probs_to_logits, logits_to_probs
 
 from pyro import param, sample, plate, poutine
+from pyro.infer import infer_discrete
 from pyro.distributions import Categorical, Gamma, HalfNormal, Poisson, LogNormal
-from pyro.infer import config_enumerate
 from pyro.ops.indexing import Vindex
 from pyro.contrib.autoname import scope
 
@@ -27,6 +26,7 @@ class Cosmos(Model):
 
     def __init__(self, S, K):
         super().__init__(S, K)
+        self.classify = False
 
     @property
     def num_states(self):
@@ -80,51 +80,79 @@ class Cosmos(Model):
     def ontarget(self):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
+    @property
+    def z_probs(self):
+        r"""
+        Probability of an on-target spot :math:`p(z_{knf})`.
+        """
+        return param("d/theta_probs").data[..., 1:].permute(2,0,1)
+
+    @property
+    def j_probs(self):
+        r"""
+        Probability of an off-target spot :math:`p(j_{knf})`.
+        """
+        return self.m_probs - self.z_probs
 
     @property
     def m_probs(self):
         r"""
         Probability of a spot :math:`p(m_{knf})`.
         """
-        return param("d/m_probs").data[..., 1]
+        return torch.einsum(
+            "sknf,nfs->knf",
+            param("d/m_probs").data[..., 1],
+            param("d/theta_probs").data)
 
     @property
     def z_marginal(self):
         return self.z_probs.sum(-3)
 
-    # @poutine.block(hide=["width_mean", "width_size", "proximity"])
-    # @poutine.block(expose=["d/theta_probs", "d/theta"], expose_types=["sample"])
-    @poutine.block(hide=["width_mean", "width_size"])
+    @property
+    def z_map(self):
+        return self.z_marginal > 0.5
+
+    @property
+    def inference_config_model(self):
+        if self.classify:
+            return {"hide_types": ["param"]}
+        return {"hide": ["width_mean", "width_size", "height_scale"]}
+
+    @property
+    def inference_config_guide(self):
+        if self.classify:
+            return {"expose": ["d/theta_probs", "d/m_probs"], "expose_types": ["sample"]}
+        return {"expose_types": ["sample", "param"]}
+
     def model(self):
-        # initialize model parameters
-        self.model_parameters()
+        with poutine.block(**self.inference_config_model):
+            # initialize model parameters
+            self.model_parameters()
 
-        # test data
-        with scope(prefix="d"):
-            self.spot_model(self.data, self.data_loc, prefix="d")
+            # test data
+            with scope(prefix="d"):
+                self.spot_model(self.data, self.data_loc, prefix="d")
 
-        # control data
-        if self.control:
-            with scope(prefix="c"):
-                self.spot_model(self.control, self.control_loc, prefix="c")
+            # control data
+            if self.control:
+                with scope(prefix="c"):
+                    self.spot_model(self.control, self.control_loc, prefix="c")
 
-    # @config_enumerate
     def guide(self):
-        # initialize guide parameters
-        self.guide_parameters()
+        with poutine.block(**self.inference_config_guide):
+            # initialize guide parameters
+            self.guide_parameters()
 
-        # test data
-        with scope(prefix="d"):
-            self.spot_guide(self.data, prefix="d")
+            # test data
+            with scope(prefix="d"):
+                self.spot_guide(self.data, prefix="d")
 
-        # control data
-        if self.control:
-            with scope(prefix="c"):
-                self.spot_guide(self.control, prefix="c")
+            # control data
+            if self.control:
+                with scope(prefix="c"):
+                    self.spot_guide(self.control, prefix="c")
 
     def spot_model(self, data, data_loc, prefix):
-        # max number of spots
-        K_plate = plate("K_plate", self.K)
         # target sites
         N_plate = plate("N_plate", data.N, dim=-2)
         # time frames
@@ -143,19 +171,22 @@ class Cosmos(Model):
 
             # sample hidden model state (1+K*S,)
             if data.dtype == "test":
-                theta = sample("theta", Categorical(self.probs_theta), infer={"enumerate": "parallel"})
+                if self.classify:
+                    theta = sample("theta", Categorical(self.probs_theta))
+                else:
+                    theta = sample("theta", Categorical(self.probs_theta),
+                                   infer={"enumerate": "parallel"})
             else:
                 theta = 0
 
-            for kdx in K_plate:
+            for kdx in range(self.K):
                 ontarget = Vindex(self.ontarget)[theta, kdx]
+                # spot presence
                 m = sample(f"m_{kdx}", Categorical(Vindex(self.probs_m)[theta, kdx]))
                 with poutine.mask(mask=m > 0):
                     # sample spot variables
                     height = sample(
-                        # f"height_{kdx}", LogNormal(param("height_loc"), param("height_scale"))
-                        # f"height_{kdx}", HalfNormal(param("height_scale"))
-                        f"height_{kdx}", HalfNormal(10000.)
+                        f"height_{kdx}", HalfNormal(param("height_scale"))
                     )
                     width = sample(
                         f"width_{kdx}", AffineBeta(
@@ -180,14 +211,12 @@ class Cosmos(Model):
             sample(
                 "data", ConvolutedGamma(
                     locs / param("gain"), 1 / param("gain"),
-                    self.offset_samples, probs_to_logits(self.offset_weights)
+                    self.offset_samples, self.offset_logits
                 ).to_event(2),
-                obs=None#data[ndx]
+                obs=data[ndx]
             )
 
     def spot_guide(self, data, prefix):
-        # max number of spots
-        K_plate = plate("K_plate", self.K)
         # target sites
         N_plate = plate("N_plate", data.N,
                         subsample_size=self.batch_size,
@@ -196,6 +225,8 @@ class Cosmos(Model):
         F_plate = plate("F_plate", data.F, dim=-1)
 
         with N_plate as ndx, F_plate as fdx:
+            if prefix == "d":
+                self.batch_idx = ndx.cpu()
             # sample background intensity
             sample(
                 "background", Gamma(
@@ -203,9 +234,21 @@ class Cosmos(Model):
                     * param(f"{prefix}/b_beta")[ndx],
                     param(f"{prefix}/b_beta")[ndx]))
 
-            for kdx in K_plate:
-                m = sample(f"m_{kdx}", Categorical(
-                    Vindex(param(f"{prefix}/m_probs"))[kdx, ndx[:, None], fdx]), infer={"enumerate": "parallel"})
+            # sample hidden model state (3,1,1,1)
+            if self.classify:
+                if data.dtype == "test":
+                    theta = sample("theta", Categorical(
+                        param(f"{prefix}/theta_probs")[ndx]), infer={"enumerate": "parallel"})
+                else:
+                    theta = 0
+
+            for kdx in range(self.K):
+                # spot presence
+                if self.classify:
+                    m_probs = Vindex(param(f"{prefix}/m_probs"))[theta, kdx, ndx[:, None], fdx]
+                else:
+                    m_probs = Vindex(param(f"{prefix}/m_prob"))[kdx, ndx[:, None], fdx]
+                m = sample(f"m_{kdx}", Categorical(m_probs), infer={"enumerate": "parallel"})
                 with poutine.mask(mask=m>0):
                     # sample spot variables
                     sample(
@@ -229,7 +272,7 @@ class Cosmos(Model):
                             -(data.D+1)/2, (data.D+1)/2
                         ))
                     sample(
-                                f"y_{kdx}", AffineBeta(
+                        f"y_{kdx}", AffineBeta(
                             param(f"{prefix}/y_mean")[kdx, ndx],
                             param(f"{prefix}/size")[kdx, ndx],
                             -(data.D+1)/2, (data.D+1)/2
@@ -272,12 +315,8 @@ class Cosmos(Model):
         param("width_size",
               torch.tensor([2.]),
               constraint=constraints.positive)
-        # param("height_loc",
-        #       torch.tensor(8.),
-        #       constraint=constraints.positive)
         param("height_scale",
               torch.tensor(10000.),
-              # torch.tensor(1.),
               constraint=constraints.positive)
 
     def guide_parameters(self):
@@ -287,7 +326,16 @@ class Cosmos(Model):
             self.spot_parameters(self.control, prefix="c")
 
     def spot_parameters(self, data, prefix):
+        param(f"{prefix}/theta_probs",
+              torch.ones(data.N, data.F, 1+self.K*self.S),
+              constraint=constraints.simplex)
+        m_probs = torch.ones(1+self.K*self.S, self.K, data.N, data.F, 2)
+        m_probs[1, 0, :, :, 0] = 0
+        m_probs[2, 1, :, :, 0] = 0
         param(f"{prefix}/m_probs",
+              m_probs,
+              constraint=constraints.simplex)
+        param(f"{prefix}/m_prob",
               torch.ones(self.K, data.N, data.F, 2),
               constraint=constraints.simplex)
         param(f"{prefix}/b_loc",

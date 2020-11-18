@@ -108,6 +108,10 @@ class SpotDetection(Model):
     def z_marginal(self):
         return self.z_probs.sum(-3)
 
+    @property
+    def z_map(self):
+        return self.z_marginal > 0.5
+
     @poutine.block(hide=["width_mean", "width_size", "proximity"])
     def model(self):
         # initialize model parameters

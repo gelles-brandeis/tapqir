@@ -11,6 +11,7 @@ from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
 from pyro.ops.stats import quantile
 from torch.utils.tensorboard import SummaryWriter
+from torch.distributions.utils import probs_to_logits, logits_to_probs
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
     recall_score, precision_score
 import logging
@@ -122,6 +123,7 @@ class Model(nn.Module):
         self.data.offset = torch.clamp(self.data.offset, offset_min, offset_max)
         self.offset_samples, self.offset_weights = torch.unique(self.data.offset, sorted=True, return_counts=True)
         self.offset_weights = self.offset_weights.float() / self.offset_weights.sum()
+        self.offset_logits = probs_to_logits(self.offset_weights)
         self.offset_mean = torch.sum(self.offset_samples * self.offset_weights)
         self.offset_var = torch.sum(self.offset_samples ** 2 * self.offset_weights) - self.offset_mean ** 2
 
@@ -155,8 +157,9 @@ class Model(nn.Module):
             self.predictions = np.zeros(
                 (self.data.N, self.data.F),
                 dtype=[("z", bool),
-                       ("z_prob", float), ("m", bool, (2,)),
-                       ("m_prob", float, (2,)), ("theta", int)])
+                       ("z_probs", float), ("m", bool, (2,)),
+                       ("m_probs", float, (2,)), ("theta", int)])
+        self._z_map = torch.zeros(self.data.N, self.data.F, dtype=torch.bool)
 
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True)
@@ -174,11 +177,15 @@ class Model(nn.Module):
         """
         raise NotImplementedError
 
-    def run(self, num_iter):
-        # pyro.enable_validation()
+    def run(self, num_iter, infer):
         for i in tqdm(range(num_iter)):
-            # with torch.autograd.detect_anomaly():
-            # import pdb; pdb.set_trace()
+            self.iter_loss = self.svi.step()
+            if not self.iter % 100:
+                self.save_checkpoint()
+            self.iter += 1
+
+        self.classify = True
+        for i in tqdm(range(infer)):
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
                 self.save_checkpoint()
@@ -223,8 +230,6 @@ class Model(nn.Module):
             if torch.isnan(v).any() or torch.isinf(v).any():
                 # import pdb; pdb.set_trace()
                 raise ValueError("Step #{}. Detected NaN values in {}".format(self.iter, k))
-        # if any([torch.isnan(v).any()
-        #         for v in pyro.get_param_store().values()]):
 
         # save parameters and optimizer state
         pyro.get_param_store().save(os.path.join(self.path, "params"))
@@ -272,9 +277,9 @@ class Model(nn.Module):
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.labels is not None and self.name == "spotdetection":
+        if self.data.labels is not None:
             mask = self.data.labels["z"] < 2
-            pred_labels = (self.z_marginal > 0.5).cpu().numpy()[mask]
+            pred_labels = self.z_map.cpu().numpy()[mask]
             true_labels = self.data.labels["z"][mask]
 
             metrics = {}
@@ -298,7 +303,7 @@ class Model(nn.Module):
             try:
                 atten_labels = np.copy(self.data.labels)
                 atten_labels["z"][
-                    self.data.labels["spotpicker"] != (self.z_marginal > 0.5)] = 2
+                    self.data.labels["spotpicker"] != self.z_map] = 2
                 atten_labels["spotpicker"] = 0
                 np.save(os.path.join(self.path, "atten_labels.npy"),
                         atten_labels)
@@ -330,10 +335,8 @@ class Model(nn.Module):
         pyro.get_param_store().load(
             os.path.join(path, "params"),
             map_location=self.device)
-        self._K = 2 # param("d/h_loc").shape[-1]
+        self._K = 2
         self._S = 1
-        # self._S = len(param("probs_z")) - 1
-        # self.predictions = np.load(os.path.join(path, "predictions.npy"))
 
     def snr(self):
         r"""

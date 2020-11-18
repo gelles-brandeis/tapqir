@@ -35,7 +35,9 @@ class Fit(Command):
         parser.add_argument("-k", metavar="K_MAX", type=int,
                             help="Maximum number of spots (default: 2)")
         parser.add_argument("-it", metavar="NUM_ITER", type=int,
-                            help="Number of iterations (default: 20000)")
+                            help="Number of iterations (default: 30000)")
+        parser.add_argument("-infer", metavar="INFER", type=int,
+                            help="Number of inference iterations (default: 20000)")
         parser.add_argument("-bs", metavar="BATCH_SIZE", type=int,
                             help="Batch size (default: 5)")
         parser.add_argument("-lr", metavar="LEARNING_RATE", type=float,
@@ -57,6 +59,7 @@ class Fit(Command):
         states = args.s or config["fit"].getint("num_states")
         k_max = args.k or config["fit"].getint("k_max")
         num_iter = args.it or config["fit"].getint("num_iter")
+        infer = args.infer or config["fit"].getint("infer")
         batch_size = args.bs or config["fit"].getint("batch_size")
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
         control = args.c or config["fit"].getboolean("control")
@@ -70,4 +73,4 @@ class Fit(Command):
         model = models[args.model](states, k_max)
         model.load(args.dataset_path, control, device)
         model.settings(learning_rate, batch_size)
-        model.run(num_iter)
+        model.run(num_iter, infer)
