@@ -1,8 +1,8 @@
 from tapqir.models.model import GaussianSpot
 from tapqir.models.model import Model
+from tapqir.models.cosmos import Cosmos
 from tapqir.models.spotdetection import SpotDetection
 from tapqir.models.fixedoffset import FixedOffset
-# from tapqir.models.empirical import Empirical
 
 __all__ = [
     "GaussianSpot",
@@ -10,11 +10,11 @@ __all__ = [
     "Model",
     "SpotDetection",
     "FixedOffset",
-    # "Empirical",
+    "Cosmos",
 ]
 
 models = {
     SpotDetection.name: SpotDetection,
     FixedOffset.name: FixedOffset,
-    # Empirical.name: Empirical,
+    Cosmos.name: Cosmos,
 }
