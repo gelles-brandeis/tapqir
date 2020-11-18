@@ -1,6 +1,7 @@
 import itertools
 import torch
 import torch.distributions.constraints as constraints
+from torch.distributions.utils import lazy_property
 
 from pyro import param, sample, plate, poutine
 from pyro.infer import infer_discrete
@@ -28,7 +29,7 @@ class Cosmos(Model):
         super().__init__(S, K)
         self.classify = False
 
-    @property
+    @lazy_property
     def num_states(self):
         r"""
         Total number of states for the image model given by:
@@ -69,14 +70,14 @@ class Cosmos(Model):
                 result[self.K*s + k + 1] = param("probs_z")[s + 1] / self.K
         return result
 
-    @property
+    @lazy_property
     def theta_to_z(self):
         result = torch.zeros(self.K*self.S+1, self.K, dtype=torch.long)
         for s in range(self.S):
             result[1+s*self.K:1+(s+1)*self.K] = torch.eye(self.K) * (s+1)
         return result
 
-    @property
+    @lazy_property
     def ontarget(self):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
