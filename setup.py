@@ -41,6 +41,8 @@ setuptools.setup(
             "sphinx",
             "funsor",
             "pytest",
+            "nbsphinx",
+            "sphinx_rtd_theme",
         ],
     },
     classifiers=[

@@ -39,10 +39,12 @@ Enter the names of your folder/files under the ``[glimpse]`` section of the ``op
     test_aoiinfo = /home/ordabayev/Documents/Datasets/Grace_article_data/aoiinfo2_files_for_DNA_locations_in_cy5_and_cy3_fields/00267_fm1_green_mapped_corr_dnaaois.dat
     control_aoiinfo = /home/ordabayev/Documents/Datasets/Grace_article_data/aoiinfo2_files_for_nonDNA_locations_in_cy5_and_cy3/00267_green_mapped_corr_nondnaaois.dat
     driftlist = /home/ordabayev/Documents/Datasets/Grace_article_data/green_and_red_driftlists/b3p81_00267_green_driftlist__manual.dat
+    frame_start =
+    frame_end = 
     labels = 
     labeltype = 
     
-(Leave ``labels`` and ``labeltype`` blank)
+(Leave ``frame_start``, ``frame_end``, ``labels`` and ``labeltype`` blank)
 
 To import your data run::
 
@@ -65,21 +67,22 @@ To adjust fitting parameters edit ``[fit]`` section of the ``options.cfg`` file:
     [fit]
     num_states = 1
     k_max = 2
-    num_iter = 25000
+    num_iter = 30000
+    infer = 10000
     batch_size = 5
     learning_rate = 0.005
-    control = False
+    control = True
     device = cuda
 
 Then run::
 
-    tapqir fit spotdetection dataset_path
+    tapqir fit cosmos dataset_path
 
 .. note::
 
     To use different CUDA device run::
 
-        CUDA_VISIBLE_DEVICES=1 tapqir fit spotdetection dataset_path
+        CUDA_VISIBLE_DEVICES=1 tapqir fit cosmos dataset_path
 
 Results
 ~~~~~~~
@@ -108,7 +111,7 @@ Posterior Distributions
 
 Posterior distributions of the local parameters can be visualized by running ``show`` command::
 
-    tapqir show spotdetection dataset_path parameters_path
+    tapqir show cosmos dataset_path parameters_path
 
 which will display parameter values, original images along with best estimates:
 

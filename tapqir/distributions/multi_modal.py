@@ -7,8 +7,6 @@ class MultiModal(TorchDistribution):
     Sum of the offset variable and the Gamma distributed variable::
     """
 
-    arg_constraints = {}
-
     def __init__(self, loc, beta, weights):
         self.weights = weights
         self.dist = Gamma(loc * beta, beta)
