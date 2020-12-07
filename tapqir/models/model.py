@@ -166,6 +166,7 @@ class Model(nn.Module):
         raise NotImplementedError
 
     def run(self, num_iter, infer):
+        # pyro.enable_validation()
         for i in tqdm(range(num_iter)):
             self.iter_loss = self.svi.step()
             if not self.iter % 100:

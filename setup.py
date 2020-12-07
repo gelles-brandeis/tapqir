@@ -36,11 +36,17 @@ setuptools.setup(
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
+        "test": EXTRAS_REQUIRE + [
+            "pytest",
+            "flake8",
+        ],
         "dev": EXTRAS_REQUIRE + [
             "flake8",
             "sphinx",
             "funsor",
             "pytest",
+            "nbsphinx",
+            "sphinx_rtd_theme",
         ],
     },
     classifiers=[
