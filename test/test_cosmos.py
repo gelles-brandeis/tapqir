@@ -21,9 +21,11 @@ def test_cosmos():
     if smoke_test:
         torch.set_default_tensor_type("torch.FloatTensor")
         device = torch.device("cpu")
+        device_str = "cpu"
     else:
         torch.set_default_tensor_type("torch.cuda.FloatTensor")
         device = torch.device("cuda")
+        device_str = "cuda"
     S, K = 1, 2
     N = 5  # number of AOIs
     D = 14  # AOI size
@@ -75,6 +77,6 @@ def test_cosmos():
     batch_size = 2
     num_iter = 200 if smoke_test else 200
     infer = 200 if smoke_test else 200
-    model.load(path_data, False, "cpu" if smoke_test else "cuda")
+    model.load(path_data, False, device_str)
     model.settings(learning_rate, batch_size)
     model.run(num_iter, infer)

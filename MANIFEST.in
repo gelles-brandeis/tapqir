@@ -1,3 +1,2 @@
 include versioneer.py
 include cosmos/_version.py
-include cosmos/view.ipynb
