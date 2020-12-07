@@ -1,19 +1,14 @@
 import torch
 import pyro
-import pyro.distributions as dist
-from pyro.ops.indexing import Vindex
 from pyro import param, poutine
 from pyro.infer import Predictive
 from torch.distributions import constraints
-from torch.distributions.utils import probs_to_logits
 import numpy as np
 import pandas as pd
 import os
-import matplotlib.pyplot as plt
 
-from tapqir.distributions import AffineBeta
 from tapqir.utils.dataset import CosmosDataset
-from tapqir.models import FixedOffset, GaussianSpot, Cosmos
+from tapqir.models import GaussianSpot, Cosmos
 
 
 def test_cosmos():
