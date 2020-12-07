@@ -20,8 +20,10 @@ def test_cosmos():
     smoke_test = ("CI" in os.environ)
     if smoke_test:
         torch.set_default_tensor_type("torch.FloatTensor")
+        device = torch.device("cpu")
     else:
         torch.set_default_tensor_type("torch.cuda.FloatTensor")
+        device = torch.device("cuda")
     S, K = 1, 2
     N = 5  # number of AOIs
     D = 14  # AOI size
@@ -32,9 +34,9 @@ def test_cosmos():
     drift = pd.DataFrame(data={"dx": 0., "dy": 0}, index=np.arange(F))
     drift.index.name = "frame"
     data = CosmosDataset(torch.zeros(N, F, D, D), target, drift,
-                         dtype="test", device=torch.device("cuda"), offset=offset)
+                         dtype="test", device=device, offset=offset)
     control = CosmosDataset(torch.zeros(N, F, D, D), target, drift,
-                            dtype="control", device=torch.device("cuda"))
+                            dtype="control", device=device)
 
     pyro.set_rng_seed(0)
     pyro.get_param_store().clear()
@@ -73,6 +75,6 @@ def test_cosmos():
     batch_size = 2
     num_iter = 200 if smoke_test else 200
     infer = 200 if smoke_test else 200
-    model.load(path_data, False, "cuda")
+    model.load(path_data, False, "cpu" if smoke_test else "cuda")
     model.settings(learning_rate, batch_size)
     model.run(num_iter, infer)
