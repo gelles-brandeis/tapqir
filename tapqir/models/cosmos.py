@@ -344,10 +344,11 @@ class Cosmos(Model):
               torch.ones(data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_loc",
-              (self.data.noise * 2).repeat(self.K, data.N, data.F),
+              torch.full((self.K, data.N, data.F), 2000.),
+              # (self.data.noise * 2).repeat(self.K, data.N, data.F),
               constraint=constraints.positive)
         param(f"{prefix}/h_beta",
-              torch.ones(self.K, data.N, data.F) * 0.01,
+              torch.ones(self.K, data.N, data.F) * 0.001,
               constraint=constraints.positive)
         param(f"{prefix}/w_mean",
               torch.ones(self.K, data.N, data.F) * 1.5,
