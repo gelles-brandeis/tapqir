@@ -17,7 +17,11 @@ from tapqir.models import FixedOffset, GaussianSpot, Cosmos
 
 
 def test_cosmos():
-    torch.set_default_tensor_type("torch.cuda.FloatTensor")
+    smoke_test = ("CI" in os.environ)
+    if smoke_test:
+        torch.set_default_tensor_type("torch.FloatTensor")
+    else:
+        torch.set_default_tensor_type("torch.cuda.FloatTensor")
     S, K = 1, 2
     N = 5  # number of AOIs
     D = 14  # AOI size
@@ -65,7 +69,6 @@ def test_cosmos():
     model.data.save(path_data)
     model.control.save(path_data)
 
-    smoke_test = ("CI" in os.environ)
     learning_rate = 0.005
     batch_size = 2
     num_iter = 200 if smoke_test else 200
