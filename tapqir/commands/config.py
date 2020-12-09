@@ -33,7 +33,7 @@ class Config(Command):
         config["fit"]["k_max"] = "2"
         config["fit"]["num_iter"] = "30000"
         config["fit"]["infer"] = "10000"
-        config["fit"]["batch_size"] = "5"
+        config["fit"]["batch_size"] = "0"
         config["fit"]["learning_rate"] = "0.005"
         config["fit"]["control"] = "True"
         config["fit"]["device"] = "cuda"
