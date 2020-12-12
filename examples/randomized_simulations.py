@@ -8,6 +8,9 @@ from tapqir.utils.simulate import simulate
 def main(args):
     if args.cuda:
         torch.set_default_tensor_type("torch.cuda.FloatTensor")
+        device = "cuda"
+    else:
+        device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
     params["gain"] = random.uniform(1, 19)
@@ -20,7 +23,7 @@ def main(args):
 
     model = simulate(args.N, args.F, args.D, cuda=args.cuda, params=params)
 
-    model.load(model.data_path, True, "cuda")
+    model.load(model.data_path, True, device)
     model.settings(args.lr, args.bs)
     model.run(args.it, args.infer)
 
