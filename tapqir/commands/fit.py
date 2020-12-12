@@ -73,29 +73,10 @@ class Fit(Command):
         model = models[args.model](states, k_max)
         model.load(args.dataset_path, control, device)
 
-        # find max possible batch_size
+        model.settings(learning_rate, batch_size)
         if batch_size == 0:
-            import shutil
-            k = 0
-            while batch_size < model.data.N:
-                model.settings(learning_rate, batch_size + 2**k)
-                try:
-                    model.run(1, 1)
-                except RuntimeError as error:
-                    assert error.args[0].startswith("CUDA")
-                    shutil.rmtree(model.path)
-                    if k == 0:
-                        break
-                    else:
-                        batch_size += 2**(k-1)
-                        k = 0
-                else:
-                    shutil.rmtree(model.path)
-                    k += 1
-            # add batch_size to options.cfg
-            config.set("fit", "batch_size", str(batch_size))
+            # add new batch_size to options.cfg
+            config.set("fit", "batch_size", str(model.batch_size))
             with open(cfg_file, "w") as configfile:
                 config.write(configfile)
-
-        model.settings(learning_rate, batch_size)
         model.run(num_iter, infer)

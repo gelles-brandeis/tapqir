@@ -127,6 +127,9 @@ class Model(nn.Module):
     def settings(self, lr, batch_size, jit=False):
         # K - max number of spots
         self.lr = lr
+        # find max possible batch_size
+        if batch_size == 0:
+            batch_size = self._max_batch_size()
         self.batch_size = batch_size
         self.jit = jit
 
@@ -140,7 +143,7 @@ class Model(nn.Module):
         except FileNotFoundError:
             pyro.clear_param_store()
 
-            self.iter = 0
+            self.iter = 1
 
             self.predictions = np.zeros(
                 (self.data.N, self.data.F),
@@ -167,6 +170,7 @@ class Model(nn.Module):
 
     def run(self, num_iter, infer):
         # pyro.enable_validation()
+        self.classify = False
         for i in tqdm(range(num_iter)):
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
@@ -179,6 +183,30 @@ class Model(nn.Module):
             if not self.iter % 100:
                 self.save_checkpoint()
             self.iter += 1
+
+    def _max_batch_size(self):
+        import shutil
+        k = 0
+        batch_size = 0
+        while batch_size + 2**k < self.data.N:
+            self.settings(self.lr, batch_size + 2**k)
+            try:
+                self.run(1, 1)
+            except RuntimeError as error:
+                assert error.args[0].startswith("CUDA")
+                shutil.rmtree(self.path)
+                if k == 0:
+                    break
+                else:
+                    batch_size += 2**(k-1)
+                    k = 0
+            else:
+                shutil.rmtree(self.path)
+                k += 1
+        else:
+            batch_size += 2**(k-1)
+
+        return batch_size
 
     def log(self):
         self.path = os.path.join(
