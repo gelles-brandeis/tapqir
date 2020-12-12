@@ -5,7 +5,6 @@ from pyro.infer import Predictive
 from torch.distributions import constraints
 import numpy as np
 import pandas as pd
-import os
 
 from tapqir.utils.dataset import CosmosDataset
 from tapqir.models import GaussianSpot, Cosmos
@@ -66,13 +65,5 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
     model.data.labels["aoi"] = np.arange(N).reshape(-1, 1)
     model.data.labels["frame"] = np.arange(F)
     model.data.labels["z"] = samples["d/theta"][0].cpu() > 0
-
-    # save data
-    model.data_path = \
-        "gain{gain:.1f}probsz{probs_z:.2f}ratej{rate_j:.2f}prox{proximity:.2f}b{background:d}h{height:d}" \
-        .format(**params)
-    model.data.save(model.data_path)
-    model.control.save(model.data_path)
-    pd.Series(params).to_csv(os.path.join(model.data_path, "simulated_params.csv"))
 
     return model
