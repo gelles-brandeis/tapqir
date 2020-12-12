@@ -1,6 +1,8 @@
 import argparse
 import torch
 import pyro
+import pandas as pd
+import os
 import random
 from tapqir.utils.simulate import simulate
 
@@ -13,15 +15,21 @@ def main(args):
         device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
-    params["gain"] = random.uniform(1, 19)
-    params["probs_z"] = random.uniform(0, 0.5)
-    params["rate_j"] = random.uniform(0, 1.5)
+    params["gain"] = random.uniform(1, 20)
+    params["probs_z"] = random.betavariate(1, 9)
+    params["rate_j"] = random.uniform(0, 1)
     params["proximity"] = random.uniform(0.2, 0.6)
     params["offset"] = 90.
     params["height"] = 3000
     params["background"] = 150
 
     model = simulate(args.N, args.F, args.D, cuda=args.cuda, params=params)
+
+    # save data
+    model.data_path = "seed{}".format(args.seed)
+    model.data.save(model.data_path)
+    model.control.save(model.data_path)
+    pd.Series(params).to_csv(os.path.join(model.data_path, "simulated_params.csv"))
 
     model.load(model.data_path, True, device)
     model.settings(args.lr, args.bs)
