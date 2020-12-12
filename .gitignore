@@ -8,6 +8,7 @@ tapqir/models/__pycache__/
 .ipynb_checkpoints/
 tapqir.egg-info/
 examples/gain*
+test/gain*
 
 # sphinx documentation
 docs/build/
