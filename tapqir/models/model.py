@@ -144,6 +144,7 @@ class Model(nn.Module):
             pyro.clear_param_store()
 
             self.iter = 1
+            self._rolling = None
 
             self.predictions = np.zeros(
                 (self.data.N, self.data.F),
@@ -170,11 +171,16 @@ class Model(nn.Module):
 
     def run(self, num_iter, infer):
         # pyro.enable_validation()
+        self._stop = False
         self.classify = False
         for i in tqdm(range(num_iter)):
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
                 self.save_checkpoint()
+                if self._stop:
+                    print("converged")
+                    self.logger.info("Step #{} converged.".format(self.iter))
+                    break
             self.iter += 1
 
         self.classify = True
@@ -260,7 +266,7 @@ class Model(nn.Module):
             h_loc - mean intensity, w_mean - mean spot width, \
             x_mean - x position, y_mean - y position, \
             b_loc - background intensity."
-        if self.name == "spotdetection":
+        if self.classify:
             matlab["z_probs"] = self.z_probs.cpu().numpy()
             matlab["j_probs"] = self.j_probs.cpu().numpy()
             matlab["m_probs"] = self.m_probs.cpu().numpy()
@@ -278,7 +284,7 @@ class Model(nn.Module):
         savemat(os.path.join(self.path, "parameters.mat"), matlab)
 
         # save global paramters in csv file and for tensorboard
-        global_params = pd.Series(data={"iter": self.iter})
+        global_params = pd.Series(dtype=float, name=self.iter)
 
         self.writer.add_scalar(
             "-ELBO", self.iter_loss, self.iter)
@@ -317,14 +323,28 @@ class Model(nn.Module):
             for key, value in {**metrics, **pos, **neg}.items():
                 global_params[key] = value
 
+        if self._rolling is None:
+            self._rolling = global_params.to_frame().T
+        elif global_params.name not in self._rolling.index:
+            self._rolling = self._rolling.append(global_params)
+        if len(self._rolling) > 100:
+            self._rolling = self._rolling.drop(self._rolling.index[0])
+            conv_params = ["-ELBO", "proximity_0", "gain", "probs_z_1", "rate_j"]
+            if all(self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.1 for p in conv_params):
+                self._stop = True
+
         global_params.to_csv(os.path.join(self.path, "global_params.csv"))
+        self._rolling.to_csv(os.path.join(self.path, "rolling_params.csv"))
         self.logger.info("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
         if path is None:
             path = self.path
-        global_params = pd.read_csv(os.path.join(path, "global_params.csv"), header=None, squeeze=True, index_col=0)
-        self.iter = int(global_params["iter"])
+        global_params = pd.read_csv(os.path.join(path, "global_params.csv"),
+                                    squeeze=True, index_col=0)
+        self._rolling = pd.read_csv(os.path.join(path, "rolling_params.csv"),
+                                    index_col=0)
+        self.iter = int(global_params.name)
         self.optim.load(os.path.join(path, "optimizer"))
         pyro.clear_param_store()
         pyro.get_param_store().load(
