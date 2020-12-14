@@ -178,7 +178,6 @@ class Model(nn.Module):
             if not self.iter % 100:
                 self.save_checkpoint()
                 if self._stop:
-                    print("converged")
                     self.logger.info("Step #{} converged.".format(self.iter))
                     break
             self.iter += 1
@@ -227,14 +226,19 @@ class Model(nn.Module):
             log_dir=os.path.join(self.path, "scalar"))
 
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
         fh = logging.FileHandler(os.path.join(
             self.path, "run.log"))
         fh.setLevel(logging.DEBUG)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
         formatter = logging.Formatter(
             fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt="%m/%d/%Y %I:%M:%S %p")
         fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
         self.logger.addHandler(fh)
+        self.logger.addHandler(ch)
         self.logger.debug("D - {}".format(self.data.D))
         self.logger.debug("K - {}".format(self.K))
         self.logger.debug("data.N - {}".format(self.data.N))
