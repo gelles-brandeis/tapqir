@@ -7,7 +7,7 @@ from pyro.ops.indexing import Vindex
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import AffineBeta, ConvolutedGamma
-from tapqir.models import Model
+from tapqir.models.model import Model
 
 
 class Cosmos(Model):
