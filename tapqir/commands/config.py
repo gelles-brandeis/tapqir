@@ -11,8 +11,7 @@ class Config(Command):
     def get_parser(self, prog_name):
         parser = super(Config, self).get_parser(prog_name)
 
-        parser.add_argument("dataset_path", type=str,
-                            help="Path to the dataset folder")
+        parser.add_argument("dataset_path", type=str, help="Path to the dataset folder")
 
         return parser
 

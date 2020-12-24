@@ -30,12 +30,11 @@ def read_glimpse(path, D):
     # load driftlist mat file
     drift_mat = loadmat(config["glimpse"]["driftlist"])
     # calculate the cumulative sum of dx and dy
-    drift_mat["driftlist"][:, 1:3] = np.cumsum(
-        drift_mat["driftlist"][:, 1:3], axis=0)
+    drift_mat["driftlist"][:, 1:3] = np.cumsum(drift_mat["driftlist"][:, 1:3], axis=0)
     # convert driftlist into DataFrame
     drift_df = pd.DataFrame(
-        drift_mat["driftlist"][:, :3],
-        columns=["frame", "dx", "dy"])
+        drift_mat["driftlist"][:, :3], columns=["frame", "dx", "dy"]
+    )
     drift_df = drift_df.astype({"frame": int}).set_index("frame")
 
     if config["glimpse"]["frame_start"] and config["glimpse"]["frame_end"]:
@@ -54,20 +53,24 @@ def read_glimpse(path, D):
         try:
             aoi_df[dtype] = pd.DataFrame(
                 aoi_mat[dtype]["aoiinfo2"],
-                columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+                columns=["frame", "ave", "x", "y", "pixnum", "aoi"],
+            )
         except KeyError:
             aoi_df[dtype] = pd.DataFrame(
                 aoi_mat[dtype]["aoifits"]["aoiinfo2"][0, 0],
-                columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+                columns=["frame", "ave", "x", "y", "pixnum", "aoi"],
+            )
         except IndexError:
             aoi_df[dtype] = pd.DataFrame(
-                aoi_mat[dtype],
-                columns=["frame", "ave", "x", "y", "pixnum", "aoi"])
+                aoi_mat[dtype], columns=["frame", "ave", "x", "y", "pixnum", "aoi"]
+            )
         aoi_df[dtype] = aoi_df[dtype].astype({"aoi": int}).set_index("aoi")
-        aoi_df[dtype]["x"] = aoi_df[dtype]["x"] \
-            - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dx"]
-        aoi_df[dtype]["y"] = aoi_df[dtype]["y"] \
-            - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dy"]
+        aoi_df[dtype]["x"] = (
+            aoi_df[dtype]["x"] - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dx"]
+        )
+        aoi_df[dtype]["y"] = (
+            aoi_df[dtype]["y"] - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dy"]
+        )
 
     labels = None
     if config["glimpse"]["labels"]:
@@ -80,36 +83,49 @@ def read_glimpse(path, D):
             aoi_df["test"] = aoi_df["test"].loc[aoi_list]
             labels = np.zeros(
                 (len(aoi_df["test"]), len(drift_df)),
-                dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)])
-            labels["aoi"] = framelist[config["glimpse"]["labeltype"]][:, 0] \
-                .reshape(len(aoi_df["test"]), len(drift_df))
-            labels["frame"] = framelist[config["glimpse"]["labeltype"]][:, 2] \
-                .reshape(len(aoi_df["test"]), len(drift_df))
-            labels["spotpicker"] = framelist[config["glimpse"]["labeltype"]][:, 1] \
-                .reshape(len(aoi_df["test"]), len(drift_df))
+                dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)],
+            )
+            labels["aoi"] = framelist[config["glimpse"]["labeltype"]][:, 0].reshape(
+                len(aoi_df["test"]), len(drift_df)
+            )
+            labels["frame"] = framelist[config["glimpse"]["labeltype"]][:, 2].reshape(
+                len(aoi_df["test"]), len(drift_df)
+            )
+            labels["spotpicker"] = framelist[config["glimpse"]["labeltype"]][
+                :, 1
+            ].reshape(len(aoi_df["test"]), len(drift_df))
             labels["spotpicker"][labels["spotpicker"] == 0] = 3
             labels["spotpicker"][labels["spotpicker"] == 2] = 0
         else:
             labels_mat = loadmat(config["glimpse"]["labels"])
             labels = np.zeros(
                 (len(aoi_df["test"]), len(drift_df)),
-                dtype=[("aoi", int), ("frame", int), ("z", bool), ("spotpicker", float)])
+                dtype=[
+                    ("aoi", int),
+                    ("frame", int),
+                    ("z", bool),
+                    ("spotpicker", float),
+                ],
+            )
             labels["aoi"] = aoi_df["test"].index.values.reshape(-1, 1)
             labels["frame"] = drift_df.index.values
-            spot_picker = labels_mat["Intervals"][
-                "CumulativeIntervalArray"][0, 0]
+            spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0, 0]
             for sp in spot_picker:
                 aoi = int(sp[-1])
                 start = int(sp[1])
                 end = int(sp[2])
-                if sp[0] in [-2., 0., 2.]:
-                    labels["spotpicker"][(labels["aoi"] == aoi) &
-                                         (labels["frame"] >= start) &
-                                         (labels["frame"] <= end)] = 0
-                elif sp[0] in [-3., 1., 3.]:
-                    labels["spotpicker"][(labels["aoi"] == aoi) &
-                                         (labels["frame"] >= start) &
-                                         (labels["frame"] <= end)] = 1
+                if sp[0] in [-2.0, 0.0, 2.0]:
+                    labels["spotpicker"][
+                        (labels["aoi"] == aoi)
+                        & (labels["frame"] >= start)
+                        & (labels["frame"] <= end)
+                    ] = 0
+                elif sp[0] in [-3.0, 1.0, 3.0]:
+                    labels["spotpicker"][
+                        (labels["aoi"] == aoi)
+                        & (labels["frame"] >= start)
+                        & (labels["frame"] <= end)
+                    ] = 1
 
         labels["z"] = labels["spotpicker"]
 
@@ -125,33 +141,39 @@ def read_glimpse(path, D):
     height, width = int(header["height"]), int(header["width"])
     # drift
     drift = pd.DataFrame(
-        data={"dx": 0., "dy": 0., "abs_dx": drift_df["dx"],
-              "abs_dy": drift_df["dy"]},
-        index=drift_df.index)
+        data={"dx": 0.0, "dy": 0.0, "abs_dx": drift_df["dx"], "abs_dy": drift_df["dy"]},
+        index=drift_df.index,
+    )
 
     target = {}
     data = {}
     for dtype in dtypes:
         # target location
         target[dtype] = pd.DataFrame(
-            data={"frame": aoi_df[dtype]["frame"], "x": 0., "y": 0.,
-                  "abs_x": aoi_df[dtype]["x"], "abs_y": aoi_df[dtype]["y"]},
-            index=aoi_df[dtype].index)
-        data[dtype] = np.ones((len(aoi_df[dtype]), len(drift_df), D, D)) * 2**15
-    offsets = np.ones((len(drift), 4, 30, 30)) * 2**15
+            data={
+                "frame": aoi_df[dtype]["frame"],
+                "x": 0.0,
+                "y": 0.0,
+                "abs_x": aoi_df[dtype]["x"],
+                "abs_y": aoi_df[dtype]["y"],
+            },
+            index=aoi_df[dtype].index,
+        )
+        data[dtype] = np.ones((len(aoi_df[dtype]), len(drift_df), D, D)) * 2 ** 15
+    offsets = np.ones((len(drift), 4, 30, 30)) * 2 ** 15
     # loop through each frame
     for i, frame in enumerate(tqdm(drift.index)):
         # read the entire frame image
         glimpse_number = header["filenumber"][frame - 1]
         glimpse_path = os.path.join(
-            config["glimpse"]["dir"], "{}.glimpse".format(glimpse_number))
+            config["glimpse"]["dir"], "{}.glimpse".format(glimpse_number)
+        )
         offset = header["offset"][frame - 1]
         with open(glimpse_path, "rb") as fid:
             fid.seek(offset)
-            img = np.fromfile(
-                fid, dtype='>i2',
-                count=height*width) \
-                .reshape(height, width)
+            img = np.fromfile(fid, dtype=">i2", count=height * width).reshape(
+                height, width
+            )
 
         offsets[i, 0, :, :] += img[10:40, 10:40]
         offsets[i, 1, :, :] += img[10:40, -40:-10]
@@ -166,12 +188,16 @@ def read_glimpse(path, D):
                 # top left corner of aoi
                 # integer part (target center - half aoi width) \
                 # + integer part (drift)
-                top_x = int((aoi_df[dtype].at[aoi, "x"] - D * 0.5) // 1
-                            + drift_df.at[frame, "dx"] // 1)
-                left_y = int((aoi_df[dtype].at[aoi, "y"] - D * 0.5) // 1
-                             + drift_df.at[frame, "dy"] // 1)
+                top_x = int(
+                    (aoi_df[dtype].at[aoi, "x"] - D * 0.5) // 1
+                    + drift_df.at[frame, "dx"] // 1
+                )
+                left_y = int(
+                    (aoi_df[dtype].at[aoi, "y"] - D * 0.5) // 1
+                    + drift_df.at[frame, "dy"] // 1
+                )
                 # j-th frame, i-th aoi
-                data[dtype][j, i, :, :] += img[top_x:top_x+D, left_y:left_y+D]
+                data[dtype][j, i, :, :] += img[top_x : top_x + D, left_y : left_y + D]
                 # new target center for the first frame
                 # if i == 0:
                 #    target.at[aoi, "x"] = aoi_df.at[aoi, "x"] - top_x - 1
@@ -179,11 +205,19 @@ def read_glimpse(path, D):
     offset = torch.tensor(offsets, dtype=torch.float32)
     for dtype in dtypes:
         for j, aoi in enumerate(aoi_df[dtype].index):
-            target[dtype].at[aoi, "x"] = aoi_df[dtype].at[aoi, "x"] \
-                - int((aoi_df[dtype].at[aoi, "x"] - D * 0.5) // 1) - 1
-            target[dtype].at[aoi, "y"] = aoi_df[dtype].at[aoi, "y"] \
-                - int((aoi_df[dtype].at[aoi, "y"] - D * 0.5) // 1) - 1
+            target[dtype].at[aoi, "x"] = (
+                aoi_df[dtype].at[aoi, "x"]
+                - int((aoi_df[dtype].at[aoi, "x"] - D * 0.5) // 1)
+                - 1
+            )
+            target[dtype].at[aoi, "y"] = (
+                aoi_df[dtype].at[aoi, "y"]
+                - int((aoi_df[dtype].at[aoi, "y"] - D * 0.5) // 1)
+                - 1
+            )
         # convert data into torch tensor
         data[dtype] = torch.tensor(data[dtype], dtype=torch.float32)
-        dataset = CosmosDataset(data[dtype], target[dtype], drift, dtype, device, offset, labels)
+        dataset = CosmosDataset(
+            data[dtype], target[dtype], drift, dtype, device, offset, labels
+        )
         dataset.save(path)

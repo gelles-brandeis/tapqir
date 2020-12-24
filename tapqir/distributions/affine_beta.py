@@ -25,12 +25,14 @@ class AffineBeta(TransformedDistribution):
         concentration1 = size * (mean - a) / (b - a)
         concentration0 = size * (b - mean) / (b - a)
         base_dist = Beta(concentration1, concentration0)
-        super(AffineBeta, self).__init__(base_dist, AffineTransform(loc=a, scale=(b - a)),
-                                         validate_args=validate_args)
+        super(AffineBeta, self).__init__(
+            base_dist,
+            AffineTransform(loc=a, scale=(b - a)),
+            validate_args=validate_args,
+        )
 
     def expand(self, batch_shape, _instance=None):
-        """
-        """
+        """"""
         new = self._get_checked_instance(AffineBeta, _instance)
         return super(AffineBeta, self).expand(batch_shape, _instance=new)
 

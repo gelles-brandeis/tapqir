@@ -11,8 +11,12 @@ from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
 from torch.utils.tensorboard import SummaryWriter
 from torch.distributions.utils import lazy_property
-from sklearn.metrics import matthews_corrcoef, confusion_matrix, \
-    recall_score, precision_score
+from sklearn.metrics import (
+    matthews_corrcoef,
+    confusion_matrix,
+    recall_score,
+    precision_score,
+)
 import logging
 from tapqir import __version__ as tapqir_version
 from tqdm import tqdm
@@ -63,7 +67,7 @@ class GaussianSpot:
             spot_locs = Vindex(self.target_locs)[ndx] + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
-            scale_tril=torch.eye(2) * width[..., None, None, None, None]
+            scale_tril=torch.eye(2) * width[..., None, None, None, None],
         )
         gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
         return height[..., None, None] * gaussian_spot
@@ -111,16 +115,16 @@ class Model(nn.Module):
 
         # load test data
         self.data = load_data(self.data_path, dtype="test", device=self.device)
-        self.data_loc = GaussianSpot(
-            self.data.target, self.data.drift,
-            self.data.D)
+        self.data_loc = GaussianSpot(self.data.target, self.data.drift, self.data.D)
 
         # load control data
         if control:
-            self.control = load_data(self.data_path, dtype="control", device=self.device)
+            self.control = load_data(
+                self.data_path, dtype="control", device=self.device
+            )
             self.control_loc = GaussianSpot(
-                self.control.target, self.control.drift,
-                self.control.D)
+                self.control.target, self.control.drift, self.control.D
+            )
         else:
             self.control = control
 
@@ -148,13 +152,19 @@ class Model(nn.Module):
 
             self.predictions = np.zeros(
                 (self.data.N, self.data.F),
-                dtype=[("z", bool),
-                       ("z_probs", float), ("m", bool, (2,)),
-                       ("m_probs", float, (2,)), ("theta", int)])
+                dtype=[
+                    ("z", bool),
+                    ("z_probs", float),
+                    ("m", bool, (2,)),
+                    ("m_probs", float, (2,)),
+                    ("theta", int),
+                ],
+            )
         self._z_map = torch.zeros(self.data.N, self.data.F, dtype=torch.bool)
 
         self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
-            max_plate_nesting=2, ignore_jit_warnings=True)
+            max_plate_nesting=2, ignore_jit_warnings=True
+        )
         self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
     def model(self):
@@ -191,10 +201,11 @@ class Model(nn.Module):
 
     def _max_batch_size(self):
         import shutil
+
         k = 0
         batch_size = 0
-        while batch_size + 2**k < self.data.N:
-            self.settings(self.lr, batch_size + 2**k)
+        while batch_size + 2 ** k < self.data.N:
+            self.settings(self.lr, batch_size + 2 ** k)
             try:
                 self.run(1, 1)
             except RuntimeError as error:
@@ -203,38 +214,39 @@ class Model(nn.Module):
                 if k == 0:
                     break
                 else:
-                    batch_size += 2**(k-1)
+                    batch_size += 2 ** (k - 1)
                     k = 0
             else:
                 shutil.rmtree(self.path)
                 k += 1
         else:
-            batch_size += 2**(k-1)
+            batch_size += 2 ** (k - 1)
 
         return batch_size
 
     def log(self):
         self.path = os.path.join(
-            self.data_path, "runs",
+            self.data_path,
+            "runs",
             "{}".format(self.name),
             "{}".format(tapqir_version.split("+")[0]),
             "S{}".format(self.S),
             "{}".format("control" if self.control else "nocontrol"),
             "lr{}".format(self.lr),
-            "bs{}".format(self.batch_size))
-        self.writer = SummaryWriter(
-            log_dir=os.path.join(self.path, "scalar"))
+            "bs{}".format(self.batch_size),
+        )
+        self.writer = SummaryWriter(log_dir=os.path.join(self.path, "scalar"))
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-        fh = logging.FileHandler(os.path.join(
-            self.path, "run.log"))
+        fh = logging.FileHandler(os.path.join(self.path, "run.log"))
         fh.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.INFO)
         formatter = logging.Formatter(
             fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%m/%d/%Y %I:%M:%S %p")
+            datefmt="%m/%d/%Y %I:%M:%S %p",
+        )
         fh.setFormatter(formatter)
         ch.setFormatter(formatter)
         self.logger.addHandler(fh)
@@ -255,7 +267,9 @@ class Model(nn.Module):
         # save only if no NaN values
         for k, v in pyro.get_param_store().items():
             if torch.isnan(v).any() or torch.isinf(v).any():
-                raise ValueError("Step #{}. Detected NaN values in {}".format(self.iter, k))
+                raise ValueError(
+                    "Step #{}. Detected NaN values in {}".format(self.iter, k)
+                )
 
         # save parameters and optimizer state
         pyro.get_param_store().save(os.path.join(self.path, "params"))
@@ -264,8 +278,9 @@ class Model(nn.Module):
         # save parameters in matlab format
         keys = ["h_loc", "w_mean", "x_mean", "y_mean", "b_loc"]
         matlab = {k: param(f"d/{k}").data.cpu().numpy() for k in keys}
-        matlab["parametersDescription"] = \
-            "Parameters for N x F x K spots. \
+        matlab[
+            "parametersDescription"
+        ] = "Parameters for N x F x K spots. \
             N - target sites, F - frames, K - max number of spots in the image. \
             h_loc - mean intensity, w_mean - mean spot width, \
             x_mean - x position, y_mean - y position, \
@@ -275,8 +290,9 @@ class Model(nn.Module):
             matlab["j_probs"] = self.j_probs.cpu().numpy()
             matlab["m_probs"] = self.m_probs.cpu().numpy()
             matlab["z_marginal"] = self.z_marginal.cpu().numpy()
-            matlab["probabilitiesDescription"] = \
-                "Probabilities for N x F x K spots. \
+            matlab[
+                "probabilitiesDescription"
+            ] = "Probabilities for N x F x K spots. \
                 z_probs - on-target spot probability, \
                 j_probs - off-target spot probability, \
                 m_probs - spot probability (on-target + off-target), \
@@ -290,14 +306,13 @@ class Model(nn.Module):
         # save global paramters in csv file and for tensorboard
         global_params = pd.Series(dtype=float, name=self.iter)
 
-        self.writer.add_scalar(
-            "-ELBO", self.iter_loss, self.iter)
+        self.writer.add_scalar("-ELBO", self.iter_loss, self.iter)
         global_params["-ELBO"] = self.iter_loss
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
                 self.writer.add_scalar(name, val.item(), self.iter)
                 global_params[name] = val.item()
-            elif val.dim() == 1 and len(val) <= self.S+1:
+            elif val.dim() == 1 and len(val) <= self.S + 1:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 self.writer.add_scalars(name, scalars, self.iter)
                 for key, value in scalars.items():
@@ -312,18 +327,18 @@ class Model(nn.Module):
             with np.errstate(divide="ignore", invalid="ignore"):
                 metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
             metrics["Recall"] = recall_score(true_labels, pred_labels, zero_division=0)
-            metrics["Precision"] = precision_score(true_labels, pred_labels, zero_division=0)
+            metrics["Precision"] = precision_score(
+                true_labels, pred_labels, zero_division=0
+            )
 
             neg, pos = {}, {}
             neg["TN"], neg["FP"], pos["FN"], pos["TP"] = confusion_matrix(
-                true_labels, pred_labels).ravel()
+                true_labels, pred_labels
+            ).ravel()
 
-            self.writer.add_scalars(
-                "ACCURACY", metrics, self.iter)
-            self.writer.add_scalars(
-                "NEGATIVES", neg, self.iter)
-            self.writer.add_scalars(
-                "POSITIVES", pos, self.iter)
+            self.writer.add_scalars("ACCURACY", metrics, self.iter)
+            self.writer.add_scalars("NEGATIVES", neg, self.iter)
+            self.writer.add_scalars("POSITIVES", pos, self.iter)
             for key, value in {**metrics, **pos, **neg}.items():
                 global_params[key] = value
 
@@ -334,7 +349,10 @@ class Model(nn.Module):
         if len(self._rolling) > 100:
             self._rolling = self._rolling.drop(self._rolling.index[0])
             conv_params = ["-ELBO", "proximity_0", "gain", "probs_z_1", "rate_j"]
-            if all(self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05 for p in conv_params):
+            if all(
+                self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05
+                for p in conv_params
+            ):
                 self._stop = True
 
         global_params.to_csv(os.path.join(self.path, "global_params.csv"))
@@ -344,28 +362,32 @@ class Model(nn.Module):
     def load_checkpoint(self, path=None):
         if path is None:
             path = self.path
-        global_params = pd.read_csv(os.path.join(path, "global_params.csv"),
-                                    squeeze=True, index_col=0)
-        self._rolling = pd.read_csv(os.path.join(path, "rolling_params.csv"),
-                                    index_col=0)
+        global_params = pd.read_csv(
+            os.path.join(path, "global_params.csv"), squeeze=True, index_col=0
+        )
+        self._rolling = pd.read_csv(
+            os.path.join(path, "rolling_params.csv"), index_col=0
+        )
         self.iter = int(global_params.name)
         self.optim.load(os.path.join(path, "optimizer"))
         pyro.clear_param_store()
         pyro.get_param_store().load(
-            os.path.join(path, "params"),
-            map_location=self.device)
+            os.path.join(path, "params"), map_location=self.device
+        )
         # self.predictions = np.load(os.path.join(path, "predictions.npy"))
         self.logger.info(
-            "Step #{}. Loaded model params and optimizer state from {}"
-            .format(self.iter, path))
+            "Step #{}. Loaded model params and optimizer state from {}".format(
+                self.iter, path
+            )
+        )
 
     def load_parameters(self, path=None):
         if path is None:
             path = self.path
         pyro.clear_param_store()
         pyro.get_param_store().load(
-            os.path.join(path, "params"),
-            map_location=self.device)
+            os.path.join(path, "params"), map_location=self.device
+        )
         self._K = 2
         self._S = 1
 
@@ -395,9 +417,12 @@ class Model(nn.Module):
                 param("d/w_mode"),
                 param("d/x_mode"),
                 param("d/y_mode"),
-                torch.arange(self.data.N))
+                torch.arange(self.data.N),
+            )
             signal = (self.data.data * weights).sum(dim=(-2, -1))
-            noise = (self.offset_var + (signal - self.offset_mean) * param("gain")).sqrt()
+            noise = (
+                self.offset_var + (signal - self.offset_mean) * param("gain")
+            ).sqrt()
             result = (signal - param("d/b_loc") - self.offset_mean) / noise
             mask = self.z_probs > 0.5
             return result[mask]

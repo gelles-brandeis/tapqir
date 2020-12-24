@@ -41,9 +41,7 @@ class FixedOffset(Cosmos):
 
         with N_plate as ndx, F_plate:
             # sample background intensity
-            background = sample(
-                "background", Gamma(150., 1.)
-            )
+            background = sample("background", Gamma(150.0, 1.0))
             locs = background[..., None, None]
 
             # sample hidden model state (1+K*S,)
@@ -59,32 +57,35 @@ class FixedOffset(Cosmos):
                 with poutine.mask(mask=m > 0):
                     # sample spot variables
                     height = sample(
-                        f"height_{kdx}", Gamma(
-                            param("height_loc") / param("gain"),
-                            1 / param("gain"))
+                        f"height_{kdx}",
+                        Gamma(param("height_loc") / param("gain"), 1 / param("gain")),
                     )
                     width = sample(
-                        f"width_{kdx}", AffineBeta(
-                            param("width_mean"),
-                            param("width_size"), 0.75, 2.25
-                        ))
+                        f"width_{kdx}",
+                        AffineBeta(
+                            param("width_mean"), param("width_size"), 0.75, 2.25
+                        ),
+                    )
                     x = sample(
-                        f"x_{kdx}", AffineBeta(
-                            0, self.size[ontarget], -(data.D+1)/2, (data.D+1)/2
-                        ))
+                        f"x_{kdx}",
+                        AffineBeta(
+                            0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
+                        ),
+                    )
                     y = sample(
-                        f"y_{kdx}", AffineBeta(
-                            0, self.size[ontarget], -(data.D+1)/2, (data.D+1)/2
-                        ))
+                        f"y_{kdx}",
+                        AffineBeta(
+                            0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
+                        ),
+                    )
 
                 # calculate image shape w/o offset
-                height = height.masked_fill(m == 0, 0.)
+                height = height.masked_fill(m == 0, 0.0)
                 gaussian = data_loc(height, width, x, y, ndx)
                 locs = locs + gaussian
 
             # observed data
             sample(
-                "data", FixedOffsetGamma(
-                    locs, param("gain"), param("offset")
-                ).to_event(2),
+                "data",
+                FixedOffsetGamma(locs, param("gain"), param("offset")).to_event(2),
             )

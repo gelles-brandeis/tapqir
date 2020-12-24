@@ -14,7 +14,16 @@ class CosmosDataset(Dataset):
     Cosmos Dataset
     """
 
-    def __init__(self, data=None, target=None, drift=None, dtype=None, device=None, offset=None, labels=None):
+    def __init__(
+        self,
+        data=None,
+        target=None,
+        drift=None,
+        dtype=None,
+        device=None,
+        offset=None,
+        labels=None,
+    ):
         self.data = data.to(device)
         self.N, self.F, self.D, _ = self.data.shape
         self.target = target
@@ -41,8 +50,11 @@ class CosmosDataset(Dataset):
 
     @lazy_property
     def noise(self):
-        return (self.data.std(dim=(1, 2, 3)).mean()
-                - self.offset.std()) * np.pi * (2 * 1.3) ** 2
+        return (
+            (self.data.std(dim=(1, 2, 3)).mean() - self.offset.std())
+            * np.pi
+            * (2 * 1.3) ** 2
+        )
 
     @lazy_property
     def offset_max(self):
@@ -55,13 +67,17 @@ class CosmosDataset(Dataset):
     @lazy_property
     def offset_samples(self):
         clamped_offset = torch.clamp(self.offset, self.offset_min, self.offset_max)
-        offset_samples, offset_weights = torch.unique(clamped_offset, sorted=True, return_counts=True)
+        offset_samples, offset_weights = torch.unique(
+            clamped_offset, sorted=True, return_counts=True
+        )
         return offset_samples
 
     @lazy_property
     def offset_weights(self):
         clamped_offset = torch.clamp(self.offset, self.offset_min, self.offset_max)
-        offset_samples, offset_weights = torch.unique(clamped_offset, sorted=True, return_counts=True)
+        offset_samples, offset_weights = torch.unique(
+            clamped_offset, sorted=True, return_counts=True
+        )
         return offset_weights.float() / offset_weights.sum()
 
     @lazy_property
@@ -74,7 +90,10 @@ class CosmosDataset(Dataset):
 
     @lazy_property
     def offset_var(self):
-        return torch.sum(self.offset_samples ** 2 * self.offset_weights) - self.offset_mean ** 2
+        return (
+            torch.sum(self.offset_samples ** 2 * self.offset_weights)
+            - self.offset_mean ** 2
+        )
 
     def __len__(self):
         return self.N
@@ -83,46 +102,40 @@ class CosmosDataset(Dataset):
         return self.data[idx]
 
     def __repr__(self):
-        return f"{self.__class__.__name__}" \
-               + f"\nN={self.N!r}, F={self.F!r}, D={self.D!r}" \
-               + f"\ndtype={self.dtype!r}"
+        return (
+            f"{self.__class__.__name__}"
+            + f"\nN={self.N!r}, F={self.F!r}, D={self.D!r}"
+            + f"\ndtype={self.dtype!r}"
+        )
 
     def save(self, path):
         if not os.path.isdir(path):
             os.mkdir(path)
-        torch.save(self.data, os.path.join(
-            path, "{}_data.pt".format(self.dtype)))
-        self.target.to_csv(os.path.join(
-            path, "{}_target.csv".format(self.dtype)))
-        self.drift.to_csv(os.path.join(
-            path, "drift.csv"))
+        torch.save(self.data, os.path.join(path, "{}_data.pt".format(self.dtype)))
+        self.target.to_csv(os.path.join(path, "{}_target.csv".format(self.dtype)))
+        self.drift.to_csv(os.path.join(path, "drift.csv"))
         if self.dtype == "test":
             if self.offset is not None:
-                torch.save(self.offset, os.path.join(
-                    path, "offset.pt"))
+                torch.save(self.offset, os.path.join(path, "offset.pt"))
             if self.labels is not None:
-                np.save(os.path.join(path, "labels.npy"),
-                        self.labels)
+                np.save(os.path.join(path, "labels.npy"), self.labels)
 
 
 def load_data(path, dtype, device=None):
-    data = torch.load(os.path.join(
-        path, "{}_data.pt".format(dtype)),
-        map_location=device).detach()
-    target = pd.read_csv(os.path.join(
-        path, "{}_target.csv".format(dtype)),
-        index_col="aoi")
-    drift = pd.read_csv(os.path.join(
-        path, "drift.csv"),
-        index_col="frame")
+    data = torch.load(
+        os.path.join(path, "{}_data.pt".format(dtype)), map_location=device
+    ).detach()
+    target = pd.read_csv(
+        os.path.join(path, "{}_target.csv".format(dtype)), index_col="aoi"
+    )
+    drift = pd.read_csv(os.path.join(path, "drift.csv"), index_col="frame")
     if dtype == "test":
-        offset = torch.load(os.path.join(
-            path, "offset.pt"),
-            map_location=device).detach()
+        offset = torch.load(
+            os.path.join(path, "offset.pt"), map_location=device
+        ).detach()
         labels = None
         if os.path.isfile(os.path.join(path, "labels.npy")):
-            labels = np.load(os.path.join(
-                path, "labels.npy"))
+            labels = np.load(os.path.join(path, "labels.npy"))
         return CosmosDataset(data, target, drift, dtype, device, offset, labels)
 
     return CosmosDataset(data, target, drift, dtype, device)
@@ -152,34 +165,31 @@ class GlimpseDataset(Dataset):
         # read the entire frame image
         glimpse_number = self.header["filenumber"][frame - 1]
         glimpse_path = os.path.join(
-            self.config["glimpse"]["dir"], "{}.glimpse".format(glimpse_number))
+            self.config["glimpse"]["dir"], "{}.glimpse".format(glimpse_number)
+        )
         offset = self.header["offset"][frame - 1]
         with open(glimpse_path, "rb") as fid:
             fid.seek(offset)
-            img = np.fromfile(
-                fid, dtype='>i2',
-                count=self.height*self.width) \
-                .reshape(self.height, self.width)
-        return img + 2**15
+            img = np.fromfile(fid, dtype=">i2", count=self.height * self.width).reshape(
+                self.height, self.width
+            )
+        return img + 2 ** 15
 
     def __repr__(self):
-        return f"{self.__class__.__name__}" \
-               + f"\nN={self.N!r}, F={self.F!r}, D={self.D!r}" \
-               + f"\ndtype={self.dtype!r}"
+        return (
+            f"{self.__class__.__name__}"
+            + f"\nN={self.N!r}, F={self.F!r}, D={self.D!r}"
+            + f"\ndtype={self.dtype!r}"
+        )
 
     def save(self, path):
         if not os.path.isdir(path):
             os.mkdir(path)
-        torch.save(self.data, os.path.join(
-            path, "{}_data.pt".format(self.dtype)))
-        self.target.to_csv(os.path.join(
-            path, "{}_target.csv".format(self.dtype)))
-        self.drift.to_csv(os.path.join(
-            path, "drift.csv"))
+        torch.save(self.data, os.path.join(path, "{}_data.pt".format(self.dtype)))
+        self.target.to_csv(os.path.join(path, "{}_target.csv".format(self.dtype)))
+        self.drift.to_csv(os.path.join(path, "drift.csv"))
         if self.dtype == "test":
             if self.offset is not None:
-                torch.save(self.offset, os.path.join(
-                    path, "offset.pt"))
+                torch.save(self.offset, os.path.join(path, "offset.pt"))
             if self.labels is not None:
-                np.save(os.path.join(path, "labels.npy"),
-                        self.labels)
+                np.save(os.path.join(path, "labels.npy"), self.labels)

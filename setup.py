@@ -30,23 +30,36 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy", "scipy", "pandas", "tqdm", "scikit-learn", "future", "configparser",
-        "torch", "cliff", "PySide2", "pyqtgraph",
-        "pyro-ppl", "tb-nightly",
+        "numpy",
+        "scipy",
+        "pandas",
+        "tqdm",
+        "scikit-learn",
+        "future",
+        "configparser",
+        "torch",
+        "cliff",
+        "PySide2",
+        "pyqtgraph",
+        "pyro-ppl",
+        "tb-nightly",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
-        "test": EXTRAS_REQUIRE + [
+        "test": EXTRAS_REQUIRE
+        + [
             "pytest",
             "flake8",
         ],
-        "dev": EXTRAS_REQUIRE + [
+        "dev": EXTRAS_REQUIRE
+        + [
             "flake8",
             "sphinx",
             "funsor",
             "pytest",
             "nbsphinx",
             "sphinx_rtd_theme",
+            "black",
         ],
     },
     classifiers=[
@@ -54,7 +67,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires=">=3.6",
     entry_points={
         "console_scripts": ["tapqir=tapqir.commands.app:main"],
         "tapqir.app": [
@@ -64,6 +77,6 @@ setuptools.setup(
             "glimpse=tapqir.commands.glimpse:Glimpse",
             "elbo=tapqir.commands.elbo:ELBO",
             "matlab=tapqir.commands.matlab:Matlab",
-        ]
-    }
+        ],
+    },
 )

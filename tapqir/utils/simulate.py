@@ -25,10 +25,18 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
     # parameters and samples
     param("gain", torch.tensor(params["gain"]), constraint=constraints.positive)
     param("width_mean", torch.tensor(1.5), constraint=constraints.positive)
-    param("width_size", torch.tensor(2.), constraint=constraints.positive)
-    param("probs_z", torch.tensor([1 - params["probs_z"], params["probs_z"]]), constraint=constraints.simplex)
+    param("width_size", torch.tensor(2.0), constraint=constraints.positive)
+    param(
+        "probs_z",
+        torch.tensor([1 - params["probs_z"], params["probs_z"]]),
+        constraint=constraints.simplex,
+    )
     param("rate_j", torch.tensor(params["rate_j"]), constraint=constraints.positive)
-    param("proximity", torch.tensor([params["proximity"]]), constraint=constraints.positive)
+    param(
+        "proximity",
+        torch.tensor([params["proximity"]]),
+        constraint=constraints.positive,
+    )
 
     samples = {
         "d/background": torch.full((1, N, 1), params["background"]),
@@ -45,23 +53,38 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
 
     model = Cosmos(S, K)
     offset = torch.full((3,), params["offset"])
-    target = pd.DataFrame(data={"frame": np.zeros(N), "x": 6.5, "y": 6.5}, index=np.arange(N))
+    target = pd.DataFrame(
+        data={"frame": np.zeros(N), "x": 6.5, "y": 6.5}, index=np.arange(N)
+    )
     target.index.name = "aoi"
-    drift = pd.DataFrame(data={"dx": 0., "dy": 0}, index=np.arange(F))
+    drift = pd.DataFrame(data={"dx": 0.0, "dy": 0}, index=np.arange(F))
     drift.index.name = "frame"
-    model.data = CosmosDataset(torch.zeros(N, F, D, D), target, drift,
-                               dtype="test", device=device, offset=offset)
-    model.control = CosmosDataset(torch.zeros(N, F, D, D), target, drift,
-                                  dtype="control", device=device)
+    model.data = CosmosDataset(
+        torch.zeros(N, F, D, D),
+        target,
+        drift,
+        dtype="test",
+        device=device,
+        offset=offset,
+    )
+    model.control = CosmosDataset(
+        torch.zeros(N, F, D, D), target, drift, dtype="control", device=device
+    )
     model.data_loc = GaussianSpot(model.data.target, model.data.drift, model.data.D)
-    model.control_loc = GaussianSpot(model.control.target, model.control.drift, model.control.D)
+    model.control_loc = GaussianSpot(
+        model.control.target, model.control.drift, model.control.D
+    )
 
     # sample
-    predictive = Predictive(poutine.uncondition(model.model), posterior_samples=samples, num_samples=None)
+    predictive = Predictive(
+        poutine.uncondition(model.model), posterior_samples=samples, num_samples=None
+    )
     samples = predictive()
     model.data.data = samples["d/data"][0].data.floor()
     model.control.data = samples["c/data"][0].data.floor()
-    model.data.labels = np.zeros((N, F), dtype=[("aoi", int), ("frame", int), ("z", bool)])
+    model.data.labels = np.zeros(
+        (N, F), dtype=[("aoi", int), ("frame", int), ("z", bool)]
+    )
     model.data.labels["aoi"] = np.arange(N).reshape(-1, 1)
     model.data.labels["frame"] = np.arange(F)
     model.data.labels["z"] = samples["d/theta"][0].cpu() > 0

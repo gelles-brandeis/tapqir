@@ -19,7 +19,7 @@ def main(args):
     params["probs_z"] = random.betavariate(1, 9)
     params["rate_j"] = random.uniform(0, 1)
     params["proximity"] = random.uniform(0.2, 0.6)
-    params["offset"] = 90.
+    params["offset"] = 90.0
     params["height"] = 3000
     params["background"] = 150
 
@@ -46,6 +46,6 @@ if __name__ == "__main__":
     parser.add_argument("-infer", default=100, type=int)
     parser.add_argument("-bs", default=0, type=int)
     parser.add_argument("-lr", default=0.005, type=float)
-    parser.add_argument('--cuda', action='store_true')
+    parser.add_argument("--cuda", action="store_true")
     args = parser.parse_args()
     main(args)
