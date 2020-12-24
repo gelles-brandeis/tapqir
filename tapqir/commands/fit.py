@@ -25,28 +25,56 @@ class Fit(Command):
     def get_parser(self, prog_name):
         parser = super(Fit, self).get_parser(prog_name)
 
-        parser.add_argument("model", default="spotdetection", type=str,
-                            help="Available models: {}".format(", ".join(models.keys())))
-        parser.add_argument("dataset_path", default=".", type=str,
-                            help="Path to the dataset folder")
+        parser.add_argument(
+            "model",
+            default="spotdetection",
+            type=str,
+            help="Available models: {}".format(", ".join(models.keys())),
+        )
+        parser.add_argument(
+            "dataset_path", default=".", type=str, help="Path to the dataset folder"
+        )
 
-        parser.add_argument("-s", metavar="NUM_STATES", type=int,
-                            help="Number of molecular states (default: 1)")
-        parser.add_argument("-k", metavar="K_MAX", type=int,
-                            help="Maximum number of spots (default: 2)")
-        parser.add_argument("-it", metavar="NUM_ITER", type=int,
-                            help="Number of iterations (default: 30000)")
-        parser.add_argument("-infer", metavar="INFER", type=int,
-                            help="Number of inference iterations (default: 20000)")
-        parser.add_argument("-bs", metavar="BATCH_SIZE", type=int,
-                            help="Batch size (default: 5)")
-        parser.add_argument("-lr", metavar="LEARNING_RATE", type=float,
-                            help="Learning rate (default: 0.005)")
+        parser.add_argument(
+            "-s",
+            metavar="NUM_STATES",
+            type=int,
+            help="Number of molecular states (default: 1)",
+        )
+        parser.add_argument(
+            "-k", metavar="K_MAX", type=int, help="Maximum number of spots (default: 2)"
+        )
+        parser.add_argument(
+            "-it",
+            metavar="NUM_ITER",
+            type=int,
+            help="Number of iterations (default: 30000)",
+        )
+        parser.add_argument(
+            "-infer",
+            metavar="INFER",
+            type=int,
+            help="Number of inference iterations (default: 20000)",
+        )
+        parser.add_argument(
+            "-bs", metavar="BATCH_SIZE", type=int, help="Batch size (default: 5)"
+        )
+        parser.add_argument(
+            "-lr",
+            metavar="LEARNING_RATE",
+            type=float,
+            help="Learning rate (default: 0.005)",
+        )
 
-        parser.add_argument("-c", metavar="CONTROL", type=bool,
-                            help="Analyze control dataset (default: False)")
-        parser.add_argument("-dev", metavar="DEVICE", type=str,
-                            help="Compute device (default: cuda)")
+        parser.add_argument(
+            "-c",
+            metavar="CONTROL",
+            type=bool,
+            help="Analyze control dataset (default: False)",
+        )
+        parser.add_argument(
+            "-dev", metavar="DEVICE", type=str, help="Compute device (default: cuda)"
+        )
 
         return parser
 

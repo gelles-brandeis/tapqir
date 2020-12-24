@@ -26,7 +26,7 @@ class ConvolutedGamma(TorchDistribution):
         "concentration": constraints.positive,
         "rate": constraints.positive,
         "samples": constraints.real_vector,
-        "log_weights": constraints.real_vector
+        "log_weights": constraints.real_vector,
     }
     support = constraints.positive
 
@@ -58,6 +58,6 @@ class ConvolutedGamma(TorchDistribution):
 
         obs_logits = self.dist.log_prob(value)
         result = obs_logits + self.log_weights
-        result = result.masked_fill(~mask, -40.)
+        result = result.masked_fill(~mask, -40.0)
         result = torch.logsumexp(result, -1)
         return result

@@ -14,12 +14,18 @@ class Show(Command):
     def get_parser(self, prog_name):
         parser = super(Show, self).get_parser(prog_name)
 
-        parser.add_argument("model", default="spotdetection", type=str,
-                            help="Available models: {}".format(", ".join(models.keys())))
-        parser.add_argument("dataset_path", default=".", type=str,
-                            help="Path to the dataset folder")
-        parser.add_argument("parameters_path", type=str,
-                            help="Path to the parameters folder")
+        parser.add_argument(
+            "model",
+            default="spotdetection",
+            type=str,
+            help="Available models: {}".format(", ".join(models.keys())),
+        )
+        parser.add_argument(
+            "dataset_path", default=".", type=str, help="Path to the dataset folder"
+        )
+        parser.add_argument(
+            "parameters_path", type=str, help="Path to the parameters folder"
+        )
 
         return parser
 
