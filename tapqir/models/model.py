@@ -334,7 +334,7 @@ class Model(nn.Module):
         if len(self._rolling) > 100:
             self._rolling = self._rolling.drop(self._rolling.index[0])
             conv_params = ["-ELBO", "proximity_0", "gain", "probs_z_1", "rate_j"]
-            if all(self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.1 for p in conv_params):
+            if all(self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05 for p in conv_params):
                 self._stop = True
 
         global_params.to_csv(os.path.join(self.path, "global_params.csv"))
