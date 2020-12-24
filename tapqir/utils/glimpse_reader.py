@@ -1,10 +1,12 @@
-import os
 import configparser
-from scipy.io import loadmat
+import os
+
 import numpy as np
 import pandas as pd
 import torch
+from scipy.io import loadmat
 from tqdm import tqdm
+
 from tapqir.utils.dataset import CosmosDataset
 
 

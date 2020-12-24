@@ -1,27 +1,28 @@
-import torch
-import torch.nn as nn
+import logging
+import os
+
 import numpy as np
 import pandas as pd
-import os
 import pyro
 import pyro.distributions as dist
+import torch
+import torch.nn as nn
 from pyro import param
-from pyro.infer import SVI
-from pyro.infer import JitTraceEnum_ELBO, TraceEnum_ELBO
+from pyro.infer import SVI, JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
-from torch.utils.tensorboard import SummaryWriter
-from torch.distributions.utils import lazy_property
-from sklearn.metrics import (
-    matthews_corrcoef,
-    confusion_matrix,
-    recall_score,
-    precision_score,
-)
-import logging
-from tapqir import __version__ as tapqir_version
-from tqdm import tqdm
-from tapqir.utils.dataset import load_data
 from scipy.io import savemat
+from sklearn.metrics import (
+    confusion_matrix,
+    matthews_corrcoef,
+    precision_score,
+    recall_score,
+)
+from torch.distributions.utils import lazy_property
+from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
+
+from tapqir import __version__ as tapqir_version
+from tapqir.utils.dataset import load_data
 
 
 class GaussianSpot:

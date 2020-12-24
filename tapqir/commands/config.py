@@ -1,6 +1,7 @@
-from cliff.command import Command
 import configparser
 import os
+
+from cliff.command import Command
 
 
 class Config(Command):

@@ -1,10 +1,9 @@
 import sys
 
 from cliff.command import Command
-
 from PySide2.QtWidgets import QApplication
-from tapqir.commands.qtgui import MainWindow
 
+from tapqir.commands.qtgui import MainWindow
 from tapqir.models import models
 
 

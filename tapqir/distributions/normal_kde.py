@@ -1,7 +1,8 @@
-import torch
-from pyro.distributions import TorchDistribution, Gamma
-from pykeops.torch import Genred
 import math
+
+import torch
+from pykeops.torch import Genred
+from pyro.distributions import Gamma, TorchDistribution
 
 
 class NormalKDE(TorchDistribution):

@@ -1,5 +1,5 @@
 import torch
-from pyro.distributions import TorchDistribution, Normal
+from pyro.distributions import Normal, TorchDistribution
 
 
 class ConvolutedNormal(TorchDistribution):

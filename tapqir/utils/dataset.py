@@ -1,12 +1,13 @@
+import configparser
 import os
+
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset
 from pyro.ops.stats import quantile
-from torch.distributions.utils import probs_to_logits, lazy_property
-import configparser
 from scipy.io import loadmat
+from torch.distributions.utils import lazy_property, probs_to_logits
+from torch.utils.data import Dataset
 
 
 class CosmosDataset(Dataset):

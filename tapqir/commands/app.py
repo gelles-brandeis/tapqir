@@ -1,8 +1,9 @@
 import sys
-from tapqir import __version__ as tapqir_version
 
 from cliff.app import App
 from cliff.commandmanager import CommandManager
+
+from tapqir import __version__ as tapqir_version
 
 
 class MyApp(App):

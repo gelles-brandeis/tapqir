@@ -1,7 +1,7 @@
-from pyro import param, sample, plate, poutine
+from pyro import param, plate, poutine, sample
+from pyro.contrib.autoname import scope
 from pyro.distributions import Categorical, Gamma
 from pyro.ops.indexing import Vindex
-from pyro.contrib.autoname import scope
 
 from tapqir.distributions import AffineBeta, FixedOffsetGamma
 from tapqir.models import Cosmos
