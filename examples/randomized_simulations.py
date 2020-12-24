@@ -1,9 +1,11 @@
 import argparse
-import torch
-import pyro
-import pandas as pd
 import os
 import random
+
+import pandas as pd
+import pyro
+import torch
+
 from tapqir.utils.simulate import simulate
 
 

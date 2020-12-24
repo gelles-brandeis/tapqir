@@ -1,8 +1,9 @@
-import torch
 import os
-import pytest
 import sys
 from subprocess import check_call
+
+import pytest
+import torch
 
 requires_cuda = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="cuda is not available"

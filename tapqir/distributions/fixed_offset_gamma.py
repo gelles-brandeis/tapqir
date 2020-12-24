@@ -1,5 +1,5 @@
-from torch.distributions.transforms import AffineTransform
 from pyro.distributions import Gamma, TransformedDistribution
+from torch.distributions.transforms import AffineTransform
 
 
 class FixedOffsetGamma(TransformedDistribution):

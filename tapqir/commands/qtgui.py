@@ -1,28 +1,28 @@
-from pyqtgraph import HistogramLUTItem
-from PySide2.QtWidgets import (
-    QWidget,
-    QLineEdit,
-    QLabel,
-    QPushButton,
-    QScrollArea,
-    QApplication,
-    QHBoxLayout,
-    QVBoxLayout,
-    QMainWindow,
-    QSizePolicy,
-    QSpacerItem,
-)
-from PySide2.QtCore import Qt
-from PySide2.QtGui import QIntValidator
 import sys
 from functools import partial
 
-import pyqtgraph as pg
-import torch
 import numpy as np
+import pyqtgraph as pg
 import pyro
+import torch
+from pyqtgraph import HistogramLUTItem
 from pyro import param
 from pyro.ops.stats import pi, quantile
+from PySide2.QtCore import Qt
+from PySide2.QtGui import QIntValidator
+from PySide2.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpacerItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 C = {}
 C[0] = (31, 119, 180)

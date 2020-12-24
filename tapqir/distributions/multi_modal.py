@@ -1,5 +1,5 @@
 import torch
-from pyro.distributions import TorchDistribution, Gamma
+from pyro.distributions import Gamma, TorchDistribution
 
 
 class MultiModal(TorchDistribution):

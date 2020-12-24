@@ -1,11 +1,10 @@
 import torch
 import torch.distributions.constraints as constraints
-from torch.distributions.utils import lazy_property
-
-from pyro import param, sample, plate, poutine
+from pyro import param, plate, poutine, sample
+from pyro.contrib.autoname import scope
 from pyro.distributions import Categorical, Gamma, HalfNormal, Poisson
 from pyro.ops.indexing import Vindex
-from pyro.contrib.autoname import scope
+from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import AffineBeta, ConvolutedGamma
 from tapqir.models import Model

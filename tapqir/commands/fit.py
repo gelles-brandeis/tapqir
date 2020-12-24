@@ -1,8 +1,9 @@
+import configparser
+import os
+
+import torch
 from cliff.command import Command
 
-import os
-import torch
-import configparser
 from tapqir.models import models
 
 

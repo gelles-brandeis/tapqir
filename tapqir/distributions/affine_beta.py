@@ -1,6 +1,6 @@
 import torch
-from torch.distributions.transforms import AffineTransform
 from pyro.distributions import Beta, TransformedDistribution
+from torch.distributions.transforms import AffineTransform
 
 
 class AffineBeta(TransformedDistribution):

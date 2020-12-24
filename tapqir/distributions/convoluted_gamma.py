@@ -1,6 +1,6 @@
 import torch
+from pyro.distributions import Categorical, Gamma, TorchDistribution
 from torch.distributions import constraints
-from pyro.distributions import TorchDistribution, Gamma, Categorical
 
 
 class ConvolutedGamma(TorchDistribution):

@@ -1,13 +1,13 @@
-import torch
+import numpy as np
+import pandas as pd
 import pyro
+import torch
 from pyro import param, poutine
 from pyro.infer import Predictive
 from torch.distributions import constraints
-import numpy as np
-import pandas as pd
 
+from tapqir.models import Cosmos, GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
-from tapqir.models import GaussianSpot, Cosmos
 
 
 def simulate(N, F, D=14, cuda=True, params=dict()):
