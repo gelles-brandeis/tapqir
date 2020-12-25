@@ -22,7 +22,7 @@ class Cosmos(Model):
     """
     name = "cosmos"
 
-    def __init__(self, S, K):
+    def __init__(self, S=1, K=2):
         super().__init__(S, K)
         self.classify = False
 

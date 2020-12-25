@@ -103,11 +103,10 @@ class CosmosDataset(Dataset):
         return self.data[idx]
 
     def __repr__(self):
-        return (
-            f"{self.__class__.__name__}"
-            + f"\nN={self.N!r}, F={self.F!r}, D={self.D!r}"
-            + f"\ndtype={self.dtype!r}"
-        )
+        return rf"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
 
     def save(self, path):
         if not os.path.isdir(path):
