@@ -51,7 +51,7 @@ setuptools.setup(
         "test": EXTRAS_REQUIRE
         + [
             "pytest",
-            "flake8",
+            "pytest-qt" "flake8",
         ],
         "dev": EXTRAS_REQUIRE
         + [

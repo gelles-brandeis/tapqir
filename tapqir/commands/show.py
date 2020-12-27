@@ -15,7 +15,7 @@ class Show(Command):
 
         parser.add_argument(
             "model",
-            default="spotdetection",
+            default="cosmos",
             type=str,
             help="Available models: {}".format(", ".join(models.keys())),
         )
