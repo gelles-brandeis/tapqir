@@ -1,5 +1,5 @@
 import configparser
-import os
+from pathlib import Path
 
 import torch
 from cliff.command import Command
@@ -82,7 +82,7 @@ class Fit(Command):
     def take_action(self, args):
         # read options.cfg file
         config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = os.path.join(args.dataset_path, "options.cfg")
+        cfg_file = Path(args.dataset_path) / "options.cfg"
         config.read(cfg_file)
 
         states = args.s or config["fit"].getint("num_states")

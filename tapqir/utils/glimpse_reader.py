@@ -1,5 +1,5 @@
 import configparser
-import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -13,10 +13,11 @@ from tapqir.utils.dataset import CosmosDataset
 def read_glimpse(path, D):
     """ Read Glimpse files """
 
+    path = Path(path)
     device = torch.device("cpu")
     # read options.cfg file
     config = configparser.ConfigParser(allow_no_value=True)
-    cfg_file = os.path.join(path, "options.cfg")
+    cfg_file = path / "options.cfg"
     config.read(cfg_file)
 
     dtypes = ["test"]
@@ -24,7 +25,7 @@ def read_glimpse(path, D):
         dtypes.append("control")
 
     # convert header into dict format
-    mat_header = loadmat(os.path.join(config["glimpse"]["dir"], "header.mat"))
+    mat_header = loadmat(Path(config["glimpse"]["dir"]) / "header.mat")
     header = dict()
     for i, dt in enumerate(mat_header["vid"].dtype.names):
         header[dt] = np.squeeze(mat_header["vid"][0, 0][i])
@@ -167,9 +168,7 @@ def read_glimpse(path, D):
     for i, frame in enumerate(tqdm(drift.index)):
         # read the entire frame image
         glimpse_number = header["filenumber"][frame - 1]
-        glimpse_path = os.path.join(
-            config["glimpse"]["dir"], "{}.glimpse".format(glimpse_number)
-        )
+        glimpse_path = Path(config["glimpse"]["dir"]) / f"{glimpse_number}.glimpse"
         offset = header["offset"][frame - 1]
         with open(glimpse_path, "rb") as fid:
             fid.seek(offset)

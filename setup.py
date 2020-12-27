@@ -50,8 +50,10 @@ setuptools.setup(
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE
         + [
-            "pytest",
             "flake8",
+            "pytest",
+            "pytest-qt",
+            "pytest-xvfb",
         ],
         "dev": EXTRAS_REQUIRE
         + [
@@ -59,6 +61,8 @@ setuptools.setup(
             "sphinx",
             "funsor",
             "pytest",
+            "pytest-qt",
+            "pytest-xvfb",
             "nbsphinx",
             "sphinx_rtd_theme",
             "black",

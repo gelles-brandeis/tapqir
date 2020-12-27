@@ -184,7 +184,7 @@ class MainWindow(QMainWindow):
 
     def show_new_window(self, checked):
         if self.w is None:
-            self.lr = pg.LinearRegionItem([400, 500])
+            self.lr = pg.LinearRegionItem([0, min(self.Model.data.F, 100)])
             self.plot["zoom"].addItem(self.lr)
             self.w = ImagesWindow()
             self.initImages()
@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
         )
         plt = widget.addPlot(row=1, col=5)
         plt.plot(
-            x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0, 0, 255, 70)
+            x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0, 0, 255, 70)
         )
         for i, p in enumerate(self.params):
             self.plot[p] = widget.addPlot(row=i + 2, col=0, colspan=5)
@@ -404,17 +404,17 @@ class MainWindow(QMainWindow):
             self.item[f"{p}Hist_m"] = pg.PlotDataItem(
                 x,
                 y,
-                stepMode=True,
+                stepMode="center",
                 fillLevel=0,
                 fillOutline=True,
                 brush=(0, 0, 255, 30),
             )
             if p in ["d/height", "d/width", "d/x", "d/y"]:
                 self.item[f"{p}Hist_z"] = pg.PlotDataItem(
-                    xz, yz, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2]
+                    xz, yz, stepMode="center", fillLevel=0, fillOutline=False, pen=C[2]
                 )
                 self.item[f"{p}Hist_j"] = pg.PlotDataItem(
-                    xj, yj, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3]
+                    xj, yj, stepMode="center", fillLevel=0, fillOutline=False, pen=C[3]
                 )
 
         for p in self.params:

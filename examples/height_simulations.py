@@ -1,5 +1,4 @@
 import argparse
-import random
 from pathlib import Path
 
 import pandas as pd
@@ -17,18 +16,18 @@ def main(args):
         device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
-    params["gain"] = random.uniform(1, 20)
-    params["probs_z"] = random.betavariate(1, 9)
-    params["rate_j"] = random.uniform(0, 1)
-    params["proximity"] = random.uniform(0.2, 0.6)
+    params["gain"] = 7.0
+    params["probs_z"] = 0.15
+    params["rate_j"] = 0.15
+    params["proximity"] = 0.2
     params["offset"] = 90.0
-    params["height"] = 3000
+    params["height"] = args.height
     params["background"] = 150
 
     model = simulate(args.N, args.F, args.D, cuda=args.cuda, params=params)
 
     # save data
-    model.data_path = args.path or "seed{}".format(args.seed)
+    model.data_path = args.path or "height{}".format(args.height)
     model.data.save(model.data_path)
     model.control.save(model.data_path)
     pd.Series(params).to_csv(Path(model.data_path) / "simulated_params.csv")
@@ -39,8 +38,9 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Randomized Simulations")
+    parser = argparse.ArgumentParser(description="Height Simulations")
     parser.add_argument("--seed", default=0, type=int)
+    parser.add_argument("--height", default=3000, type=int)
     parser.add_argument("-N", default=5, type=int)
     parser.add_argument("-F", default=500, type=int)
     parser.add_argument("-D", default=14, type=int)
