@@ -245,7 +245,7 @@ class MainWindow(QMainWindow):
         f2 = int(f2)
         frames = torch.arange(f1, f2)
         img_ideal = (
-            self.Model.offset_mean + param("d/b_loc").data[n, frames, None, None]
+            self.Model.data.offset_mean + param("d/b_loc").data[n, frames, None, None]
         )
         gaussian = self.Model.data_loc(
             param("d/h_loc")

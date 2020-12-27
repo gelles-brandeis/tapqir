@@ -62,6 +62,7 @@ setuptools.setup(
             "nbsphinx",
             "sphinx_rtd_theme",
             "black",
+            "isort",
         ],
     },
     classifiers=[
