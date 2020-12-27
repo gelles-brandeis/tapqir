@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
         )
         plt = widget.addPlot(row=1, col=5)
         plt.plot(
-            x, y, stepMode=True, fillLevel=0, fillOutline=True, brush=(0, 0, 255, 70)
+            x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0, 0, 255, 70)
         )
         for i, p in enumerate(self.params):
             self.plot[p] = widget.addPlot(row=i + 2, col=0, colspan=5)
