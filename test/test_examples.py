@@ -14,10 +14,12 @@ EXAMPLES_DIR = os.path.join(os.path.dirname(TESTS_DIR), "examples")
 
 CPU_EXAMPLES = [
     "randomized_simulations.py -it 1 -infer 1 -bs 4",
+    "height_simulations.py -it 1 -infer 1 -bs 4",
 ]
 
 CUDA_EXAMPLES = [
     "randomized_simulations.py -it 1 -infer 1 -bs 4 --cuda",
+    "height_simulations.py -it 1 -infer 1 -bs 4",
 ]
 
 
