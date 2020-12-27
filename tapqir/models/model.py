@@ -1,5 +1,5 @@
 import logging
-import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -109,7 +109,7 @@ class Model(nn.Module):
 
     def load(self, path, control, device):
         # set path
-        self.data_path = path
+        self.data_path = Path(path)
 
         # set device
         self.device = torch.device(device)
@@ -226,21 +226,21 @@ class Model(nn.Module):
         return batch_size
 
     def log(self):
-        self.path = os.path.join(
-            self.data_path,
-            "runs",
-            "{}".format(self.name),
-            "{}".format(tapqir_version.split("+")[0]),
-            "S{}".format(self.S),
-            "{}".format("control" if self.control else "nocontrol"),
-            "lr{}".format(self.lr),
-            "bs{}".format(self.batch_size),
+        self.path = (
+            self.data_path
+            / "runs"
+            / f"{self.name}"
+            / f"{tapqir_version.split('+')[0]}"
+            / f"S{self.S}"
+            / f"{'control' if self.control else 'nocontrol'}"
+            / f"lr{self.lr}"
+            / f"bs{self.batch_size}"
         )
-        self.writer = SummaryWriter(log_dir=os.path.join(self.path, "scalar"))
+        self.writer = SummaryWriter(log_dir=self.path / "scalar")
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-        fh = logging.FileHandler(os.path.join(self.path, "run.log"))
+        fh = logging.FileHandler(self.path / "run.log")
         fh.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.INFO)
@@ -273,8 +273,8 @@ class Model(nn.Module):
                 )
 
         # save parameters and optimizer state
-        pyro.get_param_store().save(os.path.join(self.path, "params"))
-        self.optim.save(os.path.join(self.path, "optimizer"))
+        pyro.get_param_store().save(self.path / "params")
+        self.optim.save(self.path / "optimizer")
 
         # save parameters in matlab format
         keys = ["h_loc", "w_mean", "x_mean", "y_mean", "b_loc"]
@@ -302,7 +302,7 @@ class Model(nn.Module):
         matlab["aoilistDescription"] = "aoi numbering from aoiinfo"
         matlab["framelist"] = self.data.drift.index.values
         matlab["framelistDescription"] = "frame numbering from driftlist"
-        savemat(os.path.join(self.path, "parameters.mat"), matlab)
+        savemat(self.path / "parameters.mat", matlab)
 
         # save global paramters in csv file and for tensorboard
         global_params = pd.Series(dtype=float, name=self.iter)
@@ -356,25 +356,20 @@ class Model(nn.Module):
             ):
                 self._stop = True
 
-        global_params.to_csv(os.path.join(self.path, "global_params.csv"))
-        self._rolling.to_csv(os.path.join(self.path, "rolling_params.csv"))
+        global_params.to_csv(self.path / "global_params.csv")
+        self._rolling.to_csv(self.path / "rolling_params.csv")
         self.logger.info("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
-        if path is None:
-            path = self.path
+        path = Path(path) if path else self.path
         global_params = pd.read_csv(
-            os.path.join(path, "global_params.csv"), squeeze=True, index_col=0
+            path / "global_params.csv", squeeze=True, index_col=0
         )
-        self._rolling = pd.read_csv(
-            os.path.join(path, "rolling_params.csv"), index_col=0
-        )
+        self._rolling = pd.read_csv(path / "rolling_params.csv", index_col=0)
         self.iter = int(global_params.name)
-        self.optim.load(os.path.join(path, "optimizer"))
+        self.optim.load(path / "optimizer")
         pyro.clear_param_store()
-        pyro.get_param_store().load(
-            os.path.join(path, "params"), map_location=self.device
-        )
+        pyro.get_param_store().load(path / "params", map_location=self.device)
         # self.predictions = np.load(os.path.join(path, "predictions.npy"))
         self.logger.info(
             "Step #{}. Loaded model params and optimizer state from {}".format(
@@ -383,12 +378,9 @@ class Model(nn.Module):
         )
 
     def load_parameters(self, path=None):
-        if path is None:
-            path = self.path
+        path = Path(path) if path else self.path
         pyro.clear_param_store()
-        pyro.get_param_store().load(
-            os.path.join(path, "params"), map_location=self.device
-        )
+        pyro.get_param_store().load(path / "params", map_location=self.device)
         self._K = 2
         self._S = 1
 

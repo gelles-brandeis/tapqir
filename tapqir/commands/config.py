@@ -1,5 +1,5 @@
 import configparser
-import os
+from pathlib import Path
 
 from cliff.command import Command
 
@@ -38,6 +38,6 @@ class Config(Command):
         config["fit"]["control"] = "True"
         config["fit"]["device"] = "cuda"
 
-        cfg_file = os.path.join(args.dataset_path, "options.cfg")
+        cfg_file = Path(args.dataset_path) / "options.cfg"
         with open(cfg_file, "w") as configfile:
             config.write(configfile)
