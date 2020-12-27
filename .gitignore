@@ -9,9 +9,8 @@ tapqir/models/__pycache__/
 tapqir.egg-info/
 examples/seed*
 examples/slurm*
-examples/height*
-test/seed*
-test/height*
+examples/height*0
+examples/height*sbatch
 
 # sphinx documentation
 docs/build/

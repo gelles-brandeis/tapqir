@@ -184,7 +184,7 @@ class MainWindow(QMainWindow):
 
     def show_new_window(self, checked):
         if self.w is None:
-            self.lr = pg.LinearRegionItem([400, 500])
+            self.lr = pg.LinearRegionItem([0, min(self.Model.data.F, 100)])
             self.plot["zoom"].addItem(self.lr)
             self.w = ImagesWindow()
             self.initImages()

@@ -24,17 +24,19 @@ CUDA_EXAMPLES = [
 
 
 @pytest.mark.parametrize("example", CPU_EXAMPLES)
-def test_cpu(example):
+def test_cpu(example, tmp_path):
     example = example.split()
     filename, args = example[0], example[1:]
     filename = EXAMPLES_DIR / filename
+    args += ["--path", tmp_path]
     check_call([sys.executable, filename] + args)
 
 
 @requires_cuda
 @pytest.mark.parametrize("example", CUDA_EXAMPLES)
-def test_cuda(example):
+def test_cuda(example, tmp_path):
     example = example.split()
     filename, args = example[0], example[1:]
     filename = EXAMPLES_DIR / filename
+    args += ["--path", tmp_path]
     check_call([sys.executable, filename] + args)

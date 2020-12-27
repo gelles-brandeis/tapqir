@@ -230,7 +230,7 @@ class Model(nn.Module):
             self.data_path
             / "runs"
             / f"{self.name}"
-            / f"{tapqir_version.split('+')[0]}"
+            / tapqir_version.split("+")[0]
             / f"S{self.S}"
             / f"{'control' if self.control else 'nocontrol'}"
             / f"lr{self.lr}"
