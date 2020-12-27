@@ -19,7 +19,7 @@ CPU_EXAMPLES = [
 
 CUDA_EXAMPLES = [
     "randomized_simulations.py -it 1 -infer 1 -bs 4 --cuda",
-    "height_simulations.py -it 1 -infer 1 -bs 4",
+    "height_simulations.py -it 1 -infer 1 -bs 4 --cuda",
 ]
 
 

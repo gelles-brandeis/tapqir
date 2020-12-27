@@ -3,10 +3,11 @@ from subprocess import check_call
 
 import pytest
 import torch
+from PySide2.QtCore import Qt
+
 from tapqir import __version__ as tapqir_version
 from tapqir.commands.qtgui import MainWindow
 from tapqir.models import Cosmos
-from PySide2.QtCore import Qt
 
 requires_cuda = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="cuda is not available"
