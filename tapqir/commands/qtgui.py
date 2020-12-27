@@ -404,17 +404,17 @@ class MainWindow(QMainWindow):
             self.item[f"{p}Hist_m"] = pg.PlotDataItem(
                 x,
                 y,
-                stepMode=True,
+                stepMode="center",
                 fillLevel=0,
                 fillOutline=True,
                 brush=(0, 0, 255, 30),
             )
             if p in ["d/height", "d/width", "d/x", "d/y"]:
                 self.item[f"{p}Hist_z"] = pg.PlotDataItem(
-                    xz, yz, stepMode=True, fillLevel=0, fillOutline=False, pen=C[2]
+                    xz, yz, stepMode="center", fillLevel=0, fillOutline=False, pen=C[2]
                 )
                 self.item[f"{p}Hist_j"] = pg.PlotDataItem(
-                    xj, yj, stepMode=True, fillLevel=0, fillOutline=False, pen=C[3]
+                    xj, yj, stepMode="center", fillLevel=0, fillOutline=False, pen=C[3]
                 )
 
         for p in self.params:
