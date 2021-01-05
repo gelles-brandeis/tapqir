@@ -143,6 +143,7 @@ class GlimpseDataset(Dataset):
     """
 
     def __init__(self, path):
+        path = Path(path)
         # read options.cfg file
         self.config = configparser.ConfigParser(allow_no_value=True)
         cfg_file = path / "options.cfg"
