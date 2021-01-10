@@ -27,7 +27,7 @@ def main(args):
     model = simulate(args.N, args.F, args.D, cuda=args.cuda, params=params)
 
     # save data
-    model.data_path = args.path or "height{}".format(args.height)
+    model.data_path = args.path or Path("data") / "height{}".format(args.height)
     model.data.save(model.data_path)
     model.control.save(model.data_path)
     pd.Series(params).to_csv(Path(model.data_path) / "simulated_params.csv")
