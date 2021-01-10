@@ -3,6 +3,7 @@ from pathlib import Path
 
 import torch
 from cliff.command import Command
+from pyroapi import pyro_backend
 
 from tapqir.models import models
 
@@ -76,6 +77,9 @@ class Fit(Command):
         parser.add_argument(
             "-dev", metavar="DEVICE", type=str, help="Compute device (default: cuda)"
         )
+        parser.add_argument(
+            "-backend", metavar="BACKEND", type=str, help="Pyro backend (default: pyro)"
+        )
 
         return parser
 
@@ -93,19 +97,28 @@ class Fit(Command):
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
         control = args.c or config["fit"].getboolean("control")
         device = args.dev or config["fit"].get("device")
+        backend = args.backend or config["fit"].get("backend")
 
         if device == "cuda":
             torch.set_default_tensor_type("torch.cuda.FloatTensor")
         else:
             torch.set_default_tensor_type("torch.FloatTensor")
 
-        model = models[args.model](states, k_max)
-        model.load(args.dataset_path, control, device)
+        # pyro backend
+        if backend == "pyro":
+            PYRO_BACKEND = "pyro"
+        else:
+            raise ValueError("Only pyro backend is supported.")
 
-        model.settings(learning_rate, batch_size)
-        if batch_size == 0:
-            # add new batch_size to options.cfg
-            config.set("fit", "batch_size", str(model.batch_size))
-            with open(cfg_file, "w") as configfile:
-                config.write(configfile)
-        model.run(num_iter, infer)
+        with pyro_backend(PYRO_BACKEND):
+
+            model = models[args.model](states, k_max)
+            model.load(args.dataset_path, control, device)
+
+            model.settings(learning_rate, batch_size)
+            if batch_size == 0:
+                # add new batch_size to options.cfg
+                config.set("fit", "batch_size", str(model.batch_size))
+                with open(cfg_file, "w") as configfile:
+                    config.write(configfile)
+            model.run(num_iter, infer)

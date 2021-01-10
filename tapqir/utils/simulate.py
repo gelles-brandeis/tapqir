@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
-import pyro
 import torch
-from pyro import param, poutine
 from pyro.infer import Predictive
+from pyroapi import handlers, pyro
 from torch.distributions import constraints
 
 from tapqir.models import Cosmos, GaussianSpot
@@ -23,16 +22,18 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
         device = torch.device("cpu")
 
     # parameters and samples
-    param("gain", torch.tensor(params["gain"]), constraint=constraints.positive)
-    param("width_mean", torch.tensor(1.5), constraint=constraints.positive)
-    param("width_size", torch.tensor(2.0), constraint=constraints.positive)
-    param(
+    pyro.param("gain", torch.tensor(params["gain"]), constraint=constraints.positive)
+    pyro.param("width_mean", torch.tensor(1.5), constraint=constraints.positive)
+    pyro.param("width_size", torch.tensor(2.0), constraint=constraints.positive)
+    pyro.param(
         "probs_z",
         torch.tensor([1 - params["probs_z"], params["probs_z"]]),
         constraint=constraints.simplex,
     )
-    param("rate_j", torch.tensor(params["rate_j"]), constraint=constraints.positive)
-    param(
+    pyro.param(
+        "rate_j", torch.tensor(params["rate_j"]), constraint=constraints.positive
+    )
+    pyro.param(
         "proximity",
         torch.tensor([params["proximity"]]),
         constraint=constraints.positive,
@@ -77,7 +78,7 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
 
     # sample
     predictive = Predictive(
-        poutine.uncondition(model.model), posterior_samples=samples, num_samples=None
+        handlers.uncondition(model.model), posterior_samples=samples, num_samples=None
     )
     samples = predictive()
     model.data.data = samples["d/data"][0].data.floor()

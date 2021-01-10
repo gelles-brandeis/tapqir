@@ -2,8 +2,8 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-import pyro
 import torch
+from pyroapi import pyro, pyro_backend
 
 from tapqir.utils.simulate import simulate
 
@@ -51,4 +51,8 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str)
     parser.add_argument("--cuda", action="store_true")
     args = parser.parse_args()
-    main(args)
+
+    PYRO_BACKEND = "pyro"
+
+    with pyro_backend(PYRO_BACKEND):
+        main(args)
