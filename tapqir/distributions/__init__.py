@@ -3,6 +3,7 @@ from tapqir.distributions.convoluted_gamma import ConvolutedGamma
 from tapqir.distributions.convoluted_normal import ConvolutedNormal
 from tapqir.distributions.fixed_offset_gamma import FixedOffsetGamma
 from tapqir.distributions.multi_modal import MultiModal
+from tapqir.distributions.pyro_affine_beta import PyroAffineBeta
 
 __all__ = [
     "AffineBeta",
@@ -10,4 +11,5 @@ __all__ = [
     "ConvolutedNormal",
     "FixedOffsetGamma",
     "MultiModal",
+    "PyroAffineBeta",
 ]
