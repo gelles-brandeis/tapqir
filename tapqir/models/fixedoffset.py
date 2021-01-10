@@ -40,11 +40,11 @@ class FixedOffset(Cosmos):
         F_plate = pyro.plate("F_pyro.plate", data.F, dim=-1)
 
         with N_plate as ndx, F_plate:
-            # pyro.sample background intensity
+            # sample background intensity
             background = pyro.sample("background", dist.Gamma(150.0, 1.0))
             locs = background[..., None, None]
 
-            # pyro.sample hidden model state (1+K*S,)
+            # sample hidden model state (1+K*S,)
             if data.dtype == "test":
                 theta = pyro.sample("theta", dist.Categorical(self.probs_theta))
             else:
@@ -57,7 +57,7 @@ class FixedOffset(Cosmos):
                     f"m_{kdx}", dist.Categorical(Vindex(self.probs_m)[theta, kdx])
                 )
                 with handlers.mask(mask=m > 0):
-                    # pyro.sample spot variables
+                    # sample spot variables
                     height = pyro.sample(
                         f"height_{kdx}",
                         dist.Gamma(
