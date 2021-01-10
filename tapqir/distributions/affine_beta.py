@@ -1,9 +1,9 @@
 import torch
-from pyro.distributions import Beta, TransformedDistribution
-from torch.distributions.transforms import AffineTransform
+from torch.distributions import constraints
+from tapqir.distributions.pyro_affine_beta import PyroAffineBeta
 
 
-class AffineBeta(TransformedDistribution):
+class AffineBeta(PyroAffineBeta):
     r"""
     Beta distribution shifted by :attr:`loc` and scaled by :attr:`scale`::
 
@@ -15,64 +15,36 @@ class AffineBeta(TransformedDistribution):
 
     :param mean: mean of the distribution.
     :param size: size parameter of the Beta distribution.
-    :param a: min parameter.
-    :param b: max parameter.
+    :param low: min parameter.
+    :param high: max parameter.
     """
 
+    arg_constraints = {
+        "mean": constraints.dependent,
+        "size": constraints.real,
+        "low": constraints.real,
+        "high": constraints.dependent,
+    }
     has_rsample = True
 
-    def __init__(self, mean, size, a, b, validate_args=None):
-        concentration1 = size * (mean - a) / (b - a)
-        concentration0 = size * (b - mean) / (b - a)
-        base_dist = Beta(concentration1, concentration0)
+    def __init__(self, mean, size, low, high, validate_args=None):
+        try:
+            concentration1 = size * (mean - low) / (high - low)
+            concentration0 = size * (high - mean) / (high - low)
+        except ZeroDivisionError:
+            # this is needed to work with funsor make_dist
+            low = torch.tensor(0.0)
+            high = torch.tensor(1.0)
+            concentration1 = torch.tensor(1.0)
+            concentration0 = torch.tensor(1.0)
         super(AffineBeta, self).__init__(
-            base_dist,
-            AffineTransform(loc=a, scale=(b - a)),
+            concentration1,
+            concentration0,
+            low,
+            high - low,
             validate_args=validate_args,
         )
 
     def expand(self, batch_shape, _instance=None):
-        """"""
         new = self._get_checked_instance(AffineBeta, _instance)
         return super(AffineBeta, self).expand(batch_shape, _instance=new)
-
-    def sample(self, sample_shape=torch.Size()):
-        """
-        Generates a sample from `Beta` distribution and applies `AffineTransform`.
-        Additionally clamps the output in order to avoid `NaN` and `Inf` values
-        in the gradients.
-        """
-        with torch.no_grad():
-            x = self.base_dist.sample(sample_shape)
-            for transform in self.transforms:
-                x = transform(x)
-            # eps = torch.finfo(x.dtype).eps
-            eps = 1e-5
-            x = x.clamp(min=self.loc + eps, max=self.loc + self.scale - eps)
-            return x
-
-    def rsample(self, sample_shape=torch.Size()):
-        """
-        Generates a sample from `Beta` distribution and applies `AffineTransform`.
-        Additionally clamps the output in order to avoid `NaN` and `Inf` values
-        in the gradients.
-        """
-        x = self.base_dist.rsample(sample_shape)
-        for transform in self.transforms:
-            x = transform(x)
-        # eps = torch.finfo(x.dtype).eps
-        eps = 1e-5
-        x = x.clamp(min=self.loc + eps, max=self.loc + self.scale - eps)
-        return x
-
-    @property
-    def loc(self):
-        return self.transforms[0].loc
-
-    @property
-    def scale(self):
-        return self.transforms[0].scale
-
-    @property
-    def mean(self):
-        return self.loc + self.scale * self.base_dist.mean
