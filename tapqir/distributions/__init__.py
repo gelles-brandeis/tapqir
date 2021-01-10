@@ -1,3 +1,8 @@
+import funsor
+
+funsor.set_backend("torch")
+from funsor.distribution import make_dist
+
 from tapqir.distributions.affine_beta import AffineBeta
 from tapqir.distributions.convoluted_gamma import ConvolutedGamma
 from tapqir.distributions.convoluted_normal import ConvolutedNormal
@@ -13,3 +18,7 @@ __all__ = [
     "MultiModal",
     "PyroAffineBeta",
 ]
+
+FunsorAffineBeta = make_dist(AffineBeta)
+FunsorConvolutedGamma = make_dist(ConvolutedGamma)
+FunsorConvolutedNormal = make_dist(ConvolutedNormal)
