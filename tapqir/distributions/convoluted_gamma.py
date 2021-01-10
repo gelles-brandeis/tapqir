@@ -16,10 +16,10 @@ class ConvolutedGamma(TorchDistribution):
 
         :math:`p(X) = \sum_i p(\text{offset}_i) \text{Gamma}(X - \text{offset}_i)`
 
-    :param concentration: shape parameter (alpha) of the Gamma distribution.
-    :param rate: rate parameter (beta) of the Gamma distribution.
-    :param ~torch.Tensor samples: offset samples.
-    :param ~torch.Tensor log_weights: log weights corresponding to the offset samples.
+    :param float or torch.Tensor concentration: shape parameter (alpha) of the Gamma distribution.
+    :param float or torch.Tensor rate: rate parameter (beta) of the Gamma distribution.
+    :param torch.Tensor samples: offset samples.
+    :param torch.Tensor log_weights: log weights corresponding to the offset samples.
     """
 
     arg_constraints = {
@@ -31,13 +31,13 @@ class ConvolutedGamma(TorchDistribution):
     support = constraints.positive
 
     def __init__(self, concentration, rate, samples, log_weights, validate_args=None):
+        concentration = torch.as_tensor(concentration).unsqueeze(-1)
+        rate = torch.as_tensor(rate).unsqueeze(-1)
         self.concentration = concentration
         self.rate = rate
         self.samples = samples
         self.log_weights = log_weights
-        if isinstance(concentration, torch.Tensor):
-            concentration = concentration.unsqueeze(-1)
-        self.dist = Gamma(concentration, rate)
+        self.dist = Gamma(concentration, rate, validate_args=validate_args)
         self.samples = samples
         self.log_weights = log_weights
         batch_shape = self.dist.batch_shape[:-1]
@@ -51,8 +51,7 @@ class ConvolutedGamma(TorchDistribution):
         return signal + offset
 
     def log_prob(self, value):
-        if isinstance(value, torch.Tensor):
-            value = value.unsqueeze(-1)
+        value = torch.as_tensor(value).unsqueeze(-1)
         mask = value > self.samples
         value = torch.where(mask, value - self.samples, value.new_ones(()))
 
