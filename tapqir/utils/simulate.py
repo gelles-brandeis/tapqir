@@ -60,7 +60,7 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
     drift = pd.DataFrame(data={"dx": 0.0, "dy": 0}, index=np.arange(F))
     drift.index.name = "frame"
     model.data = CosmosDataset(
-        torch.zeros(N, F, D, D),
+        torch.full((N, F, D, D), params["background"] + params["offset"]),
         target,
         drift,
         dtype="test",
