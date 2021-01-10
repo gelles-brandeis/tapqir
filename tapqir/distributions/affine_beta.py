@@ -1,5 +1,6 @@
 import torch
 from torch.distributions import constraints
+
 from tapqir.distributions.pyro_affine_beta import PyroAffineBeta
 
 
