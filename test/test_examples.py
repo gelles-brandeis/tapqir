@@ -13,13 +13,15 @@ TESTS_DIR = Path(__file__).resolve().parent.parent
 EXAMPLES_DIR = TESTS_DIR / "examples"
 
 CPU_EXAMPLES = [
-    "randomized_simulations.py -it 1 -infer 1 -bs 4",
     "height_simulations.py -it 1 -infer 1 -bs 4",
+    "randomized_simulations.py -it 1 -infer 1 -bs 4",
+    "ratej_simulations.py -it 1 -infer 1 -bs 4",
 ]
 
 CUDA_EXAMPLES = [
-    "randomized_simulations.py -it 1 -infer 1 -bs 4 --cuda",
     "height_simulations.py -it 1 -infer 1 -bs 4 --cuda",
+    "randomized_simulations.py -it 1 -infer 1 -bs 4 --cuda",
+    "ratej_simulations.py -it 1 -infer 1 -bs 4 --cuda",
 ]
 
 
