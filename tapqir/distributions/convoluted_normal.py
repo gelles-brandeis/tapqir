@@ -31,12 +31,12 @@ class ConvolutedNormal(TorchDistribution):
     support = constraints.real
 
     def __init__(self, loc, scale, samples, log_weights, validate_args=None):
-        loc = torch.as_tensor(loc).unsqueeze(-1)
-        scale = torch.as_tensor(scale).unsqueeze(-1)
         self.loc = loc
         self.scale = scale
         self.samples = samples
         self.log_weights = log_weights
+        loc = torch.as_tensor(loc).unsqueeze(-1)
+        scale = torch.as_tensor(scale).unsqueeze(-1)
         self.dist = Normal(loc, scale, validate_args=validate_args)
         batch_shape = self.dist.batch_shape[:-1]
         event_shape = self.dist.event_shape
