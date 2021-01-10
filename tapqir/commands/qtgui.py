@@ -3,10 +3,10 @@ from functools import partial
 
 import numpy as np
 import pyqtgraph as pg
-from pyroapi import pyro
 import torch
 from pyqtgraph import HistogramLUTItem
 from pyro.ops.stats import pi, quantile
+from pyroapi import pyro
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIntValidator
 from PySide2.QtWidgets import (
@@ -244,7 +244,8 @@ class MainWindow(QMainWindow):
         f2 = int(f2)
         frames = torch.arange(f1, f2)
         img_ideal = (
-            self.Model.data.offset_mean + pyro.param("d/b_loc").data[n, frames, None, None]
+            self.Model.data.offset_mean
+            + pyro.param("d/b_loc").data[n, frames, None, None]
         )
         gaussian = self.Model.data_loc(
             pyro.param("d/h_loc")
@@ -304,7 +305,12 @@ class MainWindow(QMainWindow):
         )
         plt = widget.addPlot(row=1, col=5)
         plt.plot(
-            x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0, 0, 255, 70)
+            x,
+            y,
+            stepMode="center",
+            fillLevel=0,
+            fillOutline=True,
+            brush=(0, 0, 255, 70),
         )
         for i, p in enumerate(self.params):
             self.plot[p] = widget.addPlot(row=i + 2, col=0, colspan=5)
@@ -398,7 +404,9 @@ class MainWindow(QMainWindow):
                 )
 
             elif p == "d/background":
-                y, x = np.histogram(pyro.param("d/b_loc").data.reshape(-1).numpy(), bins=50)
+                y, x = np.histogram(
+                    pyro.param("d/b_loc").data.reshape(-1).numpy(), bins=50
+                )
 
             self.item[f"{p}Hist_m"] = pg.PlotDataItem(
                 x,
@@ -470,8 +478,6 @@ class MainWindow(QMainWindow):
 
         # set plot ranges
         self.plot["z"].setYRange(0, 1, padding=0.01)
-        # self.plot["d/height"].setYRange(0, 2000, padding=0.01)
-        # self.plot["d/height"].setYRange(0, quantile(pyro.param("d/h_loc").data.flatten(), 0.99).item()*1.3, padding=0.01)
         self.plot["d/x"].setYRange(
             -(self.Model.data.D + 1) / 2, (self.Model.data.D + 1) / 2, padding=0.01
         )
