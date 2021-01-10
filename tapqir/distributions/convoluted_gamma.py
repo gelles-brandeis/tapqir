@@ -31,12 +31,12 @@ class ConvolutedGamma(TorchDistribution):
     support = constraints.positive
 
     def __init__(self, concentration, rate, samples, log_weights, validate_args=None):
-        concentration = torch.as_tensor(concentration).unsqueeze(-1)
-        rate = torch.as_tensor(rate).unsqueeze(-1)
         self.concentration = concentration
         self.rate = rate
         self.samples = samples
         self.log_weights = log_weights
+        concentration = torch.as_tensor(concentration).unsqueeze(-1)
+        rate = torch.as_tensor(rate).unsqueeze(-1)
         self.dist = Gamma(concentration, rate, validate_args=validate_args)
         self.samples = samples
         self.log_weights = log_weights
