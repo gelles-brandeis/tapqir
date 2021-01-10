@@ -1,7 +1,7 @@
-from pyro import param, plate, poutine, sample
 from pyro.contrib.autoname import scope
-from pyro.distributions import Categorical, Gamma
 from pyro.ops.indexing import Vindex
+from pyroapi import distributions as dist
+from pyroapi import handlers, pyro
 
 from tapqir.distributions import AffineBeta, FixedOffsetGamma
 from tapqir.models import Cosmos
@@ -19,7 +19,7 @@ class FixedOffset(Cosmos):
     """
     name = "fixedoffset"
 
-    @poutine.block(hide=["width_mean", "width_size"])
+    @handlers.block(hide=["width_mean", "width_size"])
     def model(self):
         # initialize model parameters
         # self.model_parameters()
@@ -35,44 +35,52 @@ class FixedOffset(Cosmos):
 
     def spot_model(self, data, data_loc, prefix):
         # target sites
-        N_plate = plate("N_plate", data.N, dim=-2)
+        N_plate = pyro.plate("N_pyro.plate", data.N, dim=-2)
         # time frames
-        F_plate = plate("F_plate", data.F, dim=-1)
+        F_plate = pyro.plate("F_pyro.plate", data.F, dim=-1)
 
         with N_plate as ndx, F_plate:
-            # sample background intensity
-            background = sample("background", Gamma(150.0, 1.0))
+            # pyro.sample background intensity
+            background = pyro.sample("background", dist.Gamma(150.0, 1.0))
             locs = background[..., None, None]
 
-            # sample hidden model state (1+K*S,)
+            # pyro.sample hidden model state (1+K*S,)
             if data.dtype == "test":
-                theta = sample("theta", Categorical(self.probs_theta))
+                theta = pyro.sample("theta", dist.Categorical(self.probs_theta))
             else:
                 theta = 0
 
             for kdx in range(self.K):
                 ontarget = Vindex(self.ontarget)[theta, kdx]
                 # spot presence
-                m = sample(f"m_{kdx}", Categorical(Vindex(self.probs_m)[theta, kdx]))
-                with poutine.mask(mask=m > 0):
-                    # sample spot variables
-                    height = sample(
+                m = pyro.sample(
+                    f"m_{kdx}", dist.Categorical(Vindex(self.probs_m)[theta, kdx])
+                )
+                with handlers.mask(mask=m > 0):
+                    # pyro.sample spot variables
+                    height = pyro.sample(
                         f"height_{kdx}",
-                        Gamma(param("height_loc") / param("gain"), 1 / param("gain")),
-                    )
-                    width = sample(
-                        f"width_{kdx}",
-                        AffineBeta(
-                            param("width_mean"), param("width_size"), 0.75, 2.25
+                        dist.Gamma(
+                            pyro.param("height_loc") / pyro.param("gain"),
+                            1 / pyro.param("gain"),
                         ),
                     )
-                    x = sample(
+                    width = pyro.sample(
+                        f"width_{kdx}",
+                        AffineBeta(
+                            pyro.param("width_mean"),
+                            pyro.param("width_size"),
+                            0.75,
+                            2.25,
+                        ),
+                    )
+                    x = pyro.sample(
                         f"x_{kdx}",
                         AffineBeta(
                             0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
                         ),
                     )
-                    y = sample(
+                    y = pyro.sample(
                         f"y_{kdx}",
                         AffineBeta(
                             0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
@@ -85,7 +93,9 @@ class FixedOffset(Cosmos):
                 locs = locs + gaussian
 
             # observed data
-            sample(
+            pyro.sample(
                 "data",
-                FixedOffsetGamma(locs, param("gain"), param("offset")).to_event(2),
+                FixedOffsetGamma(
+                    locs, pyro.param("gain"), pyro.param("offset")
+                ).to_event(2),
             )

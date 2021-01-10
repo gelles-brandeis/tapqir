@@ -3,13 +3,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pyro
-import pyro.distributions as dist
 import torch
 import torch.nn as nn
-from pyro import param
-from pyro.infer import SVI, JitTraceEnum_ELBO, TraceEnum_ELBO
 from pyro.ops.indexing import Vindex
+from pyroapi import distributions as dist
+from pyroapi import infer, optim, pyro
 from scipy.io import savemat
 from sklearn.metrics import (
     confusion_matrix,
@@ -138,13 +136,14 @@ class Model(nn.Module):
         self.batch_size = batch_size
         self.jit = jit
 
-        self.optim_fn = pyro.optim.Adam
+        self.optim_fn = optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
         self.log()
 
         try:
             self.load_checkpoint()
+
         except FileNotFoundError:
             pyro.clear_param_store()
 
@@ -163,10 +162,10 @@ class Model(nn.Module):
             )
         self._z_map = torch.zeros(self.data.N, self.data.F, dtype=torch.bool)
 
-        self.elbo = (JitTraceEnum_ELBO if jit else TraceEnum_ELBO)(
+        self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True
         )
-        self.svi = SVI(self.model, self.guide, self.optim, loss=self.elbo)
+        self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
     def model(self):
         r"""
@@ -278,7 +277,7 @@ class Model(nn.Module):
 
         # save parameters in matlab format
         keys = ["h_loc", "w_mean", "x_mean", "y_mean", "b_loc"]
-        matlab = {k: param(f"d/{k}").data.cpu().numpy() for k in keys}
+        matlab = {k: pyro.param(f"d/{k}").data.cpu().numpy() for k in keys}
         matlab[
             "parametersDescription"
         ] = "Parameters for N x F x K spots. \
@@ -407,15 +406,15 @@ class Model(nn.Module):
         with torch.no_grad():
             weights = self.data_loc(
                 torch.ones(1),
-                param("d/w_mode"),
-                param("d/x_mode"),
-                param("d/y_mode"),
+                pyro.param("d/w_mode"),
+                pyro.param("d/x_mode"),
+                pyro.param("d/y_mode"),
                 torch.arange(self.data.N),
             )
             signal = (self.data.data * weights).sum(dim=(-2, -1))
             noise = (
-                self.offset_var + (signal - self.offset_mean) * param("gain")
+                self.offset_var + (signal - self.offset_mean) * pyro.param("gain")
             ).sqrt()
-            result = (signal - param("d/b_loc") - self.offset_mean) / noise
+            result = (signal - pyro.param("d/b_loc") - self.offset_mean) / noise
             mask = self.z_probs > 0.5
             return result[mask]

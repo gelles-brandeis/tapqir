@@ -1,9 +1,9 @@
 import torch
 import torch.distributions.constraints as constraints
-from pyro import param, plate, poutine, sample
 from pyro.contrib.autoname import scope
-from pyro.distributions import Categorical, Gamma, HalfNormal, Poisson
 from pyro.ops.indexing import Vindex
+from pyroapi import distributions as dist
+from pyroapi import handlers, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import AffineBeta, ConvolutedGamma
@@ -39,11 +39,15 @@ class Cosmos(Model):
     def probs_j(self):
         result = torch.zeros(2, self.K + 1, dtype=torch.float)
         result[0, : self.K] = (
-            Poisson(param("rate_j")).log_prob(torch.arange(self.K).float()).exp()
+            dist.Poisson(pyro.param("rate_j"))
+            .log_prob(torch.arange(self.K).float())
+            .exp()
         )
         result[0, -1] = 1 - result[0, : self.K].sum()
         result[1, : self.K - 1] = (
-            Poisson(param("rate_j")).log_prob(torch.arange(self.K - 1).float()).exp()
+            dist.Poisson(pyro.param("rate_j"))
+            .log_prob(torch.arange(self.K - 1).float())
+            .exp()
         )
         result[1, -2] = 1 - result[0, : self.K - 1].sum()
         return result
@@ -65,10 +69,10 @@ class Cosmos(Model):
     @property
     def probs_theta(self):
         result = torch.zeros(self.K * self.S + 1, dtype=torch.float)
-        result[0] = param("probs_z")[0]
+        result[0] = pyro.param("probs_z")[0]
         for s in range(self.S):
             for k in range(self.K):
-                result[self.K * s + k + 1] = param("probs_z")[s + 1] / self.K
+                result[self.K * s + k + 1] = pyro.param("probs_z")[s + 1] / self.K
         return result
 
     @lazy_property
@@ -87,7 +91,7 @@ class Cosmos(Model):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
+        return pyro.param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
 
     @property
     def j_probs(self):
@@ -103,8 +107,8 @@ class Cosmos(Model):
         """
         return torch.einsum(
             "sknf,nfs->knf",
-            param("d/m_probs").data[..., 1],
-            param("d/theta_probs").data,
+            pyro.param("d/m_probs").data[..., 1],
+            pyro.param("d/theta_probs").data,
         )
 
     @property
@@ -131,7 +135,7 @@ class Cosmos(Model):
         return {"expose_types": ["sample", "param"]}
 
     def model(self):
-        with poutine.block(**self.inference_config_model):
+        with handlers.block(**self.inference_config_model):
             # initialize model parameters
             self.model_parameters()
 
@@ -145,7 +149,7 @@ class Cosmos(Model):
                     self.spot_model(self.control, self.control_loc, prefix="c")
 
     def guide(self):
-        with poutine.block(**self.inference_config_guide):
+        with handlers.block(**self.inference_config_guide):
             # initialize guide parameters
             self.guide_parameters()
 
@@ -160,18 +164,18 @@ class Cosmos(Model):
 
     def spot_model(self, data, data_loc, prefix):
         # target sites
-        N_plate = plate("N_plate", data.N, dim=-2)
+        N_plate = pyro.plate("N_plate", data.N, dim=-2)
         # time frames
-        F_plate = plate("F_plate", data.F, dim=-1)
+        F_plate = pyro.plate("F_plate", data.F, dim=-1)
 
         with N_plate as ndx, F_plate:
             # sample background intensity
-            background = sample(
+            background = pyro.sample(
                 "background",
-                Gamma(
-                    param(f"{prefix}/background_loc")[ndx]
-                    * param(f"{prefix}/background_beta")[ndx],
-                    param(f"{prefix}/background_beta")[ndx],
+                dist.Gamma(
+                    pyro.param(f"{prefix}/background_loc")[ndx]
+                    * pyro.param(f"{prefix}/background_beta")[ndx],
+                    pyro.param(f"{prefix}/background_beta")[ndx],
                 ),
             )
             locs = background[..., None, None]
@@ -179,11 +183,11 @@ class Cosmos(Model):
             # sample hidden model state (1+K*S,)
             if data.dtype == "test":
                 if self.classify:
-                    theta = sample("theta", Categorical(self.probs_theta))
+                    theta = pyro.sample("theta", dist.Categorical(self.probs_theta))
                 else:
-                    theta = sample(
+                    theta = pyro.sample(
                         "theta",
-                        Categorical(self.probs_theta),
+                        dist.Categorical(self.probs_theta),
                         infer={"enumerate": "parallel"},
                     )
             else:
@@ -192,23 +196,30 @@ class Cosmos(Model):
             for kdx in range(self.K):
                 ontarget = Vindex(self.ontarget)[theta, kdx]
                 # spot presence
-                m = sample(f"m_{kdx}", Categorical(Vindex(self.probs_m)[theta, kdx]))
-                with poutine.mask(mask=m > 0):
+                m = pyro.sample(
+                    f"m_{kdx}", dist.Categorical(Vindex(self.probs_m)[theta, kdx])
+                )
+                with handlers.mask(mask=m > 0):
                     # sample spot variables
-                    height = sample(f"height_{kdx}", HalfNormal(param("height_scale")))
-                    width = sample(
+                    height = pyro.sample(
+                        f"height_{kdx}", dist.HalfNormal(pyro.param("height_scale"))
+                    )
+                    width = pyro.sample(
                         f"width_{kdx}",
                         AffineBeta(
-                            param("width_mean"), param("width_size"), 0.75, 2.25
+                            pyro.param("width_mean"),
+                            pyro.param("width_size"),
+                            0.75,
+                            2.25,
                         ),
                     )
-                    x = sample(
+                    x = pyro.sample(
                         f"x_{kdx}",
                         AffineBeta(
                             0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
                         ),
                     )
-                    y = sample(
+                    y = pyro.sample(
                         f"y_{kdx}",
                         AffineBeta(
                             0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
@@ -221,11 +232,11 @@ class Cosmos(Model):
                 locs = locs + gaussian
 
             # observed data
-            sample(
+            pyro.sample(
                 "data",
                 ConvolutedGamma(
-                    locs / param("gain"),
-                    1 / param("gain"),
+                    locs / pyro.param("gain"),
+                    1 / pyro.param("gain"),
                     self.data.offset_samples,
                     self.data.offset_logits,
                 ).to_event(2),
@@ -234,30 +245,31 @@ class Cosmos(Model):
 
     def spot_guide(self, data, prefix):
         # target sites
-        N_plate = plate(
+        N_plate = pyro.plate(
             "N_plate", data.N, subsample_size=self.batch_size, subsample=self.n, dim=-2
         )
         # time frames
-        F_plate = plate("F_plate", data.F, dim=-1)
+        F_plate = pyro.plate("F_plate", data.F, dim=-1)
 
         with N_plate as ndx, F_plate as fdx:
             if prefix == "d":
                 self.batch_idx = ndx.cpu()
             # sample background intensity
-            sample(
+            pyro.sample(
                 "background",
-                Gamma(
-                    param(f"{prefix}/b_loc")[ndx] * param(f"{prefix}/b_beta")[ndx],
-                    param(f"{prefix}/b_beta")[ndx],
+                dist.Gamma(
+                    pyro.param(f"{prefix}/b_loc")[ndx]
+                    * pyro.param(f"{prefix}/b_beta")[ndx],
+                    pyro.param(f"{prefix}/b_beta")[ndx],
                 ),
             )
 
             # sample hidden model state (3,1,1,1)
             if self.classify:
                 if data.dtype == "test":
-                    theta = sample(
+                    theta = pyro.sample(
                         "theta",
-                        Categorical(param(f"{prefix}/theta_probs")[ndx]),
+                        dist.Categorical(pyro.param(f"{prefix}/theta_probs")[ndx]),
                         infer={"enumerate": "parallel"},
                     )
                 else:
@@ -266,99 +278,105 @@ class Cosmos(Model):
             for kdx in range(self.K):
                 # spot presence
                 if self.classify:
-                    m_probs = Vindex(param(f"{prefix}/m_probs"))[
+                    m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                         theta, kdx, ndx[:, None], fdx
                     ]
                 else:
-                    m_probs = Vindex(param(f"{prefix}/m_prob"))[kdx, ndx[:, None], fdx]
-                m = sample(
-                    f"m_{kdx}", Categorical(m_probs), infer={"enumerate": "parallel"}
+                    m_probs = Vindex(pyro.param(f"{prefix}/m_prob"))[
+                        kdx, ndx[:, None], fdx
+                    ]
+                m = pyro.sample(
+                    f"m_{kdx}",
+                    dist.Categorical(m_probs),
+                    infer={"enumerate": "parallel"},
                 )
-                with poutine.mask(mask=m > 0):
+                with handlers.mask(mask=m > 0):
                     # sample spot variables
-                    sample(
+                    pyro.sample(
                         f"height_{kdx}",
-                        Gamma(
-                            param(f"{prefix}/h_loc")[kdx, ndx]
-                            * param(f"{prefix}/h_beta")[kdx, ndx],
-                            param(f"{prefix}/h_beta")[kdx, ndx],
+                        dist.Gamma(
+                            pyro.param(f"{prefix}/h_loc")[kdx, ndx]
+                            * pyro.param(f"{prefix}/h_beta")[kdx, ndx],
+                            pyro.param(f"{prefix}/h_beta")[kdx, ndx],
                         ),
                     )
-                    sample(
+                    pyro.sample(
                         f"width_{kdx}",
                         AffineBeta(
-                            param(f"{prefix}/w_mean")[kdx, ndx],
-                            param(f"{prefix}/w_size")[kdx, ndx],
+                            pyro.param(f"{prefix}/w_mean")[kdx, ndx],
+                            pyro.param(f"{prefix}/w_size")[kdx, ndx],
                             0.75,
                             2.25,
                         ),
                     )
-                    sample(
+                    pyro.sample(
                         f"x_{kdx}",
                         AffineBeta(
-                            param(f"{prefix}/x_mean")[kdx, ndx],
-                            param(f"{prefix}/size")[kdx, ndx],
+                            pyro.param(f"{prefix}/x_mean")[kdx, ndx],
+                            pyro.param(f"{prefix}/size")[kdx, ndx],
                             -(data.D + 1) / 2,
                             (data.D + 1) / 2,
                         ),
                     )
-                    sample(
+                    pyro.sample(
                         f"y_{kdx}",
                         AffineBeta(
-                            param(f"{prefix}/y_mean")[kdx, ndx],
-                            param(f"{prefix}/size")[kdx, ndx],
+                            pyro.param(f"{prefix}/y_mean")[kdx, ndx],
+                            pyro.param(f"{prefix}/size")[kdx, ndx],
                             -(data.D + 1) / 2,
                             (data.D + 1) / 2,
                         ),
                     )
 
     def model_parameters(self):
-        param(
+        pyro.param(
             "proximity", torch.tensor([0.5]), constraint=constraints.interval(0.01, 2.0)
         )
         self.size = torch.cat(
             (
                 torch.tensor([2.0]),
-                (((self.data.D + 1) / (2 * param("proximity"))) ** 2 - 1),
+                (((self.data.D + 1) / (2 * pyro.param("proximity"))) ** 2 - 1),
             ),
             dim=-1,
         )
-        param("gain", torch.tensor(5.0), constraint=constraints.positive)
-        param("probs_z", torch.ones(self.S + 1), constraint=constraints.simplex)
-        param("rate_j", torch.tensor(0.5), constraint=constraints.positive)
+        pyro.param("gain", torch.tensor(5.0), constraint=constraints.positive)
+        pyro.param("probs_z", torch.ones(self.S + 1), constraint=constraints.simplex)
+        pyro.param("rate_j", torch.tensor(0.5), constraint=constraints.positive)
 
-        param(
+        pyro.param(
             "d/background_loc",
             torch.ones(self.data.N, 1)
             * (self.data.data_median - self.data.offset_median),
             constraint=constraints.positive,
         )
-        param(
+        pyro.param(
             "d/background_beta",
             torch.ones(self.data.N, 1),
             constraint=constraints.positive,
         )
 
         if self.control:
-            param(
+            pyro.param(
                 "c/background_loc",
                 torch.ones(self.control.N, 1)
                 * (self.data.data_median - self.data.offset_median),
                 constraint=constraints.positive,
             )
-            param(
+            pyro.param(
                 "c/background_beta",
                 torch.ones(self.control.N, 1),
                 constraint=constraints.positive,
             )
 
-        param(
+        pyro.param(
             "width_mean",
             torch.tensor([1.5]),
             constraint=constraints.interval(0.75, 2.25),
         )
-        param("width_size", torch.tensor([2.0]), constraint=constraints.positive)
-        param("height_scale", torch.tensor(10000.0), constraint=constraints.positive)
+        pyro.param("width_size", torch.tensor([2.0]), constraint=constraints.positive)
+        pyro.param(
+            "height_scale", torch.tensor(10000.0), constraint=constraints.positive
+        )
 
     def guide_parameters(self):
         self.spot_parameters(self.data, prefix="d")
@@ -367,7 +385,7 @@ class Cosmos(Model):
             self.spot_parameters(self.control, prefix="c")
 
     def spot_parameters(self, data, prefix):
-        param(
+        pyro.param(
             f"{prefix}/theta_probs",
             torch.ones(data.N, data.F, 1 + self.K * self.S),
             constraint=constraints.simplex,
@@ -375,49 +393,49 @@ class Cosmos(Model):
         m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
         m_probs[1, 0, :, :, 0] = 0
         m_probs[2, 1, :, :, 0] = 0
-        param(f"{prefix}/m_probs", m_probs, constraint=constraints.simplex)
-        param(
+        pyro.param(f"{prefix}/m_probs", m_probs, constraint=constraints.simplex)
+        pyro.param(
             f"{prefix}/m_prob",
             torch.ones(self.K, data.N, data.F, 2),
             constraint=constraints.simplex,
         )
-        param(
+        pyro.param(
             f"{prefix}/b_loc",
             (self.data.data_median - self.data.offset_median).repeat(data.N, data.F),
             constraint=constraints.positive,
         )
-        param(
+        pyro.param(
             f"{prefix}/b_beta",
             torch.ones(data.N, data.F),
             constraint=constraints.positive,
         )
-        param(
+        pyro.param(
             f"{prefix}/h_loc",
             torch.full((self.K, data.N, data.F), 2000.0),
             # (self.data.noise * 2).repeat(self.K, data.N, data.F),
             constraint=constraints.positive,
         )
-        param(
+        pyro.param(
             f"{prefix}/h_beta",
             torch.ones(self.K, data.N, data.F) * 0.001,
             constraint=constraints.positive,
         )
-        param(
+        pyro.param(
             f"{prefix}/w_mean",
             torch.ones(self.K, data.N, data.F) * 1.5,
             constraint=constraints.interval(0.75, 2.25),
         )
-        param(
+        pyro.param(
             f"{prefix}/w_size",
             torch.ones(self.K, data.N, data.F) * 100.0,
             constraint=constraints.greater_than(2.0),
         )
-        param(
+        pyro.param(
             f"{prefix}/x_mean",
             torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
         )
-        param(
+        pyro.param(
             f"{prefix}/y_mean",
             torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
@@ -428,4 +446,4 @@ class Cosmos(Model):
         elif self.K == 3:
             size[1] = 7.0
             size[2] = 3.0
-        param(f"{prefix}/size", size, constraint=constraints.greater_than(2.0))
+        pyro.param(f"{prefix}/size", size, constraint=constraints.greater_than(2.0))
