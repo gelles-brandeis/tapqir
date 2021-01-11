@@ -11,3 +11,29 @@ Bayesian analysis of the co-localization single-molecule microscopy image data.
   :target: https://github.com/ambv/black
 
 |ci| |black|
+
+Installing
+==========
+
+Using pip::
+
+  pip install git+https://github.com/gelles-brandeis/tapqir.git
+
+Documentation
+=============
+
+Full documentation and tutorial available at Read the Docs.
+
+Citation
+========
+
+If you use Tapqir, please consider citing::
+
+  @article{ordabayev2021tapqir,
+    author    = {Yerdos A. Ordabayev and
+                 Larry Friedman and
+                 Douglas L. Theobald and
+                 Jeff Gelles},
+    title     = {Bayesian Analysis of the Colocalization Single Molecule Image Data},
+    year      = {2021},
+  }

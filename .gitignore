@@ -8,6 +8,8 @@ tapqir/models/__pycache__/
 .ipynb_checkpoints/
 tapqir.egg-info/
 examples/data/
+examples/*sbatch
+examples/*out
 
 # sphinx documentation
 docs/build/
