@@ -44,6 +44,7 @@ setuptools.setup(
         "PySide2",
         "pyqtgraph",
         "pyro-ppl",
+        "funsor",
         "tb-nightly",
     ],
     extras_require={
@@ -59,7 +60,6 @@ setuptools.setup(
         + [
             "flake8",
             "sphinx",
-            "funsor",
             "pytest",
             "pytest-qt",
             "pytest-xvfb",

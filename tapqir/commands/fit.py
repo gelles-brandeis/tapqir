@@ -107,8 +107,14 @@ class Fit(Command):
         # pyro backend
         if backend == "pyro":
             PYRO_BACKEND = "pyro"
+        elif backend == "funsor":
+            import funsor
+            import pyro.contrib.funsor  # noqa: F401
+
+            funsor.set_backend("torch")
+            PYRO_BACKEND = "contrib.funsor"
         else:
-            raise ValueError("Only pyro backend is supported.")
+            raise ValueError("Only pyro and funsor backends are supported.")
 
         with pyro_backend(PYRO_BACKEND):
 

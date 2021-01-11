@@ -50,9 +50,18 @@ if __name__ == "__main__":
     parser.add_argument("-lr", default=0.005, type=float)
     parser.add_argument("--path", type=str)
     parser.add_argument("--cuda", action="store_true")
+    parser.add_argument("--funsor", action="store_true")
     args = parser.parse_args()
 
-    PYRO_BACKEND = "pyro"
+    if args.funsor:
+        import funsor
+
+        funsor.set_backend("torch")
+        import pyro.contrib.funsor
+
+        PYRO_BACKEND = "contrib.funsor"
+    else:
+        PYRO_BACKEND = "pyro"
 
     with pyro_backend(PYRO_BACKEND):
         main(args)

@@ -26,7 +26,6 @@ class AffineBeta(PyroAffineBeta):
         "low": constraints.real,
         "high": constraints.dependent,
     }
-    has_rsample = True
 
     def __init__(self, mean, size, low, high, validate_args=None):
         try:
