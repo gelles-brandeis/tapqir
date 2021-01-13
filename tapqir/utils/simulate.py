@@ -5,14 +5,13 @@ from pyro.infer import Predictive
 from pyroapi import handlers, pyro
 from torch.distributions import constraints
 
-from tapqir.models import Cosmos, GaussianSpot
+from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
 
 
-def simulate(N, F, D=14, cuda=True, params=dict()):
+def simulate(model, N, F, D=14, cuda=True, params=dict()):
     pyro.set_rng_seed(0)
-    pyro.get_param_store().clear()
-    S, K = 1, 2
+    pyro.clear_param_store()
 
     if cuda:
         torch.set_default_tensor_type("torch.cuda.FloatTensor")
@@ -25,11 +24,37 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
     pyro.param("gain", torch.tensor(params["gain"]), constraint=constraints.positive)
     pyro.param("width_mean", torch.tensor(1.5), constraint=constraints.positive)
     pyro.param("width_size", torch.tensor(2.0), constraint=constraints.positive)
-    pyro.param(
-        "probs_z",
-        torch.tensor([1 - params["probs_z"], params["probs_z"]]),
-        constraint=constraints.simplex,
-    )
+    if "probs_z" in params:
+        pyro.param(
+            "probs_z",
+            torch.tensor([1 - params["probs_z"], params["probs_z"]]),
+            constraint=constraints.simplex,
+        )
+    else:
+        pyro.param(
+            "init_z",
+            torch.tensor(
+                [
+                    params["koff"] / (params["kon"] + params["koff"]),
+                    params["kon"] / (params["kon"] + params["koff"]),
+                ]
+            ),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "trans_z",
+            torch.tensor(
+                [
+                    [
+                        1 - params["kon"],
+                        params["kon"],
+                        [params["koff"], 1 - params["koff"]],
+                    ]
+                ]
+            ),
+            constraint=constraints.simplex,
+        )
+
     pyro.param(
         "rate_j", torch.tensor(params["rate_j"]), constraint=constraints.positive
     )
@@ -52,7 +77,6 @@ def simulate(N, F, D=14, cuda=True, params=dict()):
         "c/height_1": torch.full((1, N, F), params["height"]),
     }
 
-    model = Cosmos(S, K)
     offset = torch.full((3,), params["offset"])
     target = pd.DataFrame(
         data={"frame": np.zeros(N), "x": 6.5, "y": 6.5}, index=np.arange(N)
