@@ -215,13 +215,13 @@ class Cosmos(Model):
                         ),
                     )
                     x = pyro.sample(
-                        f"x_{kdx}",
+                        f"{prefix}/x_{kdx}",
                         AffineBeta(
                             0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
                         ),
                     )
                     y = pyro.sample(
-                        f"y_{kdx}",
+                        f"{prefix}/y_{kdx}",
                         AffineBeta(
                             0, self.size[ontarget], -(data.D + 1) / 2, (data.D + 1) / 2
                         ),
