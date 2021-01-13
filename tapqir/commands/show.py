@@ -1,6 +1,9 @@
+import configparser
 import sys
+from pathlib import Path
 
 from cliff.command import Command
+from pyroapi import pyro_backend
 from PySide2.QtWidgets import QApplication
 
 from tapqir.commands.qtgui import MainWindow
@@ -25,11 +28,27 @@ class Show(Command):
         parser.add_argument(
             "parameters_path", type=str, help="Path to the parameters folder"
         )
+        parser.add_argument(
+            "-backend", metavar="BACKEND", type=str, help="Pyro backend (default: pyro)"
+        )
 
         return parser
 
     def take_action(self, args):
-        model = models[args.model](1, 2)
-        app = QApplication(sys.argv)
-        MainWindow(model, args.dataset_path, args.parameters_path)
-        sys.exit(app.exec_())
+        # read options.cfg file
+        config = configparser.ConfigParser(allow_no_value=True)
+        cfg_file = Path(args.dataset_path) / "options.cfg"
+        config.read(cfg_file)
+
+        backend = args.backend or config["fit"].get("backend")
+        # pyro backend
+        if backend == "pyro":
+            PYRO_BACKEND = "pyro"
+        else:
+            raise ValueError("Only pyro backend is supported.")
+
+        with pyro_backend(PYRO_BACKEND):
+            model = models[args.model](1, 2)
+            app = QApplication(sys.argv)
+            MainWindow(model, args.dataset_path, args.parameters_path)
+            sys.exit(app.exec_())
