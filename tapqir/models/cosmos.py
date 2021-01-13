@@ -1,6 +1,5 @@
 import torch
 import torch.distributions.constraints as constraints
-from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, pyro
@@ -140,13 +139,11 @@ class Cosmos(Model):
             self.model_parameters()
 
             # test data
-            with scope(prefix="d"):
-                self.spot_model(self.data, self.data_loc, prefix="d")
+            self.spot_model(self.data, self.data_loc, prefix="d")
 
             # control data
             if self.control:
-                with scope(prefix="c"):
-                    self.spot_model(self.control, self.control_loc, prefix="c")
+                self.spot_model(self.control, self.control_loc, prefix="c")
 
     def guide(self):
         with handlers.block(**self.inference_config_guide):
@@ -154,26 +151,24 @@ class Cosmos(Model):
             self.guide_parameters()
 
             # test data
-            with scope(prefix="d"):
-                self.spot_guide(self.data, prefix="d")
+            self.spot_guide(self.data, prefix="d")
 
             # control data
             if self.control:
-                with scope(prefix="c"):
-                    self.spot_guide(self.control, prefix="c")
+                self.spot_guide(self.control, prefix="c")
 
     def spot_model(self, data, data_loc, prefix):
         # spots
-        spots = pyro.plate("spots", self.K)
+        spots = pyro.plate(f"{prefix}/spots", self.K)
         # target sites
-        targets = pyro.plate("targets", data.N, dim=-2)
+        targets = pyro.plate(f"{prefix}/targets", data.N, dim=-2)
         # time frames
-        frames = pyro.plate("frames", data.F, dim=-1)
+        frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
 
         with targets as ndx, frames:
             # sample background intensity
             background = pyro.sample(
-                "background",
+                f"{prefix}/background",
                 dist.Gamma(
                     pyro.param(f"{prefix}/background_loc")[ndx]
                     * pyro.param(f"{prefix}/background_beta")[ndx],
@@ -185,10 +180,12 @@ class Cosmos(Model):
             # sample hidden model state (1+K*S,)
             if data.dtype == "test":
                 if self.classify:
-                    theta = pyro.sample("theta", dist.Categorical(self.probs_theta))
+                    theta = pyro.sample(
+                        f"{prefix}/theta", dist.Categorical(self.probs_theta)
+                    )
                 else:
                     theta = pyro.sample(
-                        "theta",
+                        f"{prefix}/theta",
                         dist.Categorical(self.probs_theta),
                         infer={"enumerate": "parallel"},
                     )
@@ -199,15 +196,17 @@ class Cosmos(Model):
                 ontarget = Vindex(self.ontarget)[theta, kdx]
                 # spot presence
                 m = pyro.sample(
-                    f"m_{kdx}", dist.Categorical(Vindex(self.probs_m)[theta, kdx])
+                    f"{prefix}/m_{kdx}",
+                    dist.Categorical(Vindex(self.probs_m)[theta, kdx]),
                 )
                 with handlers.mask(mask=m > 0):
                     # sample spot variables
                     height = pyro.sample(
-                        f"height_{kdx}", dist.HalfNormal(pyro.param("height_scale"))
+                        f"{prefix}/height_{kdx}",
+                        dist.HalfNormal(pyro.param("height_scale")),
                     )
                     width = pyro.sample(
-                        f"width_{kdx}",
+                        f"{prefix}/width_{kdx}",
                         AffineBeta(
                             pyro.param("width_mean"),
                             pyro.param("width_size"),
@@ -235,7 +234,7 @@ class Cosmos(Model):
 
             # observed data
             pyro.sample(
-                "data",
+                f"{prefix}/data",
                 ConvolutedGamma(
                     locs / pyro.param("gain"),
                     1 / pyro.param("gain"),
@@ -247,20 +246,24 @@ class Cosmos(Model):
 
     def spot_guide(self, data, prefix):
         # spots
-        spots = pyro.plate("spots", self.K)
+        spots = pyro.plate(f"{prefix}/spots", self.K)
         # target sites
         targets = pyro.plate(
-            "targets", data.N, subsample_size=self.batch_size, subsample=self.n, dim=-2
+            f"{prefix}/targets",
+            data.N,
+            subsample_size=self.batch_size,
+            subsample=self.n,
+            dim=-2,
         )
         # time frames
-        frames = pyro.plate("frames", data.F, dim=-1)
+        frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
 
         with targets as ndx, frames as fdx:
             if prefix == "d":
                 self.batch_idx = ndx.cpu()
             # sample background intensity
             pyro.sample(
-                "background",
+                f"{prefix}/background",
                 dist.Gamma(
                     pyro.param(f"{prefix}/b_loc")[ndx]
                     * pyro.param(f"{prefix}/b_beta")[ndx],
@@ -272,7 +275,7 @@ class Cosmos(Model):
             if self.classify:
                 if data.dtype == "test":
                     theta = pyro.sample(
-                        "theta",
+                        f"{prefix}/theta",
                         dist.Categorical(pyro.param(f"{prefix}/theta_probs")[ndx]),
                         infer={"enumerate": "parallel"},
                     )
@@ -290,14 +293,14 @@ class Cosmos(Model):
                         kdx, ndx[:, None], fdx
                     ]
                 m = pyro.sample(
-                    f"m_{kdx}",
+                    f"{prefix}/m_{kdx}",
                     dist.Categorical(m_probs),
                     infer={"enumerate": "parallel"},
                 )
                 with handlers.mask(mask=m > 0):
                     # sample spot variables
                     pyro.sample(
-                        f"height_{kdx}",
+                        f"{prefix}/height_{kdx}",
                         dist.Gamma(
                             pyro.param(f"{prefix}/h_loc")[kdx, ndx]
                             * pyro.param(f"{prefix}/h_beta")[kdx, ndx],
@@ -305,7 +308,7 @@ class Cosmos(Model):
                         ),
                     )
                     pyro.sample(
-                        f"width_{kdx}",
+                        f"{prefix}/width_{kdx}",
                         AffineBeta(
                             pyro.param(f"{prefix}/w_mean")[kdx, ndx],
                             pyro.param(f"{prefix}/w_size")[kdx, ndx],
@@ -314,7 +317,7 @@ class Cosmos(Model):
                         ),
                     )
                     pyro.sample(
-                        f"x_{kdx}",
+                        f"{prefix}/x_{kdx}",
                         AffineBeta(
                             pyro.param(f"{prefix}/x_mean")[kdx, ndx],
                             pyro.param(f"{prefix}/size")[kdx, ndx],
@@ -323,7 +326,7 @@ class Cosmos(Model):
                         ),
                     )
                     pyro.sample(
-                        f"y_{kdx}",
+                        f"{prefix}/y_{kdx}",
                         AffineBeta(
                             pyro.param(f"{prefix}/y_mean")[kdx, ndx],
                             pyro.param(f"{prefix}/size")[kdx, ndx],
