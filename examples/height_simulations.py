@@ -32,9 +32,9 @@ def main(args):
     except FileNotFoundError:
         simulate(model, args.N, args.F, args.D, cuda=args.cuda, params=params)
         # save data
-        model.data.save(model.data_path)
-        model.control.save(model.data_path)
-        pd.Series(params).to_csv(Path(model.data_path) / "simulated_params.csv")
+        model.data.save(data_path)
+        model.control.save(data_path)
+        pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
         pyro.clear_param_store()
 
     model.settings(args.lr, args.bs)
