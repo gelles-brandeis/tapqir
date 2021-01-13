@@ -6,7 +6,7 @@ import pyqtgraph as pg
 import torch
 from pyqtgraph import HistogramLUTItem
 from pyro.ops.stats import pi, quantile
-from pyroapi import pyro
+from pyroapi import handlers, pyro
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIntValidator
 from PySide2.QtWidgets import (
@@ -497,7 +497,7 @@ class MainWindow(QMainWindow):
         self.aoiNumber.setText(str(n))
 
         self.Model.n = torch.tensor([n])
-        trace = pyro.poutine.trace(self.Model.guide).get_trace()
+        trace = handlers.trace(self.Model.guide).get_trace()
         self.item["zoom"].setData(self.Model.z_marginal[n])
         for p in self.params:
             if p == "z":
