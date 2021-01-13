@@ -163,12 +163,14 @@ class Cosmos(Model):
                     self.spot_guide(self.control, prefix="c")
 
     def spot_model(self, data, data_loc, prefix):
+        # spots
+        spots = pyro.plate("spots", self.K)
         # target sites
-        N_plate = pyro.plate("N_plate", data.N, dim=-2)
+        targets = pyro.plate("targets", data.N, dim=-2)
         # time frames
-        F_plate = pyro.plate("F_plate", data.F, dim=-1)
+        frames = pyro.plate("frames", data.F, dim=-1)
 
-        with N_plate as ndx, F_plate:
+        with targets as ndx, frames:
             # sample background intensity
             background = pyro.sample(
                 "background",
@@ -193,7 +195,7 @@ class Cosmos(Model):
             else:
                 theta = 0
 
-            for kdx in range(self.K):
+            for kdx in spots:
                 ontarget = Vindex(self.ontarget)[theta, kdx]
                 # spot presence
                 m = pyro.sample(
@@ -244,14 +246,16 @@ class Cosmos(Model):
             )
 
     def spot_guide(self, data, prefix):
+        # spots
+        spots = pyro.plate("spots", self.K)
         # target sites
-        N_plate = pyro.plate(
-            "N_plate", data.N, subsample_size=self.batch_size, subsample=self.n, dim=-2
+        targets = pyro.plate(
+            "targets", data.N, subsample_size=self.batch_size, subsample=self.n, dim=-2
         )
         # time frames
-        F_plate = pyro.plate("F_plate", data.F, dim=-1)
+        frames = pyro.plate("frames", data.F, dim=-1)
 
-        with N_plate as ndx, F_plate as fdx:
+        with targets as ndx, frames as fdx:
             if prefix == "d":
                 self.batch_idx = ndx.cpu()
             # sample background intensity
@@ -275,7 +279,7 @@ class Cosmos(Model):
                 else:
                     theta = 0
 
-            for kdx in range(self.K):
+            for kdx in spots:
                 # spot presence
                 if self.classify:
                     m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
