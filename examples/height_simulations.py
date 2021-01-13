@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 from pyroapi import pyro, pyro_backend
 
+from tapqir.models import Cosmos
 from tapqir.utils.simulate import simulate
 
 
@@ -24,15 +25,18 @@ def main(args):
     params["height"] = args.height
     params["background"] = 150
 
-    model = simulate(args.N, args.F, args.D, cuda=args.cuda, params=params)
+    model = Cosmos(1, 2)
+    data_path = args.path or Path("data") / "height{}".format(args.height)
+    try:
+        model.load(data_path, True, device)
+    except FileNotFoundError:
+        simulate(model, args.N, args.F, args.D, cuda=args.cuda, params=params)
+        # save data
+        model.data.save(model.data_path)
+        model.control.save(model.data_path)
+        pd.Series(params).to_csv(Path(model.data_path) / "simulated_params.csv")
+        pyro.clear_param_store()
 
-    # save data
-    model.data_path = args.path or Path("data") / "height{}".format(args.height)
-    model.data.save(model.data_path)
-    model.control.save(model.data_path)
-    pd.Series(params).to_csv(Path(model.data_path) / "simulated_params.csv")
-
-    model.load(model.data_path, True, device)
     model.settings(args.lr, args.bs)
     model.run(args.it, args.infer)
 
