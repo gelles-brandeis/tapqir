@@ -1,7 +1,6 @@
 import torch
+from pyro.distributions import AffineBeta as PyroAffineBeta
 from torch.distributions import constraints
-
-from tapqir.distributions.pyro_affine_beta import PyroAffineBeta
 
 
 class AffineBeta(PyroAffineBeta):
@@ -28,10 +27,10 @@ class AffineBeta(PyroAffineBeta):
     }
 
     def __init__(self, mean, size, low, high, validate_args=None):
-        try:
+        if low != high:
             concentration1 = size * (mean - low) / (high - low)
             concentration0 = size * (high - mean) / (high - low)
-        except ZeroDivisionError:
+        else:
             # this is needed to work with funsor make_dist
             low = torch.tensor(0.0)
             high = torch.tensor(1.0)
