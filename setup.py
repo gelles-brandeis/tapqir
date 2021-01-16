@@ -43,7 +43,7 @@ setuptools.setup(
         "cliff",
         "PySide2",
         "pyqtgraph",
-        "pyro-ppl",
+        "pyro-ppl @ git+git://github.com/pyro-ppl/pyro.git@dev",
         "funsor",
         "tb-nightly",
     ],
