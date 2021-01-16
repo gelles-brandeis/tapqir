@@ -334,7 +334,9 @@ class Cosmos(Model):
 
     def model_parameters(self):
         pyro.param(
-            "proximity", torch.tensor([0.5]), constraint=constraints.interval(0.01, 2.0)
+            "proximity",
+            lambda: torch.tensor([0.5]),
+            constraint=constraints.interval(0.01, 2.0),
         )
         self.size = torch.cat(
             (
@@ -343,43 +345,51 @@ class Cosmos(Model):
             ),
             dim=-1,
         )
-        pyro.param("gain", torch.tensor(5.0), constraint=constraints.positive)
-        pyro.param("probs_z", torch.ones(self.S + 1), constraint=constraints.simplex)
-        pyro.param("rate_j", torch.tensor(0.5), constraint=constraints.positive)
+        pyro.param("gain", lambda: torch.tensor(5.0), constraint=constraints.positive)
+        pyro.param(
+            "probs_z", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
+        )
+        pyro.param("rate_j", lambda: torch.tensor(0.5), constraint=constraints.positive)
 
         pyro.param(
             "d/background_loc",
-            torch.ones(self.data.N, 1)
-            * (self.data.data_median - self.data.offset_median),
+            lambda: torch.full(
+                (self.data.N, 1), self.data.data_median - self.data.offset_median
+            ),
             constraint=constraints.positive,
         )
         pyro.param(
             "d/background_beta",
-            torch.ones(self.data.N, 1),
+            lambda: torch.ones(self.data.N, 1),
             constraint=constraints.positive,
         )
 
         if self.control:
             pyro.param(
                 "c/background_loc",
-                torch.ones(self.control.N, 1)
-                * (self.data.data_median - self.data.offset_median),
+                lambda: torch.full(
+                    (self.control.N, 1), self.data.data_median - self.data.offset_median
+                ),
                 constraint=constraints.positive,
             )
             pyro.param(
                 "c/background_beta",
-                torch.ones(self.control.N, 1),
+                lambda: torch.ones(self.control.N, 1),
                 constraint=constraints.positive,
             )
 
         pyro.param(
             "width_mean",
-            torch.tensor([1.5]),
+            lambda: torch.tensor([1.5]),
             constraint=constraints.interval(0.75, 2.25),
         )
-        pyro.param("width_size", torch.tensor([2.0]), constraint=constraints.positive)
         pyro.param(
-            "height_scale", torch.tensor(10000.0), constraint=constraints.positive
+            "width_size", lambda: torch.tensor([2.0]), constraint=constraints.positive
+        )
+        pyro.param(
+            "height_scale",
+            lambda: torch.tensor(10000.0),
+            constraint=constraints.positive,
         )
 
     def guide_parameters(self):
@@ -391,57 +401,58 @@ class Cosmos(Model):
     def spot_parameters(self, data, prefix):
         pyro.param(
             f"{prefix}/theta_probs",
-            torch.ones(data.N, data.F, 1 + self.K * self.S),
+            lambda: torch.ones(data.N, data.F, 1 + self.K * self.S),
             constraint=constraints.simplex,
         )
         m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
         m_probs[1, 0, :, :, 0] = 0
         m_probs[2, 1, :, :, 0] = 0
-        pyro.param(f"{prefix}/m_probs", m_probs, constraint=constraints.simplex)
+        pyro.param(f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex)
         pyro.param(
             f"{prefix}/m_prob",
-            torch.ones(self.K, data.N, data.F, 2),
+            lambda: torch.ones(self.K, data.N, data.F, 2),
             constraint=constraints.simplex,
         )
         pyro.param(
             f"{prefix}/b_loc",
-            (self.data.data_median - self.data.offset_median).repeat(data.N, data.F),
+            lambda: torch.full(
+                (data.N, data.F), self.data.data_median - self.data.offset_median
+            ),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/b_beta",
-            torch.ones(data.N, data.F),
+            lambda: torch.ones(data.N, data.F),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_loc",
-            torch.full((self.K, data.N, data.F), 2000.0),
-            # (self.data.noise * 2).repeat(self.K, data.N, data.F),
+            lambda: torch.full((self.K, data.N, data.F), 2000.0),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_beta",
-            torch.ones(self.K, data.N, data.F) * 0.001,
+            lambda: torch.full((self.K, data.N, data.F), 0.001),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/w_mean",
-            torch.ones(self.K, data.N, data.F) * 1.5,
+            lambda: torch.full((self.K, data.N, data.F), 1.5),
             constraint=constraints.interval(0.75, 2.25),
         )
         pyro.param(
             f"{prefix}/w_size",
-            torch.ones(self.K, data.N, data.F) * 100.0,
+            lambda: torch.full((self.K, data.N, data.F), 100.0),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             f"{prefix}/x_mean",
-            torch.zeros(self.K, data.N, data.F),
+            lambda: torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
         )
         pyro.param(
             f"{prefix}/y_mean",
-            torch.zeros(self.K, data.N, data.F),
+            lambda: torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
         )
         size = torch.ones(self.K, data.N, data.F) * 200.0
