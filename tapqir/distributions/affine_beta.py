@@ -21,15 +21,15 @@ class AffineBeta(PyroAffineBeta):
 
     arg_constraints = {
         "mean": constraints.dependent,
-        "samle_size": constraints.real,
+        "sample_size": constraints.real,
         "low": constraints.real,
         "high": constraints.dependent,
     }
 
-    def __init__(self, mean, samle_size, low, high, validate_args=None):
+    def __init__(self, mean, sample_size, low, high, validate_args=None):
         if low != high:
-            concentration1 = samle_size * (mean - low) / (high - low)
-            concentration0 = samle_size * (high - mean) / (high - low)
+            concentration1 = sample_size * (mean - low) / (high - low)
+            concentration0 = sample_size * (high - mean) / (high - low)
         else:
             # this is needed to work with funsor make_dist
             low = torch.tensor(0.0)
