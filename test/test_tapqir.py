@@ -24,9 +24,12 @@ def dataset_path(tmp_path):
     params["offset"] = 90.0
     params["height"] = 3000
     params["background"] = 150
+    N = 2
+    F = 5
+    D = 14
 
     model = Cosmos(1, 2)
-    simulate(model, 2, 5, 14, cuda=False, params=params)
+    simulate(model, N, F, D, cuda=False, params=params)
 
     # save data
     model.data.save(tmp_path)

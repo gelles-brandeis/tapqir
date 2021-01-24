@@ -45,11 +45,8 @@ def simulate(model, N, F, D=14, cuda=True, params=dict()):
             "trans_z",
             torch.tensor(
                 [
-                    [
-                        1 - params["kon"],
-                        params["kon"],
-                        [params["koff"], 1 - params["koff"]],
-                    ]
+                    [1 - params["kon"], params["kon"]],
+                    [params["koff"], 1 - params["koff"]],
                 ]
             ),
             constraint=constraints.simplex,
@@ -64,18 +61,33 @@ def simulate(model, N, F, D=14, cuda=True, params=dict()):
         constraint=constraints.positive,
     )
 
-    samples = {
-        "d/background": torch.full((1, N, 1), params["background"]),
-        "d/width_0": torch.full((1, N, F), 1.4),
-        "d/width_1": torch.full((1, N, F), 1.4),
-        "d/height_0": torch.full((1, N, F), params["height"]),
-        "d/height_1": torch.full((1, N, F), params["height"]),
-        "c/background": torch.full((1, N, 1), params["background"]),
-        "c/width_0": torch.full((1, N, F), 1.4),
-        "c/width_1": torch.full((1, N, F), 1.4),
-        "c/height_0": torch.full((1, N, F), params["height"]),
-        "c/height_1": torch.full((1, N, F), params["height"]),
-    }
+    if "probs_z" in params:
+        samples = {
+            "d/background": torch.full((1, N, 1), params["background"]),
+            "d/width_0": torch.full((1, N, F), 1.4),
+            "d/width_1": torch.full((1, N, F), 1.4),
+            "d/height_0": torch.full((1, N, F), params["height"]),
+            "d/height_1": torch.full((1, N, F), params["height"]),
+            "c/background": torch.full((1, N, 1), params["background"]),
+            "c/width_0": torch.full((1, N, F), 1.4),
+            "c/width_1": torch.full((1, N, F), 1.4),
+            "c/height_0": torch.full((1, N, F), params["height"]),
+            "c/height_1": torch.full((1, N, F), params["height"]),
+        }
+    else:
+        # kinetic simulations
+        samples = {}
+        for f in range(F):
+            samples[f"d/background_{f}"] = torch.full((1, N, 1), params["background"])
+            samples[f"d/width_0_{f}"] = torch.full((1, N, 1), 1.4)
+            samples[f"d/width_1_{f}"] = torch.full((1, N, 1), 1.4)
+            samples[f"d/height_0_{f}"] = torch.full((1, N, 1), params["height"])
+            samples[f"d/height_1_{f}"] = torch.full((1, N, 1), params["height"])
+            samples[f"c/background_{f}"] = torch.full((1, N, 1), params["background"])
+            samples[f"c/width_0_{f}"] = torch.full((1, N, 1), 1.4)
+            samples[f"c/width_1_{f}"] = torch.full((1, N, 1), 1.4)
+            samples[f"c/height_0_{f}"] = torch.full((1, N, 1), params["height"])
+            samples[f"c/height_1_{f}"] = torch.full((1, N, 1), params["height"])
 
     offset = torch.full((3,), params["offset"])
     target = pd.DataFrame(
@@ -102,16 +114,23 @@ def simulate(model, N, F, D=14, cuda=True, params=dict()):
 
     # sample
     predictive = Predictive(
-        handlers.uncondition(model.model), posterior_samples=samples, num_samples=None
+        handlers.uncondition(model.model), posterior_samples=samples, num_samples=1
     )
     samples = predictive()
-    model.data.data = samples["d/data"][0].data.floor()
-    model.control.data = samples["c/data"][0].data.floor()
     model.data.labels = np.zeros(
         (N, F), dtype=[("aoi", int), ("frame", int), ("z", bool)]
     )
     model.data.labels["aoi"] = np.arange(N).reshape(-1, 1)
     model.data.labels["frame"] = np.arange(F)
-    model.data.labels["z"] = samples["d/theta"][0].cpu() > 0
+    if "probs_z" in params:
+        model.data.data = samples["d/data"][0].data.floor()
+        model.control.data = samples["c/data"][0].data.floor()
+        model.data.labels["z"] = samples["d/theta"][0].cpu() > 0
+    else:
+        # kinetic simulations
+        for f in range(F):
+            model.data.data[:, f : f + 1] = samples[f"d/data_{f}"][0].data.floor()
+            model.control.data[:, f : f + 1] = samples[f"c/data_{f}"][0].data.floor()
+            model.data.labels["z"][:, f : f + 1] = samples[f"d/theta_{f}"][0].cpu() > 0
 
     return model
