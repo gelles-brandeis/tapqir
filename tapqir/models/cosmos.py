@@ -461,4 +461,6 @@ class Cosmos(Model):
         elif self.K == 3:
             size[1] = 7.0
             size[2] = 3.0
-        pyro.param(f"{prefix}/size", size, constraint=constraints.greater_than(2.0))
+        pyro.param(
+            f"{prefix}/size", lambda: size, constraint=constraints.greater_than(2.0)
+        )

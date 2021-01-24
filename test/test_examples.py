@@ -16,18 +16,22 @@ CPU_EXAMPLES = [
     "height_simulations.py -it 1 -infer 1",
     "randomized_simulations.py -it 1 -infer 1",
     "ratej_simulations.py -it 1 -infer 1",
+    "kinetic_simulations.py -it 1 -infer 1",
     "height_simulations.py -it 1 -infer 1 --funsor",
     "randomized_simulations.py -it 1 -infer 1 --funsor",
     "ratej_simulations.py -it 1 -infer 1 --funsor",
+    "kinetic_simulations.py -it 1 -infer 1 --funsor",
 ]
 
 CUDA_EXAMPLES = [
     "height_simulations.py -it 1 -infer 1 --cuda",
     "randomized_simulations.py -it 1 -infer 1 --cuda",
     "ratej_simulations.py -it 1 -infer 1 --cuda",
+    "kinetic_simulations.py -it 1 -infer 1 --cuda",
     "height_simulations.py -it 1 -infer 1 --cuda --funsor",
     "randomized_simulations.py -it 1 -infer 1 --cuda --funsor",
     "ratej_simulations.py -it 1 -infer 1 --cuda --funsor",
+    "kinetic_simulations.py -it 1 -infer 1 --cuda --funsor",
 ]
 
 

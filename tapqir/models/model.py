@@ -318,7 +318,7 @@ class Model(nn.Module):
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.labels is not None:
+        if self.classify and self.data.labels is not None:
             mask = self.data.labels["z"] < 2
             pred_labels = self.z_map.cpu().numpy()[mask]
             true_labels = self.data.labels["z"][mask]
