@@ -25,7 +25,8 @@ class Config(Command):
         config["glimpse"]["driftlist"] = "/path/to/driftlist_file"
         config["glimpse"]["frame_start"] = None
         config["glimpse"]["frame_end"] = None
-        config["glimpse"]["labels"] = None
+        config["glimpse"]["test_labels"] = None
+        config["glimpse"]["control_labels"] = None
         config["glimpse"]["labeltype"] = None
 
         config["fit"] = {}

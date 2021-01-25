@@ -22,15 +22,15 @@ class CosmosDataset(Dataset):
         drift=None,
         dtype=None,
         device=None,
-        offset=None,
         labels=None,
+        offset=None,
     ):
         self.data = data.to(device)
         self.N, self.F, self.D, _ = self.data.shape
         self.target = target
         self.drift = drift
+        self.labels = labels
         if dtype == "test":
-            self.labels = labels
             if offset is not None:
                 self.offset = offset.to(device)
             else:
@@ -38,8 +38,14 @@ class CosmosDataset(Dataset):
         assert self.N == len(self.target)
         assert self.F == len(self.drift)
         self.dtype = dtype
-        self.vmin = np.percentile(self.data.cpu().numpy(), 5)
-        self.vmax = np.percentile(self.data.cpu().numpy(), 99)
+
+    @lazy_property
+    def vmin(self):
+        return np.percentile(self.data.cpu().numpy(), 5)
+
+    @lazy_property
+    def vmax(self):
+        return np.percentile(self.data.cpu().numpy(), 99)
 
     @lazy_property
     def data_median(self):
@@ -115,11 +121,11 @@ class CosmosDataset(Dataset):
         torch.save(self.data, path / f"{self.dtype}_data.pt")
         self.target.to_csv(path / f"{self.dtype}_target.csv")
         self.drift.to_csv(path / "drift.csv")
+        if self.labels is not None:
+            np.save(path / f"{self.dtype}_labels.npy", self.labels)
         if self.dtype == "test":
             if self.offset is not None:
                 torch.save(self.offset, path / "offset.pt")
-            if self.labels is not None:
-                np.save(path / "labels.npy", self.labels)
 
 
 def load_data(path, dtype, device=None):
@@ -127,14 +133,14 @@ def load_data(path, dtype, device=None):
     data = torch.load(path / f"{dtype}_data.pt", map_location=device).detach()
     target = pd.read_csv(path / f"{dtype}_target.csv", index_col="aoi")
     drift = pd.read_csv(path / "drift.csv", index_col="frame")
+    labels = None
+    if (path / f"{dtype}_labels.npy").is_file():
+        labels = np.load(path / f"{dtype}_labels.npy")
     if dtype == "test":
         offset = torch.load(path / "offset.pt", map_location=device).detach()
-        labels = None
-        if (path / "labels.npy").is_file():
-            labels = np.load(path / "labels.npy")
-        return CosmosDataset(data, target, drift, dtype, device, offset, labels)
+        return CosmosDataset(data, target, drift, dtype, device, labels, offset)
 
-    return CosmosDataset(data, target, drift, dtype, device)
+    return CosmosDataset(data, target, drift, dtype, device, labels)
 
 
 class GlimpseDataset(Dataset):
