@@ -13,25 +13,29 @@ TESTS_DIR = Path(__file__).resolve().parent.parent
 EXAMPLES_DIR = TESTS_DIR / "examples"
 
 CPU_EXAMPLES = [
-    "height_simulations.py -N 2 -F 5 -it 1 -infer 1",
-    "randomized_simulations.py -N 2 -F 5 -it 1 -infer 1",
-    "ratej_simulations.py -N 2 -F 5 -it 1 -infer 1",
+    "cosmos_simulations.py \
+            --gain 7 --probsz 0.15 --ratej 0.15 --proximity 0.2 \
+            --height 3000 -N 2 -F 5 -it 1 -infer 1",
+    "cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1",
     "kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1",
-    "height_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor",
-    "randomized_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor",
-    "ratej_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor",
+    "cosmos_simulations.py \
+            --gain 7 --probsz 0.15 --ratej 0.15 --proximity 0.2 \
+            --height 3000 -N 2 -F 5 -it 1 -infer 1 --funsor",
+    "cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor",
     "kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor",
 ]
 
 CUDA_EXAMPLES = [
-    "height_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda",
-    "randomized_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda",
-    "ratej_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda",
+    "cosmos_simulations.py \
+            --gain 7 --probsz 0.15 --ratej 0.15 --proximity 0.2 \
+            --height 3000 -N 2 -F 5 -it 1 -infer 1 --cuda",
+    "cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda",
     "kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda",
-    "height_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda --funsor",
-    "randomized_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda --funsor",
-    "ratej_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda --funsor",
-    "kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda --funsor",
+    "cosmos_simulations.py \
+            --gain 7 --probsz 0.15 --ratej 0.15 --proximity 0.2 \
+            --height 3000 -N 2 -F 5 -it 1 -infer 1 --funsor --cuda",
+    "cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor --cuda",
+    "kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor --cuda",
 ]
 
 

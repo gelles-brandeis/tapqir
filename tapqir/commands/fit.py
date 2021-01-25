@@ -78,6 +78,12 @@ class Fit(Command):
             "-dev", metavar="DEVICE", type=str, help="Compute device (default: cuda)"
         )
         parser.add_argument(
+            "-jit",
+            metavar="JIT",
+            type=bool,
+            help="Use jit compiler (default: False)",
+        )
+        parser.add_argument(
             "-backend", metavar="BACKEND", type=str, help="Pyro backend (default: pyro)"
         )
 
@@ -97,6 +103,7 @@ class Fit(Command):
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
         control = args.c or config["fit"].getboolean("control")
         device = args.dev or config["fit"].get("device")
+        jit = args.jit or config["fit"].getboolean("jit")
         backend = args.backend or config["fit"].get("backend")
 
         if device == "cuda":
@@ -121,7 +128,7 @@ class Fit(Command):
             model = models[args.model](states, k_max)
             model.load(args.dataset_path, control, device)
 
-            model.settings(learning_rate, batch_size)
+            model.settings(learning_rate, batch_size, jit)
             if batch_size == 0:
                 # add new batch_size to options.cfg
                 config.set("fit", "batch_size", str(model.batch_size))

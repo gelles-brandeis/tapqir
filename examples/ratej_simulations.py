@@ -26,7 +26,7 @@ def main(args):
     params["background"] = 150
 
     model = Cosmos(1, 2)
-    data_path = args.path or Path("data") / "ratej{}".format(args.ratej)
+    data_path = args.path or Path("data") / f"ratej{args.ratej}"
     try:
         model.load(data_path, True, device)
     except FileNotFoundError:
