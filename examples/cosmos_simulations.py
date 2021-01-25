@@ -1,4 +1,5 @@
 import argparse
+import random
 from pathlib import Path
 
 import pandas as pd
@@ -17,16 +18,16 @@ def main(args):
         device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
-    params["gain"] = 7.0
-    params["probs_z"] = 0.15
-    params["rate_j"] = 0.15
-    params["proximity"] = 0.2
+    params["gain"] = args.gain or random.uniform(1, 20)
+    params["probs_z"] = args.probsz or random.betavariate(1, 9)
+    params["rate_j"] = args.ratej or random.uniform(0, 1)
+    params["proximity"] = args.proximity or random.uniform(0.2, 0.6)
     params["offset"] = 90.0
     params["height"] = args.height
     params["background"] = 150
 
     model = Cosmos(1, 2)
-    data_path = args.path or Path("data") / "height{}".format(args.height)
+    data_path = args.path
     try:
         model.load(data_path, True, device)
     except FileNotFoundError:
@@ -37,14 +38,18 @@ def main(args):
         pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
         pyro.clear_param_store()
 
-    model.settings(args.lr, args.bs)
+    model.settings(args.lr, args.bs, args.jit)
     model.run(args.it, args.infer)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Height Simulations")
     parser.add_argument("--seed", default=0, type=int)
-    parser.add_argument("--height", default=3000, type=int)
+    parser.add_argument("--gain", type=float)  # default 7.0
+    parser.add_argument("--probsz", type=float)  # default 0.15
+    parser.add_argument("--ratej", type=float)  # default 0.15
+    parser.add_argument("--proximity", type=float)  # default 0.2
+    parser.add_argument("--height", default=3000, type=int)  # default 3000
     parser.add_argument("-N", default=5, type=int)
     parser.add_argument("-F", default=500, type=int)
     parser.add_argument("-D", default=14, type=int)
@@ -55,6 +60,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--funsor", action="store_true")
+    parser.add_argument("--jit", action="store_true")
     args = parser.parse_args()
 
     if args.funsor:
