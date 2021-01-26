@@ -1,5 +1,6 @@
 import configparser
 from pathlib import Path
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -50,9 +51,9 @@ def read_glimpse(path, D):
     aoi_df = {}
     for dtype in dtypes:
         try:
-            aoi_mat[dtype] = loadmat(config["glimpse"]["{}_aoiinfo".format(dtype)])
+            aoi_mat[dtype] = loadmat(config["glimpse"][f"{dtype}_aoiinfo"])
         except ValueError:
-            aoi_mat[dtype] = np.loadtxt(config["glimpse"]["{}_aoiinfo".format(dtype)])
+            aoi_mat[dtype] = np.loadtxt(config["glimpse"][f"{dtype}_aoiinfo"])
         try:
             aoi_df[dtype] = pd.DataFrame(
                 aoi_mat[dtype]["aoiinfo2"],
@@ -75,62 +76,63 @@ def read_glimpse(path, D):
             aoi_df[dtype]["y"] - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dy"]
         )
 
-    labels = None
-    if config["glimpse"]["labels"]:
-        if config["glimpse"]["labeltype"] is not None:
-            framelist = loadmat(config["glimpse"]["labels"])
-            f1 = framelist[config["glimpse"]["labeltype"]][0, 2]
-            f2 = framelist[config["glimpse"]["labeltype"]][-1, 2]
-            drift_df = drift_df.loc[f1:f2]
-            aoi_list = np.unique(framelist[config["glimpse"]["labeltype"]][:, 0])
-            aoi_df["test"] = aoi_df["test"].loc[aoi_list]
-            labels = np.zeros(
-                (len(aoi_df["test"]), len(drift_df)),
-                dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)],
-            )
-            labels["aoi"] = framelist[config["glimpse"]["labeltype"]][:, 0].reshape(
-                len(aoi_df["test"]), len(drift_df)
-            )
-            labels["frame"] = framelist[config["glimpse"]["labeltype"]][:, 2].reshape(
-                len(aoi_df["test"]), len(drift_df)
-            )
-            labels["spotpicker"] = framelist[config["glimpse"]["labeltype"]][
-                :, 1
-            ].reshape(len(aoi_df["test"]), len(drift_df))
-            labels["spotpicker"][labels["spotpicker"] == 0] = 3
-            labels["spotpicker"][labels["spotpicker"] == 2] = 0
-        else:
-            labels_mat = loadmat(config["glimpse"]["labels"])
-            labels = np.zeros(
-                (len(aoi_df["test"]), len(drift_df)),
-                dtype=[
-                    ("aoi", int),
-                    ("frame", int),
-                    ("z", bool),
-                    ("spotpicker", float),
-                ],
-            )
-            labels["aoi"] = aoi_df["test"].index.values.reshape(-1, 1)
-            labels["frame"] = drift_df.index.values
-            spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0, 0]
-            for sp in spot_picker:
-                aoi = int(sp[-1])
-                start = int(sp[1])
-                end = int(sp[2])
-                if sp[0] in [-2.0, 0.0, 2.0]:
-                    labels["spotpicker"][
-                        (labels["aoi"] == aoi)
-                        & (labels["frame"] >= start)
-                        & (labels["frame"] <= end)
-                    ] = 0
-                elif sp[0] in [-3.0, 1.0, 3.0]:
-                    labels["spotpicker"][
-                        (labels["aoi"] == aoi)
-                        & (labels["frame"] >= start)
-                        & (labels["frame"] <= end)
-                    ] = 1
+    labels = defaultdict(None)
+    for dtype in dtypes:
+        if config["glimpse"][f"{dtype}_labels"] is not None:
+            if config["glimpse"]["labeltype"] is not None:
+                framelist = loadmat(config["glimpse"][f"{dtype}_labels"])
+                f1 = framelist[config["glimpse"]["labeltype"]][0, 2]
+                f2 = framelist[config["glimpse"]["labeltype"]][-1, 2]
+                drift_df = drift_df.loc[f1:f2]
+                aoi_list = np.unique(framelist[config["glimpse"]["labeltype"]][:, 0])
+                aoi_df["test"] = aoi_df["test"].loc[aoi_list]
+                labels[dtype] = np.zeros(
+                    (len(aoi_df[dtype]), len(drift_df)),
+                    dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)],
+                )
+                labels[dtype]["aoi"] = framelist[config["glimpse"]["labeltype"]][:, 0].reshape(
+                    len(aoi_df[dtype]), len(drift_df)
+                )
+                labels[dtype]["frame"] = framelist[config["glimpse"]["labeltype"]][:, 2].reshape(
+                    len(aoi_df[dtype]), len(drift_df)
+                )
+                labels["spotpicker"] = framelist[config["glimpse"]["labeltype"]][
+                    :, 1
+                ].reshape(len(aoi_df[dtype]), len(drift_df))
+                labels[dtype]["spotpicker"][labels[dtype]["spotpicker"] == 0] = 3
+                labels[dtype]["spotpicker"][labels[dtype]["spotpicker"] == 2] = 0
+            else:
+                labels_mat = loadmat(config["glimpse"][f"{dtype}_labels"])
+                labels[dtype] = np.zeros(
+                    (len(aoi_df[dtype]), len(drift_df)),
+                    dtype=[
+                        ("aoi", int),
+                        ("frame", int),
+                        ("z", bool),
+                        ("spotpicker", float),
+                    ],
+                )
+                labels[dtype]["aoi"] = aoi_df[dtype].index.values.reshape(-1, 1)
+                labels[dtype]["frame"] = drift_df.index.values
+                spot_picker = labels_mat["Intervals"]["CumulativeIntervalArray"][0, 0]
+                for sp in spot_picker:
+                    aoi = int(sp[-1])
+                    start = int(sp[1])
+                    end = int(sp[2])
+                    if sp[0] in [-2.0, 0.0, 2.0]:
+                        labels[dtype]["spotpicker"][
+                            (labels[dtype]["aoi"] == aoi)
+                            & (labels[dtype]["frame"] >= start)
+                            & (labels[dtype]["frame"] <= end)
+                        ] = 0
+                    elif sp[0] in [-3.0, 1.0, 3.0]:
+                        labels[dtype]["spotpicker"][
+                            (labels[dtype]["aoi"] == aoi)
+                            & (labels[dtype]["frame"] >= start)
+                            & (labels[dtype]["frame"] <= end)
+                        ] = 1
 
-        labels["z"] = labels["spotpicker"]
+            labels[dtype]["z"] = labels[dtype]["spotpicker"]
 
     """
     target DataFrame
@@ -219,6 +221,6 @@ def read_glimpse(path, D):
         # convert data into torch tensor
         data[dtype] = torch.tensor(data[dtype], dtype=torch.float32)
         dataset = CosmosDataset(
-            data[dtype], target[dtype], drift, dtype, device, offset, labels
+            data[dtype], target[dtype], drift, dtype, device, labels[dtype], offset
         )
         dataset.save(path)
