@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-import torch
 
 from tapqir.utils.imscroll import count_intervals
 
