@@ -93,3 +93,32 @@ def _(labels):
         }
     )
     return result
+
+
+@singledispatch
+def time_to_first_binding(labels):
+    raise NotImplementedError
+
+
+@time_to_first_binding.register(np.ndarray)
+def _(labels):
+    labels = labels.astype("float")
+    N, F = labels.shape
+    frames = np.arange(1, F+1)
+    q1 = np.ones((N, F))
+    q1[:, :-1] = labels[:, 1:]
+    cumq0 = np.cumprod(1 - labels, axis=-1)
+    ttfb = (frames * q1 * cumq0).sum(-1)
+    return ttfb
+
+
+@time_to_first_binding.register(torch.Tensor)
+def _(labels):
+    labels = labels.float()
+    N, F = labels.shape
+    frames = torch.arange(1, F+1)
+    q1 = torch.ones(N, F)
+    q1[:, :-1] = labels[:, 1:]
+    cumq0 = torch.cumprod(1 - labels, dim=-1)
+    ttfb = (frames * q1 * cumq0).sum(-1)
+    return ttfb
