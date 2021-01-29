@@ -21,6 +21,7 @@ Welcome to tapqir's documentation!
    commands
    models
    distributions
+   utils
 
 .. toctree::
    :maxdepth: 1

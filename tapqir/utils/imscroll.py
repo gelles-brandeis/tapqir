@@ -100,6 +100,18 @@ def time_to_first_binding(labels):
     r"""
     Measure the time elapsed prior to the first binding.
 
+    Time-to-first binding for a binary data:
+
+        :math:`\mathrm{ttfb} =
+        \sum_{f=1}^{F-1} f z_{n,f} \prod_{f^\prime=0}^{f-1} (1 - z_{n,f^\prime})
+        + F \prod_{f^\prime=0}^{F-1} (1 - z_{n,f^\prime})`
+
+    Expected value of the time-to-first binding:
+
+        :math:`\mathbb{E}[\mathrm{ttfb}] =
+        \sum_{f=1}^{F-1} f q(z_{n,f}=1) \prod_{f^\prime=f-1}^{f-1} q(z_{n,f^\prime}=0)
+        + F \prod_{f^\prime=0}^{F-1} q(z_{n,f^\prime}=0)`
+
     Reference::
 
       @article{friedman2015multi,
