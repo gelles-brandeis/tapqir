@@ -18,6 +18,13 @@ EXTRAS_REQUIRE = [
     "notebook",
     "matplotlib",
 ]
+# tests
+TEST_REQUIRE = [
+    "flake8",
+    "pytest",
+    "pytest-qt",
+    "pytest-xvfb",
+]
 
 setuptools.setup(
     name="tapqir",
@@ -32,41 +39,29 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy",
-        "scipy",
-        "pandas",
-        "tqdm",
-        "scikit-learn",
-        "future",
-        "configparser",
-        "torch",
         "cliff",
-        "PySide2",
+        "configparser",
+        "funsor @ git+git://github.com/pyro-ppl/funsor.git@master",
+        "future",
+        "pandas",
         "pyqtgraph",
         "pyro-ppl @ git+git://github.com/pyro-ppl/pyro.git@dev",
-        "funsor @ git+git://github.com/pyro-ppl/funsor.git@master",
+        "PySide2",
+        "scikit-learn",
+        "scipy",
         "tb-nightly",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
-        "test": EXTRAS_REQUIRE
-        + [
-            "flake8",
-            "pytest",
-            "pytest-qt",
-            "pytest-xvfb",
-        ],
+        "test": EXTRAS_REQUIRE + TEST_REQUIRE,
         "dev": EXTRAS_REQUIRE
+        + TEST_REQUIRE
         + [
-            "flake8",
-            "sphinx",
-            "pytest",
-            "pytest-qt",
-            "pytest-xvfb",
-            "nbsphinx",
-            "sphinx_rtd_theme",
             "black",
             "isort",
+            "nbsphinx",
+            "sphinx",
+            "sphinx_rtd_theme",
         ],
     },
     classifiers=[
