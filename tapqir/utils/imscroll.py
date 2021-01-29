@@ -97,6 +97,21 @@ def _(labels):
 
 @singledispatch
 def time_to_first_binding(labels):
+    r"""
+    Measure the time elapsed prior to the first binding.
+
+    Reference::
+
+      @article{friedman2015multi,
+        title={Multi-wavelength single-molecule fluorescence analysis of transcription mechanisms},
+        author={Friedman, Larry J and Gelles, Jeff},
+        journal={Methods},
+        volume={86},
+        pages={27--36},
+        year={2015},
+        publisher={Elsevier}
+      }
+    """
     raise NotImplementedError
 
 
