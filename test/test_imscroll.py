@@ -2,7 +2,12 @@ import numpy as np
 import pytest
 import torch
 
-from tapqir.utils.imscroll import count_intervals, time_to_first_binding
+from tapqir.utils.imscroll import (
+    association_rate,
+    count_intervals,
+    dissociation_rate,
+    time_to_first_binding,
+)
 
 
 @pytest.mark.parametrize(
@@ -62,3 +67,59 @@ def test_count_intervals(labels, expected):
 def test_time_to_first_binding(labels, expected):
     actual = time_to_first_binding(labels)
     assert (actual == expected).all()
+
+
+@pytest.mark.parametrize(
+    "labels,expected",
+    [
+        (
+            np.array(
+                [
+                    [False, False, False, True, True],
+                    [False, True, True, False, True],
+                ]
+            ),
+            3 / 5,
+        ),
+        (
+            np.array(
+                [
+                    [True, False, False, False, False],
+                    [False, True, True, False, False],
+                ]
+            ),
+            1 / 5,
+        ),
+    ],
+)
+def test_association_rate(labels, expected):
+    actual = association_rate(labels)
+    assert actual == expected
+
+
+@pytest.mark.parametrize(
+    "labels,expected",
+    [
+        (
+            np.array(
+                [
+                    [False, False, False, True, True],
+                    [False, True, True, False, True],
+                ]
+            ),
+            1 / 3,
+        ),
+        (
+            np.array(
+                [
+                    [True, False, False, False, False],
+                    [False, True, True, False, False],
+                ]
+            ),
+            2 / 3,
+        ),
+    ],
+)
+def test_dissociation_rate(labels, expected):
+    actual = dissociation_rate(labels)
+    assert actual == expected
