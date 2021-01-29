@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from tapqir.utils.imscroll import count_intervals
+from tapqir.utils.imscroll import count_intervals, time_to_first_binding
 
 
 @pytest.mark.parametrize(
@@ -29,4 +29,36 @@ from tapqir.utils.imscroll import count_intervals
 def test_count_intervals(labels, expected):
     result = count_intervals(labels)
     actual = result[["aoi", "dwell_time", "low_or_high"]].values
+    assert (actual == expected).all()
+
+
+@pytest.mark.parametrize(
+    "labels,expected",
+    [
+        (
+            np.array(
+                [
+                    [False, False, False],
+                    [False, False, True],
+                    [False, True, True],
+                    [True, False, True],
+                ]
+            ),
+            np.array([3.0, 2.0, 1.0, 0.0]),
+        ),
+        (
+            torch.tensor(
+                [
+                    [False, False, False],
+                    [False, False, True],
+                    [False, True, True],
+                    [True, False, True],
+                ]
+            ),
+            torch.tensor([3.0, 2.0, 1.0, 0.0]),
+        ),
+    ],
+)
+def test_time_to_first_binding(labels, expected):
+    actual = time_to_first_binding(labels)
     assert (actual == expected).all()
