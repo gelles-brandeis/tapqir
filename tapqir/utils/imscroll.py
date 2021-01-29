@@ -47,6 +47,8 @@ def _(labels):
     stop_type[:, -1] += 2
     stop_type = stop_type[stop_aoi, stop_frame]
 
+    assert all(start_aoi == stop_aoi)
+
     low_or_high = np.where(abs(start_type) > abs(stop_type), start_type, stop_type)
 
     result = pd.DataFrame(
@@ -76,6 +78,8 @@ def _(labels):
     stop_type = labels.long()
     stop_type[:, -1] += 2
     stop_type = stop_type[stop_aoi, stop_frame]
+
+    assert all(start_aoi == stop_aoi)
 
     low_or_high = torch.where(abs(start_type) > abs(stop_type), start_type, stop_type)
 
