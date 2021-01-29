@@ -131,7 +131,7 @@ def time_to_first_binding(labels):
 def _(labels):
     labels = labels.astype("float")
     N, F = labels.shape
-    frames = np.arange(1, F+1)
+    frames = np.arange(1, F + 1)
     q1 = np.ones((N, F))
     q1[:, :-1] = labels[:, 1:]
     cumq0 = np.cumprod(1 - labels, axis=-1)
@@ -143,9 +143,59 @@ def _(labels):
 def _(labels):
     labels = labels.float()
     N, F = labels.shape
-    frames = torch.arange(1, F+1)
+    frames = torch.arange(1, F + 1)
     q1 = torch.ones(N, F)
     q1[:, :-1] = labels[:, 1:]
     cumq0 = torch.cumprod(1 - labels, dim=-1)
     ttfb = (frames * q1 * cumq0).sum(-1)
     return ttfb
+
+
+@singledispatch
+def association_rate(labels):
+    r"""
+    Compute the on-rate from the binary data assuming a two-state HMM model.
+    """
+    raise NotImplementedError
+
+
+@association_rate.register(np.ndarray)
+def _(labels):
+    binding_events = ((1 - labels[..., :-1]) * labels[..., 1:]).sum()
+    off_states = (1 - labels[..., :-1]).sum()
+    kon = binding_events / off_states
+    return kon
+
+
+@association_rate.register(torch.Tensor)
+def _(labels):
+    labels = labels.float()
+    binding_events = ((1 - labels[..., :-1]) * labels[..., 1:]).sum()
+    off_states = (1 - labels[..., :-1]).sum()
+    kon = binding_events / off_states
+    return kon
+
+
+@singledispatch
+def dissociation_rate(labels):
+    r"""
+    Compute the off-rate from the binary data assuming a two-state HMM model.
+    """
+    raise NotImplementedError
+
+
+@dissociation_rate.register(np.ndarray)
+def _(labels):
+    dissociation_events = (labels[..., :-1] * (1 - labels[..., 1:])).sum()
+    on_states = labels[..., :-1].sum()
+    koff = dissociation_events / on_states
+    return koff
+
+
+@dissociation_rate.register(torch.Tensor)
+def _(labels):
+    labels = labels.float()
+    dissociation_events = (labels[..., :-1] * (1 - labels[..., 1:])).sum()
+    on_states = labels[..., :-1].sum()
+    koff = dissociation_events / on_states
+    return koff
