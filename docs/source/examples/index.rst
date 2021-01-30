@@ -12,6 +12,8 @@ Intro
    :maxdepth: 1
    :caption: Contents:
 
+   height_simulations
+   ratej_simulations
    larrycy3sigma54
    gracearticlecy3
    signal-to-noise
