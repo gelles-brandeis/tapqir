@@ -3,6 +3,7 @@ from functools import singledispatch
 import numpy as np
 import pandas as pd
 import torch
+from pyro.ops.stats import pi, resample
 
 
 @singledispatch
@@ -199,3 +200,28 @@ def _(labels):
     on_states = labels[..., :-1].sum()
     koff = dissociation_events / on_states
     return koff
+
+
+@singledispatch
+def bootstrap(samples, estimator, repetitions=1000, probs=0.68):
+    raise NotImplementedError
+
+
+@bootstrap.register(np.ndarray)
+def _(samples, estimator, repetitions=1000, probs=0.68):
+    estimand = np.zeros((repetitions,))
+    for i in range(repetitions):
+        bootstrap_values = np.random.choice(samples, size=len(samples), replace=True)
+        estimand[i] = estimator(bootstrap_values)
+    return np.quantile(estimand, (1 - probs) / 2), np.quantile(
+        estimand, (1 + probs) / 2
+    )
+
+
+@bootstrap.register(torch.Tensor)
+def _(samples, estimator, repetitions=1000, probs=0.68):
+    estimand = torch.zeros(repetitions)
+    for i in range(repetitions):
+        bootstrap_values = resample(samples, num_samples=len(samples), replacement=True)
+        estimand[i] = estimator(bootstrap_values)
+    return pi(estimand, probs)
