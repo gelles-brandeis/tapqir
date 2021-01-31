@@ -18,22 +18,24 @@ def main(args):
     pyro.set_rng_seed(args.seed)
     params = {}
     params["gain"] = 7.0
-    params["kon"] = args.kon / 100
-    params["koff"] = 0.1
-    params["rate_j"] = args.ratej / 100
+    params["kon"] = args.kon
+    params["koff"] = 0.2
+    params["rate_j"] = args.ratej
     params["proximity"] = 0.2
     params["offset"] = 90.0
     params["height"] = 3000
     params["background"] = 150
 
     model = Cosmos(1, 2)
-    data_path = args.path or Path("data") / f"kon{args.kon}ratej{args.ratej}"
+    data_path = args.path or Path("data") / f"kon{args.kon:.2e}ratej{args.ratej:.2e}"
     try:
         model.load(data_path, True, device)
     except FileNotFoundError:
         hmm = HMM(1, 2)
         hmm.vectorized = False
-        simulate(hmm, args.N, args.F, args.D, cuda=args.cuda, params=params)
+        simulate(
+            hmm, args.N, args.F, args.D, seed=args.seed, cuda=args.cuda, params=params
+        )
         # save data
         hmm.data.save(data_path)
         hmm.control.save(data_path)
@@ -48,8 +50,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HMM Simulations")
     parser.add_argument("--seed", default=0, type=int)
-    parser.add_argument("--kon", default=1, type=int)
-    parser.add_argument("--ratej", default=15, type=int)
+    parser.add_argument("--kon", default=1e-3, type=float)
+    parser.add_argument("--ratej", default=0.15, type=float)
     parser.add_argument("-N", default=5, type=int)
     parser.add_argument("-F", default=500, type=int)
     parser.add_argument("-D", default=14, type=int)
