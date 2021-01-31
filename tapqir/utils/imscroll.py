@@ -33,6 +33,7 @@ def count_intervals(labels):
 
 @count_intervals.register(np.ndarray)
 def _(labels):
+    labels = labels.astype("bool")
     start_condition = (
         np.concatenate((~labels[:, 0:1], labels[:, :-1]), axis=1) != labels
     )
@@ -67,6 +68,7 @@ def _(labels):
 
 @count_intervals.register(torch.Tensor)
 def _(labels):
+    labels = labels.bool()
     start_condition = torch.cat((~labels[:, 0:1], labels[:, :-1]), dim=1) != labels
     start_aoi, start_frame = torch.nonzero(start_condition, as_tuple=True)
     start_type = labels.long()
@@ -95,6 +97,18 @@ def _(labels):
         }
     )
     return result
+
+
+def bound_dwell_times(intervals):
+    assert isinstance(intervals, pd.DataFrame)
+    mask = intervals["low_or_high"] == 1
+    return intervals.loc[mask, "dwell_time"].values
+
+
+def unbound_dwell_times(intervals):
+    assert isinstance(intervals, pd.DataFrame)
+    mask = intervals["low_or_high"] == 0
+    return intervals.loc[mask, "dwell_time"].values
 
 
 @singledispatch
@@ -233,7 +247,7 @@ def _(samples, estimator, repetitions=1000, probs=0.68):
 
 
 @singledispatch
-def sample_and_bootstrap(dist, estimator, repetitions=1000, probs=0.68):
+def posterior_estimate(dist, estimator, repetitions=1000, probs=0.68):
     r"""
     A version of bootstrapping method where samples are first drawn from
     a distribution and then resampled with replacement.
@@ -241,11 +255,10 @@ def sample_and_bootstrap(dist, estimator, repetitions=1000, probs=0.68):
     raise NotImplementedError
 
 
-@sample_and_bootstrap.register(dist.Distribution)
+@posterior_estimate.register(dist.Distribution)
 def _(dist, estimator, repetitions=1000, probs=0.68):
     estimand = torch.zeros(repetitions)
     for i in range(repetitions):
         samples = dist.sample()
-        bootstrap_values = resample(samples, num_samples=len(samples), replacement=True)
-        estimand[i] = estimator(bootstrap_values)
+        estimand[i] = estimator(samples)
     return pi(estimand, probs)
