@@ -31,7 +31,9 @@ def main(args):
     try:
         model.load(data_path, True, device)
     except FileNotFoundError:
-        simulate(model, args.N, args.F, args.D, cuda=args.cuda, params=params)
+        simulate(
+            model, args.N, args.F, args.D, seed=args.seed, cuda=args.cuda, params=params
+        )
         # save data
         model.data.save(data_path)
         model.control.save(data_path)

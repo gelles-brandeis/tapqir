@@ -9,8 +9,8 @@ from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
 
 
-def simulate(model, N, F, D=14, cuda=True, params=dict()):
-    pyro.set_rng_seed(0)
+def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
+    pyro.set_rng_seed(seed)
     pyro.clear_param_store()
 
     if cuda:
