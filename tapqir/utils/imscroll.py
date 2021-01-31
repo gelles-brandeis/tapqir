@@ -2,6 +2,7 @@ from functools import singledispatch
 
 import numpy as np
 import pandas as pd
+import pyro.distributions as dist
 import torch
 from pyro.ops.stats import pi, resample
 
@@ -204,6 +205,10 @@ def _(labels):
 
 @singledispatch
 def bootstrap(samples, estimator, repetitions=1000, probs=0.68):
+    r"""
+    Estimate the confidence interval of an estimator by constructing approximating
+    distributions using the bootstrap method (resampling with replacement).
+    """
     raise NotImplementedError
 
 
@@ -222,6 +227,25 @@ def _(samples, estimator, repetitions=1000, probs=0.68):
 def _(samples, estimator, repetitions=1000, probs=0.68):
     estimand = torch.zeros(repetitions)
     for i in range(repetitions):
+        bootstrap_values = resample(samples, num_samples=len(samples), replacement=True)
+        estimand[i] = estimator(bootstrap_values)
+    return pi(estimand, probs)
+
+
+@singledispatch
+def sample_and_bootstrap(dist, estimator, repetitions=1000, probs=0.68):
+    r"""
+    A version of bootstrapping method where samples are first drawn from
+    a distribution and then resampled with replacement.
+    """
+    raise NotImplementedError
+
+
+@sample_and_bootstrap.register(dist.Distribution)
+def _(dist, estimator, repetitions=1000, probs=0.68):
+    estimand = torch.zeros(repetitions)
+    for i in range(repetitions):
+        samples = dist.sample()
         bootstrap_values = resample(samples, num_samples=len(samples), replacement=True)
         estimand[i] = estimator(bootstrap_values)
     return pi(estimand, probs)
