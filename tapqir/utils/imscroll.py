@@ -146,10 +146,10 @@ def time_to_first_binding(labels):
 @time_to_first_binding.register(np.ndarray)
 def _(labels):
     labels = labels.astype("float")
-    N, F = labels.shape
+    F = labels.shape[-1]
     frames = np.arange(1, F + 1)
-    q1 = np.ones((N, F))
-    q1[:, :-1] = labels[:, 1:]
+    q1 = np.ones_like(labels)
+    q1[..., :-1] = labels[..., 1:]
     cumq0 = np.cumprod(1 - labels, axis=-1)
     ttfb = (frames * q1 * cumq0).sum(-1)
     return ttfb
@@ -158,10 +158,10 @@ def _(labels):
 @time_to_first_binding.register(torch.Tensor)
 def _(labels):
     labels = labels.float()
-    N, F = labels.shape
+    F = labels.shape[-1]
     frames = torch.arange(1, F + 1)
-    q1 = torch.ones(N, F)
-    q1[:, :-1] = labels[:, 1:]
+    q1 = torch.ones_like(labels)
+    q1[..., :-1] = labels[..., 1:]
     cumq0 = torch.cumprod(1 - labels, dim=-1)
     ttfb = (frames * q1 * cumq0).sum(-1)
     return ttfb
@@ -257,8 +257,30 @@ def posterior_estimate(dist, estimator, repetitions=1000, probs=0.68):
 
 @posterior_estimate.register(dist.Distribution)
 def _(dist, estimator, repetitions=1000, probs=0.68):
+    samples = dist.sample((repetitions,))
+    estimand = torch.zeros(repetitions)
+    for i in range(repetitions):
+        estimand[i] = estimator(samples[i])
+    return pi(estimand, probs)
+
+
+@singledispatch
+def sample_and_bootstrap(dist, estimator, preprocess=None, repetitions=1000, probs=0.68):
+    r"""
+    A version of bootstrapping method where samples are first drawn from
+    a distribution and then resampled with replacement.
+    """
+    raise NotImplementedError
+
+
+@sample_and_bootstrap.register(dist.Distribution)
+def _(dist, estimator, preprocess=None, repetitions=1000, probs=0.68):
     estimand = torch.zeros(repetitions)
     for i in range(repetitions):
         samples = dist.sample()
-        estimand[i] = estimator(samples)
+        if preprocess is not None:
+            samples = preprocess(samples)
+        # bootstrap_values = resample(samples, num_samples=len(samples), replacement=True)
+        bootstrap_values = np.random.choice(samples, size=len(samples), replace=True)
+        estimand[i] = estimator(bootstrap_values)
     return pi(estimand, probs)
