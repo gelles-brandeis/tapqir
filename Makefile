@@ -1,4 +1,4 @@
-.PHONY: install docs lint format FORCE
+.PHONY: install lint format test FORCE
 
 install:
 	pip install -e .[dev]
