@@ -1,16 +1,16 @@
 .PHONY: install docs lint format FORCE
 
 install:
-		pip install -e .[dev]
+	pip install -e .[dev]
 
 lint: FORCE
-		flake8
-		black --check .
+	flake8
+	black --check .
 
 format: FORCE
-		black .
+	black .
 
 test: lint FORCE
-		pytest -v -n auto
+	pytest -v -n auto
 
 FORCE:
