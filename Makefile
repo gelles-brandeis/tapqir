@@ -6,9 +6,11 @@ install:
 lint: FORCE
 	flake8
 	black --check .
+	isort --check .
 
 format: FORCE
 	black .
+	isort .
 
 test: lint FORCE
 	pytest -v -n auto
