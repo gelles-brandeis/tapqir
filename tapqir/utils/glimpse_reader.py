@@ -88,14 +88,19 @@ def read_glimpse(path, D):
                 aoi_df["test"] = aoi_df["test"].loc[aoi_list]
                 labels[dtype] = np.zeros(
                     (len(aoi_df[dtype]), len(drift_df)),
-                    dtype=[("aoi", int), ("frame", int), ("z", int), ("spotpicker", int)],
+                    dtype=[
+                        ("aoi", int),
+                        ("frame", int),
+                        ("z", int),
+                        ("spotpicker", int),
+                    ],
                 )
-                labels[dtype]["aoi"] = framelist[config["glimpse"]["labeltype"]][:, 0].reshape(
-                    len(aoi_df[dtype]), len(drift_df)
-                )
-                labels[dtype]["frame"] = framelist[config["glimpse"]["labeltype"]][:, 2].reshape(
-                    len(aoi_df[dtype]), len(drift_df)
-                )
+                labels[dtype]["aoi"] = framelist[config["glimpse"]["labeltype"]][
+                    :, 0
+                ].reshape(len(aoi_df[dtype]), len(drift_df))
+                labels[dtype]["frame"] = framelist[config["glimpse"]["labeltype"]][
+                    :, 2
+                ].reshape(len(aoi_df[dtype]), len(drift_df))
                 labels["spotpicker"] = framelist[config["glimpse"]["labeltype"]][
                     :, 1
                 ].reshape(len(aoi_df[dtype]), len(drift_df))
