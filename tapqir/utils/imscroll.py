@@ -265,7 +265,9 @@ def _(dist, estimator, repetitions=1000, probs=0.68):
 
 
 @singledispatch
-def sample_and_bootstrap(dist, estimator, preprocess=None, repetitions=1000, probs=0.68):
+def sample_and_bootstrap(
+    dist, estimator, preprocess=None, repetitions=1000, probs=0.68
+):
     r"""
     A version of bootstrapping method where samples are first drawn from
     a distribution and then resampled with replacement.

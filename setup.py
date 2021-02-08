@@ -20,7 +20,9 @@ EXTRAS_REQUIRE = [
 ]
 # tests
 TEST_REQUIRE = [
+    "black",
     "flake8",
+    "isort",
     "pytest",
     "pytest-qt",
     "pytest-xvfb",
@@ -57,8 +59,6 @@ setuptools.setup(
         "dev": EXTRAS_REQUIRE
         + TEST_REQUIRE
         + [
-            "black",
-            "isort",
             "nbsphinx",
             "sphinx",
             "sphinx_rtd_theme",
