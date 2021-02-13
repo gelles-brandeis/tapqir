@@ -3,10 +3,8 @@ from functools import singledispatch
 import numpy as np
 import pandas as pd
 import torch
-import torch.distributions.constraints as constraints
 from pyro.ops.stats import pi, resample
 from pyroapi import distributions as dist
-from pyroapi import pyro
 
 
 @singledispatch
@@ -288,56 +286,3 @@ def _(dist, estimator, preprocess=None, repetitions=1000, probs=0.68):
         bootstrap_values = np.random.choice(samples, size=len(samples), replace=True)
         estimand[i] = estimator(bootstrap_values)
     return pi(estimand, probs)
-
-
-def ttfb_model(data, control, Tmax):
-    r"""
-    Eq. 4 and Eq. 7 in::
-
-      @article{friedman2015multi,
-        title={Multi-wavelength single-molecule fluorescence analysis of transcription mechanisms},
-        author={Friedman, Larry J and Gelles, Jeff},
-        journal={Methods},
-        volume={86},
-        pages={27--36},
-        year={2015},
-        publisher={Elsevier}
-      }
-
-    :param data: time prior to the first binding at the target location
-    :param control: time prior to the first binding at the control location
-    :param Tmax: entire observation interval
-    """
-    ka = pyro.param("ka", lambda: torch.tensor(0.05), constraint=constraints.positive)
-    kns = pyro.param("kns", lambda: torch.tensor(0.01), constraint=constraints.positive)
-    Af = pyro.param(
-        "Af", lambda: torch.tensor(0.5), constraint=constraints.unit_interval
-    )
-    k = torch.stack([kns, ka + kns])
-
-    # on-target data
-    n = sum(data == Tmax)  # no binding has occured
-    tau = data[(data < Tmax) & (data > 0)]
-    with pyro.plate("n", n):
-        active1 = pyro.sample(
-            "active1", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
-        )
-        pyro.factor("Tmax", -k[active1.long()] * Tmax)
-    with pyro.plate("N-n-nz", len(tau)):
-        active2 = pyro.sample(
-            "active2", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
-        )
-        pyro.sample("tau", dist.Exponential(k[active2.long()]), obs=tau)
-
-    # negative control data
-    if control is not None:
-        nc = sum(control == Tmax)  # no binding has occured
-        tauc = control[(control < Tmax) & (control > 0)]
-        with pyro.plate("nc", nc):
-            pyro.factor("Tmaxc", -kns * Tmax)
-        with pyro.plate("Nc-nc-ncz", len(tauc)):
-            pyro.sample("tauc", dist.Exponential(kns), obs=tauc)
-
-
-def ttfb_guide(data, control, Tmax):
-    pass  # MLE
