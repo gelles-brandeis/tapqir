@@ -2,9 +2,9 @@ from functools import singledispatch
 
 import numpy as np
 import pandas as pd
-import pyro.distributions as dist
 import torch
 from pyro.ops.stats import pi, resample
+from pyroapi import distributions as dist
 
 
 @singledispatch
