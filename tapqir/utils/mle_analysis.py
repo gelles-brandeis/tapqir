@@ -79,7 +79,7 @@ def double_exp_model(data):
 
     with pyro.plate("data", len(data)):
         m = pyro.sample("m", dist.Bernoulli(A), infer={"enumerate": "parallel"})
-        pyro.sample("obs", dist.Exponential(k[m.bool()]), obs=data)
+        pyro.sample("obs", dist.Exponential(k[m.long()]), obs=data)
 
 
 def double_exp_guide(data):
