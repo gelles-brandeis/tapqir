@@ -1,5 +1,6 @@
 import torch
 from pyro.distributions import AffineBeta as PyroAffineBeta
+from pyro.distributions.util import broadcast_shape
 from torch.distributions import constraints
 
 
@@ -43,6 +44,12 @@ class AffineBeta(PyroAffineBeta):
             high - low,
             validate_args=validate_args,
         )
+
+    @staticmethod
+    def infer_shapes(mean, sample_size, low, high):
+        batch_shape = broadcast_shape(mean, sample_size, low, high)
+        event_shape = torch.Size()
+        return batch_shape, event_shape
 
     def expand(self, batch_shape, _instance=None):
         new = self._get_checked_instance(AffineBeta, _instance)
