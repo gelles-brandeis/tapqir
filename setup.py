@@ -43,7 +43,8 @@ setuptools.setup(
     install_requires=[
         "cliff",
         "configparser",
-        "funsor @ git+git://github.com/pyro-ppl/funsor.git@master",
+        # "funsor @ git+git://github.com/pyro-ppl/funsor.git@master",
+        "funsor==0.4.0",
         "future",
         "pandas",
         "pyqtgraph",
