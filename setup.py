@@ -48,7 +48,7 @@ setuptools.setup(
         "future",
         "pandas",
         "pyqtgraph",
-        "pyro-ppl @ git+git://github.com/pyro-ppl/pyro.git@dev",
+        "pyro-ppl @ git+git://github.com/pyro-ppl/pyro.git@1.6.0",
         "PySide2",
         "scikit-learn",
         "scipy",
