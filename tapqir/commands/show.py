@@ -44,8 +44,10 @@ class Show(Command):
         # pyro backend
         if backend == "pyro":
             PYRO_BACKEND = "pyro"
+        elif backend == "funsor":
+            PYRO_BACKEND = "contrib.funsor"
         else:
-            raise ValueError("Only pyro backend is supported.")
+            raise ValueError("Only pyro and funsor backends are supported.")
 
         with pyro_backend(PYRO_BACKEND):
             model = models[args.model](1, 2)
