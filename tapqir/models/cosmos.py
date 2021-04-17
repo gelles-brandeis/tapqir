@@ -181,7 +181,9 @@ class Cosmos(Model):
             # sample hidden model state (1+K*S,)
             if data.dtype == "test":
                 if self.classify:
-                    theta = pyro.sample(f"{prefix}/theta", dist.Categorical(self.probs_theta))
+                    theta = pyro.sample(
+                        f"{prefix}/theta", dist.Categorical(self.probs_theta)
+                    )
                 else:
                     theta = pyro.sample(
                         f"{prefix}/theta",
@@ -195,12 +197,14 @@ class Cosmos(Model):
                 ontarget = Vindex(self.ontarget)[theta, kdx]
                 # spot presence
                 m = pyro.sample(
-                    f"{prefix}/m_{kdx}", dist.Categorical(Vindex(self.probs_m)[theta, kdx])
+                    f"{prefix}/m_{kdx}",
+                    dist.Categorical(Vindex(self.probs_m)[theta, kdx]),
                 )
                 with handlers.mask(mask=m > 0):
                     # sample spot variables
                     height = pyro.sample(
-                        f"{prefix}/height_{kdx}", dist.HalfNormal(pyro.param("height_scale"))
+                        f"{prefix}/height_{kdx}",
+                        dist.HalfNormal(pyro.param("height_scale")),
                     )
                     width = pyro.sample(
                         f"{prefix}/width_{kdx}",
@@ -246,7 +250,11 @@ class Cosmos(Model):
         spots = pyro.plate(f"{prefix}/spots", self.K)
         # target sites
         targets = pyro.plate(
-            f"{prefix}/targets", data.N, subsample_size=self.batch_size, subsample=self.n, dim=-2
+            f"{prefix}/targets",
+            data.N,
+            subsample_size=self.batch_size,
+            subsample=self.n,
+            dim=-2,
         )
         # time frames
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
