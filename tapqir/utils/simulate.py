@@ -22,8 +22,6 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
 
     # parameters and samples
     pyro.param("gain", torch.tensor(params["gain"]), constraint=constraints.positive)
-    pyro.param("width_mean", torch.tensor(1.5), constraint=constraints.positive)
-    pyro.param("width_size", torch.tensor(2.0), constraint=constraints.positive)
     if "probs_z" in params:
         pyro.param(
             "probs_z",
