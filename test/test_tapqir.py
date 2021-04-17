@@ -18,8 +18,8 @@ requires_cuda = pytest.mark.skipif(
 def dataset_path(tmp_path):
     params = {}
     params["gain"] = 7.0
-    params["probs_z"] = 0.15
-    params["rate_j"] = 0.15
+    params["pi"] = 0.15
+    params["lamda"] = 0.15
     params["proximity"] = 0.2
     params["offset"] = 90.0
     params["height"] = 3000

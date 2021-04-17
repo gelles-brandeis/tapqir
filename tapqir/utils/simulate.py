@@ -3,7 +3,6 @@ import pandas as pd
 import torch
 from pyro.infer import Predictive
 from pyroapi import handlers, pyro
-from torch.distributions import constraints
 
 from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
@@ -20,72 +19,51 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
         torch.set_default_tensor_type("torch.FloatTensor")
         device = torch.device("cpu")
 
-    # parameters and samples
-    pyro.param("gain", torch.tensor(params["gain"]), constraint=constraints.positive)
-    if "probs_z" in params:
-        pyro.param(
-            "probs_z",
-            torch.tensor([1 - params["probs_z"], params["probs_z"]]),
-            constraint=constraints.simplex,
-        )
+    # samples
+    samples = {}
+    samples["gain"] = torch.full((1, 1), params["gain"])
+    samples["lamda"] = torch.full((1, 1), params["lamda"])
+    samples["proximity"] = torch.full((1, 1), params["proximity"])
+
+    if "pi" in params:
+        samples["pi"] = torch.tensor([[1 - params["pi"], params["pi"]]])
+        for prefix in ("d", "c"):
+            samples[f"{prefix}/background"] = torch.full(
+                (1, N, 1), params["background"]
+            )
+            for k in range(model.K):
+                samples[f"{prefix}/width_{k}"] = torch.full((1, N, F), 1.4)
+                samples[f"{prefix}/height_{k}"] = torch.full(
+                    (1, N, F), params["height"]
+                )
     else:
-        pyro.param(
-            "init_z",
-            torch.tensor(
+        # kinetic simulations
+        samples["init"] = torch.tensor(
+            [
                 [
                     params["koff"] / (params["kon"] + params["koff"]),
                     params["kon"] / (params["kon"] + params["koff"]),
                 ]
-            ),
-            constraint=constraints.simplex,
+            ]
         )
-        pyro.param(
-            "trans_z",
-            torch.tensor(
+        samples["trans"] = torch.tensor(
+            [
                 [
                     [1 - params["kon"], params["kon"]],
                     [params["koff"], 1 - params["koff"]],
                 ]
-            ),
-            constraint=constraints.simplex,
+            ]
         )
-
-    pyro.param(
-        "rate_j", torch.tensor(params["rate_j"]), constraint=constraints.positive
-    )
-    pyro.param(
-        "proximity",
-        torch.tensor([params["proximity"]]),
-        constraint=constraints.positive,
-    )
-
-    if "probs_z" in params:
-        samples = {
-            "d/background": torch.full((1, N, 1), params["background"]),
-            "d/width_0": torch.full((1, N, F), 1.4),
-            "d/width_1": torch.full((1, N, F), 1.4),
-            "d/height_0": torch.full((1, N, F), params["height"]),
-            "d/height_1": torch.full((1, N, F), params["height"]),
-            "c/background": torch.full((1, N, 1), params["background"]),
-            "c/width_0": torch.full((1, N, F), 1.4),
-            "c/width_1": torch.full((1, N, F), 1.4),
-            "c/height_0": torch.full((1, N, F), params["height"]),
-            "c/height_1": torch.full((1, N, F), params["height"]),
-        }
-    else:
-        # kinetic simulations
-        samples = {}
         for f in range(F):
-            samples[f"d/background_{f}"] = torch.full((1, N, 1), params["background"])
-            samples[f"d/width_0_{f}"] = torch.full((1, N, 1), 1.4)
-            samples[f"d/width_1_{f}"] = torch.full((1, N, 1), 1.4)
-            samples[f"d/height_0_{f}"] = torch.full((1, N, 1), params["height"])
-            samples[f"d/height_1_{f}"] = torch.full((1, N, 1), params["height"])
-            samples[f"c/background_{f}"] = torch.full((1, N, 1), params["background"])
-            samples[f"c/width_0_{f}"] = torch.full((1, N, 1), 1.4)
-            samples[f"c/width_1_{f}"] = torch.full((1, N, 1), 1.4)
-            samples[f"c/height_0_{f}"] = torch.full((1, N, 1), params["height"])
-            samples[f"c/height_1_{f}"] = torch.full((1, N, 1), params["height"])
+            for prefix in ("d", "c"):
+                samples[f"{prefix}/background_{f}"] = torch.full(
+                    (1, N, 1), params["background"]
+                )
+                for k in range(model.K):
+                    samples[f"{prefix}/width_{k}_{f}"] = torch.full((1, N, 1), 1.4)
+                    samples[f"{prefix}/height_{k}_{f}"] = torch.full(
+                        (1, N, 1), params["height"]
+                    )
 
     offset = torch.full((3,), params["offset"])
     target = pd.DataFrame(
@@ -120,7 +98,7 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
     )
     model.data.labels["aoi"] = np.arange(N).reshape(-1, 1)
     model.data.labels["frame"] = np.arange(F)
-    if "probs_z" in params:
+    if "pi" in params:
         model.data.data = samples["d/data"][0].data.floor()
         model.control.data = samples["c/data"][0].data.floor()
         model.data.labels["z"] = samples["d/theta"][0].cpu() > 0
