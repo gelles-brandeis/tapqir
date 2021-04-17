@@ -38,13 +38,15 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
                 )
     else:
         # kinetic simulations
-        samples["init_z"] = torch.tensor(
+        samples["init"] = torch.tensor(
             [
-                params["koff"] / (params["kon"] + params["koff"]),
-                params["kon"] / (params["kon"] + params["koff"]),
+                [
+                    params["koff"] / (params["kon"] + params["koff"]),
+                    params["kon"] / (params["kon"] + params["koff"]),
+                ]
             ]
         )
-        samples["trans_z"] = torch.tensor(
+        samples["trans"] = torch.tensor(
             [
                 [
                     [1 - params["kon"], params["kon"]],

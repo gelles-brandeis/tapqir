@@ -90,6 +90,7 @@ class Model(nn.Module):
         self.batch_size = None
         # for plotting
         self.n = None
+        self.data_path = None
 
     @lazy_property
     def S(self):
@@ -141,26 +142,17 @@ class Model(nn.Module):
         self.optim = self.optim_fn(self.optim_args)
         self.log()
 
-        try:
-            self.load_checkpoint()
-
-        except FileNotFoundError:
+        if self.data_path is not None:
+            try:
+                self.load_checkpoint()
+            except FileNotFoundError:
+                pyro.clear_param_store()
+                self.iter = 1
+                self._rolling = None
+        else:
             pyro.clear_param_store()
-
             self.iter = 1
             self._rolling = None
-
-            self.predictions = np.zeros(
-                (self.data.N, self.data.F),
-                dtype=[
-                    ("z", bool),
-                    ("z_probs", float),
-                    ("m", bool, (2,)),
-                    ("m_probs", float, (2,)),
-                    ("theta", int),
-                ],
-            )
-        self._z_map = torch.zeros(self.data.N, self.data.F, dtype=torch.bool)
 
         self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True
@@ -185,7 +177,7 @@ class Model(nn.Module):
         self.classify = False
         for i in tqdm(range(num_iter)):
             self.iter_loss = self.svi.step()
-            if not self.iter % 100:
+            if not self.iter % 100 and self.iter != 0:
                 self.save_checkpoint()
                 if self._stop:
                     self.logger.info("Step #{} converged.".format(self.iter))
@@ -200,8 +192,6 @@ class Model(nn.Module):
             self.iter += 1
 
     def _max_batch_size(self):
-        import shutil
-
         k = 0
         batch_size = 0
         while batch_size + 2 ** k < self.data.N:
@@ -210,14 +200,12 @@ class Model(nn.Module):
                 self.run(1, 1)
             except RuntimeError as error:
                 assert error.args[0].startswith("CUDA")
-                shutil.rmtree(self.path)
                 if k == 0:
                     break
                 else:
                     batch_size += 2 ** (k - 1)
                     k = 0
             else:
-                shutil.rmtree(self.path)
                 k += 1
         else:
             batch_size += 2 ** (k - 1)
@@ -225,32 +213,34 @@ class Model(nn.Module):
         return batch_size
 
     def log(self):
-        self.path = (
-            self.data_path
-            / "runs"
-            / f"{self.name}"
-            / tapqir_version.split("+")[0]
-            / f"S{self.S}"
-            / f"{'control' if self.control else 'nocontrol'}"
-            / f"lr{self.lr}"
-            / f"bs{self.batch_size}"
-        )
-        self.writer = SummaryWriter(log_dir=self.path / "scalar")
-
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-        fh = logging.FileHandler(self.path / "run.log")
-        fh.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.INFO)
         formatter = logging.Formatter(
             fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt="%m/%d/%Y %I:%M:%S %p",
         )
-        fh.setFormatter(formatter)
         ch.setFormatter(formatter)
-        self.logger.addHandler(fh)
         self.logger.addHandler(ch)
+
+        if self.data_path is not None:
+            self.path = (
+                self.data_path
+                / "runs"
+                / f"{self.name}"
+                / tapqir_version.split("+")[0]
+                / f"S{self.S}"
+                / f"{'control' if self.control else 'nocontrol'}"
+                / f"lr{self.lr}"
+                / f"bs{self.batch_size}"
+            )
+            self.writer = SummaryWriter(log_dir=self.path / "scalar")
+
+            fh = logging.FileHandler(self.path / "run.log")
+            fh.setLevel(logging.DEBUG)
+            fh.setFormatter(formatter)
+            self.logger.addHandler(fh)
         self.logger.debug("D - {}".format(self.data.D))
         self.logger.debug("K - {}".format(self.K))
         self.logger.debug("data.N - {}".format(self.data.N))

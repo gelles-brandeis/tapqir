@@ -40,15 +40,11 @@ class HMM(Model):
     def probs_j(self):
         result = torch.zeros(2, self.K + 1, dtype=torch.float)
         result[0, : self.K] = (
-            dist.Poisson(pyro.param("rate_j"))
-            .log_prob(torch.arange(self.K).float())
-            .exp()
+            dist.Poisson(self.lamda).log_prob(torch.arange(self.K).float()).exp()
         )
         result[0, -1] = 1 - result[0, : self.K].sum()
         result[1, : self.K - 1] = (
-            dist.Poisson(pyro.param("rate_j"))
-            .log_prob(torch.arange(self.K - 1).float())
-            .exp()
+            dist.Poisson(self.lamda).log_prob(torch.arange(self.K - 1).float()).exp()
         )
         result[1, -2] = 1 - result[0, : self.K - 1].sum()
         return result
@@ -70,10 +66,10 @@ class HMM(Model):
     @property
     def init_theta(self):
         result = torch.zeros(self.K * self.S + 1, dtype=torch.float)
-        result[0] = pyro.param("init_z")[0]
+        result[0] = self.init[0]
         for s in range(self.S):
             for k in range(self.K):
-                result[self.K * s + k + 1] = pyro.param("init_z")[s + 1] / self.K
+                result[self.K * s + k + 1] = self.init[s + 1] / self.K
         return result
 
     @property
@@ -84,12 +80,10 @@ class HMM(Model):
         for i in range(self.K * self.S + 1):
             # FIXME
             j = (i + 1) // self.K
-            result[i, 0] = pyro.param("trans_z")[j, 0]
+            result[i, 0] = self.trans[j, 0]
             for s in range(self.S):
                 for k in range(self.K):
-                    result[i, self.K * s + k + 1] = (
-                        pyro.param("trans_z")[j, s + 1] / self.K
-                    )
+                    result[i, self.K * s + k + 1] = self.trans[j, s + 1] / self.K
         return result
 
     @lazy_property
@@ -197,25 +191,27 @@ class HMM(Model):
     def z_map(self):
         return self.z_marginal > 0.5
 
-    @property
-    def inference_config_model(self):
-        if self.classify:
-            return {"hide_types": ["param"]}
-        return {"hide": ["width_mean", "width_size", "height_scale"]}
-
-    @property
-    def inference_config_guide(self):
-        if self.classify:
-            return {
-                "expose": ["d/theta_probs", "d/m_probs"],
-                "expose_types": ["sample"],
-            }
-        return {"expose_types": ["sample", "param"]}
-
-    @handlers.block(**{"hide": ["width_mean", "width_size", "height_scale"]})
     def model(self):
-        # initialize model parameters
-        self.model_parameters()
+
+        self.gain = pyro.sample("gain", dist.HalfNormal(50))
+        self.init = pyro.sample(
+            "init", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
+        )
+        self.trans = pyro.sample(
+            "trans",
+            dist.Dirichlet(torch.ones(self.S + 1, self.S + 1) / (self.S + 1)).to_event(
+                1
+            ),
+        )
+        self.lamda = pyro.sample("lamda", dist.Exponential(1))
+        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
+        self.size = torch.stack(
+            (
+                torch.tensor(2.0),
+                (((self.data.D + 1) / (2 * self.proximity)) ** 2 - 1),
+            ),
+            dim=-1,
+        )
 
         # test data
         self.spot_model(self.data, self.data_loc, prefix="d")
@@ -228,6 +224,37 @@ class HMM(Model):
         # initialize guide parameters
         self.guide_parameters()
 
+        pyro.sample(
+            "gain",
+            dist.Gamma(
+                pyro.param("gain_loc") * pyro.param("gain_beta"),
+                pyro.param("gain_beta"),
+            ),
+        )
+        pyro.sample(
+            "init", dist.Dirichlet(pyro.param("init_mean") * pyro.param("init_size"))
+        )
+        pyro.sample(
+            "trans",
+            dist.Dirichlet(
+                pyro.param("trans_mean") * pyro.param("trans_size")
+            ).to_event(1),
+        )
+        pyro.sample(
+            "lamda",
+            dist.Gamma(
+                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
+                pyro.param("lamda_beta"),
+            ),
+        )
+        pyro.sample(
+            "proximity",
+            dist.Gamma(
+                pyro.param("proximity_loc") * pyro.param("proximity_beta"),
+                pyro.param("proximity_beta"),
+            ),
+        )
+
         # test data
         self.spot_guide(self.data, prefix="d")
 
@@ -238,8 +265,8 @@ class HMM(Model):
     def spot_model(self, data, data_loc, prefix):
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
-        # target sites
-        targets = pyro.plate(f"{prefix}/targets", data.N, dim=-2)
+        # aoi sites
+        aois = pyro.plate(f"{prefix}/aois", data.N, dim=-2)
         # time frames
         frames = (
             pyro.vectorized_markov(name=f"{prefix}/frames", size=data.F, dim=-1)
@@ -247,7 +274,13 @@ class HMM(Model):
             else pyro.markov(range(data.F))
         )
 
-        with targets as ndx:
+        with aois as ndx:
+            background_mean = pyro.sample(
+                f"{prefix}/background_mean", dist.HalfNormal(1000)
+            )
+            background_std = pyro.sample(
+                f"{prefix}/background_std", dist.HalfNormal(100)
+            )
             ndx = ndx[..., None]
             theta_prev = None
             for fdx in frames:
@@ -255,9 +288,8 @@ class HMM(Model):
                 background = pyro.sample(
                     f"{prefix}/background_{fdx}",
                     dist.Gamma(
-                        Vindex(pyro.param(f"{prefix}/background_loc"))[ndx, 0]
-                        * Vindex(pyro.param(f"{prefix}/background_beta"))[ndx, 0],
-                        Vindex(pyro.param(f"{prefix}/background_beta"))[ndx, 0],
+                        (background_mean / background_std) ** 2,
+                        background_mean / background_std ** 2,
                     ),
                 )
                 locs = background[..., None, None]
@@ -286,13 +318,13 @@ class HMM(Model):
                         # sample spot variables
                         height = pyro.sample(
                             f"{prefix}/height_{kdx}_{fdx}",
-                            dist.HalfNormal(pyro.param("height_scale")),
+                            dist.HalfNormal(10000),
                         )
                         width = pyro.sample(
                             f"{prefix}/width_{kdx}_{fdx}",
                             AffineBeta(
-                                pyro.param("width_mean"),
-                                pyro.param("width_size"),
+                                1.5,
+                                2,
                                 0.75,
                                 2.25,
                             ),
@@ -325,8 +357,8 @@ class HMM(Model):
                 pyro.sample(
                     f"{prefix}/data_{fdx}",
                     ConvolutedGamma(
-                        locs / pyro.param("gain"),
-                        1 / pyro.param("gain"),
+                        locs / self.gain,
+                        1 / self.gain,
                         self.data.offset_samples,
                         self.data.offset_logits,
                     ).to_event(2),
@@ -337,9 +369,9 @@ class HMM(Model):
     def spot_guide(self, data, prefix):
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
-        # target sites
-        targets = pyro.plate(
-            f"{prefix}/targets",
+        # aoi sites
+        aois = pyro.plate(
+            f"{prefix}/aois",
             data.N,
             subsample_size=self.batch_size,
             subsample=self.n,
@@ -352,9 +384,18 @@ class HMM(Model):
             else pyro.markov(range(data.F))
         )
 
-        with targets as ndx:
+        with aois as ndx:
             if prefix == "d":
                 self.batch_idx = ndx.cpu()
+
+            pyro.sample(
+                f"{prefix}/background_mean",
+                dist.Delta(pyro.param(f"{prefix}/background_mean_loc")[ndx]),
+            )
+            pyro.sample(
+                f"{prefix}/background_std",
+                dist.Delta(pyro.param(f"{prefix}/background_std_loc")[ndx]),
+            )
             ndx = ndx[..., None]
             theta_prev = None
             for fdx in frames:
@@ -434,72 +475,75 @@ class HMM(Model):
                         )
                 theta_prev = theta_curr
 
-    def model_parameters(self):
+    def guide_parameters(self):
         pyro.param(
-            "proximity",
-            lambda: torch.tensor([0.5]),
-            constraint=constraints.interval(0.01, 2.0),
-        )
-        self.size = torch.cat(
-            (
-                torch.tensor([2.0]),
-                (((self.data.D + 1) / (2 * pyro.param("proximity"))) ** 2 - 1),
-            ),
-            dim=-1,
-        )
-        pyro.param("gain", lambda: torch.tensor(5.0), constraint=constraints.positive)
-        pyro.param(
-            "init_z", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
+            "proximity_loc",
+            lambda: torch.tensor(0.5),
+            constraint=constraints.positive,
         )
         pyro.param(
-            "trans_z",
+            "proximity_beta",
+            lambda: torch.tensor(100),
+            constraint=constraints.positive,
+        )
+        pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
+        pyro.param(
+            "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
+        )
+        pyro.param(
+            "init_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
+        )
+        pyro.param(
+            "init_size", lambda: torch.tensor(2), constraint=constraints.positive
+        )
+        pyro.param(
+            "trans_mean",
             lambda: torch.ones(self.S + 1, self.S + 1),
             constraint=constraints.simplex,
         )
-        pyro.param("rate_j", lambda: torch.tensor(0.5), constraint=constraints.positive)
+        pyro.param(
+            "trans_size",
+            lambda: torch.full((self.S + 1, 1), 2),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
+        )
+        pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
+        pyro.param(
+            "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
+        )
+        pyro.param(
+            "lamda_beta", lambda: torch.tensor(100), constraint=constraints.positive
+        )
 
         pyro.param(
-            "d/background_loc",
+            "d/background_mean_loc",
             lambda: torch.full(
                 (self.data.N, 1), self.data.data_median - self.data.offset_median
             ),
             constraint=constraints.positive,
         )
         pyro.param(
-            "d/background_beta",
+            "d/background_std_loc",
             lambda: torch.ones(self.data.N, 1),
             constraint=constraints.positive,
         )
 
         if self.control:
             pyro.param(
-                "c/background_loc",
+                "c/background_mean_loc",
                 lambda: torch.full(
                     (self.control.N, 1), self.data.data_median - self.data.offset_median
                 ),
                 constraint=constraints.positive,
             )
             pyro.param(
-                "c/background_beta",
+                "c/background_std_loc",
                 lambda: torch.ones(self.control.N, 1),
                 constraint=constraints.positive,
             )
 
-        pyro.param(
-            "width_mean",
-            lambda: torch.tensor([1.5]),
-            constraint=constraints.interval(0.75, 2.25),
-        )
-        pyro.param(
-            "width_size", lambda: torch.tensor([2.0]), constraint=constraints.positive
-        )
-        pyro.param(
-            "height_scale",
-            lambda: torch.tensor(10000.0),
-            constraint=constraints.positive,
-        )
-
-    def guide_parameters(self):
         self.spot_parameters(self.data, prefix="d")
 
         if self.control:

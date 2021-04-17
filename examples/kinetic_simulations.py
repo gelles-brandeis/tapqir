@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from pyroapi import pyro, pyro_backend
 
-from tapqir.models import HMM, Cosmos
+from tapqir.models import HMM, Cosmos, GaussianSpot
 from tapqir.utils.simulate import simulate
 
 
@@ -17,31 +17,51 @@ def main(args):
         device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
-    params["gain"] = 7.0
+    params["gain"] = 7
     params["kon"] = args.kon
     params["koff"] = 0.2
-    params["rate_j"] = args.ratej
+    params["lamda"] = args.lamda
     params["proximity"] = 0.2
-    params["offset"] = 90.0
+    params["offset"] = 90
     params["height"] = 3000
     params["background"] = 150
 
     model = Cosmos(1, 2)
-    data_path = args.path or Path("data") / f"kon{args.kon:.2e}ratej{args.ratej:.2e}"
-    try:
-        model.load(data_path, True, device)
-    except FileNotFoundError:
+    data_path = args.path
+    if data_path is not None:
+        try:
+            model.load(data_path, True, device)
+        except FileNotFoundError:
+            hmm = HMM(1, 2)
+            hmm.vectorized = False
+            simulate(
+                hmm,
+                args.N,
+                args.F,
+                args.D,
+                seed=args.seed,
+                cuda=args.cuda,
+                params=params,
+            )
+            # save data
+            hmm.data.save(data_path)
+            hmm.control.save(data_path)
+            pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
+            pyro.clear_param_store()
+            model.load(data_path, True, device)
+    else:
         hmm = HMM(1, 2)
         hmm.vectorized = False
         simulate(
             hmm, args.N, args.F, args.D, seed=args.seed, cuda=args.cuda, params=params
         )
-        # save data
-        hmm.data.save(data_path)
-        hmm.control.save(data_path)
-        pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
+        model.data = hmm.data
+        model.control = hmm.control
+        model.data_loc = GaussianSpot(model.data.target, model.data.drift, model.data.D)
+        model.control_loc = GaussianSpot(
+            model.control.target, model.control.drift, model.control.D
+        )
         pyro.clear_param_store()
-        model.load(data_path, True, device)
 
     model.settings(args.lr, args.bs)
     model.run(args.it, args.infer)
@@ -51,7 +71,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HMM Simulations")
     parser.add_argument("--seed", default=0, type=int)
     parser.add_argument("--kon", default=1e-3, type=float)
-    parser.add_argument("--ratej", default=0.15, type=float)
+    parser.add_argument("--lamda", default=0.15, type=float)
     parser.add_argument("-N", default=5, type=int)
     parser.add_argument("-F", default=500, type=int)
     parser.add_argument("-D", default=14, type=int)

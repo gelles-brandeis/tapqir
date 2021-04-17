@@ -22,22 +22,34 @@ def main(args):
     params["pi"] = args.pi or random.betavariate(1, 9)
     params["lamda"] = args.lamda or random.uniform(0, 1)
     params["proximity"] = args.proximity or random.uniform(0.2, 0.6)
-    params["offset"] = 90.0
+    params["offset"] = 90
     params["height"] = args.height
     params["background"] = 150
 
     model = Cosmos(1, 2)
     data_path = args.path
-    try:
-        model.load(data_path, True, device)
-    except FileNotFoundError:
+    if data_path is not None:
+        try:
+            model.load(data_path, True, device)
+        except FileNotFoundError:
+            simulate(
+                model,
+                args.N,
+                args.F,
+                args.D,
+                seed=args.seed,
+                cuda=args.cuda,
+                params=params,
+            )
+            # save data
+            model.data.save(data_path)
+            model.control.save(data_path)
+            pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
+            pyro.clear_param_store()
+    else:
         simulate(
             model, args.N, args.F, args.D, seed=args.seed, cuda=args.cuda, params=params
         )
-        # save data
-        model.data.save(data_path)
-        model.control.save(data_path)
-        pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
         pyro.clear_param_store()
 
     model.settings(args.lr, args.bs, args.jit)

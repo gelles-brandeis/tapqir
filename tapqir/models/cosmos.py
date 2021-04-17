@@ -133,7 +133,9 @@ class Cosmos(Model):
         with handlers.block(**self.inference_config_model):
 
             self.gain = pyro.sample("gain", dist.HalfNormal(50))
-            self.pi = pyro.sample("pi", dist.Dirichlet(torch.tensor([0.5, 0.5])))
+            self.pi = pyro.sample(
+                "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
+            )
             self.lamda = pyro.sample("lamda", dist.Exponential(1))
             self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
             self.size = torch.stack(
@@ -158,7 +160,6 @@ class Cosmos(Model):
 
             pyro.sample(
                 "gain",
-                # dist.Delta(pyro.param("gain_loc"))
                 dist.Gamma(
                     pyro.param("gain_loc") * pyro.param("gain_beta"),
                     pyro.param("gain_beta"),
@@ -169,7 +170,6 @@ class Cosmos(Model):
             )
             pyro.sample(
                 "lamda",
-                # dist.Delta(pyro.param("lamda_loc"))
                 dist.Gamma(
                     pyro.param("lamda_loc") * pyro.param("lamda_beta"),
                     pyro.param("lamda_beta"),
@@ -177,7 +177,6 @@ class Cosmos(Model):
             )
             pyro.sample(
                 "proximity",
-                # dist.Delta(pyro.param("proximity_loc"))
                 dist.Gamma(
                     pyro.param("proximity_loc") * pyro.param("proximity_beta"),
                     pyro.param("proximity_beta"),
@@ -194,7 +193,7 @@ class Cosmos(Model):
     def spot_model(self, data, data_loc, prefix):
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
-        # target sites
+        # aoi sites
         aois = pyro.plate(f"{prefix}/aois", data.N, dim=-2)
         # time frames
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
@@ -293,7 +292,7 @@ class Cosmos(Model):
     def spot_guide(self, data, prefix):
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
-        # target sites
+        # aoi sites
         aois = pyro.plate(
             f"{prefix}/aois",
             data.N,
