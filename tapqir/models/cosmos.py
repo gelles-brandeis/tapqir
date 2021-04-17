@@ -1,6 +1,5 @@
 import torch
 import torch.distributions.constraints as constraints
-from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, pyro
