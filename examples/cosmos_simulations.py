@@ -19,8 +19,8 @@ def main(args):
     pyro.set_rng_seed(args.seed)
     params = {}
     params["gain"] = args.gain or random.uniform(1, 20)
-    params["probs_z"] = args.probsz or random.betavariate(1, 9)
-    params["rate_j"] = args.ratej or random.uniform(0, 1)
+    params["pi"] = args.pi or random.betavariate(1, 9)
+    params["lamda"] = args.lamda or random.uniform(0, 1)
     params["proximity"] = args.proximity or random.uniform(0.2, 0.6)
     params["offset"] = 90.0
     params["height"] = args.height
@@ -48,8 +48,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Height Simulations")
     parser.add_argument("--seed", default=0, type=int)
     parser.add_argument("--gain", type=float)  # default 7.0
-    parser.add_argument("--probsz", type=float)  # default 0.15
-    parser.add_argument("--ratej", type=float)  # default 0.15
+    parser.add_argument("--pi", type=float)  # default 0.15
+    parser.add_argument("--lamda", type=float)  # default 0.15
     parser.add_argument("--proximity", type=float)  # default 0.2
     parser.add_argument("--height", default=3000, type=int)  # default 3000
     parser.add_argument("-N", default=5, type=int)

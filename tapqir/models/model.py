@@ -348,7 +348,7 @@ class Model(nn.Module):
             self._rolling = self._rolling.append(global_params)
         if len(self._rolling) > 100:
             self._rolling = self._rolling.drop(self._rolling.index[0])
-            conv_params = ["-ELBO", "proximity_0", "gain", "probs_z_1", "rate_j"]
+            conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
             if all(
                 self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05
                 for p in conv_params
