@@ -310,11 +310,11 @@ class Cosmos(Model):
 
             pyro.sample(
                 f"{prefix}/background_mean",
-                dist.Delta(pyro.param(f"{prefix}/background_mean_loc")[ndx])
+                dist.Delta(pyro.param(f"{prefix}/background_mean_loc")[ndx]),
             )
             pyro.sample(
                 f"{prefix}/background_std",
-                dist.Delta(pyro.param(f"{prefix}/background_std_loc")[ndx])
+                dist.Delta(pyro.param(f"{prefix}/background_std_loc")[ndx]),
             )
             with frames as fdx:
                 # sample background intensity
@@ -402,18 +402,14 @@ class Cosmos(Model):
             lambda: torch.tensor(100),
             constraint=constraints.positive,
         )
-        pyro.param(
-            "gain_loc", lambda: torch.tensor(5), constraint=constraints.positive
-        )
+        pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
             "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
         )
         pyro.param(
             "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
-        pyro.param(
-            "pi_size", lambda: torch.tensor(2), constraint=constraints.positive
-        )
+        pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
         pyro.param(
             "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
         )

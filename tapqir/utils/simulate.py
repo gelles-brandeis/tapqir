@@ -3,7 +3,6 @@ import pandas as pd
 import torch
 from pyro.infer import Predictive
 from pyroapi import handlers, pyro
-from torch.distributions import constraints
 
 from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
@@ -29,10 +28,14 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
     if "pi" in params:
         samples["pi"] = torch.tensor([[1 - params["pi"], params["pi"]]])
         for prefix in ("d", "c"):
-            samples[f"{prefix}/background"] = torch.full((1, N, 1), params["background"])
+            samples[f"{prefix}/background"] = torch.full(
+                (1, N, 1), params["background"]
+            )
             for k in range(model.K):
                 samples[f"{prefix}/width_{k}"] = torch.full((1, N, F), 1.4)
-                samples[f"{prefix}/height_{k}"] = torch.full((1, N, F), params["height"])
+                samples[f"{prefix}/height_{k}"] = torch.full(
+                    (1, N, F), params["height"]
+                )
     else:
         # kinetic simulations
         samples["init_z"] = torch.tensor(
@@ -51,10 +54,14 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
         )
         for f in range(F):
             for prefix in ("d", "c"):
-                samples[f"{prefix}/background_{f}"] = torch.full((1, N, 1), params["background"])
+                samples[f"{prefix}/background_{f}"] = torch.full(
+                    (1, N, 1), params["background"]
+                )
                 for k in range(model.K):
                     samples[f"{prefix}/width_{k}_{f}"] = torch.full((1, N, 1), 1.4)
-                    samples[f"{prefix}/height_{k}_{f}"] = torch.full((1, N, 1), params["height"])
+                    samples[f"{prefix}/height_{k}_{f}"] = torch.full(
+                        (1, N, 1), params["height"]
+                    )
 
     offset = torch.full((3,), params["offset"])
     target = pd.DataFrame(
