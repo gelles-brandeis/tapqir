@@ -122,7 +122,7 @@ class Cosmos(Model):
     def inference_config_model(self):
         if self.classify:
             return {"hide_types": ["param"]}
-        return {"hide": ["width_mean", "width_size", "height_scale"]}
+        return {"expose_types": ["sample", "param", "observe"]}
 
     @property
     def inference_config_guide(self):
@@ -203,13 +203,13 @@ class Cosmos(Model):
                     # sample spot variables
                     height = pyro.sample(
                         f"{prefix}/height_{kdx}",
-                        dist.HalfNormal(pyro.param("height_scale")),
+                        dist.HalfNormal(10000),
                     )
                     width = pyro.sample(
                         f"{prefix}/width_{kdx}",
                         AffineBeta(
-                            pyro.param("width_mean"),
-                            pyro.param("width_size"),
+                            1.5,
+                            2,
                             0.75,
                             2.25,
                         ),
@@ -380,20 +380,6 @@ class Cosmos(Model):
                 lambda: torch.ones(self.control.N, 1),
                 constraint=constraints.positive,
             )
-
-        pyro.param(
-            "width_mean",
-            lambda: torch.tensor([1.5]),
-            constraint=constraints.interval(0.75, 2.25),
-        )
-        pyro.param(
-            "width_size", lambda: torch.tensor([2.0]), constraint=constraints.positive
-        )
-        pyro.param(
-            "height_scale",
-            lambda: torch.tensor(10000.0),
-            constraint=constraints.positive,
-        )
 
     def guide_parameters(self):
         self.spot_parameters(self.data, prefix="d")
