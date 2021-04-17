@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from pyroapi import pyro, pyro_backend
 
-from tapqir.models import HMM, Cosmos, GaussianSpot
+from tapqir.models import HMM, Cosmos
 from tapqir.utils.simulate import simulate
 
 
@@ -57,10 +57,8 @@ def main(args):
         )
         model.data = hmm.data
         model.control = hmm.control
-        model.data_loc = GaussianSpot(model.data.target, model.data.drift, model.data.D)
-        model.control_loc = GaussianSpot(
-            model.control.target, model.control.drift, model.control.D
-        )
+        model.data_loc = hmm.data_loc
+        model.control_loc = hmm.control_loc
         pyro.clear_param_store()
 
     model.settings(args.lr, args.bs)
