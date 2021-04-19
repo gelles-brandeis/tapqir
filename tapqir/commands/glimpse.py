@@ -1,6 +1,6 @@
 from cliff.command import Command
 
-from tapqir.utils.glimpse_reader import read_glimpse
+from tapqir.imscroll.glimpse_reader import read_glimpse
 
 
 class Glimpse(Command):
