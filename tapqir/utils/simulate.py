@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import torch
 from pyro.infer import Predictive
 from pyroapi import handlers, pyro
@@ -66,27 +65,19 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
                     )
 
     offset = torch.full((3,), params["offset"])
-    target = pd.DataFrame(
-        data={"frame": np.zeros(N), "x": 6.5, "y": 6.5}, index=np.arange(N)
-    )
-    target.index.name = "aoi"
-    drift = pd.DataFrame(data={"dx": 0.0, "dy": 0}, index=np.arange(F))
-    drift.index.name = "frame"
+    target_locs = torch.full((N, F, 2), (D - 1) / 2)
     model.data = CosmosDataset(
         torch.full((N, F, D, D), params["background"] + params["offset"]),
-        target,
-        drift,
+        target_locs,
         dtype="test",
         device=device,
         offset=offset,
     )
     model.control = CosmosDataset(
-        torch.zeros(N, F, D, D), target, drift, dtype="control", device=device
+        torch.zeros(N, F, D, D), target_locs, dtype="control", device=device
     )
-    model.data_loc = GaussianSpot(model.data.target, model.data.drift, model.data.D)
-    model.control_loc = GaussianSpot(
-        model.control.target, model.control.drift, model.control.D
-    )
+    model.data_loc = GaussianSpot(model.data.target_locs, model.data.D)
+    model.control_loc = GaussianSpot(model.control.target_locs, model.control.D)
 
     # sample
     predictive = Predictive(
