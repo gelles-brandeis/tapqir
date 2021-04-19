@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch
 from pyro.ops.stats import quantile
 from torch.distributions.utils import lazy_property, probs_to_logits
@@ -16,8 +15,7 @@ class CosmosDataset(Dataset):
     def __init__(
         self,
         data=None,
-        target=None,
-        drift=None,
+        target_locs=None,
         dtype=None,
         device=None,
         labels=None,
@@ -25,16 +23,13 @@ class CosmosDataset(Dataset):
     ):
         self.data = data.to(device)
         self.N, self.F, self.D, _ = self.data.shape
-        self.target = target
-        self.drift = drift
+        self.target_locs = target_locs
         self.labels = labels
         if dtype == "test":
             if offset is not None:
                 self.offset = offset.to(device)
             else:
                 self.offset = offset
-        assert self.N == len(self.target)
-        assert self.F == len(self.drift)
         self.dtype = dtype
 
     @lazy_property
@@ -117,8 +112,7 @@ class CosmosDataset(Dataset):
         if not path.is_dir():
             path.mkdir()
         torch.save(self.data, path / f"{self.dtype}_data.pt")
-        self.target.to_csv(path / f"{self.dtype}_target.csv")
-        self.drift.to_csv(path / "drift.csv")
+        torch.save(self.target_locs, path / f"{self.dtype}_target_locs.pt")
         if self.labels is not None:
             np.save(path / f"{self.dtype}_labels.npy", self.labels)
         if self.dtype == "test":
@@ -129,13 +123,14 @@ class CosmosDataset(Dataset):
 def load_data(path, dtype, device=None):
     path = Path(path)
     data = torch.load(path / f"{dtype}_data.pt", map_location=device).detach()
-    target = pd.read_csv(path / f"{dtype}_target.csv", index_col="aoi")
-    drift = pd.read_csv(path / "drift.csv", index_col="frame")
+    target_locs = torch.load(
+        path / f"{dtype}_target_locs.pt", map_location=device
+    ).detach()
     labels = None
     if (path / f"{dtype}_labels.npy").is_file():
         labels = np.load(path / f"{dtype}_labels.npy")
     if dtype == "test":
         offset = torch.load(path / "offset.pt", map_location=device).detach()
-        return CosmosDataset(data, target, drift, dtype, device, labels, offset)
+        return CosmosDataset(data, target_locs, dtype, device, labels, offset)
 
-    return CosmosDataset(data, target, drift, dtype, device, labels)
+    return CosmosDataset(data, target_locs, dtype, device, labels)

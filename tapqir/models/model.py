@@ -35,18 +35,13 @@ class GaussianSpot:
     :param drift: Frame drift list.
     """
 
-    def __init__(self, target, drift, D):
+    def __init__(self, target_locs, D):
         super().__init__()
         # create meshgrid of DxD pixel positions
         D_range = torch.arange(D, dtype=torch.float)
         i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
         self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
-
-        # drift locs for 2D gaussian spot
-        self.target_locs = torch.tensor(
-            drift[["dx", "dy"]].values.reshape(-1, 2)
-            + target[["x", "y"]].values.reshape(-1, 1, 2),
-        ).float()
+        self.target_locs = target_locs
 
     # Ideal 2D gaussian spots
     def __call__(self, height, width, x, y, ndx, fdx=None):
@@ -115,16 +110,14 @@ class Model(nn.Module):
 
         # load test data
         self.data = load_data(self.data_path, dtype="test", device=self.device)
-        self.data_loc = GaussianSpot(self.data.target, self.data.drift, self.data.D)
+        self.data_loc = GaussianSpot(self.data.target_locs, self.data.D)
 
         # load control data
         if control:
             self.control = load_data(
                 self.data_path, dtype="control", device=self.device
             )
-            self.control_loc = GaussianSpot(
-                self.control.target, self.control.drift, self.control.D
-            )
+            self.control_loc = GaussianSpot(self.control.target_locs, self.control.D)
         else:
             self.control = control
 
@@ -287,10 +280,6 @@ class Model(nn.Module):
                 j_probs - off-target spot probability, \
                 m_probs - spot probability (on-target + off-target), \
                 z_marginal - total on-target spot probability (sum of z_probs)."
-        matlab["aoilist"] = self.data.target.index.values
-        matlab["aoilistDescription"] = "aoi numbering from aoiinfo"
-        matlab["framelist"] = self.data.drift.index.values
-        matlab["framelistDescription"] = "frame numbering from driftlist"
         savemat(self.path / "parameters.mat", matlab)
 
         # save global paramters in csv file and for tensorboard
