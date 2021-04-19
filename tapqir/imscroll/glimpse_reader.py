@@ -67,11 +67,11 @@ class GlimpseDataset(Dataset):
                     aoi_mat[dtype], columns=["frame", "ave", "x", "y", "pixnum", "aoi"]
                 )
             aoi_df[dtype] = aoi_df[dtype].astype({"aoi": int}).set_index("aoi")
-            # adjust to the initial frame and python indexing
+            # adjust to python indexing
             aoi_df[dtype]["x"] = aoi_df[dtype]["x"] - 1
             aoi_df[dtype]["y"] = aoi_df[dtype]["y"] - 1
 
-        # calculate the cumulative sum of dx and dy
+        # calculate the cumulative sum of dx and dy relative to the aoiinfo frame
         aoiinfo_frame = int(aoi_df["test"].at[1, "frame"])
         drift_df.loc[aoiinfo_frame + 1 :] = drift_df.loc[aoiinfo_frame + 1 :].cumsum(
             axis=0
