@@ -385,15 +385,22 @@ class Model(nn.Module):
         with torch.no_grad():
             weights = self.data_loc(
                 torch.ones(1),
-                pyro.param("d/w_mode"),
-                pyro.param("d/x_mode"),
-                pyro.param("d/y_mode"),
+                pyro.param("d/w_mean"),
+                pyro.param("d/x_mean"),
+                pyro.param("d/y_mean"),
                 torch.arange(self.data.N),
             )
-            signal = (self.data.data * weights).sum(dim=(-2, -1))
+            signal = (
+                (
+                    self.data.data
+                    - pyro.param("d/b_loc")[..., None, None]
+                    - self.data.offset_mean[..., None, None]
+                )
+                * weights
+            ).sum(dim=(-2, -1))
             noise = (
-                self.offset_var + (signal - self.offset_mean) * pyro.param("gain")
+                self.data.offset_var + pyro.param("d/b_loc") * pyro.param("gain_loc")
             ).sqrt()
-            result = (signal - pyro.param("d/b_loc") - self.offset_mean) / noise
+            result = signal / noise
             mask = self.z_probs > 0.5
             return result[mask]
