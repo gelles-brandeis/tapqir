@@ -44,14 +44,6 @@ class GlimpseDataset(Dataset):
         )
         drift_df = drift_df.astype({"frame": int}).set_index("frame")
 
-        if config["glimpse"]["frame_start"] and config["glimpse"]["frame_end"]:
-            f1 = int(config["glimpse"]["frame_start"])
-            f2 = int(config["glimpse"]["frame_end"])
-            drift_df = drift_df.loc[f1:f2]
-
-        # calculate the cumulative sum of dx and dy
-        drift_df = drift_df.cumsum(axis=0)
-
         # load aoiinfo mat file
         aoi_mat = {}
         aoi_df = {}
@@ -76,17 +68,24 @@ class GlimpseDataset(Dataset):
                 )
             aoi_df[dtype] = aoi_df[dtype].astype({"aoi": int}).set_index("aoi")
             # adjust to the initial frame and python indexing
-            aoi_df[dtype]["x"] = (
-                aoi_df[dtype]["x"]
-                - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dx"]
-            ) - 1
-            aoi_df[dtype]["y"] = (
-                aoi_df[dtype]["y"]
-                - drift_df.at[int(aoi_df[dtype].at[1, "frame"]), "dy"]
-            ) - 1
-            aoi_df[dtype]["frame"] = drift_df.index[0]
+            aoi_df[dtype]["x"] = aoi_df[dtype]["x"] - 1
+            aoi_df[dtype]["y"] = aoi_df[dtype]["y"] - 1
 
-        labels = defaultdict(None)
+        # calculate the cumulative sum of dx and dy
+        aoiinfo_frame = int(aoi_df["test"].at[1, "frame"])
+        drift_df.loc[aoiinfo_frame + 1 :] = drift_df.loc[aoiinfo_frame + 1 :].cumsum(
+            axis=0
+        )
+        drift_df.loc[: aoiinfo_frame - 1] = -drift_df.loc[
+            drift_df.index[1] : aoiinfo_frame
+        ].cumsum(axis=0)
+
+        if config["glimpse"]["frame_start"] and config["glimpse"]["frame_end"]:
+            f1 = int(config["glimpse"]["frame_start"])
+            f2 = int(config["glimpse"]["frame_end"])
+            drift_df = drift_df.loc[f1:f2]
+
+        labels = defaultdict(lambda: None)
         for dtype in dtypes:
             if config["glimpse"][f"{dtype}_labels"] is not None:
                 if config["glimpse"]["labeltype"] is not None:
