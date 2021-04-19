@@ -280,10 +280,6 @@ class Model(nn.Module):
                 j_probs - off-target spot probability, \
                 m_probs - spot probability (on-target + off-target), \
                 z_marginal - total on-target spot probability (sum of z_probs)."
-        matlab["aoilist"] = self.data.target.index.values
-        matlab["aoilistDescription"] = "aoi numbering from aoiinfo"
-        matlab["framelist"] = self.data.drift.index.values
-        matlab["framelistDescription"] = "frame numbering from driftlist"
         savemat(self.path / "parameters.mat", matlab)
 
         # save global paramters in csv file and for tensorboard
