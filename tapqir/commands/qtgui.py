@@ -5,7 +5,7 @@ import numpy as np
 import pyqtgraph as pg
 import torch
 from pyqtgraph import HistogramLUTItem
-from pyro.ops.stats import pi, quantile
+from pyro.ops.stats import quantile
 from pyroapi import handlers, pyro
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIntValidator

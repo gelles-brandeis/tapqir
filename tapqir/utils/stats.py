@@ -1,4 +1,4 @@
-from pyro.ops.stats import pi, quantile
+from pyro.ops.stats import pi
 
 
 def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
