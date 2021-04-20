@@ -5,7 +5,7 @@ import numpy as np
 import pyqtgraph as pg
 import torch
 from pyqtgraph import HistogramLUTItem
-from pyro.ops.stats import pi, quantile
+from pyro.ops.stats import quantile
 from pyroapi import handlers, pyro
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIntValidator
@@ -22,6 +22,8 @@ from PySide2.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from tapqir.utils.stats import ci_from_trace
 
 C = {}
 C[0] = (31, 119, 180)
@@ -287,6 +289,17 @@ class MainWindow(QMainWindow):
 
         # create plots and items
         self.params = ["z", "d/height", "d/width", "d/x", "d/y", "d/background"]
+        self.sites = [
+            "d/height_0",
+            "d/height_1",
+            "d/width_0",
+            "d/width_1",
+            "d/x_0",
+            "d/x_1",
+            "d/y_0",
+            "d/y_1",
+            "d/background",
+        ]
         self.plot = {}
         self.item = {}
         self.plot["zoom"] = widget.addPlot(row=1, col=0, colspan=5)
@@ -434,10 +447,6 @@ class MainWindow(QMainWindow):
                     symbolSize=5,
                     name="z_probs",
                 )
-                # self.item[f"{p}_binary"] = pg.PlotDataItem(
-                #     pen=C[3], symbol=None,
-                #     symbolPen=None, name="z_binary"
-                # )
             elif p.endswith("background"):
                 k = 0
                 self.item[f"{p}_mean"] = pg.PlotDataItem(
@@ -498,35 +507,21 @@ class MainWindow(QMainWindow):
 
         self.Model.n = torch.tensor([n])
         trace = handlers.trace(self.Model.guide).get_trace()
+        ci_stats = ci_from_trace(trace, self.sites)
         self.item["zoom"].setData(self.Model.z_marginal[n])
         for p in self.params:
             if p == "z":
                 self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
             elif p == "d/background":
                 k = 0
-                hpd = pi(
-                    trace.nodes[p]["fn"].sample((500,)).data.squeeze().cpu(),
-                    0.95,
-                    dim=0,
-                )
-                mean = trace.nodes[p]["fn"].mean.data.squeeze().cpu()
-                self.item[f"{p}_high"].setData(hpd[0])
-                self.item[f"{p}_low"].setData(hpd[1])
-                self.item[f"{p}_mean"].setData(mean)
+                self.item[f"{p}_high"].setData(ci_stats[p]["high"])
+                self.item[f"{p}_low"].setData(ci_stats[p]["low"])
+                self.item[f"{p}_mean"].setData(ci_stats[p]["mean"])
             else:
                 for k in range(self.Model.K):
-                    hpd = pi(
-                        trace.nodes[f"{p}_{k}"]["fn"]
-                        .sample((500,))
-                        .data.squeeze()
-                        .cpu(),
-                        0.95,
-                        dim=0,
-                    )
-                    mean = trace.nodes[f"{p}_{k}"]["fn"].mean.data.squeeze().cpu()
-                    self.item[f"{p}_{k}_high"].setData(hpd[0])
-                    self.item[f"{p}_{k}_low"].setData(hpd[1])
-                    self.item[f"{p}_{k}_mean"].setData(mean)
+                    self.item[f"{p}_{k}_high"].setData(ci_stats[f"{p}_{k}"]["high"])
+                    self.item[f"{p}_{k}_low"].setData(ci_stats[f"{p}_{k}"]["low"])
+                    self.item[f"{p}_{k}_mean"].setData(ci_stats[f"{p}_{k}"]["mean"])
 
         if self.w is not None:
             self.updateImages()
