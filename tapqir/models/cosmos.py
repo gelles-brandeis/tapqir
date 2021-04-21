@@ -114,81 +114,61 @@ class Cosmos(Model):
     def z_map(self):
         return self.z_marginal > 0.5
 
-    @property
-    def inference_config_model(self):
-        if self.classify:
-            return {"hide_types": ["param"]}
-        return {"expose_types": ["sample", "param", "observe"]}
-
-    @property
-    def inference_config_guide(self):
-        if self.classify:
-            return {
-                "expose": ["d/theta_probs", "d/m_probs"],
-                "expose_types": ["sample"],
-            }
-        return {"expose_types": ["sample", "param"]}
-
     def model(self):
-        with handlers.block(**self.inference_config_model):
+        self.gain = pyro.sample("gain", dist.HalfNormal(50))
+        self.pi = pyro.sample(
+            "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
+        )
+        self.lamda = pyro.sample("lamda", dist.Exponential(1))
+        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
+        self.size = torch.stack(
+            (
+                torch.tensor(2.0),
+                (((self.data.D + 1) / (2 * self.proximity)) ** 2 - 1),
+            ),
+            dim=-1,
+        )
 
-            self.gain = pyro.sample("gain", dist.HalfNormal(50))
-            self.pi = pyro.sample(
-                "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
-            )
-            self.lamda = pyro.sample("lamda", dist.Exponential(1))
-            self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
-            self.size = torch.stack(
-                (
-                    torch.tensor(2.0),
-                    (((self.data.D + 1) / (2 * self.proximity)) ** 2 - 1),
-                ),
-                dim=-1,
-            )
+        # test data
+        self.spot_model(self.data, self.data_loc, prefix="d")
 
-            # test data
-            self.spot_model(self.data, self.data_loc, prefix="d")
-
-            # control data
-            if self.control:
-                self.spot_model(self.control, self.control_loc, prefix="c")
+        # control data
+        if self.control:
+            self.spot_model(self.control, self.control_loc, prefix="c")
 
     def guide(self):
-        with handlers.block(**self.inference_config_guide):
-            # initialize guide parameters
-            self.guide_parameters()
+        # initialize guide parameters
+        self.guide_parameters()
 
-            pyro.sample(
-                "gain",
-                dist.Gamma(
-                    pyro.param("gain_loc") * pyro.param("gain_beta"),
-                    pyro.param("gain_beta"),
-                ),
-            )
-            pyro.sample(
-                "pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size"))
-            )
-            pyro.sample(
-                "lamda",
-                dist.Gamma(
-                    pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                    pyro.param("lamda_beta"),
-                ),
-            )
-            pyro.sample(
-                "proximity",
-                dist.Gamma(
-                    pyro.param("proximity_loc") * pyro.param("proximity_beta"),
-                    pyro.param("proximity_beta"),
-                ),
-            )
+        pyro.sample(
+            "gain",
+            dist.Gamma(
+                pyro.param("gain_loc") * pyro.param("gain_beta"),
+                pyro.param("gain_beta"),
+            ),
+        )
+        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
+        pyro.sample(
+            "lamda",
+            dist.Gamma(
+                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
+                pyro.param("lamda_beta"),
+            ),
+        )
+        pyro.sample(
+            "proximity",
+            dist.Gamma(
+                pyro.param("proximity_loc") * pyro.param("proximity_beta"),
+                pyro.param("proximity_beta"),
+            ),
+        )
 
-            # test data
-            self.spot_guide(self.data, prefix="d")
+        # test data
+        self.spot_guide(self.data, prefix="d")
 
-            # control data
-            if self.control:
-                self.spot_guide(self.control, prefix="c")
+        # control data
+        if self.control:
+            self.spot_guide(self.control, prefix="c")
 
     def spot_model(self, data, data_loc, prefix):
         # spots
@@ -344,9 +324,13 @@ class Cosmos(Model):
                             theta, kdx, ndx[:, None], fdx
                         ]
                     else:
-                        m_probs = Vindex(pyro.param(f"{prefix}/m_prob"))[
-                            kdx, ndx[:, None], fdx
-                        ]
+                        m_probs = Vindex(
+                            torch.einsum(
+                                "sknft,nfs->knft",
+                                pyro.param("d/m_probs"),
+                                pyro.param("d/theta_probs"),
+                            )
+                        )[kdx, ndx[:, None], fdx, :]
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}",
                         dist.Categorical(m_probs),
@@ -458,11 +442,6 @@ class Cosmos(Model):
         m_probs[1, 0, :, :, 0] = 0
         m_probs[2, 1, :, :, 0] = 0
         pyro.param(f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex)
-        pyro.param(
-            f"{prefix}/m_prob",
-            lambda: torch.ones(self.K, data.N, data.F, 2),
-            constraint=constraints.simplex,
-        )
         pyro.param(
             f"{prefix}/b_loc",
             lambda: torch.full(
