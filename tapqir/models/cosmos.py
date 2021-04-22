@@ -306,31 +306,33 @@ class Cosmos(Model):
                     ),
                 )
 
-                # sample hidden model state (3,1,1,1)
-                if self.classify:
-                    if data.dtype == "test":
-                        theta = pyro.sample(
-                            f"{prefix}/theta",
-                            dist.Categorical(pyro.param(f"{prefix}/theta_probs")[ndx]),
-                            infer={"enumerate": "parallel"},
-                        )
-                    else:
-                        theta = 0
+                # sample target-specific index theta
+                if self.classify and prefix == "d":
+                    theta = pyro.sample(
+                        f"{prefix}/theta",
+                        dist.Categorical(pyro.param(f"{prefix}/theta_probs")[ndx]),
+                        infer={"enumerate": "parallel"},
+                    )
 
                 for kdx in spots:
-                    # spot presence
-                    if self.classify:
-                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                            theta, kdx, ndx[:, None], fdx
-                        ]
+                    # sample spot presence m
+                    if prefix == "d":
+                        if self.classify:
+                            m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                                theta, kdx, ndx[:, None], fdx
+                            ]
+                        else:
+                            m_probs = Vindex(
+                                torch.einsum(
+                                    "sknft,nfs->knft",
+                                    pyro.param(f"{prefix}/m_probs"),
+                                    pyro.param(f"{prefix}/theta_probs"),
+                                )
+                            )[kdx, ndx[:, None], fdx, :]
                     else:
-                        m_probs = Vindex(
-                            torch.einsum(
-                                "sknft,nfs->knft",
-                                pyro.param("d/m_probs"),
-                                pyro.param("d/theta_probs"),
-                            )
-                        )[kdx, ndx[:, None], fdx, :]
+                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                            kdx, ndx[:, None], fdx
+                        ]
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}",
                         dist.Categorical(m_probs),
@@ -438,10 +440,19 @@ class Cosmos(Model):
             lambda: torch.ones(data.N, data.F, 1 + self.K * self.S),
             constraint=constraints.simplex,
         )
-        m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
-        m_probs[1, 0, :, :, 0] = 0
-        m_probs[2, 1, :, :, 0] = 0
-        pyro.param(f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex)
+        if prefix == "d":
+            m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
+            m_probs[1, 0, :, :, 0] = 0
+            m_probs[2, 1, :, :, 0] = 0
+            pyro.param(
+                f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex
+            )
+        else:
+            pyro.param(
+                f"{prefix}/m_probs",
+                lambda: torch.ones(self.K, data.N, data.F, 2),
+                constraint=constraints.simplex,
+            )
         pyro.param(
             f"{prefix}/b_loc",
             lambda: torch.full(
