@@ -78,8 +78,7 @@ setuptools.setup(
             "fit=tapqir.commands.fit:Fit",
             "show=tapqir.commands.show:Show",
             "glimpse=tapqir.commands.glimpse:Glimpse",
-            "elbo=tapqir.commands.elbo:ELBO",
-            "matlab=tapqir.commands.matlab:Matlab",
+            "save=tapqir.commands.save:Save",
         ],
     },
 )
