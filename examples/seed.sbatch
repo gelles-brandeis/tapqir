@@ -6,4 +6,4 @@
 
 # Path to your executable
 python cosmos_simulations.py --seed ${SLURM_ARRAY_TASK_ID} \
-  -it 40000 -infer 5000 -bs 4 --path data/seed${SLURM_ARRAY_TASK_ID} --cuda
+  -it 40000 -infer 10000 -bs 4 --path data/seed${SLURM_ARRAY_TASK_ID} --cuda
