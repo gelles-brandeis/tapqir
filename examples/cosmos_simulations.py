@@ -18,10 +18,12 @@ def main(args):
         device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
-    params["gain"] = args.gain or random.uniform(1, 20)
-    params["pi"] = args.pi or random.betavariate(1, 9)
-    params["lamda"] = args.lamda or random.uniform(0, 1)
-    params["proximity"] = args.proximity or random.uniform(0.2, 0.6)
+    params["gain"] = args.gain if args.gain is not None else random.uniform(1, 20)
+    params["pi"] = args.pi if args.pi is not None else random.betavariate(1, 9)
+    params["lamda"] = args.lamda if args.lamda is not None else random.uniform(0, 1)
+    params["proximity"] = (
+        args.proximity if args.proximity is not None else random.uniform(0.2, 0.6)
+    )
     params["offset"] = 90
     params["height"] = args.height
     params["background"] = 150

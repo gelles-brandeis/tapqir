@@ -7,7 +7,7 @@
 heights=(300 500 600 750 1000 1500 2000 3000)
 
 # Path to your executable
-python cosmos_simulations.py -it 40000 -infer 7000 \
+python cosmos_simulations.py -it 40000 -infer 10000 \
   --gain 7 --pi 0.15 --lamda 0.15 --proximity 0.2 \
   -bs 4 --height ${heights[${SLURM_ARRAY_TASK_ID}]} \
   --path data/height${heights[${SLURM_ARRAY_TASK_ID}]} --cuda
