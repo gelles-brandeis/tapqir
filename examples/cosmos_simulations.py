@@ -21,7 +21,9 @@ def main(args):
     params["gain"] = args.gain if args.gain is not None else random.uniform(1, 20)
     params["pi"] = args.pi if args.pi is not None else random.betavariate(1, 9)
     params["lamda"] = args.lamda if args.lamda is not None else random.uniform(0, 1)
-    params["proximity"] = args.proximity if args.proximity is not None else random.uniform(0.2, 0.6)
+    params["proximity"] = (
+        args.proximity if args.proximity is not None else random.uniform(0.2, 0.6)
+    )
     params["offset"] = 90
     params["height"] = args.height
     params["background"] = 150
