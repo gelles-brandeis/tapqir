@@ -18,7 +18,7 @@ class GlimpseDataset(Dataset):
     """
 
     def __init__(self, path):
-        """ Read Glimpse files """
+        """Read Glimpse files"""
 
         path = Path(path)
         # read options.cfg file

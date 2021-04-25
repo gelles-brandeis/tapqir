@@ -24,6 +24,6 @@ class FixedOffsetGamma(TransformedDistribution):
         )
 
     def expand(self, batch_shape, _instance=None):
-        """"""
+        """ """
         new = self._get_checked_instance(FixedOffsetGamma, _instance)
         return super(FixedOffsetGamma, self).expand(batch_shape, _instance=new)
