@@ -9,6 +9,7 @@ from pyroapi import pyro, pyro_backend
 
 from tapqir.models import HMM, Cosmos
 from tapqir.utils.simulate import simulate
+from tapqir.utils.stats import save_stats
 
 
 def main(args):
