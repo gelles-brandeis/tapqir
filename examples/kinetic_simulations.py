@@ -1,8 +1,10 @@
 import argparse
+import math
 from pathlib import Path
 
 import pandas as pd
 import torch
+from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
 from tapqir.models import HMM, Cosmos
@@ -17,6 +19,7 @@ def main(args):
         device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
+    params["width"] = 1.4
     params["gain"] = 7
     params["kon"] = args.kon
     params["koff"] = 0.2
@@ -46,6 +49,20 @@ def main(args):
             # save data
             hmm.data.save(data_path)
             hmm.control.save(data_path)
+            # calculate snr
+            rv = dist.MultivariateNormal(
+                torch.tensor([(args.D - 1) / 2, (args.D - 1) / 2]),
+                scale_tril=torch.eye(2) * params["width"],
+            )
+
+            D_range = torch.arange(args.D, dtype=torch.float)
+            i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
+            ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
+            weights = rv.log_prob(ij_pixel).exp()
+            signal = (weights ** 2 * params["height"]).sum()
+            noise = math.sqrt((params["background"] * params["gain"]))
+            params["snr"] = float(signal / noise)
+
             pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
             pyro.clear_param_store()
             model.load(data_path, True, device)
@@ -63,6 +80,8 @@ def main(args):
 
     model.settings(args.lr, args.bs)
     model.run(args.it, args.infer)
+    if data_path is not None:
+        save_stats(model, model.path)
 
 
 if __name__ == "__main__":
