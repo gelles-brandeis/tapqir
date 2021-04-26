@@ -272,10 +272,9 @@ class Model(nn.Module):
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.classify and self.data.labels is not None:
-            mask = self.data.labels["z"] < 2
-            pred_labels = self.z_map.cpu().numpy()[mask]
-            true_labels = self.data.labels["z"][mask]
+        if self.data.labels is not None:
+            pred_labels = self.z_map.cpu().numpy().ravel()
+            true_labels = self.data.labels["z"].ravel()
 
             metrics = {}
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -323,7 +322,6 @@ class Model(nn.Module):
         self.optim.load(path / "optimizer")
         pyro.clear_param_store()
         pyro.get_param_store().load(path / "params", map_location=self.device)
-        # self.predictions = np.load(os.path.join(path, "predictions.npy"))
         self.logger.info(
             "Step #{}. Loaded model params and optimizer state from {}".format(
                 self.iter, path

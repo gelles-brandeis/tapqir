@@ -31,7 +31,7 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
                 (1, N, 1), params["background"]
             )
             for k in range(model.K):
-                samples[f"{prefix}/width_{k}"] = torch.full((1, N, F), 1.4)
+                samples[f"{prefix}/width_{k}"] = torch.full((1, N, F), params["width"])
                 samples[f"{prefix}/height_{k}"] = torch.full(
                     (1, N, F), params["height"]
                 )
@@ -59,7 +59,9 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
                     (1, N, 1), params["background"]
                 )
                 for k in range(model.K):
-                    samples[f"{prefix}/width_{k}_{f}"] = torch.full((1, N, 1), 1.4)
+                    samples[f"{prefix}/width_{k}_{f}"] = torch.full(
+                        (1, N, 1), params["width"]
+                    )
                     samples[f"{prefix}/height_{k}_{f}"] = torch.full(
                         (1, N, 1), params["height"]
                     )

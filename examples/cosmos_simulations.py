@@ -1,13 +1,16 @@
 import argparse
+import math
 import random
 from pathlib import Path
 
 import pandas as pd
 import torch
+from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
 from tapqir.models import Cosmos
 from tapqir.utils.simulate import simulate
+from tapqir.utils.stats import save_stats
 
 
 def main(args):
@@ -18,6 +21,7 @@ def main(args):
         device = "cpu"
     pyro.set_rng_seed(args.seed)
     params = {}
+    params["width"] = 1.4
     params["gain"] = args.gain if args.gain is not None else random.uniform(1, 20)
     params["pi"] = args.pi if args.pi is not None else random.betavariate(1, 9)
     params["lamda"] = args.lamda if args.lamda is not None else random.uniform(0, 1)
@@ -27,6 +31,8 @@ def main(args):
     params["offset"] = 90
     params["height"] = args.height
     params["background"] = 150
+
+    # calculate snr
 
     model = Cosmos(1, 2)
     data_path = args.path
@@ -46,6 +52,20 @@ def main(args):
             # save data
             model.data.save(data_path)
             model.control.save(data_path)
+            # calculate snr
+            rv = dist.MultivariateNormal(
+                torch.tensor([(args.D - 1) / 2, (args.D - 1) / 2]),
+                scale_tril=torch.eye(2) * params["width"],
+            )
+
+            D_range = torch.arange(args.D, dtype=torch.float)
+            i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
+            ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
+            weights = rv.log_prob(ij_pixel).exp()
+            signal = (weights ** 2 * params["height"]).sum()
+            noise = math.sqrt((params["background"] * params["gain"]))
+            params["snr"] = float(signal / noise)
+
             pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
             pyro.clear_param_store()
     else:
@@ -56,6 +76,8 @@ def main(args):
 
     model.settings(args.lr, args.bs, args.jit)
     model.run(args.it, args.infer)
+    if data_path is not None:
+        save_stats(model, model.path)
 
 
 if __name__ == "__main__":

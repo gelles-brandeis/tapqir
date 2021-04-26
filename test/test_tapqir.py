@@ -17,6 +17,7 @@ requires_cuda = pytest.mark.skipif(
 @pytest.fixture
 def dataset_path(tmp_path):
     params = {}
+    params["width"] = 1.4
     params["gain"] = 7.0
     params["pi"] = 0.15
     params["lamda"] = 0.15

@@ -6,6 +6,7 @@ from pyroapi import pyro_backend
 
 from tapqir.imscroll.utils import save_matlab
 from tapqir.models import models
+from tapqir.utils.stats import save_stats
 
 
 class Save(Command):
@@ -76,5 +77,7 @@ class Save(Command):
             model = models[args.model](1, 2)
             model.load(args.dataset_path, False, "cpu")
             model.load_parameters(args.parameters_path)
+
+            save_stats(model, args.parameters_path)
             if args.matlab:
                 save_matlab(model, args.parameters_path)
