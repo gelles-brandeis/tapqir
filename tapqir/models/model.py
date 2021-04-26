@@ -8,7 +8,6 @@ import torch.nn as nn
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import infer, optim, pyro
-from scipy.io import savemat
 from sklearn.metrics import (
     confusion_matrix,
     matthews_corrcoef,
@@ -257,30 +256,6 @@ class Model(nn.Module):
         # save parameters and optimizer state
         pyro.get_param_store().save(self.path / "params")
         self.optim.save(self.path / "optimizer")
-
-        # save parameters in matlab format
-        keys = ["h_loc", "w_mean", "x_mean", "y_mean", "b_loc"]
-        matlab = {k: pyro.param(f"d/{k}").data.cpu().numpy() for k in keys}
-        matlab[
-            "parametersDescription"
-        ] = "Parameters for N x F x K spots. \
-            N - target sites, F - frames, K - max number of spots in the image. \
-            h_loc - mean intensity, w_mean - mean spot width, \
-            x_mean - x position, y_mean - y position, \
-            b_loc - background intensity."
-        if self.classify:
-            matlab["z_probs"] = self.z_probs.cpu().numpy()
-            matlab["j_probs"] = self.j_probs.cpu().numpy()
-            matlab["m_probs"] = self.m_probs.cpu().numpy()
-            matlab["z_marginal"] = self.z_marginal.cpu().numpy()
-            matlab[
-                "probabilitiesDescription"
-            ] = "Probabilities for N x F x K spots. \
-                z_probs - on-target spot probability, \
-                j_probs - off-target spot probability, \
-                m_probs - spot probability (on-target + off-target), \
-                z_marginal - total on-target spot probability (sum of z_probs)."
-        savemat(self.path / "parameters.mat", matlab)
 
         # save global paramters in csv file and for tensorboard
         global_params = pd.Series(dtype=float, name=self.iter)
