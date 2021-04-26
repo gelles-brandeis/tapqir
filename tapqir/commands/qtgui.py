@@ -457,10 +457,10 @@ class MainWindow(QMainWindow):
                     symbolSize=5,
                     name=k,
                 )
-                self.item[f"{p}_high"] = pg.PlotDataItem(pen=(*C[k], 70))
-                self.item[f"{p}_low"] = pg.PlotDataItem(pen=(*C[k], 70))
+                self.item[f"{p}_ul"] = pg.PlotDataItem(pen=(*C[k], 70))
+                self.item[f"{p}_ll"] = pg.PlotDataItem(pen=(*C[k], 70))
                 self.item[f"{p}_fill"] = pg.FillBetweenItem(
-                    self.item[f"{p}_high"], self.item[f"{p}_low"], brush=(*C[k], 70)
+                    self.item[f"{p}_ul"], self.item[f"{p}_ll"], brush=(*C[k], 70)
                 )
             else:
 
@@ -473,11 +473,11 @@ class MainWindow(QMainWindow):
                         symbolSize=5,
                         name=k,
                     )
-                    self.item[f"{p}_{k}_high"] = pg.PlotDataItem(pen=(*C[k], 70))
-                    self.item[f"{p}_{k}_low"] = pg.PlotDataItem(pen=(*C[k], 70))
+                    self.item[f"{p}_{k}_ul"] = pg.PlotDataItem(pen=(*C[k], 70))
+                    self.item[f"{p}_{k}_ll"] = pg.PlotDataItem(pen=(*C[k], 70))
                     self.item[f"{p}_{k}_fill"] = pg.FillBetweenItem(
-                        self.item[f"{p}_{k}_high"],
-                        self.item[f"{p}_{k}_low"],
+                        self.item[f"{p}_{k}_ul"],
+                        self.item[f"{p}_{k}_ll"],
                         brush=(*C[k], 70),
                     )
 
@@ -514,13 +514,13 @@ class MainWindow(QMainWindow):
                 self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
             elif p == "d/background":
                 k = 0
-                self.item[f"{p}_high"].setData(ci_stats[p]["high"])
-                self.item[f"{p}_low"].setData(ci_stats[p]["low"])
+                self.item[f"{p}_ul"].setData(ci_stats[p]["ci_ul"])
+                self.item[f"{p}_ll"].setData(ci_stats[p]["ci_ll"])
                 self.item[f"{p}_mean"].setData(ci_stats[p]["mean"])
             else:
                 for k in range(self.Model.K):
-                    self.item[f"{p}_{k}_high"].setData(ci_stats[f"{p}_{k}"]["high"])
-                    self.item[f"{p}_{k}_low"].setData(ci_stats[f"{p}_{k}"]["low"])
+                    self.item[f"{p}_{k}_ul"].setData(ci_stats[f"{p}_{k}"]["ci_ul"])
+                    self.item[f"{p}_{k}_ll"].setData(ci_stats[f"{p}_{k}"]["ci_ll"])
                     self.item[f"{p}_{k}_mean"].setData(ci_stats[f"{p}_{k}"]["mean"])
 
         if self.w is not None:
