@@ -30,7 +30,7 @@ If you are using Anaconda package manager make sure that your created environmen
 Installation on Linux
 ~~~~~~~~~~~~~~~~~~~~~
 
-Using pip::
+Using pip (changes)::
 
     pip install git+https://github.com/gelles-brandeis/tapqir.git
 
