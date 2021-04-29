@@ -1,7 +1,13 @@
-.PHONY: install lint format test FORCE
+.PHONY: install docs lint format test FORCE
 
-install:
+install: FORCE
 	pip install -e .[dev]
+
+uninstall: FORCE
+	pip uninstall tapqir
+
+docs: FORCE
+	$(MAKE) -C docs html
 
 lint: FORCE
 	flake8
