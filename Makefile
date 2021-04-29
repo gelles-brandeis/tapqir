@@ -3,6 +3,9 @@
 install:
 	pip install -e .[dev]
 
+docs: FORCE
+	$(MAKE) -C docs html
+
 lint: FORCE
 	flake8
 	black --check .
