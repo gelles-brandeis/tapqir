@@ -141,10 +141,12 @@ class Model(nn.Module):
                 pyro.clear_param_store()
                 self.iter = 1
                 self._rolling = None
+                self._rolling2 = None
         else:
             pyro.clear_param_store()
             self.iter = 1
             self._rolling = None
+            self._rolling2 = None
 
         self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True
@@ -172,15 +174,23 @@ class Model(nn.Module):
             if not self.iter % 100 and self.iter != 0:
                 self.save_checkpoint()
                 if self._stop:
-                    self.logger.info("Step #{} converged.".format(self.iter))
+                    self.logger.info(
+                        "Step #{} marginalized model converged.".format(self.iter)
+                    )
                     break
             self.iter += 1
 
+        self._stop = False
         self.classify = True
         for i in tqdm(range(infer)):
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
                 self.save_checkpoint()
+                if self._stop:
+                    self.logger.info(
+                        "Step #{} classifier model converged.".format(self.iter)
+                    )
+                    break
             self.iter += 1
 
     def _max_batch_size(self):
@@ -286,7 +296,7 @@ class Model(nn.Module):
 
             neg, pos = {}, {}
             neg["TN"], neg["FP"], pos["FN"], pos["TP"] = confusion_matrix(
-                true_labels, pred_labels
+                true_labels, pred_labels, labels=(0, 1)
             ).ravel()
 
             self.writer.add_scalars("ACCURACY", metrics, self.iter)
@@ -297,19 +307,29 @@ class Model(nn.Module):
 
         if self._rolling is None:
             self._rolling = global_params.to_frame().T
-        elif global_params.name not in self._rolling.index:
-            self._rolling = self._rolling.append(global_params)
-        if len(self._rolling) > 100:
-            self._rolling = self._rolling.drop(self._rolling.index[0])
+        if self._rolling2 is None:
+            self._rolling2 = global_params.to_frame().T
+
+        rolling = self._rolling2 if self.classify else self._rolling
+        if global_params.name not in rolling.index:
+            rolling = rolling.append(global_params)
+        if len(rolling) > 100:
+            rolling = rolling.drop(rolling.index[0])
             conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
-            if all(
-                self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05
+            crit = all(
+                rolling[p].std() / rolling[p].iloc[-50:].std() < 1.05
                 for p in conv_params
-            ):
+            )
+            if crit:
                 self._stop = True
 
         global_params.to_csv(self.path / "global_params.csv")
+        if self.classify:
+            self._rolling2 = rolling
+        else:
+            self._rolling = rolling
         self._rolling.to_csv(self.path / "rolling_params.csv")
+        self._rolling2.to_csv(self.path / "rolling_params2.csv")
         self.logger.info("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
@@ -318,6 +338,7 @@ class Model(nn.Module):
             path / "global_params.csv", squeeze=True, index_col=0
         )
         self._rolling = pd.read_csv(path / "rolling_params.csv", index_col=0)
+        self._rolling2 = pd.read_csv(path / "rolling_params2.csv", index_col=0)
         self.iter = int(global_params.name)
         self.optim.load(path / "optimizer")
         pyro.clear_param_store()
