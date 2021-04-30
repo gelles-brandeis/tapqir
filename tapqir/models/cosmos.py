@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.distributions.constraints as constraints
 from pyro.ops.indexing import Vindex
@@ -157,9 +159,11 @@ class Cosmos(Model):
         )
         pyro.sample(
             "proximity",
-            dist.Gamma(
-                pyro.param("proximity_loc") * pyro.param("proximity_beta"),
-                pyro.param("proximity_beta"),
+            AffineBeta(
+                pyro.param("proximity_loc"),
+                pyro.param("proximity_size"),
+                0,
+                (self.data.D + 1) / math.sqrt(12),
             ),
         )
 
@@ -383,9 +387,9 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
         pyro.param(
-            "proximity_beta",
+            "proximity_size",
             lambda: torch.tensor(100),
-            constraint=constraints.positive,
+            constraint=constraints.greater_than(2.0),
         )
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
