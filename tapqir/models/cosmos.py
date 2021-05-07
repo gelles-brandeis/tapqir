@@ -21,7 +21,7 @@ class Cosmos(Model):
 
             :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
     """
-    name = "delta"
+    name = "cosmos"
 
     def __init__(self, S=1, K=2):
         super().__init__(S, K)
