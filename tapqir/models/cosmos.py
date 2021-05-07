@@ -144,27 +144,16 @@ class Cosmos(Model):
 
         pyro.sample(
             "gain",
-            dist.Gamma(
-                pyro.param("gain_loc") * pyro.param("gain_beta"),
-                pyro.param("gain_beta"),
-            ),
+            dist.Delta(pyro.param("gain_loc")),
         )
-        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
+        pyro.sample("pi", dist.Delta(pyro.param("pi_mean")).to_event(1))
         pyro.sample(
             "lamda",
-            dist.Gamma(
-                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                pyro.param("lamda_beta"),
-            ),
+            dist.Delta(pyro.param("lamda_loc")),
         )
         pyro.sample(
             "proximity",
-            AffineBeta(
-                pyro.param("proximity_loc"),
-                pyro.param("proximity_size"),
-                0,
-                (self.data.D + 1) / math.sqrt(12),
-            ),
+            dist.Delta(pyro.param("proximity_loc")),
         )
 
         # test data
@@ -384,26 +373,14 @@ class Cosmos(Model):
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "proximity_size",
-            lambda: torch.tensor(100),
-            constraint=constraints.greater_than(2.0),
+            constraint=constraints.interval(0, (self.data.D + 1) / math.sqrt(12)),
         )
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
-            "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
-        )
-        pyro.param(
             "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
-        pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
         pyro.param(
             "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
-        )
-        pyro.param(
-            "lamda_beta", lambda: torch.tensor(100), constraint=constraints.positive
         )
 
         pyro.param(
