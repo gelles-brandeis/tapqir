@@ -23,8 +23,8 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
             dim=0,
         )
         mean = tr.nodes[name]["fn"].mean.data.squeeze().cpu()
-        ci_stats[name]["ci_ul"] = hpd[1]
-        ci_stats[name]["ci_ll"] = hpd[0]
+        ci_stats[name]["ul"] = hpd[1]
+        ci_stats[name]["ll"] = hpd[0]
         ci_stats[name]["mean"] = mean
     return ci_stats
 
@@ -42,12 +42,12 @@ def save_stats(model, path):
     for param in global_params:
         if param == "pi":
             data[f"{param}_mean"] = ci_stats[param]["mean"][1].item()
-            data[f"{param}_ll"] = ci_stats[param]["ci_ll"][1].item()
-            data[f"{param}_ul"] = ci_stats[param]["ci_ul"][1].item()
+            data[f"{param}_ll"] = ci_stats[param]["ll"][1].item()
+            data[f"{param}_ul"] = ci_stats[param]["ul"][1].item()
         else:
             data[f"{param}_mean"] = ci_stats[param]["mean"].item()
-            data[f"{param}_ll"] = ci_stats[param]["ci_ll"].item()
-            data[f"{param}_ul"] = ci_stats[param]["ci_ul"].item()
+            data[f"{param}_ll"] = ci_stats[param]["ll"].item()
+            data[f"{param}_ul"] = ci_stats[param]["ul"].item()
 
     # classification statistics
     if model.data.labels is not None:

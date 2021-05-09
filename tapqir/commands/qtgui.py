@@ -514,13 +514,13 @@ class MainWindow(QMainWindow):
                 self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
             elif p == "d/background":
                 k = 0
-                self.item[f"{p}_ul"].setData(ci_stats[p]["ci_ul"])
-                self.item[f"{p}_ll"].setData(ci_stats[p]["ci_ll"])
+                self.item[f"{p}_ul"].setData(ci_stats[p]["ul"])
+                self.item[f"{p}_ll"].setData(ci_stats[p]["ll"])
                 self.item[f"{p}_mean"].setData(ci_stats[p]["mean"])
             else:
                 for k in range(self.Model.K):
-                    self.item[f"{p}_{k}_ul"].setData(ci_stats[f"{p}_{k}"]["ci_ul"])
-                    self.item[f"{p}_{k}_ll"].setData(ci_stats[f"{p}_{k}"]["ci_ll"])
+                    self.item[f"{p}_{k}_ul"].setData(ci_stats[f"{p}_{k}"]["ul"])
+                    self.item[f"{p}_{k}_ll"].setData(ci_stats[f"{p}_{k}"]["ll"])
                     self.item[f"{p}_{k}_mean"].setData(ci_stats[f"{p}_{k}"]["mean"])
 
         if self.w is not None:
