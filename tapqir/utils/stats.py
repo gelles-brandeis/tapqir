@@ -49,6 +49,15 @@ def save_stats(model, path):
             data[f"{param}_ll"] = ci_stats[param]["ll"].item()
             data[f"{param}_ul"] = ci_stats[param]["ul"].item()
 
+    # check convergence status
+    data["marginal"] = False
+    data["classifier"] = False
+    for line in open(Path(path) / "run.log"):
+        if "marginalized model converged" in line:
+            data["marginal"] = True
+        if "classifier model converged" in line:
+            data["classifier"] = True
+
     # classification statistics
     if model.data.labels is not None:
         pred_labels = model.z_map.cpu().numpy().ravel()
