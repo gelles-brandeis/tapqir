@@ -4,7 +4,7 @@ from pyroapi import distributions as dist
 from pyroapi import infer, optim, pyro
 
 
-def train(model, guide, lr=1e-3, n_steps=1000, **kwargs):
+def train(model, guide, lr=1e-3, n_steps=1000, verbose=False, **kwargs):
 
     pyro.clear_param_store()
     optimizer = optim.Adam({"lr": lr})
@@ -13,7 +13,7 @@ def train(model, guide, lr=1e-3, n_steps=1000, **kwargs):
 
     for step in range(n_steps):
         svi.step(**kwargs)
-        if step % 100 == 99:
+        if step % 100 == 99 and verbose:
             values = tuple(f"{k}: {v}" for k, v in pyro.get_param_store().items())
             print(values)
 
@@ -46,11 +46,12 @@ def ttfb_model(data, control, Tmax):
     # on-target data
     n = sum(data == Tmax)  # no binding has occured
     tau = data[(data < Tmax) & (data > 0)]
-    with pyro.plate("n", n):
-        active1 = pyro.sample(
-            "active1", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
-        )
-        pyro.factor("Tmax", -k[active1.long()] * Tmax)
+    if n:
+        with pyro.plate("n", n):
+            active1 = pyro.sample(
+                "active1", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
+            )
+            pyro.factor("Tmax", -k[active1.long()] * Tmax)
     with pyro.plate("N-n-nz", len(tau)):
         active2 = pyro.sample(
             "active2", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
@@ -61,8 +62,9 @@ def ttfb_model(data, control, Tmax):
     if control is not None:
         nc = sum(control == Tmax)  # no binding has occured
         tauc = control[(control < Tmax) & (control > 0)]
-        with pyro.plate("nc", nc):
-            pyro.factor("Tmaxc", -kns * Tmax)
+        if nc:
+            with pyro.plate("nc", nc):
+                pyro.factor("Tmaxc", -kns * Tmax)
         with pyro.plate("Nc-nc-ncz", len(tauc)):
             pyro.sample("tauc", dist.Exponential(kns), obs=tauc)
 
