@@ -12,7 +12,7 @@ Intro
    :maxdepth: 1
    :caption: Contents:
 
-   height_simulations
+   height
    ratej_simulations
    negative_simulations
    kinetic_simulations
