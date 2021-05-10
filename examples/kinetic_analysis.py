@@ -1,20 +1,17 @@
 import argparse
-import math
 from pathlib import Path
 
 import pandas as pd
 import torch
 from pyro.ops.stats import pi
 from pyroapi import distributions as dist
-from pyroapi import pyro, pyro_backend
 
-from tapqir.models import HMM, Cosmos
+from tapqir.models import Cosmos
 from tapqir.utils.imscroll import (
     bound_dwell_times,
     count_intervals,
     unbound_dwell_times,
 )
-from tapqir.utils.simulate import simulate
 from tapqir.utils.stats import save_stats
 
 
@@ -62,25 +59,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HMM Simulations")
-    parser.add_argument("--seed", default=0, type=int)
     parser.add_argument("-it", default=100, type=int)
-    parser.add_argument("-infer", default=100, type=int)
-    parser.add_argument("-lr", default=0.005, type=float)
     parser.add_argument("--data-path", type=str)
     parser.add_argument("--param-path", type=str)
     parser.add_argument("--cuda", action="store_true")
-    parser.add_argument("--funsor", action="store_true")
     args = parser.parse_args()
 
-    if args.funsor:
-        import funsor
-
-        funsor.set_backend("torch")
-        import pyro.contrib.funsor
-
-        PYRO_BACKEND = "contrib.funsor"
-    else:
-        PYRO_BACKEND = "pyro"
-
-    with pyro_backend(PYRO_BACKEND):
-        main(args)
+    main(args)
