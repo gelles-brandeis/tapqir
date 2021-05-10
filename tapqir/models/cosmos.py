@@ -117,11 +117,11 @@ class Cosmos(Model):
         return self.z_marginal > 0.5
 
     def model(self):
-        self.gain = pyro.sample("gain", dist.HalfNormal(50))
+        self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
         self.pi = pyro.sample(
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
-        )
-        self.lamda = pyro.sample("lamda", dist.Exponential(1))
+        ).squeeze()
+        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
         self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
         self.size = torch.stack(
             (
@@ -315,13 +315,25 @@ class Cosmos(Model):
                                 theta, kdx, ndx[:, None], fdx
                             ]
                         else:
-                            m_probs = Vindex(
-                                torch.einsum(
-                                    "sknft,nfs->knft",
-                                    pyro.param(f"{prefix}/m_probs"),
-                                    pyro.param(f"{prefix}/theta_probs"),
-                                )
-                            )[kdx, ndx[:, None], fdx, :]
+                            #  m_probs1 = Vindex(
+                            #      torch.einsum(
+                            #          "sknft,s->knft",
+                            #          pyro.param(f"{prefix}/m_probs"),
+                            #          # pyro.param(f"{prefix}/theta_probs"),
+                            #          torch.ones(self.K * self.S + 1) / (self.K * self.S + 1),
+                            #      )
+                            #  )[kdx, ndx[:, None], fdx, :]
+                            #  m_probs = Vindex(
+                            #      torch.einsum(
+                            #          "sknft,nfs->knft",
+                            #          pyro.param(f"{prefix}/m_probs"),
+                            #          pyro.param(f"{prefix}/theta_probs"),
+                            #          # torch.ones(self.K * self.S + 1) / (self.K * self.S + 1),
+                            #      )
+                            #  )[kdx, ndx[:, None], fdx, :]
+                            m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                                0, kdx, ndx[:, None], fdx
+                            ]
                     else:
                         m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                             kdx, ndx[:, None], fdx
