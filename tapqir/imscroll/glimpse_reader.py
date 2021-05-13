@@ -14,7 +14,11 @@ from tapqir.utils.dataset import CosmosDataset
 
 class GlimpseDataset(Dataset):
     """
-    Glimpse Dataset
+    GlimpseDataset parses header, aoiinfo, driftlist, and intervals (optional)
+    files and creates 1) aoiinfo and cumdrift DataFrames, 2) __getitem__ method
+    to retrieve glimpse image for a given frame, 3) labels np.array.
+
+    :param path: path to the folder containing options.cfg file.
     """
 
     def __init__(self, path):
@@ -163,8 +167,14 @@ class GlimpseDataset(Dataset):
     def __len__(self):
         return self.N
 
-    def __getitem__(self, frame):
+    def __getitem__(self, key):
         # read the entire frame image
+        if isinstance(key, slice):
+            imgs = []
+            for frame in range(key.start, key.stop, 1 if key.step is None else key.step):
+                imgs.append(self[frame])
+            return np.stack(imgs, 0)
+        frame = key
         glimpse_number = self.header["filenumber"][frame - 1]
         glimpse_path = Path(self.config["glimpse"]["dir"]) / f"{glimpse_number}.glimpse"
         offset = self.header["offset"][frame - 1]
@@ -180,19 +190,6 @@ class GlimpseDataset(Dataset):
 
     def __str__(self):
         return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
-
-    def save(self, path):
-        path = Path(path)
-        if not path.is_dir():
-            path.mkdir()
-        torch.save(self.data, path / f"{self.dtype}_data.pt")
-        self.target.to_csv(path / f"{self.dtype}_target.csv")
-        self.drift.to_csv(path / "drift.csv")
-        if self.dtype == "test":
-            if self.offset is not None:
-                torch.save(self.offset, path / "offset.pt")
-            if self.labels is not None:
-                np.save(path / "labels.npy", self.labels)
 
 
 def read_glimpse(path, D):
