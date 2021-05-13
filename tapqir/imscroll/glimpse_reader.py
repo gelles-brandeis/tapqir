@@ -171,7 +171,9 @@ class GlimpseDataset(Dataset):
         # read the entire frame image
         if isinstance(key, slice):
             imgs = []
-            for frame in range(key.start, key.stop, 1 if key.step is None else key.step):
+            for frame in range(
+                key.start, key.stop, 1 if key.step is None else key.step
+            ):
                 imgs.append(self[frame])
             return np.stack(imgs, 0)
         frame = key
