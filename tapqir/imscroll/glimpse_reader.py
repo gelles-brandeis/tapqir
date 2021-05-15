@@ -80,9 +80,9 @@ class GlimpseDataset(Dataset):
         drift_df.loc[aoiinfo_frame + 1 :] = drift_df.loc[aoiinfo_frame + 1 :].cumsum(
             axis=0
         )
-        drift_df.loc[: aoiinfo_frame - 1] = -drift_df.loc[
-            drift_df.index[1] : aoiinfo_frame
-        ].cumsum(axis=0)
+        drift_df.loc[aoiinfo_frame - 1 :: -1] = (
+            -drift_df.loc[aoiinfo_frame : drift_df.index[1] : -1]
+        ).cumsum(axis=0)
 
         if config["glimpse"]["frame_start"] and config["glimpse"]["frame_end"]:
             f1 = int(config["glimpse"]["frame_start"])
