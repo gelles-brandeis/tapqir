@@ -315,25 +315,13 @@ class Cosmos(Model):
                                 theta, kdx, ndx[:, None], fdx
                             ]
                         else:
-                            #  m_probs1 = Vindex(
-                            #      torch.einsum(
-                            #          "sknft,s->knft",
-                            #          pyro.param(f"{prefix}/m_probs"),
-                            #          # pyro.param(f"{prefix}/theta_probs"),
-                            #          torch.ones(self.K * self.S + 1) / (self.K * self.S + 1),
-                            #      )
-                            #  )[kdx, ndx[:, None], fdx, :]
-                            #  m_probs = Vindex(
-                            #      torch.einsum(
-                            #          "sknft,nfs->knft",
-                            #          pyro.param(f"{prefix}/m_probs"),
-                            #          pyro.param(f"{prefix}/theta_probs"),
-                            #          # torch.ones(self.K * self.S + 1) / (self.K * self.S + 1),
-                            #      )
-                            #  )[kdx, ndx[:, None], fdx, :]
-                            m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                                0, kdx, ndx[:, None], fdx
-                            ]
+                            m_probs = Vindex(
+                                torch.einsum(
+                                    "sknft,nfs->knft",
+                                    pyro.param(f"{prefix}/m_probs"),
+                                    pyro.param(f"{prefix}/theta_probs"),
+                                )
+                            )[kdx, ndx[:, None], fdx, :]
                     else:
                         m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                             kdx, ndx[:, None], fdx
