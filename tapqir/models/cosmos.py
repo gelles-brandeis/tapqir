@@ -373,7 +373,9 @@ class Cosmos(Model):
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5),
-            constraint=constraints.interval(0, (self.data.D + 1) / math.sqrt(12)),
+            constraint=constraints.interval(
+                0,
+                (self.data.D + 1) / math.sqrt(12)) - torch.finfo(torch.float32).eps,
         )
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
@@ -459,7 +461,10 @@ class Cosmos(Model):
         pyro.param(
             f"{prefix}/w_mean",
             lambda: torch.full((self.K, data.N, data.F), 1.5),
-            constraint=constraints.interval(0.75, 2.25),
+            constraint=constraints.interval(
+                0.75 + torch.finfo(torch.float32).eps,
+                2.25 - torch.finfo(torch.float32).eps,
+            ),
         )
         pyro.param(
             f"{prefix}/w_size",
@@ -469,12 +474,18 @@ class Cosmos(Model):
         pyro.param(
             f"{prefix}/x_mean",
             lambda: torch.zeros(self.K, data.N, data.F),
-            constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
+            constraint=constraints.interval(
+                -(data.D + 1) / 2 + torch.finfo(torch.float32).eps,
+                (data.D + 1) / 2 - torch.finfo(torch.float32).eps,
+            ),
         )
         pyro.param(
             f"{prefix}/y_mean",
             lambda: torch.zeros(self.K, data.N, data.F),
-            constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
+            constraint=constraints.interval(
+                -(data.D + 1) / 2 + torch.finfo(torch.float32).eps,
+                (data.D + 1) / 2 - torch.finfo(torch.float32).eps,
+            ),
         )
         size = torch.ones(self.K, data.N, data.F) * 200.0
         if self.K == 2:
