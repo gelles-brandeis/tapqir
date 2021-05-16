@@ -1,14 +1,19 @@
 import torch
 import torch.distributions.constraints as constraints
+from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
-from pyroapi import infer, optim, pyro
+from pyroapi import handlers, infer, optim, pyro
 
 
-def train(model, guide, lr=1e-3, n_steps=1000, verbose=False, **kwargs):
+def train(model, guide, lr=1e-3, n_steps=1000, jit=True, verbose=False, **kwargs):
 
     pyro.clear_param_store()
     optimizer = optim.Adam({"lr": lr})
-    elbo = infer.TraceEnum_ELBO(max_plate_nesting=1)
+    elbo = (
+        infer.JitTraceEnum_ELBO(max_plate_nesting=2)
+        if jit
+        else infer.TraceEnum_ELBO(max_plate_nesting=2)
+    )
     svi = infer.SVI(model, guide, optimizer, elbo)
 
     for step in range(n_steps):
@@ -36,37 +41,52 @@ def ttfb_model(data, control, Tmax):
     :param control: time prior to the first binding at the control location
     :param Tmax: entire observation interval
     """
-    ka = pyro.param("ka", lambda: torch.tensor(0.05), constraint=constraints.positive)
-    kns = pyro.param("kns", lambda: torch.tensor(0.01), constraint=constraints.positive)
+    ka = pyro.param(
+        "ka",
+        lambda: torch.full((data.shape[0], 1), 0.05),
+        constraint=constraints.positive,
+    )
+    kns = pyro.param(
+        "kns",
+        lambda: torch.full((data.shape[0], 1), 0.01),
+        constraint=constraints.positive,
+    )
     Af = pyro.param(
-        "Af", lambda: torch.tensor(0.5), constraint=constraints.unit_interval
+        "Af",
+        lambda: torch.full((data.shape[0], 1), 0.5),
+        constraint=constraints.unit_interval,
     )
     k = torch.stack([kns, ka + kns])
 
     # on-target data
-    n = sum(data == Tmax)  # no binding has occured
-    tau = data[(data < Tmax) & (data > 0)]
-    if n:
-        with pyro.plate("n", n):
-            active1 = pyro.sample(
-                "active1", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
+    mask = (data < Tmax) & (data > 0)
+    tau = data.masked_fill(~mask, 1.0)
+    with pyro.plate("bootstrap", data.shape[0], dim=-2) as bdx:
+        with pyro.plate("N", data.shape[1], dim=-1):
+            active = pyro.sample(
+                "active", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
             )
-            pyro.factor("Tmax", -k[active1.long()] * Tmax)
-    with pyro.plate("N-n-nz", len(tau)):
-        active2 = pyro.sample(
-            "active2", dist.Bernoulli(Af), infer={"enumerate": "parallel"}
-        )
-        pyro.sample("tau", dist.Exponential(k[active2.long()]), obs=tau)
+            with handlers.mask(mask=(data == Tmax)):
+                pyro.factor("Tmax", -Vindex(k)[active.long().squeeze(-1), bdx] * Tmax)
+                # pyro.factor("Tmax", -k * Tmax)
+            with handlers.mask(mask=mask):
+                pyro.sample(
+                    "tau",
+                    dist.Exponential(Vindex(k)[active.long().squeeze(-1), bdx]),
+                    obs=tau,
+                )
+                # pyro.sample("tau", dist.Exponential(k), obs=tau)
 
     # negative control data
     if control is not None:
-        nc = sum(control == Tmax)  # no binding has occured
-        tauc = control[(control < Tmax) & (control > 0)]
-        if nc:
-            with pyro.plate("nc", nc):
-                pyro.factor("Tmaxc", -kns * Tmax)
-        with pyro.plate("Nc-nc-ncz", len(tauc)):
-            pyro.sample("tauc", dist.Exponential(kns), obs=tauc)
+        mask = (control < Tmax) & (control > 0)
+        tauc = control.masked_fill(~mask, 1.0)
+        with pyro.plate("bootstrapc", control.shape[0], dim=-2):
+            with pyro.plate("Nc", control.shape[1], dim=-1):
+                with handlers.mask(mask=(control == Tmax)):
+                    pyro.factor("Tmaxc", -kns * Tmax)
+                with handlers.mask(mask=mask):
+                    pyro.sample("tauc", dist.Exponential(kns), obs=tauc)
 
 
 def ttfb_guide(data, control, Tmax):
