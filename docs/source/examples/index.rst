@@ -17,5 +17,4 @@ Intro
    negative_simulations
    kinetic_simulations
    larrycy3sigma54
-   gracearticlecy3
-   signal-to-noise
+   Rpb1SNAP549
