@@ -4,64 +4,18 @@ from pyro.distributions.hmm import _logmatmulexp
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, pyro
-from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import AffineBeta, ConvolutedGamma
-from tapqir.models.model import Model
+from tapqir.models.cosmos import Cosmos
 
 
-class HMM(Model):
-    r"""
-    for :math:`n=1` to :math:`N`:
-
-        for :math:`n=1` to :math:`F`:
-
-            :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
-
-            :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
-    """
+class HMM(Cosmos):
     name = "hmm"
 
     def __init__(self, S=1, K=2, vectorized=True):
         self.vectorized = vectorized
         super().__init__(S, K)
         self.classify = True
-
-    @lazy_property
-    def num_states(self):
-        r"""
-        Total number of states for the image model given by:
-
-            :math:`2 (1+SK) K`
-        """
-        return 2 * (1 + self.K * self.S) * self.K
-
-    @property
-    def probs_j(self):
-        result = torch.zeros(2, self.K + 1, dtype=torch.float)
-        result[0, : self.K] = (
-            dist.Poisson(self.lamda).log_prob(torch.arange(self.K).float()).exp()
-        )
-        result[0, -1] = 1 - result[0, : self.K].sum()
-        result[1, : self.K - 1] = (
-            dist.Poisson(self.lamda).log_prob(torch.arange(self.K - 1).float()).exp()
-        )
-        result[1, -2] = 1 - result[0, : self.K - 1].sum()
-        return result
-
-    @property
-    def probs_m(self):
-        # this only works for K=2
-        result = torch.zeros(1 + self.K * self.S, self.K, 2, dtype=torch.float)
-        result[0, :, 0] = self.probs_j[0, 0] + self.probs_j[0, 1] / 2
-        result[0, :, 1] = self.probs_j[0, 2] + self.probs_j[0, 1] / 2
-        result[1, 0, 1] = 1
-        result[1, 1, 0] = self.probs_j[1, 0]
-        result[1, 1, 1] = self.probs_j[1, 1]
-        result[2, 0, 0] = self.probs_j[1, 0]
-        result[2, 0, 1] = self.probs_j[1, 1]
-        result[2, 1, 1] = 1
-        return result
 
     @property
     def init_theta(self):
@@ -85,17 +39,6 @@ class HMM(Model):
                 for k in range(self.K):
                     result[i, self.K * s + k + 1] = self.trans[j, s + 1] / self.K
         return result
-
-    @lazy_property
-    def theta_to_z(self):
-        result = torch.zeros(self.K * self.S + 1, self.K, dtype=torch.long)
-        for s in range(self.S):
-            result[1 + s * self.K : 1 + (s + 1) * self.K] = torch.eye(self.K) * (s + 1)
-        return result
-
-    @lazy_property
-    def ontarget(self):
-        return torch.clamp(self.theta_to_z, min=0, max=1)
 
     def _sequential_logmatmulexp(self, logits):
         """
@@ -168,13 +111,6 @@ class HMM(Model):
         return self.theta_probs.data[..., 1:].permute(2, 0, 1)
 
     @property
-    def j_probs(self):
-        r"""
-        Probability of an off-target spot :math:`p(j_{knf})`.
-        """
-        return self.m_probs - self.z_probs
-
-    @property
     def m_probs(self):
         r"""
         Probability of a spot :math:`p(m_{knf})`.
@@ -183,17 +119,7 @@ class HMM(Model):
             "sknf,nfs->knf", pyro.param("d/m_probs").data[..., 1], self.theta_probs
         )
 
-    @property
-    def z_marginal(self):
-        return self.z_probs.sum(-3)
-
-    @property
-    def z_map(self):
-        return self.z_marginal > 0.5
-
-    def model(self):
-
-        self.gain = pyro.sample("gain", dist.HalfNormal(50))
+    def state_model(self):
         self.init = pyro.sample(
             "init", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         )
@@ -203,34 +129,8 @@ class HMM(Model):
                 1
             ),
         )
-        self.lamda = pyro.sample("lamda", dist.Exponential(1))
-        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
-        self.size = torch.stack(
-            (
-                torch.tensor(2.0),
-                (((self.data.D + 1) / (2 * self.proximity)) ** 2 - 1),
-            ),
-            dim=-1,
-        )
 
-        # test data
-        self.spot_model(self.data, self.data_loc, prefix="d")
-
-        # control data
-        if self.control:
-            self.spot_model(self.control, self.control_loc, prefix="c")
-
-    def guide(self):
-        # initialize guide parameters
-        self.guide_parameters()
-
-        pyro.sample(
-            "gain",
-            dist.Gamma(
-                pyro.param("gain_loc") * pyro.param("gain_beta"),
-                pyro.param("gain_beta"),
-            ),
-        )
+    def state_guide(self):
         pyro.sample(
             "init", dist.Dirichlet(pyro.param("init_mean") * pyro.param("init_size"))
         )
@@ -240,27 +140,6 @@ class HMM(Model):
                 pyro.param("trans_mean") * pyro.param("trans_size")
             ).to_event(1),
         )
-        pyro.sample(
-            "lamda",
-            dist.Gamma(
-                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                pyro.param("lamda_beta"),
-            ),
-        )
-        pyro.sample(
-            "proximity",
-            dist.Gamma(
-                pyro.param("proximity_loc") * pyro.param("proximity_beta"),
-                pyro.param("proximity_beta"),
-            ),
-        )
-
-        # test data
-        self.spot_guide(self.data, prefix="d")
-
-        # control data
-        if self.control:
-            self.spot_guide(self.control, prefix="c")
 
     def spot_model(self, data, data_loc, prefix):
         # spots
@@ -475,21 +354,7 @@ class HMM(Model):
                         )
                 theta_prev = theta_curr
 
-    def guide_parameters(self):
-        pyro.param(
-            "proximity_loc",
-            lambda: torch.tensor(0.5),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "proximity_beta",
-            lambda: torch.tensor(100),
-            constraint=constraints.positive,
-        )
-        pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
-        pyro.param(
-            "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
-        )
+    def state_parameters(self):
         pyro.param(
             "init_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
@@ -507,108 +372,9 @@ class HMM(Model):
             constraint=constraints.positive,
         )
         pyro.param(
-            "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
-        )
-        pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
-        pyro.param(
-            "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
-        )
-        pyro.param(
-            "lamda_beta", lambda: torch.tensor(100), constraint=constraints.positive
-        )
-
-        pyro.param(
-            "d/background_mean_loc",
-            lambda: torch.full(
-                (self.data.N, 1), self.data.data_median - self.data.offset_median
-            ),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "d/background_std_loc",
-            lambda: torch.ones(self.data.N, 1),
-            constraint=constraints.positive,
-        )
-
-        if self.control:
-            pyro.param(
-                "c/background_mean_loc",
-                lambda: torch.full(
-                    (self.control.N, 1), self.data.data_median - self.data.offset_median
-                ),
-                constraint=constraints.positive,
-            )
-            pyro.param(
-                "c/background_std_loc",
-                lambda: torch.ones(self.control.N, 1),
-                constraint=constraints.positive,
-            )
-
-        self.spot_parameters(self.data, prefix="d")
-
-        if self.control:
-            self.spot_parameters(self.control, prefix="c")
-
-    def spot_parameters(self, data, prefix):
-        pyro.param(
-            f"{prefix}/theta_trans",
+            "d/theta_trans",
             lambda: torch.ones(
-                data.N, data.F, 1 + self.K * self.S, 1 + self.K * self.S
+                self.data.N, self.data.F, 1 + self.K * self.S, 1 + self.K * self.S
             ),
             constraint=constraints.simplex,
-        )
-        m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
-        m_probs[1, 0, :, :, 0] = 0
-        m_probs[2, 1, :, :, 0] = 0
-        pyro.param(f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex)
-        pyro.param(
-            f"{prefix}/b_loc",
-            lambda: torch.full(
-                (data.N, data.F), self.data.data_median - self.data.offset_median
-            ),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/b_beta",
-            lambda: torch.ones(data.N, data.F),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/h_loc",
-            lambda: torch.full((self.K, data.N, data.F), 2000.0),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/h_beta",
-            lambda: torch.full((self.K, data.N, data.F), 0.001),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/w_mean",
-            lambda: torch.full((self.K, data.N, data.F), 1.5),
-            constraint=constraints.interval(0.75, 2.25),
-        )
-        pyro.param(
-            f"{prefix}/w_size",
-            lambda: torch.full((self.K, data.N, data.F), 100.0),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            f"{prefix}/x_mean",
-            lambda: torch.zeros(self.K, data.N, data.F),
-            constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
-        )
-        pyro.param(
-            f"{prefix}/y_mean",
-            lambda: torch.zeros(self.K, data.N, data.F),
-            constraint=constraints.interval(-(data.D + 1) / 2, (data.D + 1) / 2),
-        )
-        size = torch.ones(self.K, data.N, data.F) * 200.0
-        if self.K == 2:
-            size[1] = 7.0
-        elif self.K == 3:
-            size[1] = 7.0
-            size[2] = 3.0
-        pyro.param(
-            f"{prefix}/size", lambda: size, constraint=constraints.greater_than(2.0)
         )
