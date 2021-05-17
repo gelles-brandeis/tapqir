@@ -117,10 +117,8 @@ class Cosmos(Model):
         return self.z_marginal > 0.5
 
     def model(self):
+        # global parameters
         self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        self.pi = pyro.sample(
-            "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
-        ).squeeze()
         self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
         self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
         self.size = torch.stack(
@@ -130,6 +128,7 @@ class Cosmos(Model):
             ),
             dim=-1,
         )
+        self.state_model()
 
         # test data
         self.spot_model(self.data, self.data_loc, prefix="d")
@@ -138,15 +137,20 @@ class Cosmos(Model):
         if self.control:
             self.spot_model(self.control, self.control_loc, prefix="c")
 
+    def state_model(self):
+        self.pi = pyro.sample(
+            "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
+        ).squeeze()
+
     def guide(self):
         # initialize guide parameters
         self.guide_parameters()
 
+        # global parameters
         pyro.sample(
             "gain",
             dist.Delta(pyro.param("gain_loc")),
         )
-        pyro.sample("pi", dist.Delta(pyro.param("pi_mean")).to_event(1))
         pyro.sample(
             "lamda",
             dist.Delta(pyro.param("lamda_loc")),
@@ -155,6 +159,7 @@ class Cosmos(Model):
             "proximity",
             dist.Delta(pyro.param("proximity_loc")),
         )
+        self.state_guide()
 
         # test data
         self.spot_guide(self.data, prefix="d")
@@ -162,6 +167,9 @@ class Cosmos(Model):
         # control data
         if self.control:
             self.spot_guide(self.control, prefix="c")
+
+    def state_guide(self):
+        pyro.sample("pi", dist.Delta(pyro.param("pi_mean")).to_event(1))
 
     def spot_model(self, data, data_loc, prefix):
         # spots
@@ -379,50 +387,40 @@ class Cosmos(Model):
         )
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
-            "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
-        )
-        pyro.param(
             "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
         )
 
-        pyro.param(
-            "d/background_mean_loc",
-            lambda: torch.full(
-                (self.data.N, 1), self.data.data_median - self.data.offset_median
-            ),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "d/background_std_loc",
-            lambda: torch.ones(self.data.N, 1),
-            constraint=constraints.positive,
-        )
-
-        if self.control:
-            pyro.param(
-                "c/background_mean_loc",
-                lambda: torch.full(
-                    (self.control.N, 1), self.data.data_median - self.data.offset_median
-                ),
-                constraint=constraints.positive,
-            )
-            pyro.param(
-                "c/background_std_loc",
-                lambda: torch.ones(self.control.N, 1),
-                constraint=constraints.positive,
-            )
+        self.state_parameters()
 
         self.spot_parameters(self.data, prefix="d")
 
         if self.control:
             self.spot_parameters(self.control, prefix="c")
 
-    def spot_parameters(self, data, prefix):
+    def state_parameters(self):
         pyro.param(
-            f"{prefix}/theta_probs",
-            lambda: torch.ones(data.N, data.F, 1 + self.K * self.S),
+            "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
+        )
+        pyro.param(
+            "d/theta_probs",
+            lambda: torch.ones(self.data.N, self.data.F, 1 + self.K * self.S),
             constraint=constraints.simplex,
         )
+
+    def spot_parameters(self, data, prefix):
+        pyro.param(
+            f"{prefix}/background_mean_loc",
+            lambda: torch.full(
+                (data.N, 1), self.data.data_median - self.data.offset_median
+            ),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            f"{prefix}/background_std_loc",
+            lambda: torch.ones(data.N, 1),
+            constraint=constraints.positive,
+        )
+
         if prefix == "d":
             m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
             m_probs[1, 0, :, :, 0] = 0
