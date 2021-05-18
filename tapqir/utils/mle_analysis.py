@@ -43,17 +43,17 @@ def ttfb_model(data, control, Tmax):
     """
     ka = pyro.param(
         "ka",
-        lambda: torch.full((data.shape[0], 1), 0.05),
+        lambda: torch.full((data.shape[0], 1), 0.001),
         constraint=constraints.positive,
     )
     kns = pyro.param(
         "kns",
-        lambda: torch.full((data.shape[0], 1), 0.01),
+        lambda: torch.full((data.shape[0], 1), 0.001),
         constraint=constraints.positive,
     )
     Af = pyro.param(
         "Af",
-        lambda: torch.full((data.shape[0], 1), 0.5),
+        lambda: torch.full((data.shape[0], 1), 0.9),
         constraint=constraints.unit_interval,
     )
     k = torch.stack([kns, ka + kns])
