@@ -7,7 +7,7 @@
 lamdas=(0.01 0.05 0.15 0.5 1)
 
 # Path to your executable
-python cosmos_simulations.py -it 50000 -infer 50000 \
+python cosmos_simulations.py -it 60000 -infer 40000 \
   --gain 7 --pi 0.15 --height 3000 --proximity 0.2 \
   -bs 4 --lamda ${lamdas[${SLURM_ARRAY_TASK_ID}]} \
   --path data/lamda${lamdas[${SLURM_ARRAY_TASK_ID}]} --cuda
