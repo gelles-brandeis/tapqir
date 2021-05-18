@@ -177,8 +177,8 @@ def association_rate(labels):
 
 @association_rate.register(np.ndarray)
 def _(labels):
-    binding_events = ((1 - labels[..., :-1]) * labels[..., 1:]).sum()
-    off_states = (1 - labels[..., :-1]).sum()
+    binding_events = ((1 - labels[..., :-1]) * labels[..., 1:]).sum((-2, -1))
+    off_states = (1 - labels[..., :-1]).sum((-2, -1))
     kon = binding_events / off_states
     return kon
 
@@ -186,8 +186,8 @@ def _(labels):
 @association_rate.register(torch.Tensor)
 def _(labels):
     labels = labels.float()
-    binding_events = ((1 - labels[..., :-1]) * labels[..., 1:]).sum()
-    off_states = (1 - labels[..., :-1]).sum()
+    binding_events = ((1 - labels[..., :-1]) * labels[..., 1:]).sum((-2, -1))
+    off_states = (1 - labels[..., :-1]).sum((-2, -1))
     kon = binding_events / off_states
     return kon
 
@@ -202,8 +202,8 @@ def dissociation_rate(labels):
 
 @dissociation_rate.register(np.ndarray)
 def _(labels):
-    dissociation_events = (labels[..., :-1] * (1 - labels[..., 1:])).sum()
-    on_states = labels[..., :-1].sum()
+    dissociation_events = (labels[..., :-1] * (1 - labels[..., 1:])).sum((-2, -1))
+    on_states = labels[..., :-1].sum((-2, -1))
     koff = dissociation_events / on_states
     return koff
 
@@ -211,8 +211,8 @@ def _(labels):
 @dissociation_rate.register(torch.Tensor)
 def _(labels):
     labels = labels.float()
-    dissociation_events = (labels[..., :-1] * (1 - labels[..., 1:])).sum()
-    on_states = labels[..., :-1].sum()
+    dissociation_events = (labels[..., :-1] * (1 - labels[..., 1:])).sum((-2, -1))
+    on_states = labels[..., :-1].sum((-2, -1))
     koff = dissociation_events / on_states
     return koff
 

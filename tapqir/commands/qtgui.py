@@ -439,6 +439,14 @@ class MainWindow(QMainWindow):
 
         for p in self.params:
             if p == "z":
+                self.item["z_label"] = pg.PlotDataItem(
+                    pen=C[3],
+                    symbol="o",
+                    symbolBrush=C[3],
+                    symbolPen=None,
+                    symbolSize=5,
+                    name="z_label",
+                )
                 self.item[f"{p}_probs"] = pg.PlotDataItem(
                     pen=C[2],
                     symbol="o",
@@ -512,6 +520,7 @@ class MainWindow(QMainWindow):
         for p in self.params:
             if p == "z":
                 self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
+                self.item["z_label"].setData(self.Model.data.labels["z"][n])
             elif p == "d/background":
                 k = 0
                 self.item[f"{p}_ul"].setData(ci_stats[p]["ul"])
