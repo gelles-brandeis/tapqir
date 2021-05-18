@@ -1,3 +1,6 @@
+# Copyright Contributors to the Tapqir project.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import torch
 from pyro.distributions import AffineBeta as PyroAffineBeta
 from pyro.distributions.util import broadcast_shape

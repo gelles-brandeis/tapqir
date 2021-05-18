@@ -1,3 +1,6 @@
+# Copyright Contributors to the Tapqir project.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from tapqir.models.cosmos import Cosmos
 from tapqir.models.fixedoffset import FixedOffset
 from tapqir.models.hmm import HMM
