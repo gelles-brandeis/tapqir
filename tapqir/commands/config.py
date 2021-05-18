@@ -32,8 +32,8 @@ class Config(Command):
         config["fit"] = {}
         config["fit"]["num_states"] = "1"
         config["fit"]["k_max"] = "2"
-        config["fit"]["num_iter"] = "30000"
-        config["fit"]["infer"] = "10000"
+        config["fit"]["num_iter"] = "60000"
+        config["fit"]["infer"] = "40000"
         config["fit"]["batch_size"] = "0"
         config["fit"]["learning_rate"] = "0.005"
         config["fit"]["control"] = "True"
