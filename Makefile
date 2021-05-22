@@ -1,4 +1,4 @@
-.PHONY: install docs lint format test FORCE
+.PHONY: install docs lint license format test FORCE
 
 install: FORCE
 	pip install -e .[dev]
@@ -13,8 +13,12 @@ lint: FORCE
 	flake8
 	black --check .
 	isort --check .
+	python scripts/update_headers.py --check
 
-format: FORCE
+license: FORCE
+	python scripts/update_headers.py
+
+format: license FORCE
 	black .
 	isort .
 

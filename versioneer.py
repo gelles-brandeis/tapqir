@@ -1,3 +1,6 @@
+# Copyright Contributors to the Tapqir project.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Version: 0.18
 
 """The Versioneer - like a rocketeer, but for versions.

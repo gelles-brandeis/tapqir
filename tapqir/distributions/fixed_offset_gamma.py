@@ -1,3 +1,6 @@
+# Copyright Contributors to the Tapqir project.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from pyro.distributions import Gamma, TransformedDistribution
 from torch.distributions.transforms import AffineTransform
 

@@ -1,3 +1,6 @@
+# Copyright Contributors to the Tapqir project.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from tapqir.commands.config import Config
 from tapqir.commands.fit import Fit
 from tapqir.commands.glimpse import Glimpse

@@ -1,3 +1,6 @@
+# Copyright Contributors to the Tapqir project.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from pyro.contrib.autoname import scope
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist

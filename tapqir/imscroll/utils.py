@@ -1,3 +1,6 @@
+# Copyright Contributors to the Tapqir project.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from pathlib import Path
 
 from pyroapi import pyro
