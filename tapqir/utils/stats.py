@@ -76,7 +76,7 @@ def save_stats(model, path):
         ).ravel()
 
         mask = torch.from_numpy(model.data.labels["z"])
-        samples = torch.masked_select(model.z_marginal, mask)
+        samples = torch.masked_select(model.z_marginal.cpu(), mask)
         if len(samples):
             z_ll, z_ul = pi(samples, 0.68)
             data["z_median"] = quantile(samples, 0.5).item()
