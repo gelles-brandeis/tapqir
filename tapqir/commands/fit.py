@@ -56,12 +56,6 @@ class Fit(Command):
             help="Number of iterations (default: 30000)",
         )
         parser.add_argument(
-            "-infer",
-            metavar="INFER",
-            type=int,
-            help="Number of inference iterations (default: 20000)",
-        )
-        parser.add_argument(
             "-bs", metavar="BATCH_SIZE", type=int, help="Batch size (default: 5)"
         )
         parser.add_argument(
@@ -101,7 +95,6 @@ class Fit(Command):
         states = args.s or config["fit"].getint("num_states")
         k_max = args.k or config["fit"].getint("k_max")
         num_iter = args.it or config["fit"].getint("num_iter")
-        infer = args.infer or config["fit"].getint("infer")
         batch_size = args.bs or config["fit"].getint("batch_size")
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
         control = args.c or config["fit"].getboolean("control")
@@ -137,4 +130,4 @@ class Fit(Command):
                 config.set("fit", "batch_size", str(model.batch_size))
                 with open(cfg_file, "w") as configfile:
                     config.write(configfile)
-            model.run(num_iter, infer)
+            model.run(num_iter)
