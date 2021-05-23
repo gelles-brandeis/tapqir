@@ -189,7 +189,7 @@ class Model(nn.Module):
         while batch_size + 2 ** k < self.data.N:
             self.settings(self.lr, batch_size + 2 ** k)
             try:
-                self.run(1, 1)
+                self.run(1)
             except RuntimeError as error:
                 assert error.args[0].startswith("CUDA")
                 if k == 0:
