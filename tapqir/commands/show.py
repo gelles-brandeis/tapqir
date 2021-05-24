@@ -53,7 +53,7 @@ class Show(Command):
             raise ValueError("Only pyro and funsor backends are supported.")
 
         with pyro_backend(PYRO_BACKEND):
-            model = models[args.model](1, 2)
+            model = models[args.model](1, 2, "cpu", "float")
             app = QApplication(sys.argv)
             MainWindow(model, args.dataset_path, args.parameters_path)
             sys.exit(app.exec_())

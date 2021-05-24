@@ -40,7 +40,7 @@ class GaussianSpot:
     def __init__(self, target_locs, D):
         super().__init__()
         # create meshgrid of DxD pixel positions
-        D_range = torch.arange(D, dtype=torch.float)
+        D_range = torch.arange(D, dtype=target_locs.dtype)
         i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
         self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
         self.target_locs = target_locs
@@ -80,7 +80,7 @@ class Model(nn.Module):
     :meth:`guide`
     """
 
-    def __init__(self, S, K=2):
+    def __init__(self, S=1, K=2, device="cpu", dtype="float"):
         super().__init__()
         self._S = S
         self._K = K
@@ -88,6 +88,17 @@ class Model(nn.Module):
         # for plotting
         self.n = None
         self.data_path = None
+        # set device & dtype
+        self.dtype = getattr(torch, dtype)
+        self.device = torch.device(device)
+        if device == "cuda" and dtype == "double":
+            torch.set_default_tensor_type(torch.cuda.DoubleTensor)
+        elif device == "cuda" and dtype == "float":
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+        elif device == "cpu" and dtype == "double":
+            torch.set_default_tensor_type(torch.DoubleTensor)
+        else:
+            torch.set_default_tensor_type(torch.FloatTensor)
 
     @lazy_property
     def S(self):
@@ -103,12 +114,9 @@ class Model(nn.Module):
         """
         return self._K
 
-    def load(self, path, control, device):
+    def load(self, path, control):
         # set path
         self.data_path = Path(path)
-
-        # set device
-        self.device = torch.device(device)
 
         # load test data
         self.data = load_data(self.data_path, dtype="test", device=self.device)

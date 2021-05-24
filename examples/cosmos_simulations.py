@@ -18,7 +18,6 @@ from tapqir.utils.stats import save_stats
 
 def main(args):
     if args.cuda:
-        torch.set_default_tensor_type("torch.cuda.FloatTensor")
         device = "cuda"
     else:
         device = "cpu"
@@ -37,11 +36,11 @@ def main(args):
 
     # calculate snr
 
-    model = Cosmos(1, 2)
+    model = Cosmos(1, 2, device, args.dtype)
     data_path = args.path
     if data_path is not None:
         try:
-            model.load(data_path, True, device)
+            model.load(data_path, True)
         except FileNotFoundError:
             simulate(
                 model,
@@ -49,7 +48,6 @@ def main(args):
                 args.F,
                 args.D,
                 seed=args.seed,
-                cuda=args.cuda,
                 params=params,
             )
             # save data
@@ -61,7 +59,7 @@ def main(args):
                 scale_tril=torch.eye(2) * params["width"],
             )
 
-            D_range = torch.arange(args.D, dtype=torch.float)
+            D_range = torch.arange(args.D, dtype=model.dtype)
             i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
             ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
             weights = rv.log_prob(ij_pixel).exp()
@@ -72,9 +70,7 @@ def main(args):
             pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
             pyro.clear_param_store()
     else:
-        simulate(
-            model, args.N, args.F, args.D, seed=args.seed, cuda=args.cuda, params=params
-        )
+        simulate(model, args.N, args.F, args.D, seed=args.seed, params=params)
         pyro.clear_param_store()
 
     model.settings(args.lr, args.bs, args.jit)
@@ -100,6 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-samples", default=2, type=int)
     parser.add_argument("--path", type=str)
     parser.add_argument("--cuda", action="store_true")
+    parser.add_argument("--dtype", default="float", type=str)
     parser.add_argument("--funsor", action="store_true")
     parser.add_argument("--jit", action="store_true")
     args = parser.parse_args()

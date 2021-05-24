@@ -4,7 +4,6 @@
 import configparser
 from pathlib import Path
 
-import torch
 from cliff.command import Command
 from pyroapi import pyro_backend
 
@@ -49,9 +48,13 @@ class Save(Command):
         )
 
         parser.add_argument(
-            "--cuda",
-            action="store_true",
-            help="Compute device (default: cuda)",
+            "-dev", metavar="DEVICE", type=str, help="Compute device (default: cuda)"
+        )
+        parser.add_argument(
+            "-dtype",
+            metavar="DTYPE",
+            type=str,
+            help="Floating number precision (default: float32)",
         )
         parser.add_argument(
             "--matlab",
@@ -68,13 +71,8 @@ class Save(Command):
         config.read(cfg_file)
 
         backend = args.backend or config["fit"].get("backend")
-
-        if args.cuda:
-            torch.set_default_tensor_type("torch.cuda.FloatTensor")
-            device = "cuda"
-        else:
-            torch.set_default_tensor_type("torch.FloatTensor")
-            device = "cpu"
+        device = args.dev or config["fit"].get("device")
+        dtype = args.dtype or config["fit"].get("dtype")
 
         # pyro backend
         if backend == "pyro":
@@ -90,10 +88,10 @@ class Save(Command):
 
         with pyro_backend(PYRO_BACKEND):
 
-            model = models[args.model](1, 2)
-            model.load(args.dataset_path, False, device)
+            model = models[args.model](1, 2, device, dtype)
+            model.load(args.dataset_path, False)
             model.load_parameters(args.parameters_path)
 
-            save_stats(model, args.parameters_path)
+            save_stats(model, args.parameters_path, 100)
             if args.matlab:
                 save_matlab(model, args.parameters_path)

@@ -4,7 +4,6 @@
 import configparser
 from pathlib import Path
 
-import torch
 from cliff.command import Command
 from pyroapi import pyro_backend
 
@@ -75,6 +74,12 @@ class Fit(Command):
             "-dev", metavar="DEVICE", type=str, help="Compute device (default: cuda)"
         )
         parser.add_argument(
+            "-dtype",
+            metavar="DTYPE",
+            type=str,
+            help="Floating number precision (default: float32)",
+        )
+        parser.add_argument(
             "-jit",
             metavar="JIT",
             type=bool,
@@ -99,13 +104,9 @@ class Fit(Command):
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
         control = args.c or config["fit"].getboolean("control")
         device = args.dev or config["fit"].get("device")
+        dtype = args.dtype or config["fit"].get("dtype")
         jit = args.jit or config["fit"].getboolean("jit")
         backend = args.backend or config["fit"].get("backend")
-
-        if device == "cuda":
-            torch.set_default_tensor_type("torch.cuda.FloatTensor")
-        else:
-            torch.set_default_tensor_type("torch.FloatTensor")
 
         # pyro backend
         if backend == "pyro":
@@ -121,8 +122,8 @@ class Fit(Command):
 
         with pyro_backend(PYRO_BACKEND):
 
-            model = models[args.model](states, k_max)
-            model.load(args.dataset_path, control, device)
+            model = models[args.model](states, k_max, device, dtype)
+            model.load(args.dataset_path, control)
 
             model.settings(learning_rate, batch_size, jit)
             if batch_size == 0:
