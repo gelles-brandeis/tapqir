@@ -32,9 +32,9 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
     return ci_stats
 
 
-def save_stats(model, path):
+def save_stats(model, path, num_samples):
     # compute and save theta_samples
-    model._compute_theta_samples()
+    model._compute_theta_samples(num_samples)
     torch.save(model.theta_samples, Path(path) / "theta_samples.pt")
 
     # global parameters

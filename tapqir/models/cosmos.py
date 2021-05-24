@@ -86,9 +86,9 @@ class Cosmos(Model):
     def ontarget(self):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
-    def _compute_theta_samples(self):
-        samples = torch.zeros(500, self.data.N, self.data.F).long()
-        for i in tqdm(range(samples.shape[0])):
+    def _compute_theta_samples(self, num_samples):
+        samples = torch.zeros(num_samples, self.data.N, self.data.F).long()
+        for i in tqdm(range(num_samples)):
             for ndx in torch.split(torch.arange(self.data.N), 8):
                 self.n = ndx
                 guide_trace = handlers.trace(self.guide).get_trace()
