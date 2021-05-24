@@ -25,22 +25,22 @@ format: license FORCE
 test: lint FORCE
 	pytest
 	python examples/cosmos_simulations.py --gain 7 --pi 0.15 --lamda 0.15 \
-		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 -infer 1
-	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1
-	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1
+		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 --num-samples 1
+	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 --num-samples 1
+	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 --num-samples 1
 	python examples/cosmos_simulations.py --gain 7 --pi 0.15 --lamda 0.15 \
-		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 -infer 1 --funsor
-	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor
-	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor
+		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 --num-samples 1 --funsor
+	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 --num-samples 1 --funsor
+	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 --num-samples 1 --funsor
 
 test-cuda: lint FORCE
 	python examples/cosmos_simulations.py --gain 7 --pi 0.15 --lamda 0.15 \
-		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 -infer 1 --cuda
-	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda
-	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1 --cuda
+		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 --num-samples 1 --cuda
+	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 --num-samples 1 --cuda
+	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 --num-samples 1 --cuda
 	python examples/cosmos_simulations.py --gain 7 --pi 0.15 --lamda 0.15 \
-		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 -infer 1 --funsor --cuda
-	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor --cuda
-	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 -infer 1 --funsor --cuda
+		--proximity 0.2 --height 3000 -N 2 -F 5 -it 1 --num-samples 1 --funsor --cuda
+	python examples/cosmos_simulations.py -N 2 -F 5 -it 1 --num-samples 1 --funsor --cuda
+	python examples/kinetic_simulations.py -N 2 -F 5 -it 1 --num-samples 1 --funsor --cuda
 
 FORCE:

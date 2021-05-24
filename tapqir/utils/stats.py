@@ -32,13 +32,16 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
     return ci_stats
 
 
-def save_stats(model, path):
-    data = {}
-
-    # snr
-    data["snr"] = model.snr().mean().item()
+def save_stats(model, path, num_samples):
+    # compute and save theta_samples
+    model._compute_theta_samples(num_samples)
+    torch.save(model.theta_samples, Path(path) / "theta_samples.pt")
 
     # global parameters
+    data = {}
+    # snr
+    data["snr"] = model.snr().mean().item()
+    # parameters
     guide_tr = handlers.trace(model.guide).get_trace()
     global_params = ["gain", "pi", "lamda", "proximity"]
     ci_stats = ci_from_trace(guide_tr, global_params)
@@ -53,13 +56,10 @@ def save_stats(model, path):
             data[f"{param}_ul"] = ci_stats[param]["ul"].item()
 
     # check convergence status
-    data["marginal"] = False
-    data["classifier"] = False
+    data["converged"] = False
     for line in open(Path(path) / "run.log"):
-        if "marginalized model converged" in line:
-            data["marginal"] = True
-        if "classifier model converged" in line:
-            data["classifier"] = True
+        if "model converged" in line:
+            data["converged"] = True
 
     # classification statistics
     if model.data.labels is not None:

@@ -7,8 +7,9 @@ import torch
 import torch.distributions.constraints as constraints
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
-from pyroapi import handlers, pyro
+from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
+from tqdm import tqdm
 
 from tapqir.distributions import AffineBeta, ConvolutedGamma
 from tapqir.models.model import Model
@@ -28,7 +29,6 @@ class Cosmos(Model):
 
     def __init__(self, S=1, K=2):
         super().__init__(S, K)
-        self.classify = False
 
     @lazy_property
     def num_states(self):
@@ -86,12 +86,28 @@ class Cosmos(Model):
     def ontarget(self):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
-    @property
+    def _compute_theta_samples(self, num_samples):
+        samples = torch.zeros(num_samples, self.data.N, self.data.F).long()
+        for i in tqdm(range(num_samples)):
+            for ndx in torch.split(torch.arange(self.data.N), 8):
+                self.n = ndx
+                guide_trace = handlers.trace(self.guide).get_trace()
+                trained_model = handlers.replay(self.model, trace=guide_trace)
+                inferred_model = infer.infer_discrete(
+                    trained_model, temperature=1, first_available_dim=-3
+                )
+                trace = handlers.trace(inferred_model).get_trace()
+                samples[i, ndx] = trace.nodes["d/theta"]["value"]
+        self.theta_samples = samples
+
+    @lazy_property
     def z_probs(self):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return pyro.param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
+        return (
+            Vindex(self.theta_to_z)[self.theta_samples].float().mean(0).permute(2, 0, 1)
+        )
 
     @property
     def j_probs(self):
@@ -105,11 +121,7 @@ class Cosmos(Model):
         r"""
         Probability of a spot :math:`p(m_{knf})`.
         """
-        return torch.einsum(
-            "sknf,nfs->knf",
-            pyro.param("d/m_probs").data[..., 1],
-            pyro.param("d/theta_probs").data,
-        )
+        return pyro.param("d/m_probs").data[..., 1]
 
     @property
     def z_marginal(self):
@@ -202,16 +214,11 @@ class Cosmos(Model):
 
                 # sample hidden model state (1+K*S,)
                 if data.dtype == "test":
-                    if self.classify:
-                        theta = pyro.sample(
-                            f"{prefix}/theta", dist.Categorical(self.probs_theta)
-                        )
-                    else:
-                        theta = pyro.sample(
-                            f"{prefix}/theta",
-                            dist.Categorical(self.probs_theta),
-                            infer={"enumerate": "parallel"},
-                        )
+                    theta = pyro.sample(
+                        f"{prefix}/theta",
+                        dist.Categorical(self.probs_theta),
+                        infer={"enumerate": "parallel"},
+                    )
                 else:
                     theta = 0
 
@@ -310,33 +317,11 @@ class Cosmos(Model):
                     ),
                 )
 
-                # sample target-specific index theta
-                if self.classify and prefix == "d":
-                    theta = pyro.sample(
-                        f"{prefix}/theta",
-                        dist.Categorical(pyro.param(f"{prefix}/theta_probs")[ndx]),
-                        infer={"enumerate": "parallel"},
-                    )
-
                 for kdx in spots:
                     # sample spot presence m
-                    if prefix == "d":
-                        if self.classify:
-                            m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                                theta, kdx, ndx[:, None], fdx
-                            ]
-                        else:
-                            m_probs = Vindex(
-                                torch.einsum(
-                                    "sknft,nfs->knft",
-                                    pyro.param(f"{prefix}/m_probs"),
-                                    pyro.param(f"{prefix}/theta_probs"),
-                                )
-                            )[kdx, ndx[:, None], fdx, :]
-                    else:
-                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                            kdx, ndx[:, None], fdx
-                        ]
+                    m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                        kdx, ndx[:, None], fdx
+                    ]
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}",
                         dist.Categorical(m_probs),
@@ -404,11 +389,6 @@ class Cosmos(Model):
         pyro.param(
             "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
-        pyro.param(
-            "d/theta_probs",
-            lambda: torch.ones(self.data.N, self.data.F, 1 + self.K * self.S),
-            constraint=constraints.simplex,
-        )
 
     def spot_parameters(self, data, prefix):
         pyro.param(
@@ -424,19 +404,11 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
 
-        if prefix == "d":
-            m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
-            m_probs[1, 0, :, :, 0] = 0
-            m_probs[2, 1, :, :, 0] = 0
-            pyro.param(
-                f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex
-            )
-        else:
-            pyro.param(
-                f"{prefix}/m_probs",
-                lambda: torch.ones(self.K, data.N, data.F, 2),
-                constraint=constraints.simplex,
-            )
+        pyro.param(
+            f"{prefix}/m_probs",
+            lambda: torch.ones(self.K, data.N, data.F, 2),
+            constraint=constraints.simplex,
+        )
         pyro.param(
             f"{prefix}/b_loc",
             lambda: torch.full(

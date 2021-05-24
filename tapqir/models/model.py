@@ -144,16 +144,19 @@ class Model(nn.Module):
                 pyro.clear_param_store()
                 self.iter = 1
                 self._rolling = None
-                self._rolling2 = None
         else:
             pyro.clear_param_store()
             self.iter = 1
             self._rolling = None
-            self._rolling2 = None
 
-        self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
-            max_plate_nesting=2, ignore_jit_warnings=True
-        )
+        if self.name == "hmm":
+            self.elbo = (
+                infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO
+            )(max_plate_nesting=3, ignore_jit_warnings=True)
+        else:
+            self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
+                max_plate_nesting=2, ignore_jit_warnings=True
+            )
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
     def model(self):
@@ -168,31 +171,15 @@ class Model(nn.Module):
         """
         raise NotImplementedError
 
-    def run(self, num_iter, infer):
+    def run(self, num_iter):
         # pyro.enable_validation()
         self._stop = False
-        self.classify = False
         for i in tqdm(range(num_iter)):
             self.iter_loss = self.svi.step()
             if not self.iter % 100 and self.iter != 0:
                 self.save_checkpoint()
                 if self._stop:
-                    self.logger.info(
-                        "Step #{} marginalized model converged.".format(self.iter)
-                    )
-                    break
-            self.iter += 1
-
-        self._stop = False
-        self.classify = True
-        for i in tqdm(range(infer)):
-            self.iter_loss = self.svi.step()
-            if not self.iter % 100:
-                self.save_checkpoint()
-                if self._stop:
-                    self.logger.info(
-                        "Step #{} classifier model converged.".format(self.iter)
-                    )
+                    self.logger.info("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
 
@@ -202,7 +189,7 @@ class Model(nn.Module):
         while batch_size + 2 ** k < self.data.N:
             self.settings(self.lr, batch_size + 2 ** k)
             try:
-                self.run(1, 1)
+                self.run(1)
             except RuntimeError as error:
                 assert error.args[0].startswith("CUDA")
                 if k == 0:
@@ -285,7 +272,7 @@ class Model(nn.Module):
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.labels is not None:
+        if self.data.labels is not None and self.name == "hmm":
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.labels["z"].ravel()
 
@@ -310,29 +297,21 @@ class Model(nn.Module):
 
         if self._rolling is None:
             self._rolling = global_params.to_frame().T
-        if self._rolling2 is None:
-            self._rolling2 = global_params.to_frame().T
 
-        rolling = self._rolling2 if self.classify else self._rolling
-        if global_params.name not in rolling.index:
-            rolling = rolling.append(global_params)
-        if len(rolling) > 100:
-            rolling = rolling.drop(rolling.index[0])
+        if global_params.name not in self._rolling.index:
+            self._rolling = self._rolling.append(global_params)
+        if len(self._rolling) > 100:
+            self._rolling = self._rolling.drop(self._rolling.index[0])
             conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
             crit = all(
-                rolling[p].std() / rolling[p].iloc[-50:].std() < 1.05
+                self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05
                 for p in conv_params
             )
             if crit:
                 self._stop = True
 
         global_params.to_csv(self.path / "global_params.csv")
-        if self.classify:
-            self._rolling2 = rolling
-        else:
-            self._rolling = rolling
         self._rolling.to_csv(self.path / "rolling_params.csv")
-        self._rolling2.to_csv(self.path / "rolling_params2.csv")
         self.logger.info("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
@@ -341,7 +320,6 @@ class Model(nn.Module):
             path / "global_params.csv", squeeze=True, index_col=0
         )
         self._rolling = pd.read_csv(path / "rolling_params.csv", index_col=0)
-        self._rolling2 = pd.read_csv(path / "rolling_params2.csv", index_col=0)
         self.iter = int(global_params.name)
         self.optim.load(path / "optimizer")
         pyro.clear_param_store()
@@ -356,6 +334,10 @@ class Model(nn.Module):
         path = Path(path) if path else self.path
         pyro.clear_param_store()
         pyro.get_param_store().load(path / "params", map_location=self.device)
+        if (path / "theta_samples.pt").is_file():
+            self.theta_samples = torch.load(
+                path / "theta_samples.pt", map_location=self.device
+            ).detach()
         self._K = 2
         self._S = 1
 
