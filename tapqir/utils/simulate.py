@@ -57,17 +57,14 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
             ]
         )
         for f in range(F):
-            for prefix in ("d", "c"):
-                samples[f"{prefix}/background_{f}"] = torch.full(
-                    (1, N, 1), params["background"]
-                )
-                for k in range(model.K):
-                    samples[f"{prefix}/width_{k}_{f}"] = torch.full(
-                        (1, N, 1), params["width"]
-                    )
-                    samples[f"{prefix}/height_{k}_{f}"] = torch.full(
-                        (1, N, 1), params["height"]
-                    )
+            samples["d/background_{f}"] = torch.full((1, N, 1), params["background"])
+            for k in range(model.K):
+                samples["d/width_{k}_{f}"] = torch.full((1, N, 1), params["width"])
+                samples["d/height_{k}_{f}"] = torch.full((1, N, 1), params["height"])
+        samples["c/background"] = torch.full((1, N, 1), params["background"])
+        for k in range(model.K):
+            samples["c/width_{k}"] = torch.full((1, N, F), params["width"])
+            samples["c/height_{k}"] = torch.full((1, N, F), params["height"])
 
     offset = torch.full((3,), params["offset"])
     target_locs = torch.full((N, F, 2), (D - 1) / 2)
@@ -102,7 +99,7 @@ def simulate(model, N, F, D=14, seed=0, cuda=True, params=dict()):
         # kinetic simulations
         for f in range(F):
             model.data.data[:, f : f + 1] = samples[f"d/data_{f}"][0].data.floor()
-            model.control.data[:, f : f + 1] = samples[f"c/data_{f}"][0].data.floor()
             model.data.labels["z"][:, f : f + 1] = samples[f"d/theta_{f}"][0].cpu() > 0
+        model.control.data = samples["c/data"][0].data.floor()
 
     return model
