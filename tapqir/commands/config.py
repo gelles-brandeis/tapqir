@@ -40,6 +40,7 @@ class Config(Command):
         config["fit"]["learning_rate"] = "0.005"
         config["fit"]["control"] = "True"
         config["fit"]["device"] = "cuda"
+        config["fit"]["dtype"] = "float"
         config["fit"]["jit"] = "False"
         config["fit"]["backend"] = "pyro"
 

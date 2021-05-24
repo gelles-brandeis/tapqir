@@ -15,9 +15,9 @@ from tapqir.models.cosmos import Cosmos
 class HMM(Cosmos):
     name = "hmm"
 
-    def __init__(self, S=1, K=2, vectorized=True):
+    def __init__(self, S=1, K=2, device="cpu", dtype="float", vectorized=True):
         self.vectorized = vectorized
-        super().__init__(S, K)
+        super().__init__(S, K, device, dtype)
         self.classify = True
 
     @property
@@ -31,9 +31,7 @@ class HMM(Cosmos):
 
     @property
     def trans_theta(self):
-        result = torch.zeros(
-            self.K * self.S + 1, self.K * self.S + 1, dtype=self.dtype
-        )
+        result = torch.zeros(self.K * self.S + 1, self.K * self.S + 1, dtype=self.dtype)
         for i in range(self.K * self.S + 1):
             # FIXME
             j = (i + 1) // self.K

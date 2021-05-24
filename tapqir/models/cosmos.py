@@ -27,8 +27,8 @@ class Cosmos(Model):
     """
     name = "cosmos"
 
-    def __init__(self, S=1, K=2):
-        super().__init__(S, K)
+    def __init__(self, S=1, K=2, device="cpu", dtype="float"):
+        super().__init__(S, K, device, dtype)
 
     @lazy_property
     def num_states(self):
