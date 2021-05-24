@@ -22,7 +22,7 @@ class HMM(Cosmos):
 
     @property
     def init_theta(self):
-        result = torch.zeros(self.K * self.S + 1, dtype=torch.float)
+        result = torch.zeros(self.K * self.S + 1, dtype=self.dtype)
         result[0] = self.init[0]
         for s in range(self.S):
             for k in range(self.K):
@@ -32,7 +32,7 @@ class HMM(Cosmos):
     @property
     def trans_theta(self):
         result = torch.zeros(
-            self.K * self.S + 1, self.K * self.S + 1, dtype=torch.float
+            self.K * self.S + 1, self.K * self.S + 1, dtype=self.dtype
         )
         for i in range(self.K * self.S + 1):
             # FIXME

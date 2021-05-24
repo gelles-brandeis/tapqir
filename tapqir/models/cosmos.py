@@ -41,13 +41,15 @@ class Cosmos(Model):
 
     @property
     def probs_j(self):
-        result = torch.zeros(2, self.K + 1, dtype=torch.float)
+        result = torch.zeros(2, self.K + 1, dtype=self.dtype)
         result[0, : self.K] = (
-            dist.Poisson(self.lamda).log_prob(torch.arange(self.K).float()).exp()
+            dist.Poisson(self.lamda).log_prob(torch.arange(self.K).to(self.dtype)).exp()
         )
         result[0, -1] = 1 - result[0, : self.K].sum()
         result[1, : self.K - 1] = (
-            dist.Poisson(self.lamda).log_prob(torch.arange(self.K - 1).float()).exp()
+            dist.Poisson(self.lamda)
+            .log_prob(torch.arange(self.K - 1).to(self.dtype))
+            .exp()
         )
         result[1, -2] = 1 - result[0, : self.K - 1].sum()
         return result
@@ -55,7 +57,7 @@ class Cosmos(Model):
     @property
     def probs_m(self):
         # this only works for K=2
-        result = torch.zeros(1 + self.K * self.S, self.K, 2, dtype=torch.float)
+        result = torch.zeros(1 + self.K * self.S, self.K, 2, dtype=self.dtype)
         result[0, :, 0] = self.probs_j[0, 0] + self.probs_j[0, 1] / 2
         result[0, :, 1] = self.probs_j[0, 2] + self.probs_j[0, 1] / 2
         result[1, 0, 1] = 1
@@ -68,7 +70,7 @@ class Cosmos(Model):
 
     @property
     def probs_theta(self):
-        result = torch.zeros(self.K * self.S + 1, dtype=torch.float)
+        result = torch.zeros(self.K * self.S + 1, dtype=self.dtype)
         result[0] = self.pi[0]
         for s in range(self.S):
             for k in range(self.K):
@@ -106,7 +108,10 @@ class Cosmos(Model):
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
         return (
-            Vindex(self.theta_to_z)[self.theta_samples].float().mean(0).permute(2, 0, 1)
+            Vindex(self.theta_to_z)[self.theta_samples]
+            .to(self.dtype)
+            .mean(0)
+            .permute(2, 0, 1)
         )
 
     @property
@@ -370,7 +375,7 @@ class Cosmos(Model):
             "proximity_loc",
             lambda: torch.tensor(0.5),
             constraint=constraints.interval(
-                0, (self.data.D + 1) / math.sqrt(12) - torch.finfo(torch.float32).eps
+                0, (self.data.D + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps
             ),
         )
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
@@ -435,8 +440,8 @@ class Cosmos(Model):
             f"{prefix}/w_mean",
             lambda: torch.full((self.K, data.N, data.F), 1.5),
             constraint=constraints.interval(
-                0.75 + torch.finfo(torch.float32).eps,
-                2.25 - torch.finfo(torch.float32).eps,
+                0.75 + torch.finfo(self.dtype).eps,
+                2.25 - torch.finfo(self.dtype).eps,
             ),
         )
         pyro.param(
@@ -448,16 +453,16 @@ class Cosmos(Model):
             f"{prefix}/x_mean",
             lambda: torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(
-                -(data.D + 1) / 2 + torch.finfo(torch.float32).eps,
-                (data.D + 1) / 2 - torch.finfo(torch.float32).eps,
+                -(data.D + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.D + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
         pyro.param(
             f"{prefix}/y_mean",
             lambda: torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(
-                -(data.D + 1) / 2 + torch.finfo(torch.float32).eps,
-                (data.D + 1) / 2 - torch.finfo(torch.float32).eps,
+                -(data.D + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.D + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
         size = torch.ones(self.K, data.N, data.F) * 200.0

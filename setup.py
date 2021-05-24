@@ -46,7 +46,7 @@ setuptools.setup(
     install_requires=[
         "cliff",
         "configparser",
-        "funsor @ git+git://github.com/ordabayevy/funsor.git@sequential-integral",
+        "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
         # "funsor==0.4.0",
         "future",
         "pandas",
