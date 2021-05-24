@@ -11,7 +11,7 @@ using a Bayesian statistics-based image classification method.
 **tapqir** is open source software licensed under the `GNU General Public License, version 3 <http://www.gnu.org/licenses/gpl-3.0.txt>`_.
 
 **Author**:
-Yerdo Ordabayev;
+Yerdos Ordabayev;
 Department of Biochemistry, MS009;
 Brandeis University;
 PO Box 549110;

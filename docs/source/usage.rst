@@ -29,7 +29,7 @@ will require the following files:
 
 - image data folder in glimpse format
 - aoiinfo file designating the areas of interest (aois) corresponfing to target molecules to be analyzed
-- (optional) aoiinfo file designating the areas of interest corresponding to locations that do not contain target molecules  (negative control)
+- (optional) aoiinfo file designating the areas of interest corresponding to locations that do not contain target molecules  (negative control -- optional)
 - driftlist file recording the stage movement that took place during the experiment
 
 Enter the names of your folder/files under the ``[glimpse]`` section of the ``options.cfg`` file::
