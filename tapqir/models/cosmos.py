@@ -90,8 +90,10 @@ class Cosmos(Model):
 
     def _compute_theta_samples(self, num_samples):
         samples = torch.zeros(num_samples, self.data.N, self.data.F).long()
+        split_size = self.batch_size
+        self.batch_size = None
         for i in tqdm(range(num_samples)):
-            for ndx in torch.split(torch.arange(self.data.N), 8):
+            for ndx in torch.split(torch.arange(self.data.N), split_size):
                 self.n = ndx
                 guide_trace = handlers.trace(self.guide).get_trace()
                 trained_model = handlers.replay(self.model, trace=guide_trace)
@@ -101,6 +103,7 @@ class Cosmos(Model):
                 trace = handlers.trace(inferred_model).get_trace()
                 samples[i, ndx] = trace.nodes["d/theta"]["value"]
         self.theta_samples = samples
+        self.batch_size = split_size
 
     @lazy_property
     def z_probs(self):
@@ -169,15 +172,29 @@ class Cosmos(Model):
         # global parameters
         pyro.sample(
             "gain",
-            dist.Delta(pyro.param("gain_loc")),
+            # dist.Delta(pyro.param("gain_loc")),
+            dist.Gamma(
+                pyro.param("gain_loc") * pyro.param("gain_beta"),
+                pyro.param("gain_beta"),
+            ),
         )
         pyro.sample(
             "lamda",
-            dist.Delta(pyro.param("lamda_loc")),
+            # dist.Delta(pyro.param("lamda_loc")),
+            dist.Gamma(
+                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
+                pyro.param("lamda_beta"),
+            ),
         )
         pyro.sample(
             "proximity",
-            dist.Delta(pyro.param("proximity_loc")),
+            # dist.Delta(pyro.param("proximity_loc")),
+            AffineBeta(
+                pyro.param("proximity_loc"),
+                pyro.param("proximity_size"),
+                0,
+                (self.data.D + 1) / math.sqrt(12),
+            ),
         )
         self.state_guide()
 
@@ -189,7 +206,8 @@ class Cosmos(Model):
             self.spot_guide(self.control, prefix="c")
 
     def state_guide(self):
-        pyro.sample("pi", dist.Delta(pyro.param("pi_mean")).to_event(1))
+        # pyro.sample("pi", dist.Delta(pyro.param("pi_mean")).to_event(1))
+        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
 
     def spot_model(self, data, data_loc, prefix):
         # spots
@@ -378,9 +396,20 @@ class Cosmos(Model):
                 0, (self.data.D + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps
             ),
         )
+        pyro.param(
+            "proximity_size",
+            lambda: torch.tensor(100),
+            constraint=constraints.interval(0, (self.data.D + 1) / math.sqrt(12)),
+        )
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
+            "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
+        )
+        pyro.param(
             "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
+        )
+        pyro.param(
+            "lamda_beta", lambda: torch.tensor(100), constraint=constraints.positive
         )
 
         self.state_parameters()
@@ -394,6 +423,7 @@ class Cosmos(Model):
         pyro.param(
             "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
+        pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
 
     def spot_parameters(self, data, prefix):
         pyro.param(

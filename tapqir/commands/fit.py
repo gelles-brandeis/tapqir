@@ -52,7 +52,13 @@ class Fit(Command):
             "-it",
             metavar="NUM_ITER",
             type=int,
-            help="Number of iterations (default: 30000)",
+            help="Number of iterations (default: 60000)",
+        )
+        parser.add_argument(
+            "-nsamples",
+            metavar="NUM_SAMPLES",
+            type=int,
+            help="Number of theta samples (default: 1000)",
         )
         parser.add_argument(
             "-bs", metavar="BATCH_SIZE", type=int, help="Batch size (default: 5)"
@@ -100,6 +106,7 @@ class Fit(Command):
         states = args.s or config["fit"].getint("num_states")
         k_max = args.k or config["fit"].getint("k_max")
         num_iter = args.it or config["fit"].getint("num_iter")
+        num_samples = args.nsamples or config["fit"].getint("num_samples")
         batch_size = args.bs or config["fit"].getint("batch_size")
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
         control = args.c or config["fit"].getboolean("control")
@@ -132,3 +139,7 @@ class Fit(Command):
                 with open(cfg_file, "w") as configfile:
                     config.write(configfile)
             model.run(num_iter)
+            if model.name == "cosmos":
+                # compute and save theta_samples
+                model._compute_theta_samples(num_samples)
+                torch.save(model.theta_samples, model.path / "theta_samples.pt")

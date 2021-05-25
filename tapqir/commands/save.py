@@ -92,6 +92,6 @@ class Save(Command):
             model.load(args.dataset_path, False)
             model.load_parameters(args.parameters_path)
 
-            save_stats(model, args.parameters_path, 100)
+            save_stats(model, args.parameters_path)
             if args.matlab:
                 save_matlab(model, args.parameters_path)

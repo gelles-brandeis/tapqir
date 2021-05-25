@@ -518,9 +518,6 @@ class MainWindow(QMainWindow):
         n = (int(self.aoiNumber.text()) + inc) % self.Model.data.N
         self.aoiNumber.setText(str(n))
 
-        self.Model.n = torch.tensor([n])
-        trace = handlers.trace(self.Model.guide).get_trace()
-        ci_stats = ci_from_trace(trace, self.sites)
         self.item["zoom"].setData(self.Model.z_marginal[n])
         for p in self.params:
             if p == "z":
@@ -528,14 +525,20 @@ class MainWindow(QMainWindow):
                 self.item["z_label"].setData(self.Model.data.labels["z"][n])
             elif p == "d/background":
                 k = 0
-                self.item[f"{p}_ul"].setData(ci_stats[p]["ul"])
-                self.item[f"{p}_ll"].setData(ci_stats[p]["ll"])
-                self.item[f"{p}_mean"].setData(ci_stats[p]["mean"])
+                self.item[f"{p}_ul"].setData(self.Model.local_params[f"{p}_ul"][n])
+                self.item[f"{p}_ll"].setData(self.Model.local_params[f"{p}_ll"][n])
+                self.item[f"{p}_mean"].setData(self.Model.local_params[f"{p}_mean"][n])
             else:
                 for k in range(self.Model.K):
-                    self.item[f"{p}_{k}_ul"].setData(ci_stats[f"{p}_{k}"]["ul"])
-                    self.item[f"{p}_{k}_ll"].setData(ci_stats[f"{p}_{k}"]["ll"])
-                    self.item[f"{p}_{k}_mean"].setData(ci_stats[f"{p}_{k}"]["mean"])
+                    self.item[f"{p}_{k}_ul"].setData(
+                        self.Model.local_params[f"{p}_{k}_ul"][n]
+                    )
+                    self.item[f"{p}_{k}_ll"].setData(
+                        self.Model.local_params[f"{p}_{k}_ll"][n]
+                    )
+                    self.item[f"{p}_{k}_mean"].setData(
+                        self.Model.local_params[f"{p}_{k}_mean"][n]
+                    )
 
         if self.w is not None:
             self.updateImages()
