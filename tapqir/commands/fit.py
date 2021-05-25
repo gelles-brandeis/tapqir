@@ -4,6 +4,7 @@
 import configparser
 from pathlib import Path
 
+import torch
 from cliff.command import Command
 from pyroapi import pyro_backend
 

@@ -9,7 +9,7 @@ import pyqtgraph as pg
 import torch
 from pyqtgraph import HistogramLUTItem
 from pyro.ops.stats import quantile
-from pyroapi import handlers, pyro
+from pyroapi import pyro
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIntValidator
 from PySide2.QtWidgets import (
@@ -25,8 +25,6 @@ from PySide2.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from tapqir.utils.stats import ci_from_trace
 
 C = {}
 C[0] = (31, 119, 180)
