@@ -110,12 +110,15 @@ class Cosmos(Model):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return (
-            Vindex(self.theta_to_z)[self.theta_samples]
-            .to(self.dtype)
-            .mean(0)
-            .permute(2, 0, 1)
-        )
+        try:
+            return (
+                Vindex(self.theta_to_z)[self.theta_samples]
+                .to(self.dtype)
+                .mean(0)
+                .permute(2, 0, 1)
+            )
+        except AttributeError:
+            return torch.zeros(self.K, self.data.N, self.data.F)
 
     @property
     def j_probs(self):

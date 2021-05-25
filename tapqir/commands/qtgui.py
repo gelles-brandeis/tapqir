@@ -103,8 +103,6 @@ class MainWindow(QMainWindow):
         self.parameters = parameters
         self.Model.load(dataset, control)
         self.Model.load_parameters(self.parameters)
-        if not hasattr(self.Model, "theta_samples"):
-            self.Model._compute_theta_samples(2)
 
         self.initUI()
 

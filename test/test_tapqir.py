@@ -42,6 +42,17 @@ def dataset_path(tmp_path):
 
 
 def test_commands_cpu(dataset_path, qtbot):
+    parameters_path = (
+        dataset_path
+        / "runs"
+        / "cosmos"
+        / tapqir_version.split("+")[0]
+        / "S1"
+        / "control"
+        / "lr0.005"
+        / "bs1"
+    )
+
     commands = [
         ["tapqir", "config", dataset_path],
         [
@@ -53,6 +64,15 @@ def test_commands_cpu(dataset_path, qtbot):
             "100",
             "-nsamples",
             "2",
+            "-dev",
+            "cpu",
+        ],
+        [
+            "tapqir",
+            "save",
+            "cosmos",
+            dataset_path,
+            parameters_path,
             "-dev",
             "cpu",
         ],
@@ -75,17 +95,7 @@ def test_commands_cpu(dataset_path, qtbot):
     for command in commands:
         check_call(command)
 
-    parameters_path = (
-        dataset_path
-        / "runs"
-        / "cosmos"
-        / tapqir_version.split("+")[0]
-        / "S1"
-        / "control"
-        / "lr0.005"
-        / "bs1"
-    )
-    model = Cosmos(1, 2)
+    model = Cosmos()
     window = MainWindow(model, dataset_path, parameters_path)
     qtbot.addWidget(window)
     qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
