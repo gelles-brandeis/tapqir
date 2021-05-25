@@ -43,7 +43,6 @@ def dataset_path(tmp_path):
 
 def test_commands_cpu(dataset_path, qtbot):
     commands = [
-        ["tapqir", "--version"],
         ["tapqir", "config", dataset_path],
         [
             "tapqir",
@@ -57,20 +56,20 @@ def test_commands_cpu(dataset_path, qtbot):
             "-dev",
             "cpu",
         ],
-        [
-            "tapqir",
-            "fit",
-            "cosmos",
-            dataset_path,
-            "-it",
-            "100",
-            "-nsamples",
-            "2",
-            "-dev",
-            "cpu",
-            "-backend",
-            "funsor",
-        ],
+        #  [
+        #      "tapqir",
+        #      "fit",
+        #      "cosmos",
+        #      dataset_path,
+        #      "-it",
+        #      "100",
+        #      "-nsamples",
+        #      "2",
+        #      "-dev",
+        #      "cpu",
+        #      "-backend",
+        #      "funsor",
+        #  ],
     ]
 
     for command in commands:
@@ -112,18 +111,18 @@ def test_commands_cuda(dataset_path):
             "-nsamples",
             "2",
         ],
-        [
-            "tapqir",
-            "fit",
-            "cosmos",
-            dataset_path,
-            "-it",
-            "100",
-            "-nsamples",
-            "2",
-            "-backend",
-            "funsor",
-        ],
+        #  [
+        #      "tapqir",
+        #      "fit",
+        #      "cosmos",
+        #      dataset_path,
+        #      "-it",
+        #      "100",
+        #      "-nsamples",
+        #      "2",
+        #      "-backend",
+        #      "funsor",
+        #  ],
     ]
 
     for command in commands:

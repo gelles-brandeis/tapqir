@@ -399,7 +399,7 @@ class Cosmos(Model):
         pyro.param(
             "proximity_size",
             lambda: torch.tensor(100),
-            constraint=constraints.interval(0, (self.data.D + 1) / math.sqrt(12)),
+            constraint=constraints.greater_than(2.0),
         )
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
