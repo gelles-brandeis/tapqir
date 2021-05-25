@@ -75,8 +75,15 @@ def main(args):
 
     model.settings(args.lr, args.bs, args.jit)
     model.run(args.it)
+    # compute and save theta_samples
+    model._compute_theta_samples(args.num_samples)
     if data_path is not None:
-        save_stats(model, model.path, args.num_samples)
+        torch.save(model.theta_samples, model.path / "theta_samples.pt")
+        param_path = model.path
+        model = Cosmos(1, 2, "cpu", args.dtype)
+        model.load(data_path, False)
+        model.load_parameters(param_path)
+        save_stats(model, param_path)
 
 
 if __name__ == "__main__":

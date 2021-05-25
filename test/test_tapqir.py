@@ -42,36 +42,6 @@ def dataset_path(tmp_path):
 
 
 def test_commands_cpu(dataset_path, qtbot):
-    commands = [
-        ["tapqir", "--version"],
-        ["tapqir", "config", dataset_path],
-        [
-            "tapqir",
-            "fit",
-            "cosmos",
-            dataset_path,
-            "-it",
-            "100",
-            "-dev",
-            "cpu",
-        ],
-        [
-            "tapqir",
-            "fit",
-            "cosmos",
-            dataset_path,
-            "-it",
-            "100",
-            "-dev",
-            "cpu",
-            "-backend",
-            "funsor",
-        ],
-    ]
-
-    for command in commands:
-        check_call(command)
-
     parameters_path = (
         dataset_path
         / "runs"
@@ -82,7 +52,50 @@ def test_commands_cpu(dataset_path, qtbot):
         / "lr0.005"
         / "bs1"
     )
-    model = Cosmos(1, 2)
+
+    commands = [
+        ["tapqir", "config", dataset_path],
+        [
+            "tapqir",
+            "fit",
+            "cosmos",
+            dataset_path,
+            "-it",
+            "100",
+            "-nsamples",
+            "2",
+            "-dev",
+            "cpu",
+        ],
+        [
+            "tapqir",
+            "save",
+            "cosmos",
+            dataset_path,
+            parameters_path,
+            "-dev",
+            "cpu",
+        ],
+        #  [
+        #      "tapqir",
+        #      "fit",
+        #      "cosmos",
+        #      dataset_path,
+        #      "-it",
+        #      "100",
+        #      "-nsamples",
+        #      "2",
+        #      "-dev",
+        #      "cpu",
+        #      "-backend",
+        #      "funsor",
+        #  ],
+    ]
+
+    for command in commands:
+        check_call(command)
+
+    model = Cosmos()
     window = MainWindow(model, dataset_path, parameters_path)
     qtbot.addWidget(window)
     qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
@@ -105,17 +118,21 @@ def test_commands_cuda(dataset_path):
             dataset_path,
             "-it",
             "100",
+            "-nsamples",
+            "2",
         ],
-        [
-            "tapqir",
-            "fit",
-            "cosmos",
-            dataset_path,
-            "-it",
-            "100",
-            "-backend",
-            "funsor",
-        ],
+        #  [
+        #      "tapqir",
+        #      "fit",
+        #      "cosmos",
+        #      dataset_path,
+        #      "-it",
+        #      "100",
+        #      "-nsamples",
+        #      "2",
+        #      "-backend",
+        #      "funsor",
+        #  ],
     ]
 
     for command in commands:

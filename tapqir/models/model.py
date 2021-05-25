@@ -345,7 +345,11 @@ class Model(nn.Module):
         if (path / "theta_samples.pt").is_file():
             self.theta_samples = torch.load(
                 path / "theta_samples.pt", map_location=self.device
-            ).detach()
+            )
+        if (path / "local_params.pt").is_file():
+            self.local_params = torch.load(
+                path / "local_params.pt", map_location=self.device
+            )
         self._K = 2
         self._S = 1
 

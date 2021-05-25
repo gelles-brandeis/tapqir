@@ -32,11 +32,8 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
     return ci_stats
 
 
-def save_stats(model, path, num_samples):
-    # compute and save theta_samples
-    model._compute_theta_samples(num_samples)
-    torch.save(model.theta_samples, Path(path) / "theta_samples.pt")
-
+def save_stats(model, path):
+    path = Path(path)
     # global parameters
     data = {}
     # snr
@@ -44,7 +41,18 @@ def save_stats(model, path, num_samples):
     # parameters
     guide_tr = handlers.trace(model.guide).get_trace()
     global_params = ["gain", "pi", "lamda", "proximity"]
-    ci_stats = ci_from_trace(guide_tr, global_params)
+    local_params = [
+        "d/height_0",
+        "d/height_1",
+        "d/width_0",
+        "d/width_1",
+        "d/x_0",
+        "d/x_1",
+        "d/y_0",
+        "d/y_1",
+        "d/background",
+    ]
+    ci_stats = ci_from_trace(guide_tr, global_params + local_params)
     for param in global_params:
         if param == "pi":
             data[f"{param}_mean"] = ci_stats[param]["mean"][1].item()
@@ -54,10 +62,16 @@ def save_stats(model, path, num_samples):
             data[f"{param}_mean"] = ci_stats[param]["mean"].item()
             data[f"{param}_ll"] = ci_stats[param]["ll"].item()
             data[f"{param}_ul"] = ci_stats[param]["ul"].item()
+    local_params_dict = {}
+    for param in local_params:
+        local_params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
+        local_params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
+        local_params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
+    torch.save(local_params_dict, path / "local_params.pt")
 
     # check convergence status
     data["converged"] = False
-    for line in open(Path(path) / "run.log"):
+    for line in open(path / "run.log"):
         if "model converged" in line:
             data["converged"] = True
 
@@ -88,5 +102,5 @@ def save_stats(model, path, num_samples):
             data["z_ul"] = 0.0
 
     pd.Series(data).to_csv(
-        Path(path) / "statistics.csv",
+        path / "statistics.csv",
     )
