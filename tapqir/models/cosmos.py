@@ -321,9 +321,6 @@ class Cosmos(Model):
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
 
         with aois as ndx:
-            if prefix == "d":
-                self.batch_idx = ndx.cpu()
-
             pyro.sample(
                 f"{prefix}/background_mean",
                 dist.Delta(pyro.param(f"{prefix}/background_mean_loc")[ndx]),
