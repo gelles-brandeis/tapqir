@@ -84,7 +84,7 @@ class Fit(Command):
             "-dtype",
             metavar="DTYPE",
             type=str,
-            help="Floating number precision (default: float32)",
+            help="Floating number precision (default: double)",
         )
         parser.add_argument(
             "-jit",
