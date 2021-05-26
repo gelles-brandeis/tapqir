@@ -93,13 +93,13 @@ def save_stats(model, path):
         samples = torch.masked_select(model.z_marginal.cpu(), mask)
         if len(samples):
             z_ll, z_ul = pi(samples, 0.68)
-            data["z_median"] = quantile(samples, 0.5).item()
-            data["z_ll"] = z_ll.item()
-            data["z_ul"] = z_ul.item()
+            data["p(specific)_median"] = quantile(samples, 0.5).item()
+            data["p(specific)_ll"] = z_ll.item()
+            data["p(specific)_ul"] = z_ul.item()
         else:
-            data["z_median"] = 0.0
-            data["z_ll"] = 0.0
-            data["z_ul"] = 0.0
+            data["p(specific)_median"] = 0.0
+            data["p(specific)_ll"] = 0.0
+            data["p(specific)_ul"] = 0.0
 
     pd.Series(data).to_csv(
         path / "statistics.csv",

@@ -66,6 +66,11 @@ def main(args):
             signal = (weights ** 2 * params["height"]).sum()
             noise = math.sqrt((params["background"] * params["gain"]))
             params["snr"] = float(signal / noise)
+            params["N"] = args.N
+            params["F"] = args.F
+            params["Nc"] = args.N
+            params["Fc"] = args.F
+            params["P"] = args.D
 
             pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
             pyro.clear_param_store()
