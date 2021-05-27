@@ -5,5 +5,7 @@
 #SBATCH --array=0-16
 
 # Path to your executable
-python cosmos_simulations.py --seed ${SLURM_ARRAY_TASK_ID} \
-  -it 60000 -infer 40000 -bs 4 --path data/seed${SLURM_ARRAY_TASK_ID} --cuda
+python cosmos_simulations.py -it 60000 --num-samples 1000 \
+  -bs 4 --cuda --dtype double \
+  --seed ${SLURM_ARRAY_TASK_ID} \
+  --path data/seed${SLURM_ARRAY_TASK_ID}
