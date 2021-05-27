@@ -97,7 +97,7 @@ def save_stats(model, path):
         data["Precision"] = precision_score(true_labels, pred_labels, zero_division=0)
 
         data["TN"], data["FP"], data["FN"], data["TP"] = confusion_matrix(
-            true_labels, pred_labels
+            true_labels, pred_labels, labels=(0, 1)
         ).ravel()
 
         mask = torch.from_numpy(model.data.labels["z"])
