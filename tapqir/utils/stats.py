@@ -20,8 +20,9 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
     ci_stats = {}
     for name in sites:
         ci_stats[name] = {}
+        samples = tr.nodes[name]["fn"].sample((num_samples,)).data.squeeze().cpu()
         hpd = pi(
-            tr.nodes[name]["fn"].sample((num_samples,)).data.squeeze().cpu(),
+            samples,
             ci,
             dim=0,
         )
@@ -29,6 +30,16 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
         ci_stats[name]["ul"] = hpd[1]
         ci_stats[name]["ll"] = hpd[0]
         ci_stats[name]["mean"] = mean
+
+        # calculate Keq
+        if name == "pi":
+            hpd = pi(samples[:, 1] / (1 - samples[:, 1]), ci, dim=0)
+            mean = (samples[:, 1] / (1 - samples[:, 1])).mean()
+            ci_stats["Keq"] = {}
+            ci_stats["Keq"]["ul"] = hpd[1]
+            ci_stats["Keq"]["ll"] = hpd[0]
+            ci_stats["Keq"]["mean"] = mean
+
     return ci_stats
 
 
@@ -53,7 +64,7 @@ def save_stats(model, path):
         "d/background",
     ]
     ci_stats = ci_from_trace(guide_tr, global_params + local_params)
-    for param in global_params:
+    for param in global_params + ["Keq"]:
         if param == "pi":
             data[f"{param}_mean"] = ci_stats[param]["mean"][1].item()
             data[f"{param}_ll"] = ci_stats[param]["ll"][1].item()
