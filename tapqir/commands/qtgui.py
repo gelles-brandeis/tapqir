@@ -520,7 +520,7 @@ class MainWindow(QMainWindow):
         for p in self.params:
             if p == "z":
                 self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
-                self.item["z_label"].setData(self.Model.data.labels["z"][n])
+                self.item["z_label"].setData(self.Model.data.ontarget.labels["z"][n])
             elif p == "d/background":
                 k = 0
                 self.item[f"{p}_ul"].setData(self.Model.local_params[f"{p}_ul"][n])
