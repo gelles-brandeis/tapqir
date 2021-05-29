@@ -89,7 +89,7 @@ class Save(Command):
         with pyro_backend(PYRO_BACKEND):
 
             model = models[args.model](1, 2, device, dtype)
-            model.load(args.dataset_path, False)
+            model.load_data(args.dataset_path)
             model.load_parameters(args.parameters_path)
 
             save_stats(model, args.parameters_path)
