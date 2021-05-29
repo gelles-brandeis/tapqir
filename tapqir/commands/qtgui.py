@@ -147,13 +147,13 @@ class MainWindow(QMainWindow):
         self.aoiDecrLarge.clicked.connect(partial(self.updateParams, -10))
 
         self.aoiNumber = QLineEdit("0")
-        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.N - 1))
+        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.ontarget.N - 1))
         self.aoiNumber.setMaximumWidth(50)
         self.aoiNumber.setAlignment(Qt.AlignRight)
         self.aoiNumber.returnPressed.connect(partial(self.updateParams, 0))
 
-        self.aoiLabel = QLabel("Aoi")
-        self.aoiMax = QLabel(f"/{self.Model.data.N}")
+        self.aoiLabel = QLabel("AOI")
+        self.aoiMax = QLabel(f"/{self.Model.data.ontarget.N}")
         self.hspacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.w = None
@@ -515,7 +515,7 @@ class MainWindow(QMainWindow):
         self.vbox.addWidget(widget)
 
     def updateParams(self, inc):
-        n = (int(self.aoiNumber.text()) + inc) % self.Model.data.N
+        n = (int(self.aoiNumber.text()) + inc) % self.Model.data.ontarget.N
         self.aoiNumber.setText(str(n))
 
         self.item["zoom"].setData(self.Model.z_marginal[n])
