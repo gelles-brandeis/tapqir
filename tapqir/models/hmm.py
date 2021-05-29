@@ -8,14 +8,14 @@ from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, pyro
 
-from tapqir.distributions import AffineBeta, ConvolutedGamma
+from tapqir.distributions import AffineBeta
 from tapqir.models.cosmos import Cosmos
 
 
 class HMM(Cosmos):
     name = "hmm"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="float", vectorized=True):
+    def __init__(self, S=1, K=2, device="cpu", dtype="double", vectorized=True):
         self.vectorized = vectorized
         super().__init__(S, K, device, dtype)
         self.classify = True
@@ -120,53 +120,6 @@ class HMM(Cosmos):
             "sknf,nfs->knf", pyro.param("d/m_probs").data[..., 1], self.theta_probs
         )
 
-    def model(self):
-        # global parameters
-        self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
-        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
-        self.size = torch.stack(
-            (
-                torch.tensor(2.0),
-                (((self.data.D + 1) / (2 * self.proximity)) ** 2 - 1),
-            ),
-            dim=-1,
-        )
-        self.state_model()
-
-        # test data
-        self.hmm_spot_model(self.data, self.data_loc, prefix="d")
-
-        # control data
-        if self.control:
-            self.spot_model(self.control, self.control_loc, prefix="c")
-
-    def guide(self):
-        # initialize guide parameters
-        self.guide_parameters()
-
-        # global parameters
-        pyro.sample(
-            "gain",
-            dist.Delta(pyro.param("gain_loc")),
-        )
-        pyro.sample(
-            "lamda",
-            dist.Delta(pyro.param("lamda_loc")),
-        )
-        pyro.sample(
-            "proximity",
-            dist.Delta(pyro.param("proximity_loc")),
-        )
-        self.state_guide()
-
-        # test data
-        self.hmm_spot_guide(self.data, prefix="d")
-
-        # control data
-        if self.control:
-            self.spot_guide(self.control, prefix="c")
-
     def state_model(self):
         self.init = pyro.sample(
             "init", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
@@ -180,19 +133,19 @@ class HMM(Cosmos):
 
     def state_guide(self):
         pyro.sample(
-            "init",
-            dist.Delta(pyro.param("init_mean")).to_event(1)
-            # "init", dist.Dirichlet(pyro.param("init_mean") * pyro.param("init_size"))
+            "init", dist.Dirichlet(pyro.param("init_mean") * pyro.param("init_size"))
         )
         pyro.sample(
             "trans",
-            #  dist.Dirichlet(
-            #      pyro.param("trans_mean") * pyro.param("trans_size")
-            #  ).to_event(1),
-            dist.Delta(pyro.param("trans_mean")).to_event(2),
+            dist.Dirichlet(
+                pyro.param("trans_mean") * pyro.param("trans_size")
+            ).to_event(1),
         )
 
-    def hmm_spot_model(self, data, data_loc, prefix):
+    def spot_model(self, data, prefix):
+        # use time-independent model for control data
+        if prefix == "c":
+            return super().spot_model(data, prefix)
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
         # aoi sites
@@ -205,6 +158,7 @@ class HMM(Cosmos):
         )
 
         with aois as ndx:
+            # background mean and std
             background_mean = pyro.sample(
                 f"{prefix}/background_mean", dist.HalfNormal(1000)
             )
@@ -214,6 +168,8 @@ class HMM(Cosmos):
             ndx = ndx[..., None]
             theta_prev = None
             for fdx in frames:
+                # fetch data
+                obs, target_locs = data[ndx, fdx]
                 # sample background intensity
                 background = pyro.sample(
                     f"{prefix}/background_{fdx}",
@@ -225,7 +181,7 @@ class HMM(Cosmos):
                 locs = background[..., None, None]
 
                 # sample hidden model state (1+K*S,)
-                if data.dtype == "test":
+                if prefix == "d":
                     probs = (
                         self.init_theta
                         if isinstance(fdx, int) and fdx < 1
@@ -264,8 +220,8 @@ class HMM(Cosmos):
                             AffineBeta(
                                 0,
                                 self.size[ontarget],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
                         y = pyro.sample(
@@ -273,30 +229,43 @@ class HMM(Cosmos):
                             AffineBeta(
                                 0,
                                 self.size[ontarget],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
 
                     # calculate image shape w/o offset
                     height = height.masked_fill(m == 0, 0.0)
-                    gaussian = data_loc(height, width, x, y, ndx, fdx)
+                    gaussian = self.gaussian(height, width, x, y, target_locs)
                     locs = locs + gaussian
 
+                # subtract offset
+                odx = pyro.sample(
+                    f"{prefix}/offset_{fdx}",
+                    dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
+                    .expand([data.P, data.P])
+                    .to_event(2),
+                )
+                offset = self.data.offset.samples[odx]
+                offset_mask = obs > offset
+                obs = torch.where(offset_mask, obs - offset, obs.new_ones(()))
                 # observed data
                 pyro.sample(
                     f"{prefix}/data_{fdx}",
-                    ConvolutedGamma(
+                    dist.Gamma(
                         locs / self.gain,
                         1 / self.gain,
-                        self.data.offset_samples,
-                        self.data.offset_logits,
-                    ).to_event(2),
-                    obs=Vindex(data[:])[ndx, fdx],
+                    )
+                    .mask(mask=offset_mask)
+                    .to_event(2),
+                    obs=obs,
                 )
                 theta_prev = theta_curr
 
-    def hmm_spot_guide(self, data, prefix):
+    def spot_guide(self, data, prefix):
+        # use time-independent model for control data
+        if prefix == "c":
+            return super().spot_guide(data, prefix)
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
         # aoi sites
@@ -390,8 +359,8 @@ class HMM(Cosmos):
                             AffineBeta(
                                 Vindex(pyro.param(f"{prefix}/x_mean"))[kdx, ndx, fdx],
                                 Vindex(pyro.param(f"{prefix}/size"))[kdx, ndx, fdx],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
                         pyro.sample(
@@ -399,10 +368,16 @@ class HMM(Cosmos):
                             AffineBeta(
                                 Vindex(pyro.param(f"{prefix}/y_mean"))[kdx, ndx, fdx],
                                 Vindex(pyro.param(f"{prefix}/size"))[kdx, ndx, fdx],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
+                pyro.sample(
+                    f"{prefix}/offset_{fdx}",
+                    dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
+                    .expand([data.P, data.P])
+                    .to_event(2),
+                )
                 theta_prev = theta_curr
 
     def state_parameters(self):
@@ -425,7 +400,10 @@ class HMM(Cosmos):
         pyro.param(
             "d/theta_trans",
             lambda: torch.ones(
-                self.data.N, self.data.F, 1 + self.K * self.S, 1 + self.K * self.S
+                self.data.ontarget.N,
+                self.data.ontarget.F,
+                1 + self.K * self.S,
+                1 + self.K * self.S,
             ),
             constraint=constraints.simplex,
         )

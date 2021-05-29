@@ -8,15 +8,7 @@ from tapqir.imscroll.glimpse_reader import read_glimpse
 
 class Glimpse(Command):
     """
-    Read the data from glimpse files and save it in the Cosmos compatible format.
-
-    - ``drift.csv`` contains drift list
-    - ``test_data.pt`` contains cropped images at target sites
-    - ``test_target.csv`` contains target site positions
-    - ``offset.pt`` contains cropped images of offset sites
-    - ``control_data.pt`` contains cropped images at dark sites
-    - ``control_target.csv`` contains dark site positions
-
+    Read the data from glimpse files and save it in the Cosmos compatible format, ``data.tpqr``.
     Path names to glimpse files are read from the ``options.cfg`` file.
     """
 
@@ -28,4 +20,4 @@ class Glimpse(Command):
         return parser
 
     def take_action(self, args):
-        read_glimpse(args.dataset_path, D=14)
+        read_glimpse(args.dataset_path, P=14)

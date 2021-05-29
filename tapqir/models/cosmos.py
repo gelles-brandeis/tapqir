@@ -11,7 +11,7 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 from tqdm import tqdm
 
-from tapqir.distributions import AffineBeta, ConvolutedGamma
+from tapqir.distributions import AffineBeta
 from tapqir.models.model import Model
 
 
@@ -27,7 +27,7 @@ class Cosmos(Model):
     """
     name = "cosmos"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="float"):
+    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__(S, K, device, dtype)
 
     @lazy_property
@@ -89,11 +89,13 @@ class Cosmos(Model):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
     def _compute_theta_samples(self, num_samples):
-        samples = torch.zeros(num_samples, self.data.N, self.data.F).long()
+        samples = torch.zeros(
+            num_samples, self.data.ontarget.N, self.data.ontarget.F
+        ).long()
         split_size = self.batch_size
         self.batch_size = None
         for i in tqdm(range(num_samples)):
-            for ndx in torch.split(torch.arange(self.data.N), split_size):
+            for ndx in torch.split(torch.arange(self.data.ontarget.N), split_size):
                 self.n = ndx
                 guide_trace = handlers.trace(self.guide).get_trace()
                 trained_model = handlers.replay(self.model, trace=guide_trace)
@@ -118,7 +120,7 @@ class Cosmos(Model):
                 .permute(2, 0, 1)
             )
         except AttributeError:
-            return torch.zeros(self.K, self.data.N, self.data.F)
+            return torch.zeros(self.K, self.data.ontarget.N, self.data.ontarget.F)
 
     @property
     def j_probs(self):
@@ -150,18 +152,18 @@ class Cosmos(Model):
         self.size = torch.stack(
             (
                 torch.tensor(2.0),
-                (((self.data.D + 1) / (2 * self.proximity)) ** 2 - 1),
+                (((self.data.ontarget.P + 1) / (2 * self.proximity)) ** 2 - 1),
             ),
             dim=-1,
         )
         self.state_model()
 
         # test data
-        self.spot_model(self.data, self.data_loc, prefix="d")
+        self.spot_model(self.data.ontarget, prefix="d")
 
         # control data
-        if self.control:
-            self.spot_model(self.control, self.control_loc, prefix="c")
+        if self.data.offtarget.data is not None:
+            self.spot_model(self.data.offtarget, prefix="c")
 
     def state_model(self):
         self.pi = pyro.sample(
@@ -175,7 +177,6 @@ class Cosmos(Model):
         # global parameters
         pyro.sample(
             "gain",
-            # dist.Delta(pyro.param("gain_loc")),
             dist.Gamma(
                 pyro.param("gain_loc") * pyro.param("gain_beta"),
                 pyro.param("gain_beta"),
@@ -183,7 +184,6 @@ class Cosmos(Model):
         )
         pyro.sample(
             "lamda",
-            # dist.Delta(pyro.param("lamda_loc")),
             dist.Gamma(
                 pyro.param("lamda_loc") * pyro.param("lamda_beta"),
                 pyro.param("lamda_beta"),
@@ -191,28 +191,26 @@ class Cosmos(Model):
         )
         pyro.sample(
             "proximity",
-            # dist.Delta(pyro.param("proximity_loc")),
             AffineBeta(
                 pyro.param("proximity_loc"),
                 pyro.param("proximity_size"),
                 0,
-                (self.data.D + 1) / math.sqrt(12),
+                (self.data.ontarget.P + 1) / math.sqrt(12),
             ),
         )
         self.state_guide()
 
         # test data
-        self.spot_guide(self.data, prefix="d")
+        self.spot_guide(self.data.ontarget, prefix="d")
 
         # control data
-        if self.control:
-            self.spot_guide(self.control, prefix="c")
+        if self.data.offtarget.data is not None:
+            self.spot_guide(self.data.offtarget, prefix="c")
 
     def state_guide(self):
-        # pyro.sample("pi", dist.Delta(pyro.param("pi_mean")).to_event(1))
         pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
 
-    def spot_model(self, data, data_loc, prefix):
+    def spot_model(self, data, prefix):
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
         # aoi sites
@@ -221,6 +219,9 @@ class Cosmos(Model):
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
 
         with aois as ndx:
+            # fetch data
+            obs, target_locs = data[ndx]
+            # background mean and std
             background_mean = pyro.sample(
                 f"{prefix}/background_mean", dist.HalfNormal(1000)
             )
@@ -239,7 +240,7 @@ class Cosmos(Model):
                 locs = background[..., None, None]
 
                 # sample hidden model state (1+K*S,)
-                if data.dtype == "test":
+                if prefix == "d":
                     theta = pyro.sample(
                         f"{prefix}/theta",
                         dist.Categorical(self.probs_theta),
@@ -275,8 +276,8 @@ class Cosmos(Model):
                             AffineBeta(
                                 0,
                                 self.size[ontarget],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
                         y = pyro.sample(
@@ -284,26 +285,36 @@ class Cosmos(Model):
                             AffineBeta(
                                 0,
                                 self.size[ontarget],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
 
                     # calculate image shape w/o offset
                     height = height.masked_fill(m == 0, 0.0)
-                    gaussian = data_loc(height, width, x, y, ndx)
+                    gaussian = self.gaussian(height, width, x, y, target_locs)
                     locs = locs + gaussian
 
+                # subtract offset
+                odx = pyro.sample(
+                    f"{prefix}/offset",
+                    dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
+                    .expand([data.P, data.P])
+                    .to_event(2),
+                )
+                offset = self.data.offset.samples[odx]
+                offset_mask = obs > offset
+                obs = torch.where(offset_mask, obs - offset, obs.new_ones(()))
                 # observed data
                 pyro.sample(
                     f"{prefix}/data",
-                    ConvolutedGamma(
+                    dist.Gamma(
                         locs / self.gain,
                         1 / self.gain,
-                        self.data.offset_samples,
-                        self.data.offset_logits,
-                    ).to_event(2),
-                    obs=data[ndx],
+                    )
+                    .mask(mask=offset_mask)
+                    .to_event(2),
+                    obs=obs,
                 )
 
     def spot_guide(self, data, prefix):
@@ -374,8 +385,8 @@ class Cosmos(Model):
                             AffineBeta(
                                 pyro.param(f"{prefix}/x_mean")[kdx, ndx],
                                 pyro.param(f"{prefix}/size")[kdx, ndx],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
                         pyro.sample(
@@ -383,17 +394,25 @@ class Cosmos(Model):
                             AffineBeta(
                                 pyro.param(f"{prefix}/y_mean")[kdx, ndx],
                                 pyro.param(f"{prefix}/size")[kdx, ndx],
-                                -(data.D + 1) / 2,
-                                (data.D + 1) / 2,
+                                -(data.P + 1) / 2,
+                                (data.P + 1) / 2,
                             ),
                         )
+                pyro.sample(
+                    f"{prefix}/offset",
+                    dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
+                    .expand([data.P, data.P])
+                    .to_event(2),
+                )
 
     def guide_parameters(self):
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5),
             constraint=constraints.interval(
-                0, (self.data.D + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps
+                0,
+                (self.data.ontarget.P + 1) / math.sqrt(12)
+                - torch.finfo(self.dtype).eps,
             ),
         )
         pyro.param(
@@ -414,10 +433,10 @@ class Cosmos(Model):
 
         self.state_parameters()
 
-        self.spot_parameters(self.data, prefix="d")
+        self.spot_parameters(self.data.ontarget, prefix="d")
 
-        if self.control:
-            self.spot_parameters(self.control, prefix="c")
+        if self.data.offtarget.data is not None:
+            self.spot_parameters(self.data.offtarget, prefix="c")
 
     def state_parameters(self):
         pyro.param(
@@ -428,9 +447,7 @@ class Cosmos(Model):
     def spot_parameters(self, data, prefix):
         pyro.param(
             f"{prefix}/background_mean_loc",
-            lambda: torch.full(
-                (data.N, 1), self.data.data_median - self.data.offset_median
-            ),
+            lambda: torch.full((data.N, 1), data.median - self.data.offset.median),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -446,9 +463,7 @@ class Cosmos(Model):
         )
         pyro.param(
             f"{prefix}/b_loc",
-            lambda: torch.full(
-                (data.N, data.F), self.data.data_median - self.data.offset_median
-            ),
+            lambda: torch.full((data.N, data.F), data.median - self.data.offset.median),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -483,16 +498,16 @@ class Cosmos(Model):
             f"{prefix}/x_mean",
             lambda: torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(
-                -(data.D + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.D + 1) / 2 - torch.finfo(self.dtype).eps,
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
         pyro.param(
             f"{prefix}/y_mean",
             lambda: torch.zeros(self.K, data.N, data.F),
             constraint=constraints.interval(
-                -(data.D + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.D + 1) / 2 - torch.finfo(self.dtype).eps,
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
         size = torch.ones(self.K, data.N, data.F) * 200.0

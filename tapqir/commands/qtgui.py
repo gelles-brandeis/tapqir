@@ -269,7 +269,7 @@ class MainWindow(QMainWindow):
             self.prob[(f - f1) % 100].setOpts(
                 height=(
                     self.Model.z_probs[:, int(self.aoiNumber.text()), f].sum()
-                    * self.Model.data.D,
+                    * self.Model.data.ontarget.P,
                 )
             )
             # ideal image
@@ -497,10 +497,14 @@ class MainWindow(QMainWindow):
         # set plot ranges
         self.plot["z"].setYRange(0, 1, padding=0.01)
         self.plot["d/x"].setYRange(
-            -(self.Model.data.D + 1) / 2, (self.Model.data.D + 1) / 2, padding=0.01
+            -(self.Model.data.ontarget.P + 1) / 2,
+            (self.Model.data.ontarget.P + 1) / 2,
+            padding=0.01,
         )
         self.plot["d/y"].setYRange(
-            -(self.Model.data.D + 1) / 2, (self.Model.data.D + 1) / 2, padding=0.01
+            -(self.Model.data.ontarget.P + 1) / 2,
+            (self.Model.data.ontarget.P + 1) / 2,
+            padding=0.01,
         )
         self.plot["d/background"].setYRange(
             0,

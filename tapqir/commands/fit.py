@@ -110,7 +110,6 @@ class Fit(Command):
         num_samples = args.nsamples or config["fit"].getint("num_samples")
         batch_size = args.bs or config["fit"].getint("batch_size")
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
-        control = args.c or config["fit"].getboolean("control")
         device = args.dev or config["fit"].get("device")
         dtype = args.dtype or config["fit"].get("dtype")
         jit = args.jit or config["fit"].getboolean("jit")
@@ -131,7 +130,7 @@ class Fit(Command):
         with pyro_backend(PYRO_BACKEND):
 
             model = models[args.model](states, k_max, device, dtype)
-            model.load(args.dataset_path, control)
+            model.load_data(args.dataset_path)
 
             model.settings(learning_rate, batch_size, jit)
             if batch_size == 0:

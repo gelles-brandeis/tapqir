@@ -7,8 +7,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import infer, optim, pyro
 from sklearn.metrics import (
@@ -22,7 +20,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from tapqir import __version__ as tapqir_version
-from tapqir.utils.dataset import load_data
+from tapqir.utils.dataset import load
 
 
 class GaussianSpot:
@@ -37,16 +35,15 @@ class GaussianSpot:
     :param drift: Frame drift list.
     """
 
-    def __init__(self, target_locs, D):
+    def __init__(self, P):
         super().__init__()
-        # create meshgrid of DxD pixel positions
-        D_range = torch.arange(D, dtype=target_locs.dtype)
-        i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
+        # create meshgrid of PxP pixel positions
+        P_range = torch.arange(P)
+        i_pixel, j_pixel = torch.meshgrid(P_range, P_range)
         self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
-        self.target_locs = target_locs
 
     # Ideal 2D gaussian spots
-    def __call__(self, height, width, x, y, ndx, fdx=None):
+    def __call__(self, height, width, x, y, target_locs):
         r"""
         :param height: integrated spot intensity.
         :param width: width of the 2D-Gaussian spot.
@@ -57,10 +54,7 @@ class GaussianSpot:
         :return: Ideal shape 2D-Gaussian spot.
         """
 
-        if fdx is not None:
-            spot_locs = Vindex(self.target_locs)[ndx, fdx] + torch.stack((x, y), -1)
-        else:
-            spot_locs = Vindex(self.target_locs)[ndx] + torch.stack((x, y), -1)
+        spot_locs = target_locs + torch.stack((x, y), -1)
         rv = dist.MultivariateNormal(
             spot_locs[..., None, None, :],
             scale_tril=torch.eye(2) * width[..., None, None, None, None],
@@ -69,7 +63,7 @@ class GaussianSpot:
         return height[..., None, None] * gaussian_spot
 
 
-class Model(nn.Module):
+class Model:
     r"""
     Base class for tapqir models.
 
@@ -80,7 +74,7 @@ class Model(nn.Module):
     :meth:`guide`
     """
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="float"):
+    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__()
         self._S = S
         self._K = K
@@ -114,24 +108,15 @@ class Model(nn.Module):
         """
         return self._K
 
-    def load(self, path, control):
+    def load_data(self, path):
         # set path
         self.data_path = Path(path)
 
-        # load test data
-        self.data = load_data(self.data_path, dtype="test", device=self.device)
-        self.data_loc = GaussianSpot(self.data.target_locs, self.data.D)
+        # load data
+        self.data = load(self.data_path, self.device)
+        self.gaussian = GaussianSpot(self.data.ontarget.P)
 
-        # load control data
-        if control:
-            self.control = load_data(
-                self.data_path, dtype="control", device=self.device
-            )
-            self.control_loc = GaussianSpot(self.control.target_locs, self.control.D)
-        else:
-            self.control = control
-
-    def settings(self, lr, batch_size, jit=False):
+    def settings(self, lr=0.005, batch_size=0, jit=False):
         # K - max number of spots
         self.lr = lr
         # find max possible batch_size
@@ -187,14 +172,14 @@ class Model(nn.Module):
             if not self.iter % 100 and self.iter != 0:
                 self.save_checkpoint()
                 if self._stop:
-                    self.logger.info("Step #{} model converged.".format(self.iter))
+                    self.logger.debug("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
 
     def _max_batch_size(self):
         k = 0
         batch_size = 0
-        while batch_size + 2 ** k < self.data.N:
+        while batch_size + 2 ** k < self.data.ontarget.N:
             self.settings(self.lr, batch_size + 2 ** k)
             try:
                 self.run(1)
@@ -225,32 +210,19 @@ class Model(nn.Module):
         self.logger.addHandler(ch)
 
         if self.data_path is not None:
-            self.path = (
-                self.data_path
-                / "runs"
-                / f"{self.name}"
-                / tapqir_version.split("+")[0]
-                / f"S{self.S}"
-                / f"{'control' if self.control else 'nocontrol'}"
-                / f"lr{self.lr}"
-                / f"bs{self.batch_size}"
-            )
+            self.path = self.data_path / f"{self.name}" / tapqir_version.split("+")[0]
             self.writer = SummaryWriter(log_dir=self.path / "scalar")
 
             fh = logging.FileHandler(self.path / "run.log")
             fh.setLevel(logging.DEBUG)
             fh.setFormatter(formatter)
             self.logger.addHandler(fh)
-        self.logger.debug("D - {}".format(self.data.D))
-        self.logger.debug("K - {}".format(self.K))
-        self.logger.debug("data.N - {}".format(self.data.N))
-        self.logger.debug("data.F - {}".format(self.data.F))
-        if self.control:
-            self.logger.debug("control.N - {}".format(self.control.N))
-            self.logger.debug("control.F - {}".format(self.control.F))
+        self.logger.info("Tapqir version - {}".format(tapqir_version))
+        self.logger.info("Model - {}".format(self.name))
         self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
         self.logger.info("Learning rate - {}".format(self.lr))
         self.logger.info("Batch size - {}".format(self.batch_size))
+        self.logger.info("Floating precision - {}".format(self.dtype))
         self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def save_checkpoint(self):
@@ -280,9 +252,9 @@ class Model(nn.Module):
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.labels is not None and self.name == "hmm":
+        if self.data.ontarget.labels is not None and self.name == "hmm":
             pred_labels = self.z_map.cpu().numpy().ravel()
-            true_labels = self.data.labels["z"].ravel()
+            true_labels = self.data.ontarget.labels["z"].ravel()
 
             metrics = {}
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -320,7 +292,7 @@ class Model(nn.Module):
 
         global_params.to_csv(self.path / "global_params.csv")
         self._rolling.to_csv(self.path / "rolling_params.csv")
-        self.logger.info("Step #{}.".format(self.iter))
+        self.logger.debug("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None):
         path = Path(path) if path else self.path
