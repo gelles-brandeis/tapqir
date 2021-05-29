@@ -309,12 +309,10 @@ class MainWindow(QMainWindow):
         self.item["zoom"] = pg.PlotDataItem(
             pen=C[2], symbol="o", symbolBrush=C[2], symbolPen=None, symbolSize=5
         )
-        offset_max = np.percentile(self.Model.data.offset.cpu().numpy(), 99.5)
-        offset_min = np.percentile(self.Model.data.offset.cpu().numpy(), 0.5)
         y, x = np.histogram(
-            self.Model.data.offset.cpu().numpy(),
-            range=(offset_min, offset_max),
-            bins=max(1, int(offset_max - offset_min)),
+            self.Model.data.offset.data.numpy(),
+            range=(self.Model.data.offset.min, self.Model.data.offset.max),
+            bins=max(1, int(self.Model.data.max - self.Model.data.min)),
             density=True,
         )
         plt = widget.addPlot(row=1, col=5)
