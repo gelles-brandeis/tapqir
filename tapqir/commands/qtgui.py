@@ -230,9 +230,9 @@ class MainWindow(QMainWindow):
             self.img_ideal[i] = pg.ImageItem()
             self.box_ideal[i].addItem(self.img_ideal[i])
 
-        img = pg.ImageItem(self.Model.data.data.cpu().numpy())
-        range_min = np.percentile(self.Model.data.data.cpu().numpy(), 0.5)
-        range_max = np.percentile(self.Model.data.data.cpu().numpy(), 99.5)
+        img = pg.ImageItem(self.Model.data.ontarget.data.numpy())
+        range_min = np.percentile(self.Model.data.ontarget.data.numpy(), 0.5)
+        range_max = np.percentile(self.Model.data.ontarget.data.numpy(), 99.5)
         self.hist = HistogramLUTGraph(self.img, image=img)
         self.hist.setLevels(min=self.Model.data.vmin, max=self.Model.data.vmax)
         self.hist.setHistogramRange(range_min, range_max)
@@ -250,21 +250,20 @@ class MainWindow(QMainWindow):
             self.Model.data.offset.mean
             + pyro.param("d/b_loc").data[n, frames, None, None]
         )
-        gaussian = self.Model.data_loc(
+        gaussian = self.Model.gaussian(
             pyro.param("d/h_loc")
             .data[:, n, frames]
             .masked_fill(self.Model.m_probs[:, n, frames] < 0.5, 0.0),
             pyro.param("d/w_mean").data[:, n, frames],
             pyro.param("d/x_mean").data[:, n, frames],
             pyro.param("d/y_mean").data[:, n, frames],
-            n,
-            frames,
+            self.Model.data.ontarget.xy[n, frames],
         )
         img_ideal = img_ideal + gaussian.sum(-4)
         for f in range(f1, f2):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
-                self.Model.data[int(self.aoiNumber.text()), f].cpu().numpy()
+                self.Model.data.ontarget.data[int(self.aoiNumber.text()), f].numpy()
             )
             self.prob[(f - f1) % 100].setOpts(
                 height=(

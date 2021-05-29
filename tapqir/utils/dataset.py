@@ -52,11 +52,11 @@ class OffsetData(namedtuple("OffsetData", ["data", "device"])):
 
     @lazy_property
     def max(self):
-        return quantile(self.data.flatten(), 0.995).item()
+        return quantile(self.data.flatten().float(), 0.995).item()
 
     @lazy_property
     def min(self):
-        return quantile(self.data.flatten(), 0.005).item()
+        return quantile(self.data.flatten().float(), 0.005).item()
 
     @lazy_property
     def samples(self):
@@ -111,11 +111,11 @@ class CosmosDataset:
 
     @lazy_property
     def vmin(self):
-        return quantile(self.ontarget.data.flatten(), 0.05).item()
+        return quantile(self.ontarget.data.flatten().float(), 0.05).item()
 
     @lazy_property
     def vmax(self):
-        return quantile(self.ontarget.data.flatten(), 0.99).item()
+        return quantile(self.ontarget.data.flatten().float(), 0.99).item()
 
     def __repr__(self):
         return f"{self.__class__.__name__}(N={self.ontarget.N}, F={self.ontarget.F}, P={self.ontarget.P})"
