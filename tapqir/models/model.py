@@ -128,7 +128,7 @@ class Model:
         # load fit results
         if (self.path / "params.tpqr").is_file():
             self.params = torch.load(self.path / "params.tpqr")
-        if (self.path / "theta_samples.pt").is_file():
+        if (self.path / "theta_samples.tpqr").is_file():
             self.theta_samples = torch.load(self.path / "theta_samples.tpqr")
 
     def settings(self, lr=0.005, batch_size=0, jit=False):
