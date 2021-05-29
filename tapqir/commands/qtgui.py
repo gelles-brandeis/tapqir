@@ -247,7 +247,7 @@ class MainWindow(QMainWindow):
         f2 = int(f2)
         frames = torch.arange(f1, f2)
         img_ideal = (
-            self.Model.data.offset_mean
+            self.Model.data.offset.mean
             + pyro.param("d/b_loc").data[n, frames, None, None]
         )
         gaussian = self.Model.data_loc(
@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
         y, x = np.histogram(
             self.Model.data.offset.data.numpy(),
             range=(self.Model.data.offset.min, self.Model.data.offset.max),
-            bins=max(1, int(self.Model.data.max - self.Model.data.min)),
+            bins=max(1, int(self.Model.data.offset.max - self.Model.data.offset.min)),
             density=True,
         )
         plt = widget.addPlot(row=1, col=5)
