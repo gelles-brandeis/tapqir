@@ -87,9 +87,9 @@ def save_stats(model, path):
             data["converged"] = True
 
     # classification statistics
-    if model.data.labels is not None:
+    if model.data.ontarget.labels is not None:
         pred_labels = model.z_map.cpu().numpy().ravel()
-        true_labels = model.data.labels["z"].ravel()
+        true_labels = model.data.ontarget.labels["z"].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             data["MCC"] = matthews_corrcoef(true_labels, pred_labels)
@@ -100,7 +100,7 @@ def save_stats(model, path):
             true_labels, pred_labels, labels=(0, 1)
         ).ravel()
 
-        mask = torch.from_numpy(model.data.labels["z"])
+        mask = torch.from_numpy(model.data.ontarget.labels["z"])
         samples = torch.masked_select(model.z_marginal.cpu(), mask)
         if len(samples):
             z_ll, z_ul = pi(samples, 0.68)
