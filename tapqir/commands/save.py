@@ -38,10 +38,7 @@ class Save(Command):
             help="Available models: {}".format(", ".join(models.keys())),
         )
         parser.add_argument(
-            "dataset_path", default=".", type=str, help="Path to the dataset folder"
-        )
-        parser.add_argument(
-            "parameters_path", type=str, help="Path to the parameters folder"
+            "path", default=".", type=str, help="Path to the dataset folder"
         )
         parser.add_argument(
             "-backend", metavar="BACKEND", type=str, help="Pyro backend (default: pyro)"
@@ -67,11 +64,10 @@ class Save(Command):
     def take_action(self, args):
         # read options.cfg file
         config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(args.dataset_path) / "options.cfg"
+        cfg_file = Path(args.path) / "options.cfg"
         config.read(cfg_file)
 
         backend = args.backend or config["fit"].get("backend")
-        device = args.dev or config["fit"].get("device")
         dtype = args.dtype or config["fit"].get("dtype")
 
         # pyro backend
@@ -88,10 +84,10 @@ class Save(Command):
 
         with pyro_backend(PYRO_BACKEND):
 
-            model = models[args.model](1, 2, device, dtype)
-            model.load_data(args.dataset_path)
-            model.load_parameters(args.parameters_path)
+            model = models[args.model](1, 2, "cpu", dtype)
+            model.load(args.path)
+            model.load_checkpoint(param_only=True)
 
-            save_stats(model, args.parameters_path)
+            save_stats(model, args.path)
             if args.matlab:
-                save_matlab(model, args.parameters_path)
+                save_matlab(model, args.path)

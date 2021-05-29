@@ -96,13 +96,12 @@ class ZoomWindow(QScrollArea):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, model, dataset, parameters, control=False):
+    def __init__(self, model, path):
         super().__init__()
 
         self.Model = model
-        self.parameters = parameters
-        self.Model.load_data(dataset)
-        self.Model.load_parameters(self.parameters)
+        self.path = path
+        self.Model.load(path)
 
         self.initUI()
 
@@ -177,7 +176,7 @@ class MainWindow(QMainWindow):
         self.vbox.addLayout(layout)
 
     def refreshParams(self):
-        self.Model.load_parameters(self.parameters)
+        self.Model.load(self.path)
         self.updateParams(0)
 
     def updateRange(self):

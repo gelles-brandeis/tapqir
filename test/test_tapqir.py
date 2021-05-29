@@ -7,7 +7,6 @@ import pytest
 import torch
 from PySide2.QtCore import Qt
 
-from tapqir import __version__ as tapqir_version
 from tapqir.commands.qtgui import MainWindow
 from tapqir.models import Cosmos
 from tapqir.utils.dataset import save
@@ -42,7 +41,6 @@ def dataset_path(tmp_path):
 
 
 def test_commands_cpu(dataset_path, qtbot):
-    parameters_path = dataset_path / "cosmos" / tapqir_version.split("+")[0]
 
     commands = [
         ["tapqir", "config", dataset_path],
@@ -63,7 +61,6 @@ def test_commands_cpu(dataset_path, qtbot):
             "save",
             "cosmos",
             dataset_path,
-            parameters_path,
             "-dev",
             "cpu",
         ],
@@ -87,7 +84,7 @@ def test_commands_cpu(dataset_path, qtbot):
         check_call(command)
 
     model = Cosmos()
-    window = MainWindow(model, dataset_path, parameters_path)
+    window = MainWindow(model, dataset_path)
     qtbot.addWidget(window)
     qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
     qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)

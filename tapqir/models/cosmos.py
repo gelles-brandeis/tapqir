@@ -92,7 +92,8 @@ class Cosmos(Model):
         samples = torch.zeros(
             num_samples, self.data.ontarget.N, self.data.ontarget.F
         ).long()
-        split_size = self.batch_size
+        batch_size = self.batch_size
+        split_size = 1 + self.batch_size // 2
         self.batch_size = None
         for i in tqdm(range(num_samples)):
             for ndx in torch.split(torch.arange(self.data.ontarget.N), split_size):
@@ -105,7 +106,7 @@ class Cosmos(Model):
                 trace = handlers.trace(inferred_model).get_trace()
                 samples[i, ndx] = trace.nodes["d/theta"]["value"]
         self.theta_samples = samples
-        self.batch_size = split_size
+        self.batch_size = batch_size
 
     @lazy_property
     def z_probs(self):

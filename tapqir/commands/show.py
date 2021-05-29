@@ -26,10 +26,7 @@ class Show(Command):
             help="Available models: {}".format(", ".join(models.keys())),
         )
         parser.add_argument(
-            "dataset_path", default=".", type=str, help="Path to the dataset folder"
-        )
-        parser.add_argument(
-            "parameters_path", type=str, help="Path to the parameters folder"
+            "path", default=".", type=str, help="Path to the dataset folder"
         )
         parser.add_argument(
             "-backend", metavar="BACKEND", type=str, help="Pyro backend (default: pyro)"
@@ -40,7 +37,7 @@ class Show(Command):
     def take_action(self, args):
         # read options.cfg file
         config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(args.dataset_path) / "options.cfg"
+        cfg_file = Path(args.path) / "options.cfg"
         config.read(cfg_file)
 
         backend = args.backend or config["fit"].get("backend")
@@ -55,5 +52,5 @@ class Show(Command):
         with pyro_backend(PYRO_BACKEND):
             model = models[args.model](1, 2, "cpu", "float")
             app = QApplication(sys.argv)
-            MainWindow(model, args.dataset_path, args.parameters_path)
+            MainWindow(model, args.path)
             sys.exit(app.exec_())

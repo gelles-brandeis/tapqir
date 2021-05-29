@@ -78,7 +78,7 @@ def save_stats(model, path):
         local_params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
         local_params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
         local_params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
-    torch.save(local_params_dict, path / "local_params.pt")
+    torch.save(local_params_dict, path / "params.tpqr")
 
     # check convergence status
     data["converged"] = False

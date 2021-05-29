@@ -38,10 +38,10 @@ def main(args):
     # calculate snr
 
     model = Cosmos(1, 2, device, args.dtype)
-    data_path = Path(args.path)
-    if data_path is not None:
+    if args.path is not None:
+        data_path = Path(args.path)
         try:
-            model.load_data(data_path)
+            model.load(data_path)
         except FileNotFoundError:
             simulate(
                 model,
@@ -84,13 +84,11 @@ def main(args):
     model.run(args.it)
     # compute and save theta_samples
     model._compute_theta_samples(args.num_samples)
-    if data_path is not None:
-        torch.save(model.theta_samples, model.path / "theta_samples.pt")
-        param_path = model.path
+    if args.path is not None:
+        torch.save(model.theta_samples, model.path / "theta_samples.tpqr")
         model = Cosmos(1, 2, "cpu", args.dtype)
-        model.load_data(data_path)
-        model.load_parameters(param_path)
-        save_stats(model, param_path)
+        model.load(args.path)
+        save_stats(model, args.path)
 
 
 if __name__ == "__main__":
