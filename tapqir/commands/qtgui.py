@@ -186,7 +186,7 @@ class MainWindow(QMainWindow):
 
     def show_new_window(self, checked):
         if self.w is None:
-            self.lr = pg.LinearRegionItem([0, min(self.Model.data.F, 100)])
+            self.lr = pg.LinearRegionItem([0, min(self.Model.data.ontarget.F, 100)])
             self.plot["zoom"].addItem(self.lr)
             self.w = ImagesWindow()
             self.initImages()
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow):
         else:
             self.plot["zoom"].removeItem(self.lr)
             for p in self.params:
-                self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
+                self.plot[p].setXRange(0, self.Model.data.ontarget.F, padding=0.01)
             self.w.close()  # Close window.
             self.w = None  # Discard reference.
 
@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
         self.item = {}
         self.plot["zoom"] = widget.addPlot(row=1, col=0, colspan=5)
         self.plot["zoom"].setLabel("left", "zoom")
-        self.plot["zoom"].setXRange(0, self.Model.data.F, padding=0.01)
+        self.plot["zoom"].setXRange(0, self.Model.data.ontarget.F, padding=0.01)
         self.item["zoom"] = pg.PlotDataItem(
             pen=C[2], symbol="o", symbolBrush=C[2], symbolPen=None, symbolSize=5
         )
@@ -330,7 +330,7 @@ class MainWindow(QMainWindow):
             self.plot[p] = widget.addPlot(row=i + 2, col=0, colspan=5)
             self.plot[p].addLegend()
             self.plot[p].setLabel("left", p)
-            self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
+            self.plot[p].setXRange(0, self.Model.data.ontarget.F, padding=0.01)
             self.plot[p].getViewBox().setMouseMode(pg.ViewBox.RectMode)
 
             self.plot[f"{p}Hist"] = widget.addPlot(row=i + 2, col=5)
