@@ -115,10 +115,11 @@ class Model:
         self.run_path = self.path / f"{self.name}" / tapqir_version.split("+")[0]
 
         # status
-        for line in reversed(list(open(self.run_path / "run.log"))):
-            if "model converged" in line:
-                self.status = "Trained"
-                break
+        if (self.run_path / "run.log").is_file():
+            for line in reversed(list(open(self.run_path / "run.log"))):
+                if "model converged" in line:
+                    self.status = "Trained"
+                    break
 
         # load data
         self.data = load(self.path, self.device)
