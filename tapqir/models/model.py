@@ -346,23 +346,23 @@ class Model:
             \text{ for } \theta_{nf} = k`
         """
         with torch.no_grad():
-            weights = self.data_loc(
+            weights = self.gaussian(
                 torch.ones(1),
                 pyro.param("d/w_mean"),
                 pyro.param("d/x_mean"),
                 pyro.param("d/y_mean"),
-                torch.arange(self.data.N),
+                self.data.ontarget.xy,
             )
             signal = (
                 (
-                    self.data.data
+                    self.data.ontarget.data
                     - pyro.param("d/b_loc")[..., None, None]
-                    - self.data.offset_mean[..., None, None]
+                    - self.data.offset.mean
                 )
                 * weights
             ).sum(dim=(-2, -1))
             noise = (
-                self.data.offset_var + pyro.param("d/b_loc") * pyro.param("gain_loc")
+                self.data.offset.var + pyro.param("d/b_loc") * pyro.param("gain_loc")
             ).sqrt()
             result = signal / noise
             mask = self.z_probs > 0.5
