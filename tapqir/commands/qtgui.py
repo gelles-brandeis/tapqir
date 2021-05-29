@@ -101,7 +101,7 @@ class MainWindow(QMainWindow):
 
         self.Model = model
         self.parameters = parameters
-        self.Model.load(dataset, control)
+        self.Model.load_data(dataset)
         self.Model.load_parameters(self.parameters)
 
         self.initUI()
