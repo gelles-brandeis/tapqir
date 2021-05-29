@@ -11,6 +11,7 @@ from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
 from tapqir.models import HMM, Cosmos
+from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 from tapqir.utils.stats import save_stats
 
@@ -33,10 +34,10 @@ def main(args):
     params["background"] = 150
 
     model = Cosmos(1, 2, device, args.dtype)
-    data_path = args.path
+    data_path = Path(args.path)
     if data_path is not None:
         try:
-            model.load(data_path, True)
+            model.load_data(data_path)
         except FileNotFoundError:
             hmm = HMM(1, 2, device, args.dtype)
             hmm.vectorized = False
@@ -49,8 +50,9 @@ def main(args):
                 params=params,
             )
             # save data
-            hmm.data.save(data_path)
-            hmm.control.save(data_path)
+            if not data_path.is_dir():
+                data_path.mkdir()
+            save(model.data, data_path)
             # calculate snr
             rv = dist.MultivariateNormal(
                 torch.tensor([(args.P - 1) / 2, (args.P - 1) / 2]),
