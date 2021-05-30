@@ -121,6 +121,7 @@ class Cosmos(Model):
                 .to(self.dtype)
                 .mean(0)
                 .permute(2, 0, 1)
+                .to(self.device)
             )
         except AttributeError:
             return torch.zeros(self.K, self.data.ontarget.N, self.data.ontarget.F)

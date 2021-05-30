@@ -142,6 +142,8 @@ class Model:
             self.params = torch.load(self.path / "params.tpqr")
         if (self.path / "theta_samples.tpqr").is_file():
             self.theta_samples = torch.load(self.path / "theta_samples.tpqr")
+        if (self.path / "statistics.csv").is_file():
+            self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
 
     def settings(self, lr=0.005, batch_size=0, jit=False):
         # K - max number of spots
