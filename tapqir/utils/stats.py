@@ -75,21 +75,38 @@ def save_stats(model, path):
             data[f"{param}_ul"] = ci_stats[param]["ul"].item()
     local_params_dict = {}
     for param in local_params:
-        local_params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
-        local_params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
-        local_params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
-    torch.save(local_params_dict, path / "local_params.pt")
+        if param == "d/background":
+            local_params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
+            local_params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
+            local_params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
+        elif param.endswith("_0"):
+            base_name = param.split("_")[0]
+            local_params_dict[f"{base_name}_mean"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["mean"] for k in range(model.K)], dim=0
+            )
+            local_params_dict[f"{base_name}_ll"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["ll"] for k in range(model.K)], dim=0
+            )
+            local_params_dict[f"{base_name}_ul"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["ul"] for k in range(model.K)], dim=0
+            )
+    local_params_dict["d/m_probs"] = model.m_probs.data
+    local_params_dict["d/z_probs"] = model.z_probs.data
+    local_params_dict["d/j_probs"] = model.j_probs.data
+    local_params_dict["z_marginal"] = model.z_marginal.data
+    local_params_dict["z_map"] = model.z_map.data
+    torch.save(local_params_dict, path / "params.tpqr")
 
     # check convergence status
     data["converged"] = False
-    for line in open(path / "run.log"):
+    for line in open(model.run_path / "run.log"):
         if "model converged" in line:
             data["converged"] = True
 
     # classification statistics
-    if model.data.labels is not None:
+    if model.data.ontarget.labels is not None:
         pred_labels = model.z_map.cpu().numpy().ravel()
-        true_labels = model.data.labels["z"].ravel()
+        true_labels = model.data.ontarget.labels["z"].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             data["MCC"] = matthews_corrcoef(true_labels, pred_labels)
@@ -100,7 +117,7 @@ def save_stats(model, path):
             true_labels, pred_labels, labels=(0, 1)
         ).ravel()
 
-        mask = torch.from_numpy(model.data.labels["z"])
+        mask = torch.from_numpy(model.data.ontarget.labels["z"])
         samples = torch.masked_select(model.z_marginal.cpu(), mask)
         if len(samples):
             z_ll, z_ul = pi(samples, 0.68)

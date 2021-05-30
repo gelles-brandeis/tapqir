@@ -10,7 +10,7 @@ from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
 
 
-def simulate(model, N, F, D=14, seed=0, params=dict()):
+def simulate(model, N, F, P=14, seed=0, params=dict()):
     pyro.set_rng_seed(seed)
     pyro.clear_param_store()
 
@@ -60,39 +60,48 @@ def simulate(model, N, F, D=14, seed=0, params=dict()):
             samples[f"c/height_{k}"] = torch.full((1, N, F), params["height"])
 
     offset = torch.full((3,), params["offset"])
-    target_locs = torch.full((N, F, 2), (D - 1) / 2)
+    target_locs = torch.full((N, F, 2), (P - 1) / 2)
     model.data = CosmosDataset(
-        torch.full((N, F, D, D), params["background"] + params["offset"]),
+        torch.full((N, F, P, P), params["background"] + params["offset"]),
         target_locs,
-        dtype="test",
-        device=model.device,
+        None,
+        torch.full((N, F, P, P), params["background"] + params["offset"]),
+        target_locs,
+        None,
         offset=offset,
+        device=model.device,
     )
-    model.control = CosmosDataset(
-        torch.zeros(N, F, D, D), target_locs, dtype="control", device=model.device
-    )
-    model.data_loc = GaussianSpot(model.data.target_locs, model.data.D)
-    model.control_loc = GaussianSpot(model.control.target_locs, model.control.D)
+    model.gaussian = GaussianSpot(P)
 
     # sample
     predictive = Predictive(
         handlers.uncondition(model.model), posterior_samples=samples, num_samples=1
     )
     samples = predictive()
-    model.data.labels = np.zeros(
-        (N, F), dtype=[("aoi", int), ("frame", int), ("z", bool)]
-    )
-    model.data.labels["aoi"] = np.arange(N).reshape(-1, 1)
-    model.data.labels["frame"] = np.arange(F)
+    data = torch.zeros(N, F, P, P)
+    control = torch.zeros(N, F, P, P)
+    labels = np.zeros((N, F), dtype=[("aoi", int), ("frame", int), ("z", bool)])
+    labels["aoi"] = np.arange(N).reshape(-1, 1)
+    labels["frame"] = np.arange(F)
     if "pi" in params:
-        model.data.data = samples["d/data"][0].data.floor()
-        model.control.data = samples["c/data"][0].data.floor()
-        model.data.labels["z"] = samples["d/theta"][0].cpu() > 0
+        data = samples["d/data"][0].data.floor()
+        control = samples["c/data"][0].data.floor()
+        labels["z"] = samples["d/theta"][0].cpu() > 0
     else:
         # kinetic simulations
         for f in range(F):
-            model.data.data[:, f : f + 1] = samples[f"d/data_{f}"][0].data.floor()
-            model.data.labels["z"][:, f : f + 1] = samples[f"d/theta_{f}"][0].cpu() > 0
-        model.control.data = samples["c/data"][0].data.floor()
+            data[:, f : f + 1] = samples[f"d/data_{f}"][0].data.floor()
+            labels["z"][:, f : f + 1] = samples[f"d/theta_{f}"][0].cpu() > 0
+        control = samples["c/data"][0].data.floor()
+    model.data = CosmosDataset(
+        data,
+        target_locs,
+        labels,
+        control,
+        target_locs,
+        None,
+        offset=offset,
+        device=model.device,
+    )
 
     return model

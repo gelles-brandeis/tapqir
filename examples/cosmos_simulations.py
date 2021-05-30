@@ -12,6 +12,7 @@ from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
 from tapqir.models import Cosmos
+from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 from tapqir.utils.stats import save_stats
 
@@ -37,29 +38,30 @@ def main(args):
     # calculate snr
 
     model = Cosmos(1, 2, device, args.dtype)
-    data_path = args.path
-    if data_path is not None:
+    if args.path is not None:
+        data_path = Path(args.path)
         try:
-            model.load(data_path, True)
+            model.load(data_path)
         except FileNotFoundError:
             simulate(
                 model,
                 args.N,
                 args.F,
-                args.D,
+                args.P,
                 seed=args.seed,
                 params=params,
             )
             # save data
-            model.data.save(data_path)
-            model.control.save(data_path)
+            if not data_path.is_dir():
+                data_path.mkdir()
+            save(model.data, data_path)
             # calculate snr
             rv = dist.MultivariateNormal(
-                torch.tensor([(args.D - 1) / 2, (args.D - 1) / 2]),
+                torch.tensor([(args.P - 1) / 2, (args.P - 1) / 2]),
                 scale_tril=torch.eye(2) * params["width"],
             )
 
-            D_range = torch.arange(args.D, dtype=model.dtype)
+            D_range = torch.arange(args.P, dtype=model.dtype)
             i_pixel, j_pixel = torch.meshgrid(D_range, D_range)
             ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
             weights = rv.log_prob(ij_pixel).exp()
@@ -70,25 +72,23 @@ def main(args):
             params["F"] = args.F
             params["Nc"] = args.N
             params["Fc"] = args.F
-            params["P"] = args.D
+            params["P"] = args.P
 
             pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
             pyro.clear_param_store()
     else:
-        simulate(model, args.N, args.F, args.D, seed=args.seed, params=params)
+        simulate(model, args.N, args.F, args.P, seed=args.seed, params=params)
         pyro.clear_param_store()
 
     model.settings(args.lr, args.bs, args.jit)
     model.run(args.it)
     # compute and save theta_samples
     model._compute_theta_samples(args.num_samples)
-    if data_path is not None:
-        torch.save(model.theta_samples, model.path / "theta_samples.pt")
-        param_path = model.path
+    if args.path is not None:
+        torch.save(model.theta_samples, model.path / "theta_samples.tpqr")
         model = Cosmos(1, 2, "cpu", args.dtype)
-        model.load(data_path, False)
-        model.load_parameters(param_path)
-        save_stats(model, param_path)
+        model.load(args.path)
+        save_stats(model, args.path)
 
 
 if __name__ == "__main__":
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument("--height", default=3000, type=int)  # default 3000
     parser.add_argument("-N", default=5, type=int)
     parser.add_argument("-F", default=500, type=int)
-    parser.add_argument("-D", default=14, type=int)
+    parser.add_argument("-P", default=14, type=int)
     parser.add_argument("-it", default=100, type=int)
     parser.add_argument("-bs", default=0, type=int)
     parser.add_argument("-lr", default=0.005, type=float)

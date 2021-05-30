@@ -9,7 +9,6 @@ import pyqtgraph as pg
 import torch
 from pyqtgraph import HistogramLUTItem
 from pyro.ops.stats import quantile
-from pyroapi import pyro
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIntValidator
 from PySide2.QtWidgets import (
@@ -96,13 +95,12 @@ class ZoomWindow(QScrollArea):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, model, dataset, parameters, control=False):
+    def __init__(self, model, path):
         super().__init__()
 
         self.Model = model
-        self.parameters = parameters
-        self.Model.load(dataset, control)
-        self.Model.load_parameters(self.parameters)
+        self.path = path
+        self.Model.load(path)
 
         self.initUI()
 
@@ -147,13 +145,13 @@ class MainWindow(QMainWindow):
         self.aoiDecrLarge.clicked.connect(partial(self.updateParams, -10))
 
         self.aoiNumber = QLineEdit("0")
-        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.N - 1))
+        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.ontarget.N - 1))
         self.aoiNumber.setMaximumWidth(50)
         self.aoiNumber.setAlignment(Qt.AlignRight)
         self.aoiNumber.returnPressed.connect(partial(self.updateParams, 0))
 
-        self.aoiLabel = QLabel("Aoi")
-        self.aoiMax = QLabel(f"/{self.Model.data.N}")
+        self.aoiLabel = QLabel("AOI")
+        self.aoiMax = QLabel(f"/{self.Model.data.ontarget.N}")
         self.hspacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.w = None
@@ -177,7 +175,7 @@ class MainWindow(QMainWindow):
         self.vbox.addLayout(layout)
 
     def refreshParams(self):
-        self.Model.load_parameters(self.parameters)
+        self.Model.load(self.path)
         self.updateParams(0)
 
     def updateRange(self):
@@ -186,7 +184,7 @@ class MainWindow(QMainWindow):
 
     def show_new_window(self, checked):
         if self.w is None:
-            self.lr = pg.LinearRegionItem([0, min(self.Model.data.F, 100)])
+            self.lr = pg.LinearRegionItem([0, min(self.Model.data.ontarget.F, 100)])
             self.plot["zoom"].addItem(self.lr)
             self.w = ImagesWindow()
             self.initImages()
@@ -200,7 +198,7 @@ class MainWindow(QMainWindow):
         else:
             self.plot["zoom"].removeItem(self.lr)
             for p in self.params:
-                self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
+                self.plot[p].setXRange(0, self.Model.data.ontarget.F, padding=0.01)
             self.w.close()  # Close window.
             self.w = None  # Discard reference.
 
@@ -230,9 +228,9 @@ class MainWindow(QMainWindow):
             self.img_ideal[i] = pg.ImageItem()
             self.box_ideal[i].addItem(self.img_ideal[i])
 
-        img = pg.ImageItem(self.Model.data.data.cpu().numpy())
-        range_min = np.percentile(self.Model.data.data.cpu().numpy(), 0.5)
-        range_max = np.percentile(self.Model.data.data.cpu().numpy(), 99.5)
+        img = pg.ImageItem(self.Model.data.ontarget.data.numpy())
+        range_min = np.percentile(self.Model.data.ontarget.data.numpy(), 0.5)
+        range_max = np.percentile(self.Model.data.ontarget.data.numpy(), 99.5)
         self.hist = HistogramLUTGraph(self.img, image=img)
         self.hist.setLevels(min=self.Model.data.vmin, max=self.Model.data.vmax)
         self.hist.setHistogramRange(range_min, range_max)
@@ -247,29 +245,30 @@ class MainWindow(QMainWindow):
         f2 = int(f2)
         frames = torch.arange(f1, f2)
         img_ideal = (
-            self.Model.data.offset_mean
-            + pyro.param("d/b_loc").data[n, frames, None, None]
+            self.Model.data.offset.mean
+            + self.Model.params["d/background_mean"][n, frames, None, None]
         )
-        gaussian = self.Model.data_loc(
-            pyro.param("d/h_loc")
-            .data[:, n, frames]
-            .masked_fill(self.Model.m_probs[:, n, frames] < 0.5, 0.0),
-            pyro.param("d/w_mean").data[:, n, frames],
-            pyro.param("d/x_mean").data[:, n, frames],
-            pyro.param("d/y_mean").data[:, n, frames],
-            n,
-            frames,
+        gaussian = self.Model.gaussian(
+            self.Model.params["d/height_mean"][:, n, frames].masked_fill(
+                self.Model.params["d/m_probs"][:, n, frames] < 0.5, 0.0
+            ),
+            self.Model.params["d/width_mean"][:, n, frames],
+            self.Model.params["d/x_mean"][:, n, frames],
+            self.Model.params["d/y_mean"][:, n, frames],
+            self.Model.data.ontarget.xy[n, frames],
         )
         img_ideal = img_ideal + gaussian.sum(-4)
         for f in range(f1, f2):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
-                self.Model.data[int(self.aoiNumber.text()), f].cpu().numpy()
+                self.Model.data.ontarget.data[int(self.aoiNumber.text()), f].numpy()
             )
             self.prob[(f - f1) % 100].setOpts(
                 height=(
-                    self.Model.z_probs[:, int(self.aoiNumber.text()), f].sum()
-                    * self.Model.data.D,
+                    self.Model.params["d/z_probs"][
+                        :, int(self.aoiNumber.text()), f
+                    ].sum()
+                    * self.Model.data.P,
                 )
             )
             # ideal image
@@ -305,16 +304,14 @@ class MainWindow(QMainWindow):
         self.item = {}
         self.plot["zoom"] = widget.addPlot(row=1, col=0, colspan=5)
         self.plot["zoom"].setLabel("left", "zoom")
-        self.plot["zoom"].setXRange(0, self.Model.data.F, padding=0.01)
+        self.plot["zoom"].setXRange(0, self.Model.data.ontarget.F, padding=0.01)
         self.item["zoom"] = pg.PlotDataItem(
             pen=C[2], symbol="o", symbolBrush=C[2], symbolPen=None, symbolSize=5
         )
-        offset_max = np.percentile(self.Model.data.offset.cpu().numpy(), 99.5)
-        offset_min = np.percentile(self.Model.data.offset.cpu().numpy(), 0.5)
         y, x = np.histogram(
-            self.Model.data.offset.cpu().numpy(),
-            range=(offset_min, offset_max),
-            bins=max(1, int(offset_max - offset_min)),
+            self.Model.data.offset.data.numpy(),
+            range=(self.Model.data.offset.min, self.Model.data.offset.max),
+            bins=max(1, int(self.Model.data.offset.max - self.Model.data.offset.min)),
             density=True,
         )
         plt = widget.addPlot(row=1, col=5)
@@ -330,96 +327,37 @@ class MainWindow(QMainWindow):
             self.plot[p] = widget.addPlot(row=i + 2, col=0, colspan=5)
             self.plot[p].addLegend()
             self.plot[p].setLabel("left", p)
-            self.plot[p].setXRange(0, self.Model.data.F, padding=0.01)
+            self.plot[p].setXRange(0, self.Model.data.ontarget.F, padding=0.01)
             self.plot[p].getViewBox().setMouseMode(pg.ViewBox.RectMode)
 
             self.plot[f"{p}Hist"] = widget.addPlot(row=i + 2, col=5)
             if p == "z":
-                y, x = np.histogram(self.Model.z_probs.numpy(), bins=50)
-            elif p == "d/height":
+                y, x = np.histogram(self.Model.params["d/z_probs"].numpy(), bins=50)
+            elif p == "d/background":
+                y, x = np.histogram(self.Model.params[f"{p}_mean"].numpy(), bins=50)
+            else:
                 y, x = np.histogram(
-                    pyro.param("d/h_loc").data.reshape(-1).numpy(),
+                    self.Model.params[f"{p}_mean"].flatten().numpy(),
                     bins=50,
-                    weights=self.Model.m_probs.reshape(-1).numpy(),
+                    weights=self.Model.params["d/m_probs"].reshape(-1).numpy(),
                 )
                 self.plot[f"{p}Hist"].setXRange(
                     0,
-                    quantile(pyro.param("d/h_loc").data.flatten(), 0.99).item() * 1.3,
+                    quantile(self.Model.params[f"{p}_mean"].flatten(), 0.99).item()
+                    * 1.3,
                     padding=0.01,
                 )
 
                 yz, xz = np.histogram(
-                    pyro.param("d/h_loc").data.reshape(-1).numpy(),
+                    self.Model.params[f"{p}_mean"].flatten().numpy(),
                     bins=50,
-                    weights=self.Model.z_probs.reshape(-1).numpy(),
+                    weights=self.Model.params["d/z_probs"].reshape(-1).numpy(),
                 )
 
                 yj, xj = np.histogram(
-                    pyro.param("d/h_loc").data.reshape(-1).numpy(),
+                    self.Model.params[f"{p}_mean"].flatten().numpy(),
                     bins=50,
-                    weights=self.Model.j_probs.reshape(-1).numpy(),
-                )
-
-            elif p == "d/width":
-                y, x = np.histogram(
-                    pyro.param("d/w_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.m_probs.reshape(-1).numpy(),
-                )
-
-                yz, xz = np.histogram(
-                    pyro.param("d/w_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.z_probs.reshape(-1).numpy(),
-                )
-
-                yj, xj = np.histogram(
-                    pyro.param("d/w_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.j_probs.reshape(-1).numpy(),
-                )
-
-            elif p == "d/x":
-                y, x = np.histogram(
-                    pyro.param("d/x_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.m_probs.reshape(-1).numpy(),
-                )
-
-                yz, xz = np.histogram(
-                    pyro.param("d/x_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.z_probs.reshape(-1).numpy(),
-                )
-
-                yj, xj = np.histogram(
-                    pyro.param("d/x_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.j_probs.reshape(-1).numpy(),
-                )
-
-            elif p == "d/y":
-                y, x = np.histogram(
-                    pyro.param("d/y_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.m_probs.reshape(-1).numpy(),
-                )
-
-                yz, xz = np.histogram(
-                    pyro.param("d/y_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.z_probs.reshape(-1).numpy(),
-                )
-
-                yj, xj = np.histogram(
-                    pyro.param("d/y_mean").data.reshape(-1).numpy(),
-                    bins=50,
-                    weights=self.Model.j_probs.reshape(-1).numpy(),
-                )
-
-            elif p == "d/background":
-                y, x = np.histogram(
-                    pyro.param("d/b_loc").data.reshape(-1).numpy(), bins=50
+                    weights=self.Model.params["d/j_probs"].reshape(-1).numpy(),
                 )
 
             self.item[f"{p}Hist_m"] = pg.PlotDataItem(
@@ -497,43 +435,44 @@ class MainWindow(QMainWindow):
         # set plot ranges
         self.plot["z"].setYRange(0, 1, padding=0.01)
         self.plot["d/x"].setYRange(
-            -(self.Model.data.D + 1) / 2, (self.Model.data.D + 1) / 2, padding=0.01
+            -(self.Model.data.P + 1) / 2,
+            (self.Model.data.P + 1) / 2,
+            padding=0.01,
         )
         self.plot["d/y"].setYRange(
-            -(self.Model.data.D + 1) / 2, (self.Model.data.D + 1) / 2, padding=0.01
+            -(self.Model.data.P + 1) / 2,
+            (self.Model.data.P + 1) / 2,
+            padding=0.01,
         )
         self.plot["d/background"].setYRange(
             0,
-            quantile(pyro.param("d/b_loc").data.flatten(), 0.99).item() * 1.1,
+            quantile(self.Model.params["d/background_mean"].flatten(), 0.99).item()
+            * 1.1,
             padding=0.01,
         )
 
         self.vbox.addWidget(widget)
 
     def updateParams(self, inc):
-        n = (int(self.aoiNumber.text()) + inc) % self.Model.data.N
+        n = (int(self.aoiNumber.text()) + inc) % self.Model.data.ontarget.N
         self.aoiNumber.setText(str(n))
 
         self.item["zoom"].setData(self.Model.z_marginal[n])
         for p in self.params:
             if p == "z":
                 self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
-                self.item["z_label"].setData(self.Model.data.labels["z"][n])
+                self.item["z_label"].setData(self.Model.data.ontarget.labels["z"][n])
             elif p == "d/background":
                 k = 0
-                self.item[f"{p}_ul"].setData(self.Model.local_params[f"{p}_ul"][n])
-                self.item[f"{p}_ll"].setData(self.Model.local_params[f"{p}_ll"][n])
-                self.item[f"{p}_mean"].setData(self.Model.local_params[f"{p}_mean"][n])
+                self.item[f"{p}_ul"].setData(self.Model.params[f"{p}_ul"][n])
+                self.item[f"{p}_ll"].setData(self.Model.params[f"{p}_ll"][n])
+                self.item[f"{p}_mean"].setData(self.Model.params[f"{p}_mean"][n])
             else:
                 for k in range(self.Model.K):
-                    self.item[f"{p}_{k}_ul"].setData(
-                        self.Model.local_params[f"{p}_{k}_ul"][n]
-                    )
-                    self.item[f"{p}_{k}_ll"].setData(
-                        self.Model.local_params[f"{p}_{k}_ll"][n]
-                    )
+                    self.item[f"{p}_{k}_ul"].setData(self.Model.params[f"{p}_ul"][k, n])
+                    self.item[f"{p}_{k}_ll"].setData(self.Model.params[f"{p}_ll"][k, n])
                     self.item[f"{p}_{k}_mean"].setData(
-                        self.Model.local_params[f"{p}_{k}_mean"][n]
+                        self.Model.params[f"{p}_mean"][k, n]
                     )
 
         if self.w is not None:

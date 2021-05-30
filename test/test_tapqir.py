@@ -7,9 +7,9 @@ import pytest
 import torch
 from PySide2.QtCore import Qt
 
-from tapqir import __version__ as tapqir_version
 from tapqir.commands.qtgui import MainWindow
 from tapqir.models import Cosmos
+from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
 requires_cuda = pytest.mark.skipif(
@@ -30,28 +30,17 @@ def dataset_path(tmp_path):
     params["background"] = 150
     N = 2
     F = 5
-    D = 14
+    P = 14
 
-    model = Cosmos(1, 2)
-    simulate(model, N, F, D, params=params)
+    model = Cosmos()
+    simulate(model, N, F, P, params=params)
 
     # save data
-    model.data.save(tmp_path)
-    model.control.save(tmp_path)
+    save(model.data, tmp_path)
     return tmp_path
 
 
 def test_commands_cpu(dataset_path, qtbot):
-    parameters_path = (
-        dataset_path
-        / "runs"
-        / "cosmos"
-        / tapqir_version.split("+")[0]
-        / "S1"
-        / "control"
-        / "lr0.005"
-        / "bs1"
-    )
 
     commands = [
         ["tapqir", "config", dataset_path],
@@ -72,7 +61,6 @@ def test_commands_cpu(dataset_path, qtbot):
             "save",
             "cosmos",
             dataset_path,
-            parameters_path,
             "-dev",
             "cpu",
         ],
@@ -96,7 +84,7 @@ def test_commands_cpu(dataset_path, qtbot):
         check_call(command)
 
     model = Cosmos()
-    window = MainWindow(model, dataset_path, parameters_path)
+    window = MainWindow(model, dataset_path)
     qtbot.addWidget(window)
     qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
     qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)
