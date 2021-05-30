@@ -107,7 +107,8 @@ class Cosmos(Model):
                 samples[i, ndx] = trace.nodes["d/theta"]["value"]
         self.theta_samples = samples
         self.batch_size = batch_size
-        torch.save(self.theta_samples, self.path / "theta_samples.tpqr")
+        if self.path is not None:
+            torch.save(self.theta_samples, self.path / "theta_samples.tpqr")
 
     @property
     def z_probs(self):
