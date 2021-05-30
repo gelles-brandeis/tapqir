@@ -80,7 +80,6 @@ class Model:
         self._S = S
         self._K = K
         self.batch_size = None
-        self.status = None
         # for plotting
         self.n = None
         self.data_path = None
@@ -125,13 +124,6 @@ class Model:
         # set path
         self.path = Path(path)
         self.run_path = self.path / f"{self.name}" / tapqir_version.split("+")[0]
-
-        # status
-        if (self.run_path / "run.log").is_file():
-            for line in reversed(list(open(self.run_path / "run.log"))):
-                if "model converged" in line:
-                    self.status = "Trained"
-                    break
 
         # load data
         self.data = load(self.path, self.device)
@@ -366,7 +358,7 @@ class Model:
             self.params["d/width_mean"],
             self.params["d/x_mean"],
             self.params["d/y_mean"],
-            self.data.ontarget.xy,
+            self.data.ontarget.xy.to(self.dtype),
         )
         signal = (
             (

@@ -111,11 +111,6 @@ def save_stats(model, path):
 
     # snr
     data.loc["SNR", "Mean"] = model.snr().mean().item()
-    # check convergence status
-    data.loc["trained", "Mean"] = False
-    for line in open(model.run_path / "run.log"):
-        if "model converged" in line:
-            data.loc["trained", "Mean"] = True
 
     # classification statistics
     if model.data.ontarget.labels is not None:
@@ -154,6 +149,11 @@ def save_stats(model, path):
 
     if path is not None:
         path = Path(path)
+        # check convergence status
+        data.loc["trained", "Mean"] = False
+        for line in open(model.run_path / "run.log"):
+            if "model converged" in line:
+                data.loc["trained", "Mean"] = True
         torch.save(params_dict, path / "params.tpqr")
         data.to_csv(
             path / "statistics.csv",
