@@ -24,11 +24,11 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
 
     @property
     def x(self):
-        return self.xy[0]
+        return self.xy[..., 0]
 
     @property
     def y(self):
-        return self.xy[1]
+        return self.xy[..., 1]
 
     @lazy_property
     def median(self):
