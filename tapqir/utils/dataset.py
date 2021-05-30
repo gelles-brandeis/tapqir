@@ -109,6 +109,10 @@ class CosmosDataset:
         )
         self.offset = OffsetData(offset, device)
 
+    @property
+    def P(self):
+        return self.ontarget.P
+
     @lazy_property
     def vmin(self):
         return quantile(self.ontarget.data.flatten().float(), 0.05).item()
@@ -118,10 +122,10 @@ class CosmosDataset:
         return quantile(self.ontarget.data.flatten().float(), 0.99).item()
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(N={self.ontarget.N}, F={self.ontarget.F}, P={self.ontarget.P})"
+        return f"{self.__class__.__name__}(N={self.ontarget.N}, F={self.ontarget.F}, P={self.P})"
 
     def __str__(self):
-        return f"{self.__class__.__name__}(N={self.ontarget.N}, F={self.ontarget.F}, P={self.ontarget.P})"
+        return f"{self.__class__.__name__}(N={self.ontarget.N}, F={self.ontarget.F}, P={self.P})"
 
 
 def save(obj, path):

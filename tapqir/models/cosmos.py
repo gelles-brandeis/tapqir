@@ -153,7 +153,7 @@ class Cosmos(Model):
         self.size = torch.stack(
             (
                 torch.tensor(2.0),
-                (((self.data.ontarget.P + 1) / (2 * self.proximity)) ** 2 - 1),
+                (((self.data.P + 1) / (2 * self.proximity)) ** 2 - 1),
             ),
             dim=-1,
         )
@@ -196,7 +196,7 @@ class Cosmos(Model):
                 pyro.param("proximity_loc"),
                 pyro.param("proximity_size"),
                 0,
-                (self.data.ontarget.P + 1) / math.sqrt(12),
+                (self.data.P + 1) / math.sqrt(12),
             ),
         )
         self.state_guide()
@@ -412,7 +412,7 @@ class Cosmos(Model):
             lambda: torch.tensor(0.5),
             constraint=constraints.interval(
                 0,
-                (self.data.ontarget.P + 1) / math.sqrt(12)
+                (self.data.P + 1) / math.sqrt(12)
                 - torch.finfo(self.dtype).eps,
             ),
         )

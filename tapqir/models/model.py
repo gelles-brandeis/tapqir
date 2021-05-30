@@ -123,7 +123,7 @@ class Model:
 
         # load data
         self.data = load(self.path, self.device)
-        self.gaussian = GaussianSpot(self.data.ontarget.P)
+        self.gaussian = GaussianSpot(self.data.P)
 
         # load fit results
         if (self.path / "params.tpqr").is_file():
