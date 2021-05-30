@@ -20,6 +20,7 @@ with open("README.rst", "r") as fh:
 EXTRAS_REQUIRE = [
     "notebook",
     "matplotlib",
+    "openpyxl",
 ]
 # tests
 TEST_REQUIRE = [
@@ -65,7 +66,8 @@ setuptools.setup(
         + [
             "nbsphinx",
             "sphinx",
-            "sphinx_rtd_theme",
+            "pydata_sphinx_theme",
+            "sphinx-panels",
         ],
     },
     classifiers=[
