@@ -2,7 +2,7 @@
 tapqir
 ======
 
-Bayesian analysis of the co-localization single-molecule microscopy image data.
+Bayesian analysis of co-localization single-molecule microscopy image data.
 
 .. |ci| image:: https://github.com/gelles-brandeis/cosmos/workflows/build/badge.svg
   :target: https://github.com/gelles-brandeis/cosmos/actions
