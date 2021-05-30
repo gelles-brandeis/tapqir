@@ -21,6 +21,7 @@ from tqdm import tqdm
 
 from tapqir import __version__ as tapqir_version
 from tapqir.utils.dataset import load
+from tapqir.utils.stats import save_stats
 
 
 class GaussianSpot:
@@ -332,6 +333,9 @@ class Model:
                     self.iter, path
                 )
             )
+
+    def compute_stats(self):
+        save_stats(self, self.path)
 
     def snr(self):
         r"""
