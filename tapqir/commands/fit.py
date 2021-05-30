@@ -4,7 +4,6 @@
 import configparser
 from pathlib import Path
 
-import torch
 from cliff.command import Command
 from pyroapi import pyro_backend
 
@@ -141,5 +140,5 @@ class Fit(Command):
             model.run(num_iter)
             if model.name == "cosmos":
                 # compute and save theta_samples
-                model._compute_theta_samples(num_samples)
-                torch.save(model.theta_samples, model.path / "theta_samples.tpqr")
+                model.compute_theta_samples(num_samples)
+            model.compute_stats()

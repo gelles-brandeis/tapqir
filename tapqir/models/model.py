@@ -21,6 +21,7 @@ from tqdm import tqdm
 
 from tapqir import __version__ as tapqir_version
 from tapqir.utils.dataset import load
+from tapqir.utils.stats import save_stats
 
 
 class GaussianSpot:
@@ -85,6 +86,8 @@ class Model:
         self.data_path = None
         # set device & dtype
         self.to(device, dtype)
+        self.path = None
+        self.run_path = None
 
     def to(self, device, dtype="double"):
         self.dtype = getattr(torch, dtype)
@@ -154,7 +157,7 @@ class Model:
         self.optim = self.optim_fn(self.optim_args)
         self.log()
 
-        if hasattr(self, "run_path"):
+        if self.run_path is not None:
             try:
                 self.load_checkpoint()
             except FileNotFoundError:
@@ -233,7 +236,7 @@ class Model:
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
 
-        if hasattr(self, "run_path"):
+        if self.run_path is not None:
             self.writer = SummaryWriter(log_dir=self.run_path / "tb")
             fh = logging.FileHandler(self.run_path / "run.log")
             fh.setLevel(logging.DEBUG)
@@ -332,6 +335,9 @@ class Model:
                     self.iter, path
                 )
             )
+
+    def compute_stats(self):
+        save_stats(self, self.path)
 
     def snr(self):
         r"""

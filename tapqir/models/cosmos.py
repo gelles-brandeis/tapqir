@@ -88,7 +88,7 @@ class Cosmos(Model):
     def ontarget(self):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
-    def _compute_theta_samples(self, num_samples):
+    def compute_theta_samples(self, num_samples):
         samples = torch.zeros(
             num_samples, self.data.ontarget.N, self.data.ontarget.F
         ).long()
@@ -107,8 +107,10 @@ class Cosmos(Model):
                 samples[i, ndx] = trace.nodes["d/theta"]["value"]
         self.theta_samples = samples
         self.batch_size = batch_size
+        if self.path is not None:
+            torch.save(self.theta_samples, self.path / "theta_samples.tpqr")
 
-    @lazy_property
+    @property
     def z_probs(self):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
@@ -135,7 +137,7 @@ class Cosmos(Model):
         r"""
         Probability of a spot :math:`p(m_{knf})`.
         """
-        return pyro.param("d/m_probs").data[..., 1]
+        return pyro.param("d/m_probs").data[..., 1].to(self.device)
 
     @property
     def z_marginal(self):

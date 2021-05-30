@@ -44,7 +44,6 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
 
 
 def save_stats(model, path):
-    path = Path(path)
     # change device to cpu
     model.to("cpu")
     model.batch_size = model.n = None
@@ -109,7 +108,6 @@ def save_stats(model, path):
     params_dict["z_marginal"] = model.z_marginal.data
     params_dict["z_map"] = model.z_map.data
     model.params = params_dict
-    torch.save(params_dict, path / "params.tpqr")
 
     # snr
     data["snr"] = model.snr().mean().item()
@@ -145,6 +143,9 @@ def save_stats(model, path):
             data["p(specific)_ll"] = 0.0
             data["p(specific)_ul"] = 0.0
 
-    pd.Series(data).to_csv(
-        path / "statistics.csv",
-    )
+    if path is not None:
+        path = Path(path)
+        torch.save(params_dict, path / "params.tpqr")
+        pd.Series(data).to_csv(
+            path / "statistics.csv",
+        )
