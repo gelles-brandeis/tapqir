@@ -1,69 +1,54 @@
-.. _install:
-
 Installation
 ============
 
 
-**Cosmos** is a python program that will run in both Windows (we've tested it in Windows 10)
-and Linux (we've tested it in Arch and Manjaro Distros).  
+``tapqir`` can be installed via pip.  
 
 .. note::
 
-    Practical use of Cosmos requires a computer with a CUDA-capable GPU.
-    Follow NVIDIA CUDA Installation Guide for your OS:
 
-    * `CUDA Installation Guide for Microsoft Windows <https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html>`_
-    * `NVIDIA Arch Wiki <https://wiki.archlinux.org/index.php/NVIDIA>`_ and `cuda <https://www.archlinux.org/packages/community/x86_64/cuda/>`_:sup:`AUR`
+Prerequisites
+~~~~~~~~~~~~~
 
-.. note::
+1. Install CUDA_. Practical use of ``tapqir`` requires a computer with a CUDA-capable GPU.
 
-    We recommend to use Anaconda package manager to create virtual environment and install Cosmos in the virtual environment.
-    After Anaconda installation create and activate a new environment in Anaconda Prompt:
+2. Install Anaconda_. We recommend to use Anaconda package manager to create virtual
+   environment and install ``tapqir`` in the virtual environment. After Anaconda
+   installation create and activate a new environment in Anaconda Prompt:
 
     .. code-block:: bash
 
-        conda create --name myenv python
-        conda activate myenv
+        conda create --name tapqir-env python=3.8
+        conda activate tapqir-env
 
-If you are using Anaconda package manager make sure that your created environment is activated (you should see the environment name (e.g., "myenv") in the command prompt.
+If you are using Anaconda package manager make sure that your created environment
+is activated (you should see the environment name (e.g., ``tapqir-env``) in the command prompt.
 
-Installation on Linux
-~~~~~~~~~~~~~~~~~~~~~
+.. _CUDA: https://developer.nvidia.com/cuda-downloads
+.. _Anaconda: https://docs.anaconda.com/anaconda/install/
 
-Using pip::
+Pip
+~~~
+
+Install Tapqir using pip::
 
     pip install git+https://github.com/gelles-brandeis/tapqir.git
 
-From source::
+Development
+~~~~~~~~~~~
+
+For development - install from source::
 
     git clone https://github.com/gelles-brandeis/tapqir.git
     cd tapqir
-    pip install .
+    pip install -e .[dev]
 
-Installation on Windows
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Using pip::
-
-    pip install git+https://github.com/gelles-brandeis/tapqir.git -f https://download.pytorch.org/whl/torch_stable.html
-
-Updating Cosmos
-~~~~~~~~~~~~~~~
-
-To check tapqir version::
-
-    tapqir --version
-
-Update to latest verion of **tapqir**::
-
-    pip install git+https://github.com/gelles-brandeis/tapqir.git -U
-
-Set up Cosmos Server (optional)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Set up tapqir server (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Linux machines can be set up to run as servers. Following is a short instruction for Arch Linux.
 
-Ssh server
+ssh server
 ----------
 
 Install `OpenSSH <https://wiki.archlinux.org/index.php/OpenSSH#Installation>`_.
@@ -77,7 +62,7 @@ Change the default port from 22 to a random higher one like this::
 
 `Start/enable <https://wiki.archlinux.org/index.php/Systemd#Using_units>`_ ``sshd.service``.
 
-Slurm server
+slurm server
 ------------
 
 Follow instructions on `Slurm Arch Wiki <https://wiki.archlinux.org/index.php/Slurm>`_ and `Quick Start Administrator Guide <https://slurm.schedmd.com/quickstart_admin.html>`_. To create Slurm configuration file ``slurm.conf`` use the official `configurator <https://slurm.schedmd.com/configurator.easy.html>`_. Fill in the following options (same control and compute machines):

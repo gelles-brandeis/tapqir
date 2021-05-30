@@ -43,6 +43,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "cliff.sphinxext",
     "sphinx.ext.viewcode",
+    "sphinx_panels",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -59,12 +60,25 @@ exclude_patterns = []
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
+
+html_theme_options = {
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/gelles-brandeis/tapqir",
+            "icon": "fab fa-github-square",
+        },
+    ],
+    "show_prev_next": False,
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_css_files = ["css/sphinx_gallery.css"]
+html_logo = "_static/logo.png"
 
 autodoc_default_options = {"member-order": "bysource"}
 
