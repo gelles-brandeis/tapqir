@@ -15,7 +15,7 @@ Bayesian analysis of the co-localization single-molecule microscopy image data.
 Disclaimer
 ==========
 
-This is an alpha version of the program. It may contain bugs and is subject to change.
+This is an alpha version of the program. It may contain bugs and is subject to change. A preprint describing the model and algorithm is forthcoming.
 
 Installing
 ==========
