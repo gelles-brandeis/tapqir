@@ -48,10 +48,10 @@ def save_stats(model, path):
     model.to("cpu")
     model.batch_size = model.n = None
     # global parameters
-    data = {}
+    global_params = ["gain", "pi", "lamda", "proximity"]
+    data = pd.DataFrame(index=global_params, columns=["Mean", "95% LL", "95% UL"])
     # parameters
     guide_tr = handlers.trace(model.guide).get_trace()
-    global_params = ["gain", "pi", "lamda", "proximity"]
     local_params = [
         "d/height_0",
         "d/height_1",
@@ -67,23 +67,23 @@ def save_stats(model, path):
     params_dict = {}
     for param in global_params + ["Keq"]:
         if param == "pi":
-            data[f"{param}_mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
+            data.loc[param, "Mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
                 "mean"
             ][1].item()
-            data[f"{param}_ll"] = params_dict[f"{param}_ll"] = ci_stats[param]["ll"][
-                1
-            ].item()
-            data[f"{param}_ul"] = params_dict[f"{param}_ul"] = ci_stats[param]["ul"][
-                1
-            ].item()
+            data.loc[param, "95% LL"] = params_dict[f"{param}_ll"] = ci_stats[param][
+                "ll"
+            ][1].item()
+            data.loc[param, "95% UL"] = params_dict[f"{param}_ul"] = ci_stats[param][
+                "ul"
+            ][1].item()
         else:
-            data[f"{param}_mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
+            data.loc[param, "Mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
                 "mean"
             ].item()
-            data[f"{param}_ll"] = params_dict[f"{param}_ll"] = ci_stats[param][
+            data.loc[param, "95% LL"] = params_dict[f"{param}_ll"] = ci_stats[param][
                 "ll"
             ].item()
-            data[f"{param}_ul"] = params_dict[f"{param}_ul"] = ci_stats[param][
+            data.loc[param, "95% UL"] = params_dict[f"{param}_ul"] = ci_stats[param][
                 "ul"
             ].item()
     for param in local_params:
@@ -110,12 +110,7 @@ def save_stats(model, path):
     model.params = params_dict
 
     # snr
-    data["snr"] = model.snr().mean().item()
-    # check convergence status
-    data["converged"] = False
-    for line in open(model.run_path / "run.log"):
-        if "model converged" in line:
-            data["converged"] = True
+    data.loc["SNR", "Mean"] = model.snr().mean().item()
 
     # classification statistics
     if model.data.ontarget.labels is not None:
@@ -123,29 +118,43 @@ def save_stats(model, path):
         true_labels = model.data.ontarget.labels["z"].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
-            data["MCC"] = matthews_corrcoef(true_labels, pred_labels)
-        data["Recall"] = recall_score(true_labels, pred_labels, zero_division=0)
-        data["Precision"] = precision_score(true_labels, pred_labels, zero_division=0)
+            data.loc["MCC", "Mean"] = matthews_corrcoef(true_labels, pred_labels)
+        data.loc["Recall", "Mean"] = recall_score(
+            true_labels, pred_labels, zero_division=0
+        )
+        data.loc["Precision", "Mean"] = precision_score(
+            true_labels, pred_labels, zero_division=0
+        )
 
-        data["TN"], data["FP"], data["FN"], data["TP"] = confusion_matrix(
-            true_labels, pred_labels, labels=(0, 1)
-        ).ravel()
+        (
+            data.loc["TN", "Mean"],
+            data.loc["FP", "Mean"],
+            data.loc["FN", "Mean"],
+            data.loc["TP", "Mean"],
+        ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
         mask = torch.from_numpy(model.data.ontarget.labels["z"])
         samples = torch.masked_select(model.z_marginal.cpu(), mask)
         if len(samples):
             z_ll, z_ul = pi(samples, 0.68)
-            data["p(specific)_median"] = quantile(samples, 0.5).item()
-            data["p(specific)_ll"] = z_ll.item()
-            data["p(specific)_ul"] = z_ul.item()
+            data.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()
+            data.loc["p(specific)", "95% LL"] = z_ll.item()
+            data.loc["p(specific)", "95% UL"] = z_ul.item()
         else:
-            data["p(specific)_median"] = 0.0
-            data["p(specific)_ll"] = 0.0
-            data["p(specific)_ul"] = 0.0
+            data.loc["p(specific)", "Mean"] = 0.0
+            data.loc["p(specific)", "95% LL"] = 0.0
+            data.loc["p(specific)", "95% UL"] = 0.0
+
+    model.statistics = data
 
     if path is not None:
         path = Path(path)
+        # check convergence status
+        data.loc["trained", "Mean"] = False
+        for line in open(model.run_path / "run.log"):
+            if "model converged" in line:
+                data.loc["trained", "Mean"] = True
         torch.save(params_dict, path / "params.tpqr")
-        pd.Series(data).to_csv(
+        data.to_csv(
             path / "statistics.csv",
         )

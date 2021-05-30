@@ -80,7 +80,6 @@ class Model:
         self._S = S
         self._K = K
         self.batch_size = None
-        self.status = None
         # for plotting
         self.n = None
         self.data_path = None
@@ -126,13 +125,6 @@ class Model:
         self.path = Path(path)
         self.run_path = self.path / f"{self.name}" / tapqir_version.split("+")[0]
 
-        # status
-        if (self.run_path / "run.log").is_file():
-            for line in reversed(list(open(self.run_path / "run.log"))):
-                if "model converged" in line:
-                    self.status = "Trained"
-                    break
-
         # load data
         self.data = load(self.path, self.device)
         self.gaussian = GaussianSpot(self.data.P)
@@ -142,6 +134,8 @@ class Model:
             self.params = torch.load(self.path / "params.tpqr")
         if (self.path / "theta_samples.tpqr").is_file():
             self.theta_samples = torch.load(self.path / "theta_samples.tpqr")
+        if (self.path / "statistics.csv").is_file():
+            self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
 
     def settings(self, lr=0.005, batch_size=0, jit=False):
         # K - max number of spots
@@ -364,7 +358,7 @@ class Model:
             self.params["d/width_mean"],
             self.params["d/x_mean"],
             self.params["d/y_mean"],
-            self.data.ontarget.xy,
+            self.data.ontarget.xy.to(self.dtype),
         )
         signal = (
             (

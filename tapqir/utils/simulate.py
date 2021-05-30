@@ -94,11 +94,11 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
             labels["z"][:, f : f + 1] = samples[f"d/theta_{f}"][0].cpu() > 0
         control = samples["c/data"][0].data.floor()
     model.data = CosmosDataset(
-        data,
-        target_locs,
+        data.cpu(),
+        target_locs.cpu(),
         labels,
-        control,
-        target_locs,
+        control.cpu(),
+        target_locs.cpu(),
         None,
         offset=offset,
         device=model.device,
