@@ -69,13 +69,6 @@ class Fit(Command):
             type=float,
             help="Learning rate (default: 0.005)",
         )
-
-        parser.add_argument(
-            "-c",
-            metavar="CONTROL",
-            type=bool,
-            help="Analyze control dataset (default: False)",
-        )
         parser.add_argument(
             "-dev", metavar="DEVICE", type=str, help="Compute device (default: cuda)"
         )
