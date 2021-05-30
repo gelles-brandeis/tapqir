@@ -1,7 +1,6 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import configparser
 from collections import defaultdict
 from pathlib import Path
 
@@ -23,27 +22,21 @@ class GlimpseDataset:
     :param path: path to the folder containing options.cfg file.
     """
 
-    def __init__(self, path):
+    def __init__(self, **kwargs):
         """Read Glimpse files"""
 
-        path = Path(path)
-        # read options.cfg file
-        config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = path / "options.cfg"
-        config.read(cfg_file)
-
         dtypes = ["ontarget"]
-        if config["glimpse"]["offtarget_aoiinfo"] is not None:
+        if kwargs["offtarget_aoiinfo"] is not None:
             dtypes.append("offtarget")
 
         # convert header into dict format
-        mat_header = loadmat(Path(config["glimpse"]["dir"]) / "header.mat")
+        mat_header = loadmat(Path(kwargs["header_dir"]) / "header.mat")
         header = dict()
         for i, dt in enumerate(mat_header["vid"].dtype.names):
             header[dt] = np.squeeze(mat_header["vid"][0, 0][i])
 
         # load driftlist mat file
-        drift_mat = loadmat(config["glimpse"]["driftlist"])
+        drift_mat = loadmat(kwargs["driftlist"])
         # convert driftlist into DataFrame
         drift_df = pd.DataFrame(
             drift_mat["driftlist"][:, :3], columns=["frame", "dx", "dy"]
@@ -55,9 +48,9 @@ class GlimpseDataset:
         aoi_df = {}
         for dtype in dtypes:
             try:
-                aoi_mat[dtype] = loadmat(config["glimpse"][f"{dtype}_aoiinfo"])
+                aoi_mat[dtype] = loadmat(kwargs[f"{dtype}_aoiinfo"])
             except ValueError:
-                aoi_mat[dtype] = np.loadtxt(config["glimpse"][f"{dtype}_aoiinfo"])
+                aoi_mat[dtype] = np.loadtxt(kwargs[f"{dtype}_aoiinfo"])
             try:
                 aoi_df[dtype] = pd.DataFrame(
                     aoi_mat[dtype]["aoiinfo2"],
@@ -86,15 +79,15 @@ class GlimpseDataset:
             -drift_df.loc[aoiinfo_frame : drift_df.index[1] : -1]
         ).cumsum(axis=0)
 
-        if config["glimpse"]["frame_start"] and config["glimpse"]["frame_end"]:
-            f1 = int(config["glimpse"]["frame_start"])
-            f2 = int(config["glimpse"]["frame_end"])
+        if kwargs["frame_start"] and kwargs["frame_end"]:
+            f1 = int(kwargs["frame_start"])
+            f2 = int(kwargs["frame_end"])
             drift_df = drift_df.loc[f1:f2]
 
         labels = defaultdict(lambda: None)
         for dtype in dtypes:
-            if config["glimpse"][f"{dtype}_labels"] is not None:
-                labels_mat = loadmat(config["glimpse"][f"{dtype}_labels"])
+            if kwargs[f"{dtype}_labels"] is not None:
+                labels_mat = loadmat(kwargs[f"{dtype}_labels"])
                 labels[dtype] = np.zeros(
                     (len(aoi_df[dtype]), len(drift_df)),
                     dtype=[
@@ -127,7 +120,7 @@ class GlimpseDataset:
                 labels[dtype]["z"] = labels[dtype]["spotpicker"]
 
         self.height, self.width = int(header["height"]), int(header["width"])
-        self.config = config
+        self.config = kwargs
         self.header = header
         self.dtypes = dtypes
         self.aoiinfo = aoi_df
@@ -148,7 +141,7 @@ class GlimpseDataset:
             return np.stack(imgs, 0)
         frame = key
         glimpse_number = self.header["filenumber"][frame - 1]
-        glimpse_path = Path(self.config["glimpse"]["dir"]) / f"{glimpse_number}.glimpse"
+        glimpse_path = Path(self.config["header_dir"]) / f"{glimpse_number}.glimpse"
         offset = self.header["offset"][frame - 1]
         with open(glimpse_path, "rb") as fid:
             fid.seek(offset)
@@ -164,8 +157,10 @@ class GlimpseDataset:
         return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
 
 
-def read_glimpse(path, P):
-    glimpse = GlimpseDataset(path)
+def read_glimpse(**kwargs):
+    P = kwargs.pop("P")
+    path = kwargs.pop("path")
+    glimpse = GlimpseDataset(**kwargs)
 
     abs_locs = defaultdict(lambda: None)
     target_xy = defaultdict(lambda: None)
