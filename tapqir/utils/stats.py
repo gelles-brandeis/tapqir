@@ -45,10 +45,11 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
 
 def save_stats(model, path):
     path = Path(path)
+    # change device to cpu
+    model.to("cpu")
+    model.batch_size = model.n = None
     # global parameters
     data = {}
-    # snr
-    data["snr"] = model.snr().mean().item()
     # parameters
     guide_tr = handlers.trace(model.guide).get_trace()
     global_params = ["gain", "pi", "lamda", "proximity"]
@@ -64,39 +65,54 @@ def save_stats(model, path):
         "d/background",
     ]
     ci_stats = ci_from_trace(guide_tr, global_params + local_params)
+    params_dict = {}
     for param in global_params + ["Keq"]:
         if param == "pi":
-            data[f"{param}_mean"] = ci_stats[param]["mean"][1].item()
-            data[f"{param}_ll"] = ci_stats[param]["ll"][1].item()
-            data[f"{param}_ul"] = ci_stats[param]["ul"][1].item()
+            data[f"{param}_mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
+                "mean"
+            ][1].item()
+            data[f"{param}_ll"] = params_dict[f"{param}_ll"] = ci_stats[param]["ll"][
+                1
+            ].item()
+            data[f"{param}_ul"] = params_dict[f"{param}_ul"] = ci_stats[param]["ul"][
+                1
+            ].item()
         else:
-            data[f"{param}_mean"] = ci_stats[param]["mean"].item()
-            data[f"{param}_ll"] = ci_stats[param]["ll"].item()
-            data[f"{param}_ul"] = ci_stats[param]["ul"].item()
-    local_params_dict = {}
+            data[f"{param}_mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
+                "mean"
+            ].item()
+            data[f"{param}_ll"] = params_dict[f"{param}_ll"] = ci_stats[param][
+                "ll"
+            ].item()
+            data[f"{param}_ul"] = params_dict[f"{param}_ul"] = ci_stats[param][
+                "ul"
+            ].item()
     for param in local_params:
         if param == "d/background":
-            local_params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
-            local_params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
-            local_params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
+            params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
+            params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
+            params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
         elif param.endswith("_0"):
             base_name = param.split("_")[0]
-            local_params_dict[f"{base_name}_mean"] = torch.stack(
+            params_dict[f"{base_name}_mean"] = torch.stack(
                 [ci_stats[f"{base_name}_{k}"]["mean"] for k in range(model.K)], dim=0
             )
-            local_params_dict[f"{base_name}_ll"] = torch.stack(
+            params_dict[f"{base_name}_ll"] = torch.stack(
                 [ci_stats[f"{base_name}_{k}"]["ll"] for k in range(model.K)], dim=0
             )
-            local_params_dict[f"{base_name}_ul"] = torch.stack(
+            params_dict[f"{base_name}_ul"] = torch.stack(
                 [ci_stats[f"{base_name}_{k}"]["ul"] for k in range(model.K)], dim=0
             )
-    local_params_dict["d/m_probs"] = model.m_probs.data
-    local_params_dict["d/z_probs"] = model.z_probs.data
-    local_params_dict["d/j_probs"] = model.j_probs.data
-    local_params_dict["z_marginal"] = model.z_marginal.data
-    local_params_dict["z_map"] = model.z_map.data
-    torch.save(local_params_dict, path / "params.tpqr")
+    params_dict["d/m_probs"] = model.m_probs.data
+    params_dict["d/z_probs"] = model.z_probs.data
+    params_dict["d/j_probs"] = model.j_probs.data
+    params_dict["z_marginal"] = model.z_marginal.data
+    params_dict["z_map"] = model.z_map.data
+    model.params = params_dict
+    torch.save(params_dict, path / "params.tpqr")
 
+    # snr
+    data["snr"] = model.snr().mean().item()
     # check convergence status
     data["converged"] = False
     for line in open(model.run_path / "run.log"):
