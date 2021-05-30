@@ -111,4 +111,4 @@ which will open the window in the browser:
 Log file
 --------
 
-Fitting log is saved in ``path_to_folder/cosmos/version``. 
+Fitting log is saved in ``path_to_folder/cosmos/version/run.log``. 
