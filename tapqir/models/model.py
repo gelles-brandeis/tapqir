@@ -84,6 +84,9 @@ class Model:
         self.n = None
         self.data_path = None
         # set device & dtype
+        self.to(device, dtype)
+
+    def to(self, device, dtype="double"):
         self.dtype = getattr(torch, dtype)
         self.device = torch.device(device)
         if device == "cuda" and dtype == "double":
@@ -94,6 +97,12 @@ class Model:
             torch.set_default_tensor_type(torch.DoubleTensor)
         else:
             torch.set_default_tensor_type(torch.FloatTensor)
+        # change loaded data device
+        if hasattr(self, "data"):
+            self.data.ontarget = self.data.ontarget._replace(device=self.device)
+            self.data.offtarget = self.data.offtarget._replace(device=self.device)
+            self.data.offset = self.data.offset._replace(device=self.device)
+            self.gaussian.ij_pixel = self.gaussian.ij_pixel.to(self.device)
 
     @lazy_property
     def S(self):
@@ -344,25 +353,25 @@ class Model:
             \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
             \text{ for } \theta_{nf} = k`
         """
-        with torch.no_grad():
-            weights = self.gaussian(
-                torch.ones(1),
-                pyro.param("d/w_mean"),
-                pyro.param("d/x_mean"),
-                pyro.param("d/y_mean"),
-                self.data.ontarget.xy,
+        weights = self.gaussian(
+            torch.ones(1),
+            self.params["d/width_mean"],
+            self.params["d/x_mean"],
+            self.params["d/y_mean"],
+            self.data.ontarget.xy,
+        )
+        signal = (
+            (
+                self.data.ontarget.data
+                - self.params["d/background_mean"][..., None, None]
+                - self.data.offset.mean
             )
-            signal = (
-                (
-                    self.data.ontarget.data
-                    - pyro.param("d/b_loc")[..., None, None]
-                    - self.data.offset.mean
-                )
-                * weights
-            ).sum(dim=(-2, -1))
-            noise = (
-                self.data.offset.var + pyro.param("d/b_loc") * pyro.param("gain_loc")
-            ).sqrt()
-            result = signal / noise
-            mask = self.z_probs > 0.5
-            return result[mask]
+            * weights
+        ).sum(dim=(-2, -1))
+        noise = (
+            self.data.offset.var
+            + self.params["d/background_mean"] * self.params["gain_mean"]
+        ).sqrt()
+        result = signal / noise
+        mask = self.z_probs > 0.5
+        return result[mask]
