@@ -1,12 +1,5 @@
-.. _examples:
-
 Examples
 ========
-
-Core tutorials:
----------------
-
-Intro
 
 .. toctree::
    :maxdepth: 1

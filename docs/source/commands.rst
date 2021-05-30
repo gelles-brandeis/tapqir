@@ -1,13 +1,9 @@
-.. _commands:
-
 Commands
 ========
 
 
-Cosmos commands
+Tapqir commands
 ~~~~~~~~~~~~~~~
-
-commands
 
 .. autoprogram-cliff:: tapqir.app
    :application: tapqir
