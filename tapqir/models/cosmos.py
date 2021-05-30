@@ -412,8 +412,7 @@ class Cosmos(Model):
             lambda: torch.tensor(0.5),
             constraint=constraints.interval(
                 0,
-                (self.data.P + 1) / math.sqrt(12)
-                - torch.finfo(self.dtype).eps,
+                (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
             ),
         )
         pyro.param(
