@@ -44,9 +44,6 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
             )
         return self.data[idx].to(self.device), self.xy[idx].to(self.device)
 
-    def __repr__(self):
-        "data=(N={self.N} AOIs, )"
-
 
 class OffsetData(namedtuple("OffsetData", ["data", "device"])):
     @lazy_property
