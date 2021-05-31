@@ -42,6 +42,7 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
         #      return self.data[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
         #          self.device
         #      )
+        print(idx)
         return self.data[idx].to(self.device), self.xy[idx].to(self.device)
 
     def __repr__(self):
