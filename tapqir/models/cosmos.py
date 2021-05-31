@@ -211,7 +211,7 @@ class Cosmos(Model):
 
         with aois as ndx:
             # fetch data
-            obs, target_locs = data[ndx]
+            obs, target_locs = data.get(ndx)
             # background mean and std
             background_mean = pyro.sample(
                 f"{prefix}/background_mean", dist.HalfNormal(1000)

@@ -34,15 +34,14 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
     def median(self):
         return torch.median(self.data).item()
 
-    def __getitem__(self, idx):
-        #  if isinstance(idx, tuple):
-        #      assert len(idx) == 2
-        #      ndx, fdx = idx
-        #      assert isinstance(fdx, int)
-        #      return self.data[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
-        #          self.device
-        #      )
-        print(idx)
+    def get(self, idx):
+        if isinstance(idx, tuple):
+            assert len(idx) == 2
+            ndx, fdx = idx
+            assert isinstance(fdx, int)
+            return self.data[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
+                self.device
+            )
         return self.data[idx].to(self.device), self.xy[idx].to(self.device)
 
     def __repr__(self):
