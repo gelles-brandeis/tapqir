@@ -35,17 +35,17 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
         return torch.median(self.data).item()
 
     def __getitem__(self, idx):
-        if isinstance(idx, tuple):
-            assert len(idx) == 2
-            ndx, fdx = idx
-            assert isinstance(fdx, int)
-            return self.data[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
-                self.device
-            )
+        #  if isinstance(idx, tuple):
+        #      assert len(idx) == 2
+        #      ndx, fdx = idx
+        #      assert isinstance(fdx, int)
+        #      return self.data[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
+        #          self.device
+        #      )
         return self.data[idx].to(self.device), self.xy[idx].to(self.device)
 
-
-CosmosData.data.__doc__ = "Hey"
+    def __repr__(self):
+        "data=(N={self.N} AOIs, )"
 
 
 class OffsetData(namedtuple("OffsetData", ["data", "device"])):
