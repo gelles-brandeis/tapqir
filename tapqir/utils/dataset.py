@@ -45,6 +45,9 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
         return self.data[idx].to(self.device), self.xy[idx].to(self.device)
 
 
+CosmosData.data.__doc__ = "Hey"
+
+
 class OffsetData(namedtuple("OffsetData", ["data", "device"])):
     @lazy_property
     def median(self):

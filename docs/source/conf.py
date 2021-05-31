@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 # -- Project information -----------------------------------------------------
 
 project = "tapqir"
-copyright = "2020, Yerdos Ordabayev"
+copyright = "2021, Yerdos Ordabayev"
 author = "Yerdos Ordabayev"
 
 # The full version, including alpha/beta/rc tags
@@ -44,10 +44,26 @@ extensions = [
     "cliff.sphinxext",
     "sphinx.ext.viewcode",
     "sphinx_panels",
+    "sphinx_gallery.load_style",
+    "sphinx.ext.autosummary",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
+
+# Generate the API documentation when building
+autosummary_generate = True
+
+intersphinx_mapping = dict(
+    ipython=("https://ipython.readthedocs.io/en/stable/", None),
+    matplotlib=("https://matplotlib.org/", None),
+    numpy=("https://numpy.org/doc/stable/", None),
+    pandas=("https://pandas.pydata.org/docs/", None),
+    python=("https://docs.python.org/3", None),
+    scipy=("https://docs.scipy.org/doc/scipy/reference/", None),
+    torch=("https://pytorch.org/docs/master/", None),
+    pyro=("http://docs.pyro.ai/en/stable/", None),
+)
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -71,6 +87,16 @@ html_theme_options = {
         },
     ],
     "show_prev_next": False,
+    "use_edit_page_button": True,
+}
+
+# Edit this Page link.
+html_context = {
+    # "github_url": "https://github.com", # or your GitHub Enterprise interprise
+    "github_user": "gelles-brandeis",
+    "github_repo": "tapqir",
+    "github_version": "latest",
+    "doc_path": "docs/source/",
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,

@@ -26,14 +26,10 @@ from tapqir.utils.stats import save_stats
 
 class GaussianSpot:
     r"""
-    Calculates ideal shape of the 2D-Gaussian spot given spot parameters,
-    target positions, and drift list.
+    Calculates ideal shape of the 2D-Gaussian spot given spot parameters
+    and target positions.
 
-        :math:`\dfrac{h_{knf}}{2 \pi w^2_{nfk}}
-        \exp{\left ( -\dfrac{(i-x_{nfk})^2 + (j-y_{nfk})^2}{2w^2_{nfk}} \right)}`
-
-    :param target: Target positions.
-    :param drift: Frame drift list.
+        :math:`\dfrac{h}{2 \pi \cdot w^2} \exp{\left( -\dfrac{(i-x)^2 + (j-y)^2}{2 \cdot w^2} \right)}`
     """
 
     def __init__(self, P):
@@ -50,8 +46,7 @@ class GaussianSpot:
         :param width: width of the 2D-Gaussian spot.
         :param x: relative :math:`x`-axis position relative to the target.
         :param y: relative :math:`y`-axis position relative to the target.
-        :param ndx: AoI indices.
-        :param fdx: Frame indices.
+        :param target_locs: target position.
         :return: Ideal shape 2D-Gaussian spot.
         """
 
@@ -68,11 +63,10 @@ class Model:
     r"""
     Base class for tapqir models.
 
-    **Implementing New Models**:
-
     Derived models must implement the methods
-    :meth:`model`
-    :meth:`guide`
+
+    * :meth:`model`
+    * :meth:`guide`
     """
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
@@ -181,7 +175,7 @@ class Model:
 
     def guide(self):
         r"""
-        Variational Guide
+        Variational Model
         """
         raise NotImplementedError
 

@@ -71,7 +71,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: commands
+    .. link-button:: api
             :type: ref
             :text: To the API reference
             :classes: btn-block btn-secondary stretched-link
@@ -97,6 +97,6 @@ ordabayev@brandeis.edu
    :hidden:
 
    install
-   usage
+   user_guide/index
+   api
    examples/index
-   commands

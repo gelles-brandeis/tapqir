@@ -17,12 +17,11 @@ class Fit(Command):
     Command options are read from the ``options.cfg`` file and will be
     overwritten if provided explicitly.
 
-    Output files of the analysis are saved in ``runs/model/version/S/control/lr/bs/``:
+    Output files of the analysis are saved in ``model/version/``:
 
     - ``params`` and ``optimizer`` are model parameters and optimizer state saved in PyTorch format
     - ``global_params.csv`` contains values of global parameters
-    - ``parameters.mat`` contains MAP estimate of parameters in MATLAB format
-    - ``scalar`` folder containing global parameter values over iterations
+    - ``tb`` folder containing global parameter values over iterations
     - ``run.log`` log file
     """
 

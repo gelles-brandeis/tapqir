@@ -13,31 +13,17 @@ from tqdm import tqdm
 
 from tapqir.distributions import AffineBeta
 from tapqir.models.model import Model
+from tapqir.utils.dataset import CosmosData
 
 
 class Cosmos(Model):
-    r"""
-    for :math:`n=1` to :math:`N`:
-
-        for :math:`n=1` to :math:`F`:
-
-            :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
-
-            :math:`b_{nf} \sim  \text{Gamma}(b_{nf}|\mu^b_n, \beta^b_n)`
+    """
+    Time-independent model.
     """
     name = "cosmos"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__(S, K, device, dtype)
-
-    @lazy_property
-    def num_states(self):
-        r"""
-        Total number of states for the image model given by:
-
-            :math:`2 (1+SK) K`
-        """
-        return 2 * (1 + self.K * self.S) * self.K
 
     @property
     def probs_j(self):
@@ -95,6 +81,7 @@ class Cosmos(Model):
         batch_size = self.batch_size
         split_size = 1 + self.batch_size // 2
         self.batch_size = None
+        self.data.offtarget = CosmosData(None, None, None, None)
         for i in tqdm(range(num_samples)):
             for ndx in torch.split(torch.arange(self.data.ontarget.N), split_size):
                 self.n = ndx
