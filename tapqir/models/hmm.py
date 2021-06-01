@@ -173,7 +173,7 @@ class HMM(Cosmos):
             theta_prev = None
             for fdx in frames:
                 # fetch data
-                obs, target_locs = data[ndx, fdx]
+                obs, target_locs = data.fetch(ndx, fdx)
                 # sample background intensity
                 background = pyro.sample(
                     f"{prefix}/background_{fdx}",
