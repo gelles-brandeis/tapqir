@@ -333,7 +333,8 @@ class Model:
 
     def compute_stats(self):
         save_stats(self, self.path)
-        self.logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
+        if self.path is not None:
+            self.logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
 
     def snr(self):
         r"""
