@@ -27,7 +27,7 @@ Using pip::
 Documentation
 =============
 
-Full documentation and tutorial available at Read the Docs.
+Full documentation and tutorial available at `Read the Docs <https://tapqir.readthedocs.io/>`_.
 
 Citation
 ========
