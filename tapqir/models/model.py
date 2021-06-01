@@ -221,7 +221,7 @@ class Model:
             if not self.iter % 100 and self.iter != 0:
                 self.save_checkpoint()
                 if self._stop:
-                    self.logger.INFO("Step #{} model converged.".format(self.iter))
+                    self.logger.info("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
 
