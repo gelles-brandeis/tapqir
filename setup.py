@@ -68,6 +68,7 @@ setuptools.setup(
             "nbsphinx",
             "sphinx",
             "pydata_sphinx_theme",
+            "sphinx-gallery",
             "sphinx-panels",
         ],
     },
