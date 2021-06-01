@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 
-project = "tapqir"
-copyright = "2020, Yerdos Ordabayev"
+project = "Tapqir"
+copyright = "2020, Gelles Lab"
 author = "Yerdos Ordabayev"
 
 # The full version, including alpha/beta/rc tags
@@ -39,20 +39,61 @@ release = __version__
 extensions = [
     "nbsphinx",
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
-    "cliff.sphinxext",
     "sphinx.ext.viewcode",
+    "sphinx_gallery.load_style",
     "sphinx_panels",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
+# The suffix(es) of source filenames.
+# You can specify multiple suffix as a list of string:
+#
+# source_suffix = ['.rst', '.md']
+source_suffix = [".rst", ".ipynb"]
+
+# do not execute cells
+nbsphinx_execute = "never"
+
+# Generate the API documentation when building
+autosummary_generate = True
+
+intersphinx_mapping = dict(
+    ipython=("https://ipython.readthedocs.io/en/stable/", None),
+    matplotlib=("https://matplotlib.org/", None),
+    numpy=("https://numpy.org/doc/stable/", None),
+    pandas=("https://pandas.pydata.org/docs/", None),
+    python=("https://docs.python.org/3", None),
+    scipy=("https://docs.scipy.org/doc/scipy/reference/", None),
+    torch=("https://pytorch.org/docs/master/", None),
+    pyro=("http://docs.pyro.ai/en/stable/", None),
+)
+
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+exclude_patterns = [".ipynb_checkpoints"]
+
+
+# This is processed by Jinja2 and inserted before each notebook
+nbsphinx_prolog = r"""
+{% set docname = 'docs/source/user_guide/' + env.doc2path(env.docname, base=None).split('/')[-1] %}
+:github_url: https://github.com/gelles-brandeis/tapqir/blob/read-the-docs/{{ docname }}
+.. raw:: html
+    <div class="admonition note">
+      Interactive online version:
+      <span style="white-space: nowrap;">
+        <a href="https://colab.research.google.com/github/gelles-brandeis/tapqir/blob/{{ env.config.html_context.github_version }}/{{ docname }}">
+          <img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"
+            style="vertical-align:text-bottom">
+        </a>
+      </span>
+    </div>
+"""  # noqa: E501
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -71,6 +112,16 @@ html_theme_options = {
         },
     ],
     "show_prev_next": False,
+    "use_edit_page_button": True,
+}
+
+# Edit this Page link.
+html_context = {
+    # "github_url": "https://github.com", # or your GitHub Enterprise interprise
+    "github_user": "gelles-brandeis",
+    "github_repo": "tapqir",
+    "github_version": "latest",
+    "doc_path": "docs/source/",
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -81,5 +132,3 @@ html_css_files = ["css/sphinx_gallery.css"]
 html_logo = "_static/logo.png"
 
 autodoc_default_options = {"member-order": "bysource"}
-
-autoprogram_cliff_application = "tapqir"

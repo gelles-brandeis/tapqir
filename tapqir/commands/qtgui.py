@@ -308,21 +308,15 @@ class MainWindow(QMainWindow):
         self.item["zoom"] = pg.PlotDataItem(
             pen=C[2], symbol="o", symbolBrush=C[2], symbolPen=None, symbolSize=5
         )
-        y, x = np.histogram(
-            self.Model.data.offset.data.numpy(),
-            range=(self.Model.data.offset.min, self.Model.data.offset.max),
-            bins=max(1, int(self.Model.data.offset.max - self.Model.data.offset.min)),
-            density=True,
-        )
-        plt = widget.addPlot(row=1, col=5)
-        plt.plot(
-            x,
-            y,
-            stepMode="center",
-            fillLevel=0,
-            fillOutline=True,
-            brush=(0, 0, 255, 70),
-        )
+        #  plt = widget.addPlot(row=1, col=5)
+        #  plt.plot(
+        #      self.Model.data.offset.samples.cpu(),
+        #      self.Model.data.offset.weights.cpu(),
+        #      stepMode="center",
+        #      fillLevel=0,
+        #      fillOutline=True,
+        #      brush=(0, 0, 255, 70),
+        #  )
         for i, p in enumerate(self.params):
             self.plot[p] = widget.addPlot(row=i + 2, col=0, colspan=5)
             self.plot[p].addLegend()

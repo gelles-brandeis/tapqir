@@ -4,9 +4,6 @@ Installation
 
 ``tapqir`` can be installed via pip.  
 
-.. note::
-
-
 Prerequisites
 ~~~~~~~~~~~~~
 

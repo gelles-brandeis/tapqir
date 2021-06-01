@@ -15,7 +15,7 @@ class Config(Command):
     def get_parser(self, prog_name):
         parser = super(Config, self).get_parser(prog_name)
 
-        parser.add_argument("dataset_path", type=str, help="Path to the dataset folder")
+        parser.add_argument("path", type=str, help="Path to the dataset folder")
 
         return parser
 
@@ -43,6 +43,6 @@ class Config(Command):
         config["fit"]["jit"] = "False"
         config["fit"]["backend"] = "pyro"
 
-        cfg_file = Path(args.dataset_path) / "options.cfg"
+        cfg_file = Path(args.path) / "options.cfg"
         with open(cfg_file, "w") as configfile:
             config.write(configfile)

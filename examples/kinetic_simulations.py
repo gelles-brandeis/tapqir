@@ -82,8 +82,7 @@ def main(args):
         model.gaussian = hmm.gaussian
         pyro.clear_param_store()
 
-    model.settings(args.lr, args.bs)
-    model.run(args.it)
+    model.run(args.it, args.lr, args.bs)
     # compute and save theta_samples
     model.compute_theta_samples(args.num_samples)
     model.compute_stats()

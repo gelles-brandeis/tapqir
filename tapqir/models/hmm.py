@@ -13,6 +13,10 @@ from tapqir.models.cosmos import Cosmos
 
 
 class HMM(Cosmos):
+    """
+    Hidden Markov model.
+    """
+
     name = "hmm"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", vectorized=True):
@@ -169,7 +173,7 @@ class HMM(Cosmos):
             theta_prev = None
             for fdx in frames:
                 # fetch data
-                obs, target_locs = data[ndx, fdx]
+                obs, target_locs = data.fetch(ndx, fdx)
                 # sample background intensity
                 background = pyro.sample(
                     f"{prefix}/background_{fdx}",

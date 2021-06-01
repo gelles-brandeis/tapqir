@@ -68,7 +68,8 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         torch.full((N, F, P, P), params["background"] + params["offset"]),
         target_locs,
         None,
-        offset=offset,
+        offset_samples=offset,
+        offset_weights=torch.ones(3) / 3,
         device=model.device,
     )
     model.gaussian = GaussianSpot(P)
@@ -100,7 +101,8 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         control.cpu(),
         target_locs.cpu(),
         None,
-        offset=offset,
+        offset_samples=offset,
+        offset_weights=torch.ones(3) / 3,
         device=model.device,
     )
 

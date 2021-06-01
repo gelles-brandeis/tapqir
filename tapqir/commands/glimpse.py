@@ -6,7 +6,7 @@ from pathlib import Path
 
 from cliff.command import Command
 
-from tapqir.imscroll.glimpse_reader import read_glimpse
+from tapqir.imscroll import read_glimpse
 
 
 class Glimpse(Command):

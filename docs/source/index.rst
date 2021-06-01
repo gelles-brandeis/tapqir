@@ -14,10 +14,6 @@ using a Bayesian statistics-based image classification method.
 
 :mod:`tapqir` is open source software licensed under the `GNU General Public License, version 3 <http://www.gnu.org/licenses/gpl-3.0.txt>`_.
 
-**Date**: |today| **Version**: |version|
-
-**Download documentation**: `PDF Version <tapqir.pdf>`__ | `Zipped HTML <tapqir.zip>`__
-
 **Author**:
 Yerdos Ordabayev;
 Department of Biochemistry, MS009;
@@ -52,16 +48,16 @@ ordabayev@brandeis.edu
     ---
     :img-top: _static/fi-rr-book-alt.svg
 
-    User guide
-    ^^^^^^^^^^
+    Tutorial
+    ^^^^^^^^
 
-    The user guide provides in-depth information on running tapqir models.
+    The tutorial provides in-depth information on running tapqir models.
 
     +++
 
-    .. link-button:: usage
+    .. link-button:: user_guide/tutorial
             :type: ref
-            :text: To the user guide
+            :text: To the tutorial
             :classes: btn-block btn-secondary stretched-link
 
     ---
@@ -75,7 +71,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: commands
+    .. link-button:: api
             :type: ref
             :text: To the API reference
             :classes: btn-block btn-secondary stretched-link
@@ -101,6 +97,7 @@ ordabayev@brandeis.edu
    :hidden:
 
    install
-   usage
+   user_guide/tutorial
+   api
    examples/index
-   commands
+   user_guide/commands

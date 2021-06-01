@@ -1,23 +1,40 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import logging
 from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
+from pyro.ops.stats import quantile
 from scipy.io import loadmat
 from tqdm import tqdm
 
 from tapqir.utils.dataset import CosmosDataset, save
 
+# logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+formatter = logging.Formatter(
+    fmt="%(asctime)s - %(message)s",
+    datefmt="%m/%d/%Y %I:%M %p",
+)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
 
 class GlimpseDataset:
     """
     GlimpseDataset parses header, aoiinfo, driftlist, and intervals (optional)
-    files and creates 1) aoiinfo and cumdrift DataFrames, 2) __getitem__ method
-    to retrieve glimpse image for a given frame, 3) labels np.array.
+    files and creates
+
+    1. aoiinfo and cumdrift DataFrames
+    2. __getitem__ method to retrieve glimpse image for a given frame
+    3. labels np.array
 
     :param path: path to the folder containing options.cfg file.
     """
@@ -126,6 +143,7 @@ class GlimpseDataset:
         self.aoiinfo = aoi_df
         self.cumdrift = drift_df
         self.labels = labels
+        self.title = kwargs["title"]
 
     def __len__(self):
         return self.N
@@ -158,6 +176,9 @@ class GlimpseDataset:
 
 
 def read_glimpse(**kwargs):
+    """
+    Preprocess glimpse files.
+    """
     P = kwargs.pop("P")
     path = kwargs.pop("path")
     glimpse = GlimpseDataset(**kwargs)
@@ -200,6 +221,16 @@ def read_glimpse(**kwargs):
         # convert data into torch tensor
         data[dtype] = torch.tensor(data[dtype])
         target_xy[dtype] = torch.tensor(target_xy[dtype])
+
+    # process offset data
+    offset_min = quantile(offset.flatten().float(), 0.005).item()
+    offset_max = quantile(offset.flatten().float(), 0.995).item()
+    clamped_offset = torch.clamp(offset, offset_min, offset_max)
+    offset_samples, offset_weights = torch.unique(
+        clamped_offset, sorted=True, return_counts=True
+    )
+    offset_weights = offset_weights.float() / offset_weights.sum()
+
     dataset = CosmosDataset(
         data["ontarget"],
         target_xy["ontarget"],
@@ -207,6 +238,23 @@ def read_glimpse(**kwargs):
         data["offtarget"],
         target_xy["offtarget"],
         glimpse.labels["offtarget"],
-        offset,
+        offset_samples,
+        offset_weights,
+        title=kwargs["title"],
     )
     save(dataset, path)
+
+    logger.info(
+        f"On-target data: N={dataset.ontarget.N} AOIs, "
+        f"F={dataset.ontarget.F} frames, "
+        f"P={dataset.ontarget.P} pixels, "
+        f"P={dataset.ontarget.P} pixels"
+    )
+    if dataset.offtarget.data is not None:
+        logger.info(
+            f"Off-target data: Nc={dataset.offtarget.N} AOIs, "
+            f"Fc={dataset.offtarget.F} frames, "
+            f"P={dataset.offtarget.P} pixels, "
+            f"P={dataset.offtarget.P} pixels"
+        )
+    logger.info(f"Data is saved in {Path(path) / 'data.tpqr'}")

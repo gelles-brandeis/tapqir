@@ -1,5 +1,5 @@
-User Guide
-==========
+CLI
+===
 
 Create a configuration file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,11 +88,7 @@ by running ``show`` command::
 
     tapqir show cosmos path_to_folder
 
-which will display parameter values, original images along with best estimates:
-
-.. image:: parameters.png
-
-.. image:: images.png
+which will display parameter values, original images along with best estimates.
 
 Troubleshooting
 ~~~~~~~~~~~~~~~
@@ -104,9 +100,7 @@ Fitting progress can be visualized using tensorboard program::
 
     tensorboard --logdir=path_to_folder
 
-which will open the window in the browser:
-
-.. image:: tensorboard.png
+which will open the window in the browser.
 
 Log file
 --------
