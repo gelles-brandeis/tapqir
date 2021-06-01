@@ -79,8 +79,7 @@ def main(args):
         simulate(model, args.N, args.F, args.P, seed=args.seed, params=params)
         pyro.clear_param_store()
 
-    model.settings(args.lr, args.bs, args.jit)
-    model.run(args.it)
+    model.run(args.it, args.lr, args.bs, args.jit)
     # compute and save theta_samples
     model.compute_theta_samples(args.num_samples)
     model.compute_stats()

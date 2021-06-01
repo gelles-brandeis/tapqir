@@ -123,13 +123,12 @@ class Fit(Command):
             model = models[args.model](states, k_max, device, dtype)
             model.load(args.path)
 
-            model.settings(learning_rate, batch_size, jit)
+            model.run(num_iter, learning_rate, batch_size, jit)
             if batch_size == 0:
                 # add new batch_size to options.cfg
                 config.set("fit", "batch_size", str(model.batch_size))
                 with open(cfg_file, "w") as configfile:
                     config.write(configfile)
-            model.run(num_iter)
             if model.name == "cosmos":
                 # compute and save theta_samples
                 model.compute_theta_samples(num_samples)
