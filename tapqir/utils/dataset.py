@@ -34,15 +34,13 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
     def median(self):
         return torch.median(self.data).item()
 
-    def fetch(self, idx):
-        if isinstance(idx, tuple):
-            assert len(idx) == 2
-            ndx, fdx = idx
+    def fetch(self, ndx, fdx=None):
+        if fdx is not None:
             assert isinstance(fdx, int)
             return self.data[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
                 self.device
             )
-        return self.data[idx].to(self.device), self.xy[idx].to(self.device)
+        return self.data[ndx].to(self.device), self.xy[ndx].to(self.device)
 
 
 class OffsetData(namedtuple("OffsetData", ["samples", "weights"])):
