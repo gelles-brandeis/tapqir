@@ -23,6 +23,17 @@ from tapqir import __version__ as tapqir_version
 from tapqir.utils.dataset import load
 from tapqir.utils.stats import save_stats
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+formatter = logging.Formatter(
+    fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%m/%d/%Y %I:%M:%S %p",
+)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
 
 class GaussianSpot:
     r"""
@@ -70,17 +81,20 @@ class Model:
     """
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
-        super().__init__()
         self._S = S
         self._K = K
         self.batch_size = None
         # for plotting
         self.n = None
         self.data_path = None
-        # set device & dtype
-        self.to(device, dtype)
         self.path = None
         self.run_path = None
+        # logger
+        self.logger = logger
+        self.logger.info("Tapqir version - {}".format(tapqir_version))
+        self.logger.info("Model - {}".format(self.name))
+        # set device & dtype
+        self.to(device, dtype)
 
     def to(self, device, dtype="double"):
         self.dtype = getattr(torch, dtype)
@@ -97,8 +111,13 @@ class Model:
         if hasattr(self, "data"):
             self.data.ontarget = self.data.ontarget._replace(device=self.device)
             self.data.offtarget = self.data.offtarget._replace(device=self.device)
-            self.data.offset = self.data.offset._replace(device=self.device)
+            self.data.offset = self.data.offset._replace(
+                samples=self.data.offset.samples.to(self.device),
+                weights=self.data.offset.weights.to(self.device),
+            )
             self.gaussian.ij_pixel = self.gaussian.ij_pixel.to(self.device)
+        self.logger.info("Device - {}".format(self.device))
+        self.logger.info("Floating precision - {}".format(self.dtype))
 
     @lazy_property
     def S(self):
@@ -118,32 +137,61 @@ class Model:
         # set path
         self.path = Path(path)
         self.run_path = self.path / f"{self.name}" / tapqir_version.split("+")[0]
+        # logger
+        self.writer = SummaryWriter(log_dir=self.run_path / "tb")
+        fh = logging.FileHandler(self.run_path / "run.log")
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        self.logger.addHandler(fh)
 
         # load data
         self.data = load(self.path, self.device)
         self.gaussian = GaussianSpot(self.data.P)
+        self.logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results
         if (self.path / "params.tpqr").is_file():
             self.params = torch.load(self.path / "params.tpqr")
+            self.logger.info(f"Loaded parameters from {self.path / 'params.tpqr'}")
         if (self.path / "theta_samples.tpqr").is_file():
             self.theta_samples = torch.load(self.path / "theta_samples.tpqr")
+            self.logger.info(
+                f"Loaded theta samples from {self.path / 'theta_samples.tpqr'}"
+            )
         if (self.path / "statistics.csv").is_file():
             self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
+            self.logger.info(
+                f"Loaded model statistics from {self.path / 'statistics.csv'}"
+            )
 
-    def settings(self, lr=0.005, batch_size=0, jit=False):
-        # K - max number of spots
+    def model(self):
+        r"""
+        Generative Model
+        """
+        raise NotImplementedError
+
+    def guide(self):
+        r"""
+        Variational Model
+        """
+        raise NotImplementedError
+
+    def run(self, num_iter, lr=0.005, batch_size=0, jit=False, verbose=True):
         self.lr = lr
         # find max possible batch_size
         if batch_size == 0:
             batch_size = self._max_batch_size()
         self.batch_size = batch_size
         self.jit = jit
-
         self.optim_fn = optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
-        self.log()
+
+        if verbose:
+            self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
+            self.logger.info("Learning rate - {}".format(self.lr))
+            self.logger.info("Batch size - {}".format(self.batch_size))
+            self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
         if self.run_path is not None:
             try:
@@ -166,20 +214,6 @@ class Model:
                 max_plate_nesting=2, ignore_jit_warnings=True
             )
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
-
-    def model(self):
-        r"""
-        Generative Model
-        """
-        raise NotImplementedError
-
-    def guide(self):
-        r"""
-        Variational Model
-        """
-        raise NotImplementedError
-
-    def run(self, num_iter):
         # pyro.enable_validation()
         self._stop = False
         for i in tqdm(range(num_iter)):
@@ -187,7 +221,7 @@ class Model:
             if not self.iter % 100 and self.iter != 0:
                 self.save_checkpoint()
                 if self._stop:
-                    self.logger.debug("Step #{} model converged.".format(self.iter))
+                    self.logger.INFO("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
 
@@ -195,9 +229,8 @@ class Model:
         k = 0
         batch_size = 0
         while batch_size + 2 ** k < self.data.ontarget.N:
-            self.settings(self.lr, batch_size + 2 ** k)
             try:
-                self.run(1)
+                self.run(1, lr=self.lr, batch_size=batch_size + 2 ** k, verbose=False)
             except RuntimeError as error:
                 assert error.args[0].startswith("CUDA")
                 if k == 0:
@@ -211,32 +244,6 @@ class Model:
             batch_size += 2 ** (k - 1)
 
         return batch_size
-
-    def log(self):
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%m/%d/%Y %I:%M:%S %p",
-        )
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
-
-        if self.run_path is not None:
-            self.writer = SummaryWriter(log_dir=self.run_path / "tb")
-            fh = logging.FileHandler(self.run_path / "run.log")
-            fh.setLevel(logging.DEBUG)
-            fh.setFormatter(formatter)
-            self.logger.addHandler(fh)
-        self.logger.info("Tapqir version - {}".format(tapqir_version))
-        self.logger.info("Model - {}".format(self.name))
-        self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
-        self.logger.info("Learning rate - {}".format(self.lr))
-        self.logger.info("Batch size - {}".format(self.batch_size))
-        self.logger.info("Floating precision - {}".format(self.dtype))
-        self.logger.info("{}".format("jit" if self.jit else "nojit"))
 
     def save_checkpoint(self):
         # save only if no NaN values
@@ -326,6 +333,7 @@ class Model:
 
     def compute_stats(self):
         save_stats(self, self.path)
+        self.logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
 
     def snr(self):
         r"""

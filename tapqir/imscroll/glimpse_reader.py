@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+from pyro.ops.stats import quantile
 from scipy.io import loadmat
 from tqdm import tqdm
 
@@ -142,6 +143,7 @@ class GlimpseDataset:
         self.aoiinfo = aoi_df
         self.cumdrift = drift_df
         self.labels = labels
+        self.title = kwargs["title"]
 
     def __len__(self):
         return self.N
@@ -219,6 +221,16 @@ def read_glimpse(**kwargs):
         # convert data into torch tensor
         data[dtype] = torch.tensor(data[dtype])
         target_xy[dtype] = torch.tensor(target_xy[dtype])
+
+    # process offset data
+    offset_min = quantile(offset.flatten().float(), 0.005).item()
+    offset_max = quantile(offset.flatten().float(), 0.995).item()
+    clamped_offset = torch.clamp(offset, offset_min, offset_max)
+    offset_samples, offset_weights = torch.unique(
+        clamped_offset, sorted=True, return_counts=True
+    )
+    offset_weights = offset_weights.float() / offset_weights.sum()
+
     dataset = CosmosDataset(
         data["ontarget"],
         target_xy["ontarget"],
@@ -226,7 +238,9 @@ def read_glimpse(**kwargs):
         data["offtarget"],
         target_xy["offtarget"],
         glimpse.labels["offtarget"],
-        offset,
+        offset_samples,
+        offset_weights,
+        title=kwargs["title"],
     )
     save(dataset, path)
 

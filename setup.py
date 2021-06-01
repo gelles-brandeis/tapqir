@@ -18,6 +18,7 @@ with open("README.rst", "r") as fh:
 
 # examples/tutorials
 EXTRAS_REQUIRE = [
+    "ipywidgets",
     "notebook",
     "matplotlib",
     "openpyxl",

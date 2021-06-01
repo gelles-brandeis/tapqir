@@ -48,16 +48,16 @@ ordabayev@brandeis.edu
     ---
     :img-top: _static/fi-rr-book-alt.svg
 
-    User guide
-    ^^^^^^^^^^
+    Tutorial
+    ^^^^^^^^
 
-    The user guide provides in-depth information on running tapqir models.
+    The tutorial provides in-depth information on running tapqir models.
 
     +++
 
-    .. link-button:: usage
+    .. link-button:: user_guide/tutorial
             :type: ref
-            :text: To the user guide
+            :text: To the tutorial
             :classes: btn-block btn-secondary stretched-link
 
     ---
@@ -97,6 +97,7 @@ ordabayev@brandeis.edu
    :hidden:
 
    install
-   user_guide/index
+   user_guide/tutorial
    api
    examples/index
+   user_guide/commands

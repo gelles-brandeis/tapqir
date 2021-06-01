@@ -16,6 +16,7 @@ class HMM(Cosmos):
     """
     Hidden Markov model.
     """
+
     name = "hmm"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", vectorized=True):

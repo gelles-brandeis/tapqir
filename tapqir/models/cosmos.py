@@ -20,10 +20,8 @@ class Cosmos(Model):
     """
     Time-independent model.
     """
-    name = "cosmos"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
-        super().__init__(S, K, device, dtype)
+    name = "cosmos"
 
     @property
     def probs_j(self):
@@ -76,10 +74,12 @@ class Cosmos(Model):
 
     def compute_theta_samples(self, num_samples):
         samples = torch.zeros(
-            num_samples, self.data.ontarget.N, self.data.ontarget.F
+            num_samples,
+            self.data.ontarget.N,
+            self.data.ontarget.F,
+            device=torch.device("cpu"),
         ).long()
-        batch_size = self.batch_size
-        split_size = 1 + self.batch_size // 2
+        split_size = self.batch_size
         self.batch_size = None
         self.data.offtarget = CosmosData(None, None, None, None)
         for i in tqdm(range(num_samples)):
@@ -91,11 +91,15 @@ class Cosmos(Model):
                     trained_model, temperature=1, first_available_dim=-3
                 )
                 trace = handlers.trace(inferred_model).get_trace()
-                samples[i, ndx] = trace.nodes["d/theta"]["value"]
+                samples[i, ndx] = trace.nodes["d/theta"]["value"].cpu()
         self.theta_samples = samples
-        self.batch_size = batch_size
+        self.batch_size = split_size
+        self.n = None
         if self.path is not None:
             torch.save(self.theta_samples, self.path / "theta_samples.tpqr")
+            self.logger.info(
+                f"Theta samples were saved in {self.path / 'theta_samples.tpqr'}"
+            )
 
     @property
     def z_probs(self):
@@ -437,7 +441,7 @@ class Cosmos(Model):
     def spot_parameters(self, data, prefix):
         pyro.param(
             f"{prefix}/background_mean_loc",
-            lambda: torch.full((data.N, 1), data.median - self.data.offset.median),
+            lambda: torch.full((data.N, 1), data.median - self.data.offset.mean),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -453,7 +457,7 @@ class Cosmos(Model):
         )
         pyro.param(
             f"{prefix}/b_loc",
-            lambda: torch.full((data.N, data.F), data.median - self.data.offset.median),
+            lambda: torch.full((data.N, data.F), data.median - self.data.offset.mean),
             constraint=constraints.positive,
         )
         pyro.param(
