@@ -117,6 +117,12 @@ html_theme_options = {
             "icon": "fab fa-github-square",
         },
     ],
+    "external_links": [
+        {
+            "name": "Discussion",
+            "url": "https://github.com/gelles-brandeis/tapqir/discussions",
+        },
+    ],
     "show_prev_next": False,
     "use_edit_page_button": True,
 }
