@@ -11,3 +11,4 @@ examples/data/
 
 # sphinx documentation
 docs/build/
+docs/source/reference/
