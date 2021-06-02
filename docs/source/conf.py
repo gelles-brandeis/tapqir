@@ -14,7 +14,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import glob
 import os
+import shutil
 import sys
 
 sys.path.insert(0, os.path.abspath("../.."))
@@ -79,7 +81,7 @@ intersphinx_mapping = dict(
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = [".ipynb_checkpoints"]
+exclude_patterns = ["**.ipynb_checkpoints"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -87,9 +89,11 @@ pygments_style = "sphinx"
 
 # This is processed by Jinja2 and inserted before each notebook
 nbsphinx_prolog = r"""
-{% set docname = 'docs/source/user_guide/' + env.doc2path(env.docname, base=None).split('/')[-1] %}
-:github_url: https://github.com/gelles-brandeis/tapqir/blob/read-the-docs/{{ docname }}
+{% set docname = 'notebooks/' + env.doc2path(env.docname, base=None).split('/')[-1] %}
+:github_url: https://github.com/gelles-brandeis/tapqir/blob/latest/{{ docname }}
+
 .. raw:: html
+
     <div class="admonition note">
       Interactive online version:
       <span style="white-space: nowrap;">
@@ -100,6 +104,16 @@ nbsphinx_prolog = r"""
       </span>
     </div>
 """  # noqa: E501
+
+
+# -- Copy notebook files
+
+if not os.path.exists("notebooks"):
+    os.makedirs("notebooks")
+
+for src_file in glob.glob("../../notebooks/*.ipynb"):
+    dst_file = os.path.join("notebooks", src_file.split("/")[-1])
+    shutil.copy(src_file, "notebooks/")
 
 
 # -- Options for HTML output -------------------------------------------------

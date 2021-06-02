@@ -14,17 +14,17 @@ Experiments
 
 .. nbgallery::
 
-   Rpb1SNAP549
-   sigma54RNAPCy3-597P255
-   sigma54RNAPCy3-598P2993
+   ../notebooks/Rpb1SNAP549
+   ../notebooks/sigma54RNAPCy3-597P255
+   ../notebooks/sigma54RNAPCy3-598P2993
 
 Simulations
 -----------
 
 .. nbgallery::
 
-   height
-   randomized
-   lamda
-   negative
-   kinetic
+   ../notebooks/height
+   ../notebooks/randomized
+   ../notebooks/lamda
+   ../notebooks/negative
+   ../notebooks/kinetic

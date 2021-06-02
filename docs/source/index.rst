@@ -49,7 +49,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: user_guide/tutorial
+    .. link-button:: notebooks/tutorial
             :type: ref
             :text: To the tutorial
             :classes: btn-block btn-secondary stretched-link
@@ -91,7 +91,7 @@ ordabayev@brandeis.edu
    :hidden:
 
    install
-   user_guide/tutorial
+   notebooks/tutorial
    api
    examples/index
    user_guide/commands
