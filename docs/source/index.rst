@@ -1,11 +1,5 @@
-.. tapqir documentation master file, created by
-   sphinx-quickstart on Sat Sep  5 21:04:06 2020.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-
 Documentation
-~~~~~~~~~~~~~
+=============
 
 :mod:`tapqir` is software to analyze images from single-molecule fluorescence colocalization experiments 
 using a Bayesian statistics-based image classification method.
