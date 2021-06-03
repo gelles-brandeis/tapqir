@@ -9,18 +9,18 @@ from pyro.ops.stats import quantile
 from torch.distributions.utils import lazy_property, probs_to_logits
 
 
-class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
+class CosmosData(namedtuple("CosmosData", ["images", "xy", "labels", "device"])):
     @property
     def N(self):
-        return self.data.shape[0]
+        return self.images.shape[0]
 
     @property
     def F(self):
-        return self.data.shape[1]
+        return self.images.shape[1]
 
     @property
     def P(self):
-        return self.data.shape[2]
+        return self.images.shape[2]
 
     @property
     def x(self):
@@ -32,15 +32,15 @@ class CosmosData(namedtuple("CosmosData", ["data", "xy", "labels", "device"])):
 
     @lazy_property
     def median(self):
-        return torch.median(self.data).item()
+        return torch.median(self.images).item()
 
     def fetch(self, ndx, fdx=None):
         if fdx is not None:
             assert isinstance(fdx, int)
-            return self.data[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
+            return self.images[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
                 self.device
             )
-        return self.data[ndx].to(self.device), self.xy[ndx].to(self.device)
+        return self.images[ndx].to(self.device), self.xy[ndx].to(self.device)
 
 
 class OffsetData(namedtuple("OffsetData", ["samples", "weights"])):
@@ -96,35 +96,35 @@ class CosmosDataset:
 
     @lazy_property
     def vmin(self):
-        return quantile(self.ontarget.data.flatten().float(), 0.05).item()
+        return quantile(self.ontarget.images.flatten().float(), 0.05).item()
 
     @lazy_property
     def vmax(self):
-        return quantile(self.ontarget.data.flatten().float(), 0.99).item()
+        return quantile(self.ontarget.images.flatten().float(), 0.99).item()
 
     def __repr__(self):
         samples = repr(self.offset.samples).replace("\n", "\n                  ")
         weights = repr(self.offset.weights).replace("\n", "\n                  ")
         return (
             f"{self.__class__.__name__}: {self.title}"
-            f"\n  ontarget.data   tensor(N={self.ontarget.N} AOIs, "
+            f"\n  ontarget.images  tensor(N={self.ontarget.N} AOIs, "
             f"F={self.ontarget.F} frames, "
             f"P={self.ontarget.P} pixels, "
             f"P={self.ontarget.P} pixels)"
-            f"\n          .x      tensor(N={self.ontarget.N} AOIs, "
+            f"\n          .x       tensor(N={self.ontarget.N} AOIs, "
             f"F={self.ontarget.F} frames)"
-            f"\n          .y      tensor(N={self.ontarget.N} AOIs, "
+            f"\n          .y       tensor(N={self.ontarget.N} AOIs, "
             f"F={self.ontarget.F} frames)"
-            f"\n\n  offtarget.data  tensor(N={self.offtarget.N} AOIs, "
+            f"\n\n  offtarget.images tensor(N={self.offtarget.N} AOIs, "
             f"F={self.offtarget.F} frames, "
             f"P={self.offtarget.P} pixels, "
             f"P={self.offtarget.P} pixels)"
-            f"\n           .x     tensor(N={self.offtarget.N} AOIs, "
+            f"\n           .x      tensor(N={self.offtarget.N} AOIs, "
             f"F={self.offtarget.F} frames)"
-            f"\n           .y     tensor(N={self.offtarget.N} AOIs, "
+            f"\n           .y      tensor(N={self.offtarget.N} AOIs, "
             f"F={self.offtarget.F} frames)"
-            f"\n\n  offset.samples  {samples}"
-            f"\n        .weights  {weights}"
+            f"\n\n  offset.samples   {samples}"
+            f"\n        .weights   {weights}"
         )
 
 
@@ -132,10 +132,10 @@ def save(obj, path):
     path = Path(path)
     torch.save(
         {
-            "ontarget_data": obj.ontarget.data,
+            "ontarget_data": obj.ontarget.images,
             "ontarget_xy": obj.ontarget.xy,
             "ontarget_labels": obj.ontarget.labels,
-            "offtarget_data": obj.offtarget.data,
+            "offtarget_data": obj.offtarget.images,
             "offtarget_xy": obj.offtarget.xy,
             "offtarget_labels": obj.offtarget.labels,
             "offset_samples": obj.offset.samples,

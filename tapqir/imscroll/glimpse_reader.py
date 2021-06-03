@@ -199,6 +199,7 @@ def read_glimpse(**kwargs):
         )
     offsets = np.zeros((len(glimpse.cumdrift), 4, 30, 30), dtype="int")
     # loop through each frame
+    logger.info("Processing glimpse files ...")
     for i, frame in enumerate(tqdm(glimpse.cumdrift.index)):
         img = glimpse[frame]
 
@@ -250,10 +251,10 @@ def read_glimpse(**kwargs):
         f"P={dataset.ontarget.P} pixels, "
         f"P={dataset.ontarget.P} pixels"
     )
-    if dataset.offtarget.data is not None:
+    if dataset.offtarget.images is not None:
         logger.info(
-            f"Off-target data: Nc={dataset.offtarget.N} AOIs, "
-            f"Fc={dataset.offtarget.F} frames, "
+            f"Off-target data: N={dataset.offtarget.N} AOIs, "
+            f"F={dataset.offtarget.F} frames, "
             f"P={dataset.offtarget.P} pixels, "
             f"P={dataset.offtarget.P} pixels"
         )

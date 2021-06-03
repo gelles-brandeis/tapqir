@@ -78,7 +78,8 @@ class Cosmos(Model):
             self.data.ontarget.N,
             self.data.ontarget.F,
             device=torch.device("cpu"),
-        ).long()
+            dtype=torch.uint8,
+        )
         split_size = self.batch_size
         self.batch_size = None
         self.data.offtarget = CosmosData(None, None, None, None)
@@ -91,7 +92,7 @@ class Cosmos(Model):
                     trained_model, temperature=1, first_available_dim=-3
                 )
                 trace = handlers.trace(inferred_model).get_trace()
-                samples[i, ndx] = trace.nodes["d/theta"]["value"].cpu()
+                samples[i, ndx] = trace.nodes["d/theta"]["value"].cpu().to(torch.uint8)
         self.theta_samples = samples
         self.batch_size = split_size
         self.n = None
@@ -108,14 +109,14 @@ class Cosmos(Model):
         """
         try:
             return (
-                Vindex(self.theta_to_z)[self.theta_samples]
+                self.theta_to_z[self.theta_samples.long()]
                 .to(self.dtype)
                 .mean(0)
                 .permute(2, 0, 1)
-                .to(self.device)
+                .cpu()
             )
         except AttributeError:
-            return torch.zeros(self.K, self.data.ontarget.N, self.data.ontarget.F)
+            return torch.zeros(self.K, self.data.ontarget.N, self.data.ontarget.F).cpu()
 
     @property
     def j_probs(self):
@@ -129,7 +130,7 @@ class Cosmos(Model):
         r"""
         Probability of a spot :math:`p(m_{knf})`.
         """
-        return pyro.param("d/m_probs").data[..., 1].to(self.device)
+        return pyro.param("d/m_probs").data[..., 1].cpu()
 
     @property
     def z_marginal(self):
@@ -157,7 +158,7 @@ class Cosmos(Model):
         self.spot_model(self.data.ontarget, prefix="d")
 
         # control data
-        if self.data.offtarget.data is not None:
+        if self.data.offtarget.images is not None:
             self.spot_model(self.data.offtarget, prefix="c")
 
     def state_model(self):
@@ -199,7 +200,7 @@ class Cosmos(Model):
         self.spot_guide(self.data.ontarget, prefix="d")
 
         # control data
-        if self.data.offtarget.data is not None:
+        if self.data.offtarget.images is not None:
             self.spot_guide(self.data.offtarget, prefix="c")
 
     def state_guide(self):
@@ -429,7 +430,7 @@ class Cosmos(Model):
 
         self.spot_parameters(self.data.ontarget, prefix="d")
 
-        if self.data.offtarget.data is not None:
+        if self.data.offtarget.images is not None:
             self.spot_parameters(self.data.offtarget, prefix="c")
 
     def state_parameters(self):
