@@ -365,7 +365,7 @@ class Model:
         )
         signal = (
             (
-                self.data.ontarget.data
+                self.data.ontarget.images
                 - self.params["d/background_mean"][..., None, None]
                 - self.data.offset.mean
             )

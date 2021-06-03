@@ -228,9 +228,9 @@ class MainWindow(QMainWindow):
             self.img_ideal[i] = pg.ImageItem()
             self.box_ideal[i].addItem(self.img_ideal[i])
 
-        img = pg.ImageItem(self.Model.data.ontarget.data.numpy())
-        range_min = np.percentile(self.Model.data.ontarget.data.numpy(), 0.5)
-        range_max = np.percentile(self.Model.data.ontarget.data.numpy(), 99.5)
+        img = pg.ImageItem(self.Model.data.ontarget.images.numpy())
+        range_min = np.percentile(self.Model.data.ontarget.images.numpy(), 0.5)
+        range_max = np.percentile(self.Model.data.ontarget.images.numpy(), 99.5)
         self.hist = HistogramLUTGraph(self.img, image=img)
         self.hist.setLevels(min=self.Model.data.vmin, max=self.Model.data.vmax)
         self.hist.setHistogramRange(range_min, range_max)
@@ -261,7 +261,7 @@ class MainWindow(QMainWindow):
         for f in range(f1, f2):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
-                self.Model.data.ontarget.data[int(self.aoiNumber.text()), f].numpy()
+                self.Model.data.ontarget.images[int(self.aoiNumber.text()), f].numpy()
             )
             self.prob[(f - f1) % 100].setOpts(
                 height=(

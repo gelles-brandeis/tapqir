@@ -16,14 +16,14 @@ from sklearn.metrics import (
 )
 
 
-def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
+def ci_from_trace(tr, sites, CI=0.95, num_samples=500):
     ci_stats = {}
     for name in sites:
         ci_stats[name] = {}
         samples = tr.nodes[name]["fn"].sample((num_samples,)).data.squeeze().cpu()
         hpd = pi(
             samples,
-            ci,
+            CI,
             dim=0,
         )
         mean = tr.nodes[name]["fn"].mean.data.squeeze().cpu()
@@ -33,7 +33,7 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
 
         # calculate Keq
         if name == "pi":
-            hpd = pi(samples[:, 1] / (1 - samples[:, 1]), ci, dim=0)
+            hpd = pi(samples[:, 1] / (1 - samples[:, 1]), CI, dim=0)
             mean = (samples[:, 1] / (1 - samples[:, 1])).mean()
             ci_stats["Keq"] = {}
             ci_stats["Keq"]["ul"] = hpd[1]
@@ -43,7 +43,7 @@ def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
     return ci_stats
 
 
-def save_stats(model, path):
+def save_stats(model, path, CI=0.95):
     # change device to cpu
     model.to("cpu")
     model.batch_size = model.n = None
@@ -63,7 +63,7 @@ def save_stats(model, path):
         "d/y_1",
         "d/background",
     ]
-    ci_stats = ci_from_trace(guide_tr, global_params + local_params)
+    ci_stats = ci_from_trace(guide_tr, global_params + local_params, CI=CI)
     params_dict = {}
     for param in global_params + ["Keq"]:
         if param == "pi":
@@ -102,11 +102,11 @@ def save_stats(model, path):
             params_dict[f"{base_name}_ul"] = torch.stack(
                 [ci_stats[f"{base_name}_{k}"]["ul"] for k in range(model.K)], dim=0
             )
-    params_dict["d/m_probs"] = model.m_probs.data
-    params_dict["d/z_probs"] = model.z_probs.data
-    params_dict["d/j_probs"] = model.j_probs.data
-    params_dict["z_marginal"] = model.z_marginal.data
-    params_dict["z_map"] = model.z_map.data
+    params_dict["d/m_probs"] = model.m_probs.data.cpu()
+    params_dict["d/z_probs"] = model.z_probs.data.cpu()
+    params_dict["d/j_probs"] = model.j_probs.data.cpu()
+    params_dict["z_marginal"] = model.z_marginal.data.cpu()
+    params_dict["z_map"] = model.z_map.data.cpu()
     model.params = params_dict
 
     # snr
