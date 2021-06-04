@@ -57,6 +57,7 @@ setuptools.setup(
         "PySide2",
         "scikit-learn",
         "scipy",
+        "tensorboard",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
@@ -69,7 +70,6 @@ setuptools.setup(
             "pydata_sphinx_theme",
             "sphinx-gallery",
             "sphinx-panels",
-            "tb-nightly",
         ],
     },
     classifiers=[
