@@ -32,6 +32,7 @@ class Glimpse(Command):
         read_glimpse(
             path=args.path,
             P=14,
+            title=config["glimpse"]["title"],
             header_dir=config["glimpse"]["dir"],
             ontarget_aoiinfo=config["glimpse"]["ontarget_aoiinfo"],
             offtarget_aoiinfo=config["glimpse"]["offtarget_aoiinfo"],
