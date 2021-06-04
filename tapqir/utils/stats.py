@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import torch
 from pyro.ops.stats import pi, quantile
-from pyroapi import handlers
 from sklearn.metrics import (
     confusion_matrix,
     matthews_corrcoef,
@@ -15,43 +14,17 @@ from sklearn.metrics import (
     recall_score,
 )
 
-
-def ci_from_trace(tr, sites, CI=0.95, num_samples=500):
-    ci_stats = {}
-    for name in sites:
-        ci_stats[name] = {}
-        samples = tr.nodes[name]["fn"].sample((num_samples,)).data.squeeze().cpu()
-        hpd = pi(
-            samples,
-            CI,
-            dim=0,
-        )
-        mean = tr.nodes[name]["fn"].mean.data.squeeze().cpu()
-        ci_stats[name]["ul"] = hpd[1]
-        ci_stats[name]["ll"] = hpd[0]
-        ci_stats[name]["mean"] = mean
-
-        # calculate Keq
-        if name == "pi":
-            hpd = pi(samples[:, 1] / (1 - samples[:, 1]), CI, dim=0)
-            mean = (samples[:, 1] / (1 - samples[:, 1])).mean()
-            ci_stats["Keq"] = {}
-            ci_stats["Keq"]["ul"] = hpd[1]
-            ci_stats["Keq"]["ll"] = hpd[0]
-            ci_stats["Keq"]["mean"] = mean
-
-    return ci_stats
+from tapqir.handlers import StatsMessenger
 
 
-def save_stats(model, path, CI=0.95):
+def save_stats(model, path, CI=0.95, save_matlab=False):
     # change device to cpu
     model.to("cpu")
     model.batch_size = model.n = None
     # global parameters
     global_params = ["gain", "pi", "lamda", "proximity"]
     data = pd.DataFrame(index=global_params, columns=["Mean", "95% LL", "95% UL"])
-    # parameters
-    guide_tr = handlers.trace(model.guide).get_trace()
+    # local parameters
     local_params = [
         "d/height_0",
         "d/height_1",
@@ -63,51 +36,40 @@ def save_stats(model, path, CI=0.95):
         "d/y_1",
         "d/background",
     ]
-    ci_stats = ci_from_trace(guide_tr, global_params + local_params, CI=CI)
-    params_dict = {}
+    with StatsMessenger(global_params + local_params, CI=CI) as ci_stats:
+        model.guide()
+
     for param in global_params + ["Keq"]:
         if param == "pi":
-            data.loc[param, "Mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
-                "mean"
-            ][1].item()
-            data.loc[param, "95% LL"] = params_dict[f"{param}_ll"] = ci_stats[param][
-                "ll"
-            ][1].item()
-            data.loc[param, "95% UL"] = params_dict[f"{param}_ul"] = ci_stats[param][
-                "ul"
-            ][1].item()
+            data.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
+            data.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
+            data.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
         else:
-            data.loc[param, "Mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
-                "mean"
-            ].item()
-            data.loc[param, "95% LL"] = params_dict[f"{param}_ll"] = ci_stats[param][
-                "ll"
-            ].item()
-            data.loc[param, "95% UL"] = params_dict[f"{param}_ul"] = ci_stats[param][
-                "ul"
-            ].item()
+            data.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
+            data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
+            data.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+    ci_stats["d/m_probs"] = model.m_probs.data.cpu()
+    ci_stats["d/z_probs"] = model.z_probs.data.cpu()
+    ci_stats["d/j_probs"] = model.j_probs.data.cpu()
+    ci_stats["p(specific)"] = model.z_marginal.data.cpu()
+    ci_stats["z_map"] = model.z_map.data.cpu()
+    # combine K local params
     for param in local_params:
-        if param == "d/background":
-            params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
-            params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
-            params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
-        elif param.endswith("_0"):
+        if param.endswith("_0"):
             base_name = param.split("_")[0]
-            params_dict[f"{base_name}_mean"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["mean"] for k in range(model.K)], dim=0
+            ci_stats[base_name] = {}
+            ci_stats[base_name]["Mean"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.K)], dim=0
             )
-            params_dict[f"{base_name}_ll"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["ll"] for k in range(model.K)], dim=0
+            ci_stats[base_name]["LL"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.K)], dim=0
             )
-            params_dict[f"{base_name}_ul"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["ul"] for k in range(model.K)], dim=0
+            ci_stats[base_name]["UL"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.K)], dim=0
             )
-    params_dict["d/m_probs"] = model.m_probs.data.cpu()
-    params_dict["d/z_probs"] = model.z_probs.data.cpu()
-    params_dict["d/j_probs"] = model.j_probs.data.cpu()
-    params_dict["z_marginal"] = model.z_marginal.data.cpu()
-    params_dict["z_map"] = model.z_map.data.cpu()
-    model.params = params_dict
+            for k in range(model.K):
+                del ci_stats[f"{base_name}_{k}"]
+    model.params = ci_stats
 
     # snr
     data.loc["SNR", "Mean"] = model.snr().mean().item()
@@ -154,7 +116,14 @@ def save_stats(model, path, CI=0.95):
         for line in open(model.run_path / "run.log"):
             if "model converged" in line:
                 data.loc["trained", "Mean"] = True
-        torch.save(params_dict, path / "params.tpqr")
+        torch.save(ci_stats, path / "params.tpqr")
+        if save_matlab:
+            from scipy.io import savemat
+
+            for param, field in ci_stats.items():
+                for stat, value in field.items():
+                    ci_stats[param][stat] = value.numpy()
+            savemat(path / "params.mat", ci_stats)
         data.to_csv(
             path / "statistics.csv",
         )
