@@ -28,7 +28,7 @@ logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 formatter = logging.Formatter(
-    fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    fmt="%(asctime)s - %(message)s",
     datefmt="%m/%d/%Y %I:%M:%S %p",
 )
 ch.setFormatter(formatter)
@@ -331,10 +331,12 @@ class Model:
                 )
             )
 
-    def compute_stats(self):
-        save_stats(self, self.path)
+    def compute_stats(self, CI=0.95, save_matlab=False):
+        save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
         if self.path is not None:
             self.logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
+            if save_matlab:
+                self.logger.info(f"Parameters were saved in {self.path / 'params.mat'}")
 
     def snr(self):
         r"""
@@ -358,22 +360,22 @@ class Model:
         """
         weights = self.gaussian(
             torch.ones(1),
-            self.params["d/width_mean"],
-            self.params["d/x_mean"],
-            self.params["d/y_mean"],
+            self.params["d/width"]["Mean"],
+            self.params["d/x"]["Mean"],
+            self.params["d/y"]["Mean"],
             self.data.ontarget.xy.to(self.dtype),
         )
         signal = (
             (
                 self.data.ontarget.images
-                - self.params["d/background_mean"][..., None, None]
+                - self.params["d/background"]["Mean"][..., None, None]
                 - self.data.offset.mean
             )
             * weights
         ).sum(dim=(-2, -1))
         noise = (
             self.data.offset.var
-            + self.params["d/background_mean"] * self.params["gain_mean"]
+            + self.params["d/background"]["Mean"] * self.params["gain"]["Mean"]
         ).sqrt()
         result = signal / noise
         mask = self.z_probs > 0.5

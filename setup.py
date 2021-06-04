@@ -53,8 +53,11 @@ setuptools.setup(
         "future",
         "pandas",
         "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
+        "pyqtgraph",
+        "PySide2",
         "scikit-learn",
         "scipy",
+        "tensorboard",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
@@ -65,11 +68,8 @@ setuptools.setup(
             "nbsphinx",
             "sphinx",
             "pydata_sphinx_theme",
-            "pyqtgraph",
-            "PySide2",
             "sphinx-gallery",
             "sphinx-panels",
-            "tb-nightly",
         ],
     },
     classifiers=[

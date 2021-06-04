@@ -246,15 +246,15 @@ class MainWindow(QMainWindow):
         frames = torch.arange(f1, f2)
         img_ideal = (
             self.Model.data.offset.mean
-            + self.Model.params["d/background_mean"][n, frames, None, None]
+            + self.Model.params["d/background"]["Mean"][n, frames, None, None]
         )
         gaussian = self.Model.gaussian(
-            self.Model.params["d/height_mean"][:, n, frames].masked_fill(
+            self.Model.params["d/height"]["Mean"][:, n, frames].masked_fill(
                 self.Model.params["d/m_probs"][:, n, frames] < 0.5, 0.0
             ),
-            self.Model.params["d/width_mean"][:, n, frames],
-            self.Model.params["d/x_mean"][:, n, frames],
-            self.Model.params["d/y_mean"][:, n, frames],
+            self.Model.params["d/width"]["Mean"][:, n, frames],
+            self.Model.params["d/x"]["Mean"][:, n, frames],
+            self.Model.params["d/y"]["Mean"][:, n, frames],
             self.Model.data.ontarget.xy[n, frames],
         )
         img_ideal = img_ideal + gaussian.sum(-4)
@@ -328,28 +328,28 @@ class MainWindow(QMainWindow):
             if p == "z":
                 y, x = np.histogram(self.Model.params["d/z_probs"].numpy(), bins=50)
             elif p == "d/background":
-                y, x = np.histogram(self.Model.params[f"{p}_mean"].numpy(), bins=50)
+                y, x = np.histogram(self.Model.params[f"{p}"]["Mean"].numpy(), bins=50)
             else:
                 y, x = np.histogram(
-                    self.Model.params[f"{p}_mean"].flatten().numpy(),
+                    self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
                     bins=50,
                     weights=self.Model.params["d/m_probs"].reshape(-1).numpy(),
                 )
                 self.plot[f"{p}Hist"].setXRange(
                     0,
-                    quantile(self.Model.params[f"{p}_mean"].flatten(), 0.99).item()
+                    quantile(self.Model.params[f"{p}"]["Mean"].flatten(), 0.99).item()
                     * 1.3,
                     padding=0.01,
                 )
 
                 yz, xz = np.histogram(
-                    self.Model.params[f"{p}_mean"].flatten().numpy(),
+                    self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
                     bins=50,
                     weights=self.Model.params["d/z_probs"].reshape(-1).numpy(),
                 )
 
                 yj, xj = np.histogram(
-                    self.Model.params[f"{p}_mean"].flatten().numpy(),
+                    self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
                     bins=50,
                     weights=self.Model.params["d/j_probs"].reshape(-1).numpy(),
                 )
@@ -440,7 +440,7 @@ class MainWindow(QMainWindow):
         )
         self.plot["d/background"].setYRange(
             0,
-            quantile(self.Model.params["d/background_mean"].flatten(), 0.99).item()
+            quantile(self.Model.params["d/background"]["Mean"].flatten(), 0.99).item()
             * 1.1,
             padding=0.01,
         )
@@ -458,15 +458,15 @@ class MainWindow(QMainWindow):
                 self.item["z_label"].setData(self.Model.data.ontarget.labels["z"][n])
             elif p == "d/background":
                 k = 0
-                self.item[f"{p}_ul"].setData(self.Model.params[f"{p}_ul"][n])
-                self.item[f"{p}_ll"].setData(self.Model.params[f"{p}_ll"][n])
-                self.item[f"{p}_mean"].setData(self.Model.params[f"{p}_mean"][n])
+                self.item[f"{p}_ul"].setData(self.Model.params[p]["UL"][n])
+                self.item[f"{p}_ll"].setData(self.Model.params[p]["LL"][n])
+                self.item[f"{p}_mean"].setData(self.Model.params[p]["Mean"][n])
             else:
                 for k in range(self.Model.K):
-                    self.item[f"{p}_{k}_ul"].setData(self.Model.params[f"{p}_ul"][k, n])
-                    self.item[f"{p}_{k}_ll"].setData(self.Model.params[f"{p}_ll"][k, n])
+                    self.item[f"{p}_{k}_ul"].setData(self.Model.params[p]["UL"][k, n])
+                    self.item[f"{p}_{k}_ll"].setData(self.Model.params[p]["LL"][k, n])
                     self.item[f"{p}_{k}_mean"].setData(
-                        self.Model.params[f"{p}_mean"][k, n]
+                        self.Model.params[p]["Mean"][k, n]
                     )
 
         if self.w is not None:

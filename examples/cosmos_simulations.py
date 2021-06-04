@@ -66,7 +66,7 @@ def main(args):
             weights = rv.log_prob(ij_pixel).exp()
             signal = (weights ** 2 * params["height"]).sum()
             noise = math.sqrt((params["background"] * params["gain"]))
-            params["snr"] = float(signal / noise)
+            params["SNR"] = float(signal / noise)
             params["N"] = args.N
             params["F"] = args.F
             params["Nc"] = args.N
