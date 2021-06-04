@@ -133,7 +133,7 @@ html_theme_options = {
     ],
     "external_links": [
         {
-            "name": "Discussion",
+            "name": "Discussions",
             "url": "https://github.com/gelles-brandeis/tapqir/discussions",
         },
     ],

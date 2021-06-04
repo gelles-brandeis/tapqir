@@ -7,7 +7,6 @@ from pathlib import Path
 from cliff.command import Command
 from pyroapi import pyro_backend
 
-from tapqir.imscroll.utils import save_matlab
 from tapqir.models import models
 from tapqir.utils.stats import save_stats
 
@@ -77,6 +76,4 @@ class Save(Command):
             model.load(args.path)
             model.load_checkpoint(param_only=True)
 
-            save_stats(model, args.path)
-            if args.matlab:
-                save_matlab(model, args.path)
+            save_stats(model, args.path, save_matlab=args.matlab)
