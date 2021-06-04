@@ -121,6 +121,15 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             from scipy.io import savemat
 
             for param, field in ci_stats.items():
+                if param in (
+                    "d/m_probs",
+                    "d/z_probs",
+                    "d/j_probs",
+                    "p(specific)",
+                    "z_map",
+                ):
+                    ci_stats[param] = field.numpy()
+                    continue
                 for stat, value in field.items():
                     ci_stats[param][stat] = value.numpy()
             savemat(path / "params.mat", ci_stats)
