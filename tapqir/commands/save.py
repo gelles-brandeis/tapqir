@@ -7,7 +7,6 @@ from pathlib import Path
 from cliff.command import Command
 from pyroapi import pyro_backend
 
-from tapqir.imscroll.utils import save_matlab
 from tapqir.models import models
 from tapqir.utils.stats import save_stats
 
