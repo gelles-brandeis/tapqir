@@ -77,6 +77,4 @@ class Save(Command):
             model.load(args.path)
             model.load_checkpoint(param_only=True)
 
-            save_stats(model, args.path)
-            if args.matlab:
-                save_matlab(model, args.path)
+            save_stats(model, args.path, save_matlab=args.matlab)
