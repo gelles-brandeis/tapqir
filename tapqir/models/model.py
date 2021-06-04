@@ -335,6 +335,8 @@ class Model:
         save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
         if self.path is not None:
             self.logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
+            if save_matlab:
+                self.logger.info(f"Parameters were saved in {self.path / 'params.mat'}")
 
     def snr(self):
         r"""
