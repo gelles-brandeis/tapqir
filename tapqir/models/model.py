@@ -243,7 +243,7 @@ class Model:
         else:
             batch_size += 2 ** (k - 1)
 
-        return int(batch_size * 0.8)
+        return batch_size
 
     def save_checkpoint(self):
         # save only if no NaN values
