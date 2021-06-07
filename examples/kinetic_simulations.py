@@ -51,7 +51,7 @@ def main(args):
             # save data
             if not data_path.is_dir():
                 data_path.mkdir()
-            save(model.data, data_path)
+            save(hmm.data, data_path)
             # calculate snr
             rv = dist.MultivariateNormal(
                 torch.tensor([(args.P - 1) / 2, (args.P - 1) / 2]),
@@ -73,7 +73,7 @@ def main(args):
 
             pd.Series(params).to_csv(Path(data_path) / "simulated_params.csv")
             pyro.clear_param_store()
-            model.load(data_path, True)
+            model.load(data_path)
     else:
         hmm = HMM(1, 2, device, args.dtype)
         hmm.vectorized = False

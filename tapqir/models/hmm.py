@@ -313,7 +313,7 @@ class HMM(Cosmos):
                 )
 
                 # sample hidden model state (3,1,1,1)
-                if data.dtype == "test":
+                if prefix == "d":
                     probs = (
                         Vindex(pyro.param(f"{prefix}/theta_trans"))[ndx, fdx, 0]
                         if isinstance(fdx, int) and fdx < 1
