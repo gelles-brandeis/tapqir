@@ -5,6 +5,7 @@ from collections import namedtuple
 from pathlib import Path
 
 import torch
+from pyro.ops.indexing import Vindex
 from pyro.ops.stats import quantile
 from torch.distributions.utils import lazy_property, probs_to_logits
 
@@ -36,8 +37,7 @@ class CosmosData(namedtuple("CosmosData", ["images", "xy", "labels", "device"]))
 
     def fetch(self, ndx, fdx=None):
         if fdx is not None:
-            assert isinstance(fdx, int)
-            return self.images[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
+            return Vindex(self.images)[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
                 self.device
             )
         return self.images[ndx].to(self.device), self.xy[ndx].to(self.device)

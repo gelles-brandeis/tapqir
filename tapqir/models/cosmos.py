@@ -451,11 +451,19 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
 
-        pyro.param(
-            f"{prefix}/m_probs",
-            lambda: torch.ones(self.K, data.N, data.F, 2),
-            constraint=constraints.simplex,
-        )
+        if prefix == "d" and self.name == "hmm":
+            m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
+            m_probs[1, 0, :, :, 0] = 0
+            m_probs[2, 1, :, :, 0] = 0
+            pyro.param(
+                f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex
+            )
+        else:
+            pyro.param(
+                f"{prefix}/m_probs",
+                lambda: torch.ones(self.K, data.N, data.F, 2),
+                constraint=constraints.simplex,
+            )
         pyro.param(
             f"{prefix}/b_loc",
             lambda: torch.full((data.N, data.F), data.median - self.data.offset.mean),
