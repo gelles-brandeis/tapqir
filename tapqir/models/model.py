@@ -153,11 +153,6 @@ class Model:
         if (self.path / "params.tpqr").is_file():
             self.params = torch.load(self.path / "params.tpqr")
             self.logger.info(f"Loaded parameters from {self.path / 'params.tpqr'}")
-        if (self.path / "theta_samples.tpqr").is_file():
-            self.theta_samples = torch.load(self.path / "theta_samples.tpqr")
-            self.logger.info(
-                f"Loaded theta samples from {self.path / 'theta_samples.tpqr'}"
-            )
         if (self.path / "statistics.csv").is_file():
             self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
             self.logger.info(
@@ -205,7 +200,7 @@ class Model:
             self.iter = 1
             self._rolling = None
 
-        if self.name == "hmm":
+        if self.name in ["hmm", "fullhmm"]:
             self.elbo = (
                 infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO
             )(max_plate_nesting=3, ignore_jit_warnings=True)
@@ -272,7 +267,7 @@ class Model:
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.ontarget.labels is not None and self.name == "hmm":
+        if self.data.ontarget.labels is not None:
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.ontarget.labels["z"].ravel()
 
@@ -308,7 +303,7 @@ class Model:
                 for p in conv_params
             )
             if crit:
-                self._stop = True
+                self._stop = False
 
         global_params.to_csv(self.run_path / "global_params.csv")
         self._rolling.to_csv(self.run_path / "rolling_params.csv")

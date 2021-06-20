@@ -54,12 +54,6 @@ class Fit(Command):
             help="Number of iterations (default: 60000)",
         )
         parser.add_argument(
-            "-nsamples",
-            metavar="NUM_SAMPLES",
-            type=int,
-            help="Number of theta samples (default: 1000)",
-        )
-        parser.add_argument(
             "-bs", metavar="BATCH_SIZE", type=int, help="Batch size (default: 5)"
         )
         parser.add_argument(
@@ -98,7 +92,6 @@ class Fit(Command):
         states = args.s or config["fit"].getint("num_states")
         k_max = args.k or config["fit"].getint("k_max")
         num_iter = args.it or config["fit"].getint("num_iter")
-        num_samples = args.nsamples or config["fit"].getint("num_samples")
         batch_size = args.bs or config["fit"].getint("batch_size")
         learning_rate = args.lr or config["fit"].getfloat("learning_rate")
         device = args.dev or config["fit"].get("device")
@@ -129,7 +122,4 @@ class Fit(Command):
                 config.set("fit", "batch_size", str(model.batch_size))
                 with open(cfg_file, "w") as configfile:
                     config.write(configfile)
-            if model.name == "cosmos":
-                # compute and save theta_samples
-                model.compute_theta_samples(num_samples)
             model.compute_stats()

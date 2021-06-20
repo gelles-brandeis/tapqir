@@ -451,10 +451,10 @@ class MainWindow(QMainWindow):
         n = (int(self.aoiNumber.text()) + inc) % self.Model.data.ontarget.N
         self.aoiNumber.setText(str(n))
 
-        self.item["zoom"].setData(self.Model.z_marginal[n])
+        self.item["zoom"].setData(self.Model.params["p(specific)"][n])
         for p in self.params:
             if p == "z":
-                self.item[f"{p}_probs"].setData(self.Model.z_marginal[n])
+                self.item[f"{p}_probs"].setData(self.Model.params["p(specific)"][n])
                 self.item["z_label"].setData(self.Model.data.ontarget.labels["z"][n])
             elif p == "d/background":
                 k = 0

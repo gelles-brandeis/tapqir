@@ -21,7 +21,7 @@ class Cosmos(Model):
     Time-independent model.
     """
 
-    name = "cosmos"
+    name = "full"
 
     @property
     def probs_j(self):
@@ -72,51 +72,13 @@ class Cosmos(Model):
     def ontarget(self):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
-    def compute_theta_samples(self, num_samples):
-        samples = torch.zeros(
-            num_samples,
-            self.data.ontarget.N,
-            self.data.ontarget.F,
-            device=torch.device("cpu"),
-            dtype=torch.uint8,
-        )
-        split_size = self.batch_size
-        self.batch_size = None
-        self.data.offtarget = CosmosData(None, None, None, None)
-        for i in tqdm(range(num_samples)):
-            for ndx in torch.split(torch.arange(self.data.ontarget.N), split_size):
-                self.n = ndx
-                guide_trace = handlers.trace(self.guide).get_trace()
-                trained_model = handlers.replay(self.model, trace=guide_trace)
-                inferred_model = infer.infer_discrete(
-                    trained_model, temperature=1, first_available_dim=-3
-                )
-                trace = handlers.trace(inferred_model).get_trace()
-                samples[i, ndx] = trace.nodes["d/theta"]["value"].cpu().to(torch.uint8)
-        self.theta_samples = samples
-        self.batch_size = split_size
-        self.n = None
-        if self.path is not None:
-            torch.save(self.theta_samples, self.path / "theta_samples.tpqr")
-            self.logger.info(
-                f"Theta samples were saved in {self.path / 'theta_samples.tpqr'}"
-            )
 
     @property
     def z_probs(self):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        try:
-            return (
-                self.theta_to_z[self.theta_samples.long()]
-                .to(self.dtype)
-                .mean(0)
-                .permute(2, 0, 1)
-                .cpu()
-            )
-        except AttributeError:
-            return torch.zeros(self.K, self.data.ontarget.N, self.data.ontarget.F).cpu()
+        return pyro.param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
 
     @property
     def j_probs(self):
@@ -130,7 +92,11 @@ class Cosmos(Model):
         r"""
         Probability of a spot :math:`p(m_{knf})`.
         """
-        return pyro.param("d/m_probs").data[..., 1].cpu()
+        return torch.einsum(
+            "sknf,nfs->knf",
+            pyro.param("d/m_probs").data[..., 1],
+            pyro.param("d/theta_probs").data,
+        )
 
     @property
     def z_marginal(self):
@@ -166,6 +132,24 @@ class Cosmos(Model):
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
 
+    #  @handlers.block(
+    #      hide=[
+    #          "d/h_loc",
+    #          "d/h_beta",
+    #          "d/w_mean",
+    #          "d/w_size",
+    #          "d/x_mean",
+    #          "d/y_mean",
+    #          "d/size",
+    #          "c/h_loc",
+    #          "c/h_beta",
+    #          "c/w_mean",
+    #          "c/w_size",
+    #          "c/x_mean",
+    #          "c/y_mean",
+    #          "c/size",
+    #      ]
+    #  )
     def guide(self):
         # initialize guide parameters
         self.guide_parameters()
@@ -240,7 +224,7 @@ class Cosmos(Model):
                     theta = pyro.sample(
                         f"{prefix}/theta",
                         dist.Categorical(self.probs_theta),
-                        infer={"enumerate": "parallel"},
+                        # infer={"enumerate": "parallel"},
                     )
                 else:
                     theta = 0
@@ -287,7 +271,7 @@ class Cosmos(Model):
                         )
 
                     # calculate image shape w/o offset
-                    height = height.masked_fill(m == 0, 0.0)
+                    height = height.masked_fill(m == 0, 0)
                     gaussian = self.gaussian(height, width, x, y, target_locs)
                     locs = locs + gaussian
 
@@ -346,12 +330,23 @@ class Cosmos(Model):
                         pyro.param(f"{prefix}/b_beta")[ndx],
                     ),
                 )
+                if prefix == "d":
+                    theta = pyro.sample(
+                        f"{prefix}/theta",
+                        dist.Categorical(pyro.param(f"{prefix}/theta_probs")[ndx]),
+                        infer={"enumerate": "parallel"},
+                    )
 
                 for kdx in spots:
                     # sample spot presence m
-                    m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                        kdx, ndx[:, None], fdx
-                    ]
+                    if prefix == "d":
+                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                            theta, kdx, ndx[:, None], fdx
+                        ]
+                    else:
+                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                            kdx, ndx[:, None], fdx
+                        ]
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}",
                         dist.Categorical(m_probs),
@@ -438,6 +433,11 @@ class Cosmos(Model):
             "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
         pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
+        pyro.param(
+            "d/theta_probs",
+            lambda: torch.ones(self.data.ontarget.N, self.data.ontarget.F, 1 + self.K * self.S),
+            constraint=constraints.simplex,
+        )
 
     def spot_parameters(self, data, prefix):
         pyro.param(
@@ -451,7 +451,8 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
 
-        if prefix == "d" and self.name == "hmm":
+        # if prefix == "d" and self.name == "hmm":
+        if prefix == "d":
             m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
             m_probs[1, 0, :, :, 0] = 0
             m_probs[2, 1, :, :, 0] = 0
