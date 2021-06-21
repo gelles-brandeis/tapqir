@@ -153,11 +153,6 @@ class Model:
         if (self.path / "params.tpqr").is_file():
             self.params = torch.load(self.path / "params.tpqr")
             self.logger.info(f"Loaded parameters from {self.path / 'params.tpqr'}")
-        if (self.path / "theta_samples.tpqr").is_file():
-            self.theta_samples = torch.load(self.path / "theta_samples.tpqr")
-            self.logger.info(
-                f"Loaded theta samples from {self.path / 'theta_samples.tpqr'}"
-            )
         if (self.path / "statistics.csv").is_file():
             self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
             self.logger.info(
@@ -272,7 +267,7 @@ class Model:
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.ontarget.labels is not None and self.name == "hmm":
+        if self.data.ontarget.labels is not None:
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.ontarget.labels["z"].ravel()
 
@@ -302,10 +297,9 @@ class Model:
             self._rolling = self._rolling.append(global_params)
         if len(self._rolling) > 100:
             self._rolling = self._rolling.drop(self._rolling.index[0])
-            conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
             crit = all(
                 self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05
-                for p in conv_params
+                for p in self.conv_params
             )
             if crit:
                 self._stop = True

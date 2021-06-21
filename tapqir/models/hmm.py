@@ -23,6 +23,7 @@ class HMM(Cosmos):
         self.vectorized = vectorized
         super().__init__(S, K, device, dtype)
         self.classify = True
+        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
 
     @property
     def init_theta(self):
@@ -239,7 +240,7 @@ class HMM(Cosmos):
                         )
 
                     # calculate image shape w/o offset
-                    height = height.masked_fill(m == 0, 0.0)
+                    height = height.masked_fill(m == 0, 0)
                     gaussian = self.gaussian(height, width, x, y, target_locs)
                     locs = locs + gaussian
 
@@ -313,21 +314,18 @@ class HMM(Cosmos):
                 )
 
                 # sample hidden model state (3,1,1,1)
-                if prefix == "d":
-                    probs = (
-                        Vindex(pyro.param(f"{prefix}/theta_trans"))[ndx, fdx, 0]
-                        if isinstance(fdx, int) and fdx < 1
-                        else Vindex(pyro.param(f"{prefix}/theta_trans"))[
-                            ndx, fdx, theta_prev
-                        ]
-                    )
-                    theta_curr = pyro.sample(
-                        f"{prefix}/theta_{fdx}",
-                        dist.Categorical(probs),
-                        infer={"enumerate": "parallel"},
-                    )
-                else:
-                    theta_curr = 0
+                theta_probs = (
+                    Vindex(pyro.param(f"{prefix}/theta_trans"))[ndx, fdx, 0]
+                    if isinstance(fdx, int) and fdx < 1
+                    else Vindex(pyro.param(f"{prefix}/theta_trans"))[
+                        ndx, fdx, theta_prev
+                    ]
+                )
+                theta_curr = pyro.sample(
+                    f"{prefix}/theta_{fdx}",
+                    dist.Categorical(theta_probs),
+                    infer={"enumerate": "parallel"},
+                )
 
                 for kdx in spots:
                     # spot presence
@@ -376,6 +374,7 @@ class HMM(Cosmos):
                                 (data.P + 1) / 2,
                             ),
                         )
+
                 pyro.sample(
                     f"{prefix}/offset_{fdx}",
                     dist.Categorical(logits=self.data.offset.logits.to(self.dtype))

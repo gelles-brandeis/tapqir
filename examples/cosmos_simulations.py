@@ -80,8 +80,6 @@ def main(args):
         pyro.clear_param_store()
 
     model.run(args.it, args.lr, args.bs, args.jit)
-    # compute and save theta_samples
-    model.compute_theta_samples(args.num_samples)
     model.compute_stats()
 
 
@@ -99,7 +97,6 @@ if __name__ == "__main__":
     parser.add_argument("-it", default=100, type=int)
     parser.add_argument("-bs", default=0, type=int)
     parser.add_argument("-lr", default=0.005, type=float)
-    parser.add_argument("--num-samples", default=2, type=int)
     parser.add_argument("--path", type=str)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--dtype", default="float", type=str)
