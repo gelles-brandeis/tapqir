@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import logging
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -177,13 +178,12 @@ class Model:
         """
         raise NotImplementedError
 
-    def run(self, num_iter, lr=0.005, batch_size=0, jit=False, verbose=True):
+    def run(self, num_iter=70000, lr=0.005, batch_size=0, jit=False, verbose=True):
         self.lr = lr
         # find max possible batch_size
         if batch_size == 0:
             batch_size = self._max_batch_size()
         self.batch_size = batch_size
-        self.jit = jit
         self.optim_fn = optim.Adam
         self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
@@ -192,7 +192,7 @@ class Model:
             self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
             self.logger.info("Learning rate - {}".format(self.lr))
             self.logger.info("Batch size - {}".format(self.batch_size))
-            self.logger.info("{}".format("jit" if self.jit else "nojit"))
+            self.logger.info("{}".format("jit" if jit else "nojit"))
 
         if self.run_path is not None:
             try:
@@ -200,11 +200,11 @@ class Model:
             except FileNotFoundError:
                 pyro.clear_param_store()
                 self.iter = 1
-                self._rolling = None
+                self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
         else:
             pyro.clear_param_store()
             self.iter = 1
-            self._rolling = None
+            self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
 
         self.elbo = self.TraceELBO(jit)
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
@@ -247,26 +247,46 @@ class Model:
                     "Step #{}. Detected NaN values in {}".format(self.iter, k)
                 )
 
-        # save parameters and optimizer state
-        pyro.get_param_store().save(self.run_path / "params")
-        self.optim.save(self.run_path / "optimizer")
+        # update convergence criteria parameters
+        for name in self.conv_params:
+            if name == "-ELBO":
+                self._rolling["-ELBO"].append(self.iter_loss)
+            else:
+                self._rolling[name].append(pyro.param(name).item())
 
-        # save global paramters in csv file and for tensorboard
-        global_params = pd.Series(dtype=float, name=self.iter)
+        # check convergence status
+        if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
+            crit = all(
+                torch.tensor(self._rolling[p]).std()
+                / torch.tensor(self._rolling[p])[-50:].std()
+                < 1.05
+                for p in self.conv_params
+            )
+            if crit:
+                self._stop = True
 
+        # save the model state
+        torch.save(
+            {
+                "iter": self.iter,
+                "params": pyro.get_param_store().get_state(),
+                "optimizer": self.optim.get_state(),
+                "rolling": self._rolling,
+                "convergence_status": self._stop,
+            },
+            self.run_path / "model",
+        )
+
+        # save global paramters for tensorboard
         self.writer.add_scalar("-ELBO", self.iter_loss, self.iter)
-        global_params["-ELBO"] = self.iter_loss
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
                 self.writer.add_scalar(name, val.item(), self.iter)
-                global_params[name] = val.item()
             elif val.dim() == 1 and len(val) <= self.S + 1:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 self.writer.add_scalars(name, scalars, self.iter)
-                for key, value in scalars.items():
-                    global_params["{}_{}".format(name, key)] = value
 
-        if self.data.ontarget.labels is not None:
+        if self.data.ontarget.labels is not None and self.z_marginal is not None:
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.ontarget.labels["z"].ravel()
 
@@ -286,38 +306,19 @@ class Model:
             self.writer.add_scalars("ACCURACY", metrics, self.iter)
             self.writer.add_scalars("NEGATIVES", neg, self.iter)
             self.writer.add_scalars("POSITIVES", pos, self.iter)
-            for key, value in {**metrics, **pos, **neg}.items():
-                global_params[key] = value
 
-        if self._rolling is None:
-            self._rolling = global_params.to_frame().T
-
-        if global_params.name not in self._rolling.index:
-            self._rolling = self._rolling.append(global_params)
-        if len(self._rolling) > 100:
-            self._rolling = self._rolling.drop(self._rolling.index[0])
-            crit = all(
-                self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05
-                for p in self.conv_params
-            )
-            if crit:
-                self._stop = True
-
-        global_params.to_csv(self.run_path / "global_params.csv")
-        self._rolling.to_csv(self.run_path / "rolling_params.csv")
         self.logger.debug("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None, param_only=False):
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
-        pyro.get_param_store().load(path / "params", map_location=self.device)
+        checkpoint = torch.load(path / "model", map_location=self.device)
+        pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
-            global_params = pd.read_csv(
-                path / "global_params.csv", squeeze=True, index_col=0
-            )
-            self._rolling = pd.read_csv(path / "rolling_params.csv", index_col=0)
-            self.iter = int(global_params.name)
-            self.optim.load(path / "optimizer")
+            self._stop = checkpoint["convergence_status"]
+            self._rolling = checkpoint["rolling"]
+            self.iter = checkpoint["iter"]
+            self.optim.set_state(checkpoint["optimizer"])
             self.logger.info(
                 "Step #{}. Loaded model params and optimizer state from {}".format(
                     self.iter, path
