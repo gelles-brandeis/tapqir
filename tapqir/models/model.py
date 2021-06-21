@@ -200,10 +200,12 @@ class Model:
             self.iter = 1
             self._rolling = None
 
-        if self.name in ["hmm", "fullhmm"]:
+        if self.name in "hmm":
             self.elbo = (
                 infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO
             )(max_plate_nesting=3, ignore_jit_warnings=True)
+        elif self.name == "feature":
+            self.elbo = (infer.JitTrace_ELBO if jit else infer.Trace_ELBO)()
         else:
             self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
                 max_plate_nesting=2, ignore_jit_warnings=True
@@ -267,7 +269,7 @@ class Model:
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.ontarget.labels is not None:
+        if self.data.ontarget.labels is not None and self.name != "feature":
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.ontarget.labels["z"].ravel()
 
@@ -297,13 +299,12 @@ class Model:
             self._rolling = self._rolling.append(global_params)
         if len(self._rolling) > 100:
             self._rolling = self._rolling.drop(self._rolling.index[0])
-            conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
             crit = all(
                 self._rolling[p].std() / self._rolling[p].iloc[-50:].std() < 1.05
-                for p in conv_params
+                for p in self.conv_params
             )
             if crit:
-                self._stop = False
+                self._stop = True
 
         global_params.to_csv(self.run_path / "global_params.csv")
         self._rolling.to_csv(self.run_path / "rolling_params.csv")

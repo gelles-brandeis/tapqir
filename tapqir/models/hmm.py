@@ -17,12 +17,13 @@ class HMM(Cosmos):
     Hidden Markov model.
     """
 
-    name = "fullhmm"
+    name = "hmm"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", vectorized=True):
         self.vectorized = vectorized
         super().__init__(S, K, device, dtype)
         self.classify = True
+        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
 
     @property
     def init_theta(self):
@@ -313,7 +314,7 @@ class HMM(Cosmos):
                 )
 
                 # sample hidden model state (3,1,1,1)
-                probs = (
+                theta_probs = (
                     Vindex(pyro.param(f"{prefix}/theta_trans"))[ndx, fdx, 0]
                     if isinstance(fdx, int) and fdx < 1
                     else Vindex(pyro.param(f"{prefix}/theta_trans"))[
@@ -322,7 +323,7 @@ class HMM(Cosmos):
                 )
                 theta_curr = pyro.sample(
                     f"{prefix}/theta_{fdx}",
-                    dist.Categorical(probs),
+                    dist.Categorical(theta_probs),
                     infer={"enumerate": "parallel"},
                 )
 
@@ -373,6 +374,7 @@ class HMM(Cosmos):
                                 (data.P + 1) / 2,
                             ),
                         )
+
                 pyro.sample(
                     f"{prefix}/offset_{fdx}",
                     dist.Categorical(logits=self.data.offset.logits.to(self.dtype))

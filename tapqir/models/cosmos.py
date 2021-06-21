@@ -21,7 +21,11 @@ class Cosmos(Model):
     Time-independent model.
     """
 
-    name = "full"
+    name = "cosmos"
+
+    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
+        super().__init__(S, K, device, dtype)
+        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
 
     @property
     def probs_j(self):
@@ -71,7 +75,6 @@ class Cosmos(Model):
     @lazy_property
     def ontarget(self):
         return torch.clamp(self.theta_to_z, min=0, max=1)
-
 
     @property
     def z_probs(self):
@@ -435,7 +438,9 @@ class Cosmos(Model):
         pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
         pyro.param(
             "d/theta_probs",
-            lambda: torch.ones(self.data.ontarget.N, self.data.ontarget.F, 1 + self.K * self.S),
+            lambda: torch.ones(
+                self.data.ontarget.N, self.data.ontarget.F, 1 + self.K * self.S
+            ),
             constraint=constraints.simplex,
         )
 
