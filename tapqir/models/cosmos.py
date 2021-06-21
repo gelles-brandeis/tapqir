@@ -135,24 +135,6 @@ class Cosmos(Model):
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
 
-    #  @handlers.block(
-    #      hide=[
-    #          "d/h_loc",
-    #          "d/h_beta",
-    #          "d/w_mean",
-    #          "d/w_size",
-    #          "d/x_mean",
-    #          "d/y_mean",
-    #          "d/size",
-    #          "c/h_loc",
-    #          "c/h_beta",
-    #          "c/w_mean",
-    #          "c/w_size",
-    #          "c/x_mean",
-    #          "c/y_mean",
-    #          "c/size",
-    #      ]
-    #  )
     def guide(self):
         # initialize guide parameters
         self.guide_parameters()
@@ -227,7 +209,6 @@ class Cosmos(Model):
                     theta = pyro.sample(
                         f"{prefix}/theta",
                         dist.Categorical(self.probs_theta),
-                        # infer={"enumerate": "parallel"},
                     )
                 else:
                     theta = 0
@@ -456,7 +437,6 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
 
-        # if prefix == "d" and self.name == "hmm":
         if prefix == "d":
             m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
             m_probs[1, 0, :, :, 0] = 0

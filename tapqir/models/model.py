@@ -200,12 +200,10 @@ class Model:
             self.iter = 1
             self._rolling = None
 
-        if self.name in "hmm":
+        if self.name == "hmm":
             self.elbo = (
                 infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO
             )(max_plate_nesting=3, ignore_jit_warnings=True)
-        elif self.name == "feature":
-            self.elbo = (infer.JitTrace_ELBO if jit else infer.Trace_ELBO)()
         else:
             self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
                 max_plate_nesting=2, ignore_jit_warnings=True
@@ -269,7 +267,7 @@ class Model:
                 for key, value in scalars.items():
                     global_params["{}_{}".format(name, key)] = value
 
-        if self.data.ontarget.labels is not None and self.name != "feature":
+        if self.data.ontarget.labels is not None:
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.ontarget.labels["z"].ravel()
 
