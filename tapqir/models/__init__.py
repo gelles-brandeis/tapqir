@@ -12,7 +12,7 @@ __all__ = [
     "Model",
     "Cosmos",
     "HMM",
-    "Feature",
+    "MultiSpot",
 ]
 
 models = {
