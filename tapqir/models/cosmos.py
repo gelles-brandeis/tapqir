@@ -7,13 +7,11 @@ import torch
 import torch.distributions.constraints as constraints
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
-from pyroapi import handlers, infer, pyro
+from pyroapi import handlers, pyro
 from torch.distributions.utils import lazy_property
-from tqdm import tqdm
 
 from tapqir.distributions import AffineBeta
 from tapqir.models.model import Model
-from tapqir.utils.dataset import CosmosData
 
 
 class Cosmos(Model):
