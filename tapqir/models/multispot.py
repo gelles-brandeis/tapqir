@@ -39,6 +39,10 @@ class MultiSpot(Model):
             ignore_jit_warnings=True
         )
 
+    @property
+    def z_marginal(self):
+        return None
+
     def model(self):
         # global parameters
         self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
