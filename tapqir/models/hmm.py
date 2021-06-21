@@ -6,7 +6,7 @@ import torch.distributions.constraints as constraints
 from pyro.distributions.hmm import _logmatmulexp
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
-from pyroapi import handlers, pyro
+from pyroapi import handlers, infer, pyro
 
 from tapqir.distributions import AffineBeta
 from tapqir.models.cosmos import Cosmos
@@ -24,6 +24,11 @@ class HMM(Cosmos):
         super().__init__(S, K, device, dtype)
         self.classify = True
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+
+    def TraceELBO(self, jit=False):
+        return (infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO)(
+            max_plate_nesting=3, ignore_jit_warnings=True
+        )
 
     @property
     def init_theta(self):
