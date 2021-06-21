@@ -7,7 +7,7 @@ import torch
 import torch.distributions.constraints as constraints
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
-from pyroapi import handlers, pyro
+from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import AffineBeta
@@ -24,6 +24,11 @@ class Cosmos(Model):
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+
+    def TraceELBO(self, jit=False):
+        return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
+            max_plate_nesting=2, ignore_jit_warnings=True
+        )
 
     @property
     def probs_j(self):

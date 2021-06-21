@@ -159,14 +159,20 @@ class Model:
                 f"Loaded model statistics from {self.path / 'statistics.csv'}"
             )
 
+    def TraceELBO(self, jit):
+        """
+        A trace implementation of ELBO-based SVI.
+        """
+        raise NotImplementedError
+
     def model(self):
-        r"""
+        """
         Generative Model
         """
         raise NotImplementedError
 
     def guide(self):
-        r"""
+        """
         Variational Model
         """
         raise NotImplementedError
@@ -200,14 +206,7 @@ class Model:
             self.iter = 1
             self._rolling = None
 
-        if self.name == "hmm":
-            self.elbo = (
-                infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO
-            )(max_plate_nesting=3, ignore_jit_warnings=True)
-        else:
-            self.elbo = (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
-                max_plate_nesting=2, ignore_jit_warnings=True
-            )
+        self.elbo = self.TraceELBO(jit)
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
         # pyro.enable_validation()
         self._stop = False

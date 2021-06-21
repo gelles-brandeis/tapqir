@@ -4,6 +4,7 @@
 from tapqir.models.cosmos import Cosmos
 from tapqir.models.hmm import HMM
 from tapqir.models.model import GaussianSpot, Model
+from tapqir.models.multispot import MultiSpot
 
 __all__ = [
     "GaussianSpot",
@@ -11,9 +12,11 @@ __all__ = [
     "Model",
     "Cosmos",
     "HMM",
+    "MultiSpot",
 ]
 
 models = {
     Cosmos.name: Cosmos,
     HMM.name: HMM,
+    MultiSpot.name: MultiSpot,
 }
