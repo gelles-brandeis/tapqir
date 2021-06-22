@@ -55,9 +55,6 @@ class MultiSpot(Model):
             self.spot_model(self.data.offtarget, prefix="c")
 
     def guide(self):
-        # initialize guide parameters
-        self.guide_parameters()
-
         # global parameters
         pyro.sample(
             "gain",
@@ -241,7 +238,7 @@ class MultiSpot(Model):
                     .to_event(2),
                 )
 
-    def guide_parameters(self):
+    def init_parameters(self):
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
             "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive

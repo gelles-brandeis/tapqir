@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import logging
+import os
 from collections import deque
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from sklearn.metrics import (
 )
 from torch.distributions.utils import lazy_property
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
+from tqdm import trange
 
 from tapqir import __version__ as tapqir_version
 from tapqir.utils.dataset import load
@@ -26,11 +27,11 @@ from tapqir.utils.stats import save_stats
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+logger.propagate = False
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 formatter = logging.Formatter(
-    fmt="%(asctime)s - %(message)s",
-    datefmt="%m/%d/%Y %I:%M:%S %p",
+    fmt="%(levelname)s - %(message)s",
 )
 ch.setFormatter(formatter)
 logger.addHandler(ch)
@@ -178,39 +179,42 @@ class Model:
         """
         raise NotImplementedError
 
-    def run(self, num_iter=70000, lr=0.005, batch_size=0, jit=False, verbose=True):
-        self.lr = lr
-        # find max possible batch_size
-        if batch_size == 0:
-            batch_size = self._max_batch_size()
-        self.batch_size = batch_size
+    def init(self, lr=0.005, batch_size=0, jit=False, verbose=True):
         self.optim_fn = optim.Adam
-        self.optim_args = {"lr": self.lr, "betas": [0.9, 0.999]}
+        self.optim_args = {"lr": lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
 
-        if verbose:
-            self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
-            self.logger.info("Learning rate - {}".format(self.lr))
-            self.logger.info("Batch size - {}".format(self.batch_size))
-            self.logger.info("{}".format("jit" if jit else "nojit"))
-
-        if self.run_path is not None:
-            try:
-                self.load_checkpoint()
-            except FileNotFoundError:
-                pyro.clear_param_store()
-                self.iter = 1
-                self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
-        else:
+        try:
+            self.load_checkpoint()
+        except (FileNotFoundError, TypeError):
             pyro.clear_param_store()
             self.iter = 1
             self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
+            self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
+
+        # find max possible batch_size
+        if batch_size == 0:
+            batch_size = self._max_batch_size()
+            self.logger.info("Optimal batch size determined - {}".format(batch_size))
+        self.batch_size = batch_size
+        torch.cuda.empty_cache()
+
+        if verbose:
+            self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
+            self.logger.info("Learning rate - {}".format(lr))
+            self.logger.info("Batch size - {}".format(self.batch_size))
+            self.logger.info("{}".format("jit" if jit else "nojit"))
+
+    def run(self, num_iter=70000, nrange=trange):
+        slurm = os.environ.get("SLURM_JOB_ID")
+        if slurm is not None:
+            nrange = range
         # pyro.enable_validation()
         self._stop = False
-        for i in tqdm(range(num_iter)):
+        for i in nrange(num_iter):
             self.iter_loss = self.svi.step()
             if not self.iter % 100 and self.iter != 0:
                 self.save_checkpoint()
@@ -224,7 +228,8 @@ class Model:
         batch_size = 0
         while batch_size + 2 ** k < self.data.ontarget.N:
             try:
-                self.run(1, lr=self.lr, batch_size=batch_size + 2 ** k, verbose=False)
+                self.batch_size = batch_size + 2 ** k
+                self.run(1, nrange=range)
             except RuntimeError as error:
                 assert error.args[0].startswith("CUDA")
                 if k == 0:
@@ -237,7 +242,7 @@ class Model:
         else:
             batch_size += 2 ** (k - 1)
 
-        return batch_size
+        return batch_size // 4
 
     def save_checkpoint(self):
         # save only if no NaN values
@@ -309,7 +314,7 @@ class Model:
 
         self.logger.debug("Step #{}.".format(self.iter))
 
-    def load_checkpoint(self, path=None, param_only=False):
+    def load_checkpoint(self, path=None, param_only=False, warnings=False):
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
         checkpoint = torch.load(path / "model", map_location=self.device)
@@ -324,6 +329,8 @@ class Model:
                     self.iter, path
                 )
             )
+        if warnings and not checkpoint["convergence_status"]:
+            self.logger.warning(f"Model at {path} has not been fully trained")
 
     def compute_stats(self, CI=0.95, save_matlab=False):
         save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
