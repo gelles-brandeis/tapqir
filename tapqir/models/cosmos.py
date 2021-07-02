@@ -118,13 +118,6 @@ class Cosmos(Model):
     def model(self):
         # global parameters
         self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        self.size = torch.stack(
-            (
-                torch.tensor(2.0),
-                (((self.data.P + 1) / (2 * self.proximity)) ** 2 - 1),
-            ),
-            dim=-1,
-        )
         self.state_model()
 
         # test data
@@ -140,6 +133,13 @@ class Cosmos(Model):
         ).squeeze()
         self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
         self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
+        self.size = torch.stack(
+            (
+                torch.tensor(2.0),
+                (((self.data.P + 1) / (2 * self.proximity)) ** 2 - 1),
+            ),
+            dim=-1,
+        )
 
     def guide(self):
         # global parameters
