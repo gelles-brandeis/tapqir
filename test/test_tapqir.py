@@ -47,6 +47,16 @@ def test_commands_cpu(dataset_path, qtbot):
         [
             "tapqir",
             "fit",
+            "multispot",
+            dataset_path,
+            "-it",
+            "100",
+            "-dev",
+            "cpu",
+        ],
+        [
+            "tapqir",
+            "fit",
             "cosmos",
             dataset_path,
             "-it",
@@ -95,6 +105,14 @@ def test_commands_cpu(dataset_path, qtbot):
 def test_commands_cuda(dataset_path):
     commands = [
         ["tapqir", "config", dataset_path],
+        [
+            "tapqir",
+            "fit",
+            "multispot",
+            dataset_path,
+            "-it",
+            "100",
+        ],
         [
             "tapqir",
             "fit",
