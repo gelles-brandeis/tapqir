@@ -118,7 +118,6 @@ class Cosmos(Model):
     def model(self):
         # global parameters
         self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
         self.size = torch.stack(
             (
                 torch.tensor(2.0),
@@ -140,6 +139,7 @@ class Cosmos(Model):
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
         self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
+        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
 
     def guide(self):
         # global parameters
@@ -148,15 +148,6 @@ class Cosmos(Model):
             dist.Gamma(
                 pyro.param("gain_loc") * pyro.param("gain_beta"),
                 pyro.param("gain_beta"),
-            ),
-        )
-        pyro.sample(
-            "proximity",
-            AffineBeta(
-                pyro.param("proximity_loc"),
-                pyro.param("proximity_size"),
-                0,
-                (self.data.P + 1) / math.sqrt(12),
             ),
         )
         self.state_guide()
@@ -175,6 +166,15 @@ class Cosmos(Model):
             dist.Gamma(
                 pyro.param("lamda_loc") * pyro.param("lamda_beta"),
                 pyro.param("lamda_beta"),
+            ),
+        )
+        pyro.sample(
+            "proximity",
+            AffineBeta(
+                pyro.param("proximity_loc"),
+                pyro.param("proximity_size"),
+                0,
+                (self.data.P + 1) / math.sqrt(12),
             ),
         )
 
