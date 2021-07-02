@@ -84,10 +84,10 @@ def main(args):
 
     multispot = MultiSpot(device=device, dtype=args.dtype)
     multispot.load(args.path)
-    multispot.init(args.lr, args.bs, args.jit)
+    multispot.init(args.lr, args.bs)
     multispot.run(args.it)
 
-    model.init(args.lr, args.bs, args.jit)
+    model.init(args.lr, args.bs)
     model.run(args.it)
     model.compute_stats()
 
