@@ -263,9 +263,6 @@ class Cosmos(Model):
                     locs = locs + gaussian
 
                 # subtract offset
-                #  odx = dist.Categorical(
-                #      logits=self.data.offset.logits.to(self.dtype)
-                #  ).sample((data.P, data.P))
                 odx = pyro.sample(
                     f"{prefix}/offset",
                     dist.Categorical(logits=self.data.offset.logits.to(self.dtype))

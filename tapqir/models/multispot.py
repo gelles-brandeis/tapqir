@@ -280,7 +280,6 @@ class MultiSpot(Model):
         )
         pyro.param(
             f"{prefix}/h_beta",
-            # lambda: torch.full((self.K, data.N, data.F), 0.001),
             lambda: torch.ones(self.K, data.N, data.F),
             constraint=constraints.positive,
         )
@@ -313,7 +312,6 @@ class MultiSpot(Model):
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
-        # size = torch.ones(self.K, data.N, data.F) * 200.0
         size = torch.full((self.K, data.N, data.F), ((data.P + 1) / (2 * 0.5)) ** 2 - 1)
         if self.K == 2:
             size[1] = 5.0
