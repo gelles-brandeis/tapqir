@@ -147,6 +147,13 @@ class HMM(Cosmos):
         )
         self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
         self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
+        self.size = torch.stack(
+            (
+                torch.tensor(2.0),
+                (((self.data.P + 1) / (2 * self.proximity)) ** 2 - 1),
+            ),
+            dim=-1,
+        )
 
     def state_guide(self):
         pyro.sample(
