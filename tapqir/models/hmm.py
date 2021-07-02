@@ -1,6 +1,8 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import math
+
 import torch
 import torch.distributions.constraints as constraints
 from pyro.distributions.hmm import _logmatmulexp
@@ -8,6 +10,7 @@ from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 
+from tapqir import __version__ as tapqir_version
 from tapqir.distributions import AffineBeta
 from tapqir.models.cosmos import Cosmos
 
@@ -24,6 +27,8 @@ class HMM(Cosmos):
         super().__init__(S, K, device, dtype)
         self.classify = True
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        self._global_params = ["gain", "proximity", "lamda"]
+        self._classifier = True
 
     def TraceELBO(self, jit=False):
         return (infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO)(
@@ -140,6 +145,15 @@ class HMM(Cosmos):
                 1
             ),
         )
+        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
+        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
+        self.size = torch.stack(
+            (
+                torch.tensor(2.0),
+                (((self.data.P + 1) / (2 * self.proximity)) ** 2 - 1),
+            ),
+            dim=-1,
+        )
 
     def state_guide(self):
         pyro.sample(
@@ -150,6 +164,22 @@ class HMM(Cosmos):
             dist.Dirichlet(
                 pyro.param("trans_mean") * pyro.param("trans_size")
             ).to_event(1),
+        )
+        pyro.sample(
+            "lamda",
+            dist.Gamma(
+                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
+                pyro.param("lamda_beta"),
+            ),
+        )
+        pyro.sample(
+            "proximity",
+            AffineBeta(
+                pyro.param("proximity_loc"),
+                pyro.param("proximity_size"),
+                0,
+                (self.data.P + 1) / math.sqrt(12),
+            ),
         )
 
     def spot_model(self, data, prefix):
@@ -388,7 +418,33 @@ class HMM(Cosmos):
                 )
                 theta_prev = theta_curr
 
-    def state_parameters(self):
+    def init_parameters(self):
+        # load pre-trained paramters
+        self.load_checkpoint(
+            path=self.path / "multispot" / tapqir_version.split("+")[0],
+            param_only=True,
+            warnings=True,
+        )
+
+        pyro.param(
+            "proximity_loc",
+            lambda: torch.tensor(0.5),
+            constraint=constraints.interval(
+                0,
+                (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            "proximity_size",
+            lambda: torch.tensor(100),
+            constraint=constraints.greater_than(2.0),
+        )
+        pyro.param(
+            "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
+        )
+        pyro.param(
+            "lamda_beta", lambda: torch.tensor(100), constraint=constraints.positive
+        )
         pyro.param(
             "init_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
@@ -415,3 +471,17 @@ class HMM(Cosmos):
             ),
             constraint=constraints.simplex,
         )
+        m_probs = torch.ones(
+            1 + self.K * self.S, self.K, self.data.ontarget.N, self.data.ontarget.F, 2
+        )
+        m_probs[1, 0, :, :, 0] = 0
+        m_probs[2, 1, :, :, 0] = 0
+        pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
+        if self.data.offtarget.images is not None:
+            pyro.param(
+                "c/m_probs",
+                lambda: torch.ones(
+                    self.K, self.data.offtarget.N, self.data.offtarget.F, 2
+                ),
+                constraint=constraints.simplex,
+            )

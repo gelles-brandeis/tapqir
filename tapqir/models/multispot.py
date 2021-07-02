@@ -33,6 +33,8 @@ class MultiSpot(Model):
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "gain_loc"]
+        self._global_params = ["gain"]
+        self._classifier = False
 
     def TraceELBO(self, jit=False):
         return (infer.JitTrace_ELBO if jit else infer.Trace_ELBO)(
@@ -40,7 +42,7 @@ class MultiSpot(Model):
         )
 
     @property
-    def z_marginal(self):
+    def pspecific(self):
         return None
 
     def model(self):
@@ -55,9 +57,6 @@ class MultiSpot(Model):
             self.spot_model(self.data.offtarget, prefix="c")
 
     def guide(self):
-        # initialize guide parameters
-        self.guide_parameters()
-
         # global parameters
         pyro.sample(
             "gain",
@@ -241,7 +240,7 @@ class MultiSpot(Model):
                     .to_event(2),
                 )
 
-    def guide_parameters(self):
+    def init_parameters(self):
         pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
             "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
@@ -276,12 +275,12 @@ class MultiSpot(Model):
         )
         pyro.param(
             f"{prefix}/h_loc",
-            lambda: torch.full((self.K, data.N, data.F), 1000.0),
+            lambda: torch.full((self.K, data.N, data.F), 1000),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_beta",
-            lambda: torch.full((self.K, data.N, data.F), 0.001),
+            lambda: torch.ones(self.K, data.N, data.F),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -313,9 +312,9 @@ class MultiSpot(Model):
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
-        size = torch.ones(self.K, data.N, data.F) * 200.0
+        size = torch.full((self.K, data.N, data.F), ((data.P + 1) / (2 * 0.5)) ** 2 - 1)
         if self.K == 2:
-            size[1] = 7.0
+            size[1] = 5.0
         elif self.K == 3:
             size[1] = 7.0
             size[2] = 3.0

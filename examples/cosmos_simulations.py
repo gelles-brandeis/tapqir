@@ -11,7 +11,7 @@ import torch
 from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
-from tapqir.models import Cosmos
+from tapqir.models import Cosmos, MultiSpot
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
@@ -79,7 +79,13 @@ def main(args):
         simulate(model, args.N, args.F, args.P, seed=args.seed, params=params)
         pyro.clear_param_store()
 
-    model.run(args.it, args.lr, args.bs, args.jit)
+    multispot = MultiSpot(device=device, dtype=args.dtype)
+    multispot.load(args.path)
+    multispot.init(args.lr, args.bs, args.jit)
+    multispot.run(args.it)
+
+    model.init(args.lr, args.bs, args.jit)
+    model.run(args.it)
     model.compute_stats()
 
 
@@ -94,7 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("-N", default=5, type=int)
     parser.add_argument("-F", default=500, type=int)
     parser.add_argument("-P", default=14, type=int)
-    parser.add_argument("-it", default=100, type=int)
+    parser.add_argument("-it", default=70000, type=int)
     parser.add_argument("-bs", default=0, type=int)
     parser.add_argument("-lr", default=0.005, type=float)
     parser.add_argument("--path", type=str)

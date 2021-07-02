@@ -14,6 +14,7 @@ Models
 
    models.GaussianSpot
    models.Model
+   models.MultiSpot
    models.Cosmos
    models.HMM
 

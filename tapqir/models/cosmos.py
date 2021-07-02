@@ -10,6 +10,7 @@ from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
+from tapqir import __version__ as tapqir_version
 from tapqir.distributions import AffineBeta
 from tapqir.models.model import Model
 
@@ -24,6 +25,8 @@ class Cosmos(Model):
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        self._global_params = ["gain", "proximity", "lamda"]
+        self._classifier = True
 
     def TraceELBO(self, jit=False):
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
@@ -105,25 +108,16 @@ class Cosmos(Model):
         )
 
     @property
-    def z_marginal(self):
+    def pspecific(self):
         return self.z_probs.sum(-3)
 
     @property
     def z_map(self):
-        return self.z_marginal > 0.5
+        return self.pspecific > 0.5
 
     def model(self):
         # global parameters
         self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
-        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
-        self.size = torch.stack(
-            (
-                torch.tensor(2.0),
-                (((self.data.P + 1) / (2 * self.proximity)) ** 2 - 1),
-            ),
-            dim=-1,
-        )
         self.state_model()
 
         # test data
@@ -137,11 +131,17 @@ class Cosmos(Model):
         self.pi = pyro.sample(
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
+        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
+        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
+        self.size = torch.stack(
+            (
+                torch.tensor(2.0),
+                (((self.data.P + 1) / (2 * self.proximity)) ** 2 - 1),
+            ),
+            dim=-1,
+        )
 
     def guide(self):
-        # initialize guide parameters
-        self.guide_parameters()
-
         # global parameters
         pyro.sample(
             "gain",
@@ -150,6 +150,17 @@ class Cosmos(Model):
                 pyro.param("gain_beta"),
             ),
         )
+        self.state_guide()
+
+        # test data
+        self.spot_guide(self.data.ontarget, prefix="d")
+
+        # control data
+        if self.data.offtarget.images is not None:
+            self.spot_guide(self.data.offtarget, prefix="c")
+
+    def state_guide(self):
+        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
         pyro.sample(
             "lamda",
             dist.Gamma(
@@ -166,17 +177,6 @@ class Cosmos(Model):
                 (self.data.P + 1) / math.sqrt(12),
             ),
         )
-        self.state_guide()
-
-        # test data
-        self.spot_guide(self.data.ontarget, prefix="d")
-
-        # control data
-        if self.data.offtarget.images is not None:
-            self.spot_guide(self.data.offtarget, prefix="c")
-
-    def state_guide(self):
-        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
 
     def spot_model(self, data, prefix):
         # spots
@@ -376,6 +376,7 @@ class Cosmos(Model):
                                 (data.P + 1) / 2,
                             ),
                         )
+
                 pyro.sample(
                     f"{prefix}/offset",
                     dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
@@ -383,7 +384,14 @@ class Cosmos(Model):
                     .to_event(2),
                 )
 
-    def guide_parameters(self):
+    def init_parameters(self):
+        # load pre-trained paramters
+        self.load_checkpoint(
+            path=self.path / "multispot" / tapqir_version.split("+")[0],
+            param_only=True,
+            warnings=True,
+        )
+
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5),
@@ -397,25 +405,12 @@ class Cosmos(Model):
             lambda: torch.tensor(100),
             constraint=constraints.greater_than(2.0),
         )
-        pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
-        pyro.param(
-            "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
-        )
         pyro.param(
             "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
         )
         pyro.param(
             "lamda_beta", lambda: torch.tensor(100), constraint=constraints.positive
         )
-
-        self.state_parameters()
-
-        self.spot_parameters(self.data.ontarget, prefix="d")
-
-        if self.data.offtarget.images is not None:
-            self.spot_parameters(self.data.offtarget, prefix="c")
-
-    def state_parameters(self):
         pyro.param(
             "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
@@ -427,87 +422,17 @@ class Cosmos(Model):
             ),
             constraint=constraints.simplex,
         )
-
-    def spot_parameters(self, data, prefix):
-        pyro.param(
-            f"{prefix}/background_mean_loc",
-            lambda: torch.full((data.N, 1), data.median - self.data.offset.mean),
-            constraint=constraints.positive,
+        m_probs = torch.ones(
+            1 + self.K * self.S, self.K, self.data.ontarget.N, self.data.ontarget.F, 2
         )
-        pyro.param(
-            f"{prefix}/background_std_loc",
-            lambda: torch.ones(data.N, 1),
-            constraint=constraints.positive,
-        )
-
-        if prefix == "d":
-            m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
-            m_probs[1, 0, :, :, 0] = 0
-            m_probs[2, 1, :, :, 0] = 0
+        m_probs[1, 0, :, :, 0] = 0
+        m_probs[2, 1, :, :, 0] = 0
+        pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
+        if self.data.offtarget.images is not None:
             pyro.param(
-                f"{prefix}/m_probs", lambda: m_probs, constraint=constraints.simplex
-            )
-        else:
-            pyro.param(
-                f"{prefix}/m_probs",
-                lambda: torch.ones(self.K, data.N, data.F, 2),
+                "c/m_probs",
+                lambda: torch.ones(
+                    self.K, self.data.offtarget.N, self.data.offtarget.F, 2
+                ),
                 constraint=constraints.simplex,
             )
-        pyro.param(
-            f"{prefix}/b_loc",
-            lambda: torch.full((data.N, data.F), data.median - self.data.offset.mean),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/b_beta",
-            lambda: torch.ones(data.N, data.F),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/h_loc",
-            lambda: torch.full((self.K, data.N, data.F), 2000.0),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/h_beta",
-            lambda: torch.full((self.K, data.N, data.F), 0.001),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            f"{prefix}/w_mean",
-            lambda: torch.full((self.K, data.N, data.F), 1.5),
-            constraint=constraints.interval(
-                0.75 + torch.finfo(self.dtype).eps,
-                2.25 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            f"{prefix}/w_size",
-            lambda: torch.full((self.K, data.N, data.F), 100.0),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            f"{prefix}/x_mean",
-            lambda: torch.zeros(self.K, data.N, data.F),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            f"{prefix}/y_mean",
-            lambda: torch.zeros(self.K, data.N, data.F),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        size = torch.ones(self.K, data.N, data.F) * 200.0
-        if self.K == 2:
-            size[1] = 7.0
-        elif self.K == 3:
-            size[1] = 7.0
-            size[2] = 3.0
-        pyro.param(
-            f"{prefix}/size", lambda: size, constraint=constraints.greater_than(2.0)
-        )

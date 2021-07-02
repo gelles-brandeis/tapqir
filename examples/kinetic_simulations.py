@@ -10,7 +10,7 @@ import torch
 from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
-from tapqir.models import HMM, Cosmos
+from tapqir.models import HMM, Cosmos, MultiSpot
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
@@ -82,7 +82,13 @@ def main(args):
         model.gaussian = hmm.gaussian
         pyro.clear_param_store()
 
-    model.run(args.it, args.lr, args.bs)
+    multispot = MultiSpot(device=device, dtype=args.dtype)
+    multispot.load(args.path)
+    multispot.init(args.lr, args.bs)
+    multispot.run(args.it)
+
+    model.init(args.lr, args.bs)
+    model.run(args.it)
     model.compute_stats()
 
 

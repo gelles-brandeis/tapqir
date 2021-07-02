@@ -17,11 +17,11 @@ from tapqir.utils.dataset import CosmosDataset, save
 # logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+logger.propagate = False
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 formatter = logging.Formatter(
-    fmt="%(asctime)s - %(message)s",
-    datefmt="%m/%d/%Y %I:%M %p",
+    fmt="%(levelname)s - %(message)s",
 )
 ch.setFormatter(formatter)
 logger.addHandler(ch)

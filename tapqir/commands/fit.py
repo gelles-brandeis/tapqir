@@ -116,7 +116,8 @@ class Fit(Command):
             model = models[args.model](states, k_max, device, dtype)
             model.load(args.path)
 
-            model.run(num_iter, learning_rate, batch_size, jit)
+            model.init(learning_rate, batch_size, jit)
+            model.run(num_iter)
             if batch_size == 0:
                 # add new batch_size to options.cfg
                 config.set("fit", "batch_size", str(model.batch_size))

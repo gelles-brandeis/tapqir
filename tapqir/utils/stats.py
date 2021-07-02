@@ -22,7 +22,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.to("cpu")
     model.batch_size = model.n = None
     # global parameters
-    global_params = ["gain", "pi", "lamda", "proximity"]
+    global_params = model._global_params
     data = pd.DataFrame(index=global_params, columns=["Mean", "95% LL", "95% UL"])
     # local parameters
     local_params = [
@@ -39,7 +39,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     with StatsMessenger(global_params + local_params, CI=CI) as ci_stats:
         model.guide()
 
-    for param in global_params + ["Keq"]:
+    for param in global_params:
         if param == "pi":
             data.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
             data.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
@@ -48,11 +48,12 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             data.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
-    ci_stats["d/m_probs"] = model.m_probs.data.cpu()
-    ci_stats["d/z_probs"] = model.z_probs.data.cpu()
-    ci_stats["d/j_probs"] = model.j_probs.data.cpu()
-    ci_stats["p(specific)"] = model.z_marginal.data.cpu()
-    ci_stats["z_map"] = model.z_map.data.cpu()
+    if model._classifier:
+        ci_stats["d/m_probs"] = model.m_probs.data.cpu()
+        ci_stats["d/z_probs"] = model.z_probs.data.cpu()
+        ci_stats["d/j_probs"] = model.j_probs.data.cpu()
+        ci_stats["p(specific)"] = model.pspecific.data.cpu()
+        ci_stats["z_map"] = model.z_map.data.cpu()
     # combine K local params
     for param in local_params:
         if param.endswith("_0"):
@@ -72,10 +73,11 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.params = ci_stats
 
     # snr
-    data.loc["SNR", "Mean"] = model.snr().mean().item()
+    if model._classifier:
+        data.loc["SNR", "Mean"] = model.snr().mean().item()
 
     # classification statistics
-    if model.data.ontarget.labels is not None:
+    if model._classifier and model.data.ontarget.labels is not None:
         pred_labels = model.z_map.cpu().numpy().ravel()
         true_labels = model.data.ontarget.labels["z"].ravel()
 
@@ -96,7 +98,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
         mask = torch.from_numpy(model.data.ontarget.labels["z"])
-        samples = torch.masked_select(model.z_marginal.cpu(), mask)
+        samples = torch.masked_select(model.pspecific.cpu(), mask)
         if len(samples):
             z_ll, z_ul = pi(samples, 0.68)
             data.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()

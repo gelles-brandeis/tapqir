@@ -249,9 +249,10 @@ class MainWindow(QMainWindow):
             + self.Model.params["d/background"]["Mean"][n, frames, None, None]
         )
         gaussian = self.Model.gaussian(
-            self.Model.params["d/height"]["Mean"][:, n, frames].masked_fill(
-                self.Model.params["d/m_probs"][:, n, frames] < 0.5, 0.0
-            ),
+            self.Model.params["d/height"]["Mean"][:, n, frames],
+            #  self.Model.params["d/height"]["Mean"][:, n, frames].masked_fill(
+            #      self.Model.params["d/m_probs"][:, n, frames] < 0.5, 0.0
+            #  ),
             self.Model.params["d/width"]["Mean"][:, n, frames],
             self.Model.params["d/x"]["Mean"][:, n, frames],
             self.Model.params["d/y"]["Mean"][:, n, frames],
@@ -263,14 +264,15 @@ class MainWindow(QMainWindow):
             self.img[(f - f1) % 100].setImage(
                 self.Model.data.ontarget.images[int(self.aoiNumber.text()), f].numpy()
             )
-            self.prob[(f - f1) % 100].setOpts(
-                height=(
-                    self.Model.params["d/z_probs"][
-                        :, int(self.aoiNumber.text()), f
-                    ].sum()
-                    * self.Model.data.P,
+            if self.Model._classifier:
+                self.prob[(f - f1) % 100].setOpts(
+                    height=(
+                        self.Model.params["d/z_probs"][
+                            :, int(self.aoiNumber.text()), f
+                        ].sum()
+                        * self.Model.data.P,
+                    )
                 )
-            )
             # ideal image
             self.img_ideal[(f - f1) % 100].setImage(img_ideal[f - f1].cpu().numpy())
 
@@ -317,77 +319,79 @@ class MainWindow(QMainWindow):
         #      fillOutline=True,
         #      brush=(0, 0, 255, 70),
         #  )
+
         for i, p in enumerate(self.params):
             self.plot[p] = widget.addPlot(row=i + 2, col=0, colspan=5)
             self.plot[p].addLegend()
             self.plot[p].setLabel("left", p)
             self.plot[p].setXRange(0, self.Model.data.ontarget.F, padding=0.01)
             self.plot[p].getViewBox().setMouseMode(pg.ViewBox.RectMode)
-
-            self.plot[f"{p}Hist"] = widget.addPlot(row=i + 2, col=5)
-            if p == "z":
-                y, x = np.histogram(self.Model.params["d/z_probs"].numpy(), bins=50)
-            elif p == "d/background":
-                y, x = np.histogram(self.Model.params[f"{p}"]["Mean"].numpy(), bins=50)
-            else:
-                y, x = np.histogram(
-                    self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
-                    bins=50,
-                    weights=self.Model.params["d/m_probs"].reshape(-1).numpy(),
-                )
-                self.plot[f"{p}Hist"].setXRange(
-                    0,
-                    quantile(self.Model.params[f"{p}"]["Mean"].flatten(), 0.99).item()
-                    * 1.3,
-                    padding=0.01,
-                )
-
-                yz, xz = np.histogram(
-                    self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
-                    bins=50,
-                    weights=self.Model.params["d/z_probs"].reshape(-1).numpy(),
-                )
-
-                yj, xj = np.histogram(
-                    self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
-                    bins=50,
-                    weights=self.Model.params["d/j_probs"].reshape(-1).numpy(),
-                )
-
-            self.item[f"{p}Hist_m"] = pg.PlotDataItem(
-                x,
-                y,
-                stepMode="center",
-                fillLevel=0,
-                fillOutline=True,
-                brush=(0, 0, 255, 30),
-            )
-            if p in ["d/height", "d/width", "d/x", "d/y"]:
-                self.item[f"{p}Hist_z"] = pg.PlotDataItem(
-                    xz, yz, stepMode="center", fillLevel=0, fillOutline=False, pen=C[2]
-                )
-                self.item[f"{p}Hist_j"] = pg.PlotDataItem(
-                    xj, yj, stepMode="center", fillLevel=0, fillOutline=False, pen=C[3]
-                )
+        #
+        #      self.plot[f"{p}Hist"] = widget.addPlot(row=i + 2, col=5)
+        #      if p == "z":
+        #          y, x = np.histogram(self.Model.params["d/z_probs"].numpy(), bins=50)
+        #      elif p == "d/background":
+        #          y, x = np.histogram(self.Model.params[f"{p}"]["Mean"].numpy(), bins=50)
+        #      else:
+        #          y, x = np.histogram(
+        #              self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
+        #              bins=50,
+        #              weights=self.Model.params["d/m_probs"].reshape(-1).numpy(),
+        #          )
+        #          self.plot[f"{p}Hist"].setXRange(
+        #              0,
+        #              quantile(self.Model.params[f"{p}"]["Mean"].flatten(), 0.99).item()
+        #              * 1.3,
+        #              padding=0.01,
+        #          )
+        #
+        #          yz, xz = np.histogram(
+        #              self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
+        #              bins=50,
+        #              weights=self.Model.params["d/z_probs"].reshape(-1).numpy(),
+        #          )
+        #
+        #          yj, xj = np.histogram(
+        #              self.Model.params[f"{p}"]["Mean"].flatten().numpy(),
+        #              bins=50,
+        #              weights=self.Model.params["d/j_probs"].reshape(-1).numpy(),
+        #          )
+        #
+        #      self.item[f"{p}Hist_m"] = pg.PlotDataItem(
+        #          x,
+        #          y,
+        #          stepMode="center",
+        #          fillLevel=0,
+        #          fillOutline=True,
+        #          brush=(0, 0, 255, 30),
+        #      )
+        #      if p in ["d/height", "d/width", "d/x", "d/y"]:
+        #          self.item[f"{p}Hist_z"] = pg.PlotDataItem(
+        #              xz, yz, stepMode="center", fillLevel=0, fillOutline=False, pen=C[2]
+        #          )
+        #          self.item[f"{p}Hist_j"] = pg.PlotDataItem(
+        #              xj, yj, stepMode="center", fillLevel=0, fillOutline=False, pen=C[3]
+        #          )
 
         for p in self.params:
             if p == "z":
-                self.item["z_label"] = pg.PlotDataItem(
-                    pen=C[3],
-                    symbol="o",
-                    symbolBrush=C[3],
-                    symbolPen=None,
-                    symbolSize=5,
-                    name="z_label",
-                )
-                self.item[f"{p}_probs"] = pg.PlotDataItem(
-                    pen=C[2],
-                    symbol="o",
-                    symbolBrush=C[2],
-                    symbolPen=None,
-                    symbolSize=5,
-                    name="z_probs",
-                )
+                pass
+                #  self.item["z_label"] = pg.PlotDataItem(
+                #      pen=C[3],
+                #      symbol="o",
+                #      symbolBrush=C[3],
+                #      symbolPen=None,
+                #      symbolSize=5,
+                #      name="z_label",
+                #  )
+                #  self.item[f"{p}_probs"] = pg.PlotDataItem(
+                #      pen=C[2],
+                #      symbol="o",
+                #      symbolBrush=C[2],
+                #      symbolPen=None,
+                #      symbolSize=5,
+                #      name="z_probs",
+                #  )
             elif p.endswith("background"):
                 k = 0
                 self.item[f"{p}_mean"] = pg.PlotDataItem(
@@ -451,11 +455,12 @@ class MainWindow(QMainWindow):
         n = (int(self.aoiNumber.text()) + inc) % self.Model.data.ontarget.N
         self.aoiNumber.setText(str(n))
 
-        self.item["zoom"].setData(self.Model.params["p(specific)"][n])
+        # self.item["zoom"].setData(self.Model.params["p(specific)"][n])
         for p in self.params:
             if p == "z":
-                self.item[f"{p}_probs"].setData(self.Model.params["p(specific)"][n])
-                self.item["z_label"].setData(self.Model.data.ontarget.labels["z"][n])
+                pass
+                #  self.item[f"{p}_probs"].setData(self.Model.params["p(specific)"][n])
+                #  self.item["z_label"].setData(self.Model.data.ontarget.labels["z"][n])
             elif p == "d/background":
                 k = 0
                 self.item[f"{p}_ul"].setData(self.Model.params[p]["UL"][n])
