@@ -188,7 +188,7 @@ class Model:
             self.load_checkpoint()
         except (FileNotFoundError, TypeError):
             pyro.clear_param_store()
-            self.iter = 1
+            self.iter = 0
             self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
             self.init_parameters()
 
@@ -200,7 +200,6 @@ class Model:
             batch_size = self._max_batch_size()
             self.logger.info("Optimal batch size determined - {}".format(batch_size))
         self.batch_size = batch_size
-        torch.cuda.empty_cache()
 
         if verbose:
             self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
@@ -215,19 +214,24 @@ class Model:
         # pyro.enable_validation()
         self._stop = False
         for i in nrange(num_iter):
+            # try:
             self.iter_loss = self.svi.step()
-            if not self.iter % 100 and self.iter != 0:
+            if not self.iter % 100:
                 self.save_checkpoint()
                 if self._stop:
                     self.logger.info("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
+            #  except ValueError as error:
+            #      assert error.args[0].startswith("The parameter")
+            #      self.logger.info(error)
 
     def _max_batch_size(self):
         k = 0
         batch_size = 0
         while batch_size + 2 ** k < self.data.ontarget.N:
             try:
+                torch.cuda.empty_cache()
                 self.batch_size = batch_size + 2 ** k
                 self.run(1, nrange=range)
             except RuntimeError as error:
@@ -242,7 +246,7 @@ class Model:
         else:
             batch_size += 2 ** (k - 1)
 
-        return batch_size // 4
+        return max(1, batch_size // 4)
 
     def save_checkpoint(self):
         # save only if no NaN values
@@ -291,7 +295,7 @@ class Model:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 self.writer.add_scalars(name, scalars, self.iter)
 
-        if self.data.ontarget.labels is not None and self.z_marginal is not None:
+        if self._classifier and self.data.ontarget.labels is not None:
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.ontarget.labels["z"].ravel()
 

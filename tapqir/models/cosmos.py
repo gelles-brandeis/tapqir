@@ -25,6 +25,8 @@ class Cosmos(Model):
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        self._global_params = ["gain", "proximity", "lamda"]
+        self._classifier = True
 
     def TraceELBO(self, jit=False):
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
@@ -106,17 +108,16 @@ class Cosmos(Model):
         )
 
     @property
-    def z_marginal(self):
+    def pspecific(self):
         return self.z_probs.sum(-3)
 
     @property
     def z_map(self):
-        return self.z_marginal > 0.5
+        return self.pspecific > 0.5
 
     def model(self):
         # global parameters
         self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
         self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
         self.size = torch.stack(
             (
@@ -138,6 +139,7 @@ class Cosmos(Model):
         self.pi = pyro.sample(
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
+        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
 
     def guide(self):
         # global parameters
@@ -146,13 +148,6 @@ class Cosmos(Model):
             dist.Gamma(
                 pyro.param("gain_loc") * pyro.param("gain_beta"),
                 pyro.param("gain_beta"),
-            ),
-        )
-        pyro.sample(
-            "lamda",
-            dist.Gamma(
-                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                pyro.param("lamda_beta"),
             ),
         )
         pyro.sample(
@@ -175,6 +170,13 @@ class Cosmos(Model):
 
     def state_guide(self):
         pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
+        pyro.sample(
+            "lamda",
+            dist.Gamma(
+                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
+                pyro.param("lamda_beta"),
+            ),
+        )
 
     def spot_model(self, data, prefix):
         # spots
@@ -261,6 +263,9 @@ class Cosmos(Model):
                     locs = locs + gaussian
 
                 # subtract offset
+                #  odx = dist.Categorical(
+                #      logits=self.data.offset.logits.to(self.dtype)
+                #  ).sample((data.P, data.P))
                 odx = pyro.sample(
                     f"{prefix}/offset",
                     dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
@@ -374,6 +379,7 @@ class Cosmos(Model):
                                 (data.P + 1) / 2,
                             ),
                         )
+
                 pyro.sample(
                     f"{prefix}/offset",
                     dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
