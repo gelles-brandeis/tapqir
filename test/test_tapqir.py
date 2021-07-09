@@ -57,6 +57,16 @@ def test_commands_cpu(dataset_path, qtbot):
         [
             "tapqir",
             "fit",
+            "marginal",
+            dataset_path,
+            "-it",
+            "100",
+            "-dev",
+            "cpu",
+        ],
+        [
+            "tapqir",
+            "fit",
             "cosmos",
             dataset_path,
             "-it",
@@ -89,16 +99,16 @@ def test_commands_cpu(dataset_path, qtbot):
     for command in commands:
         check_call(command)
 
-    model = Cosmos()
-    window = MainWindow(model, dataset_path)
-    qtbot.addWidget(window)
-    qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
-    qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)
-    qtbot.mouseClick(window.aoiIncrLarge, Qt.LeftButton)
-    qtbot.mouseClick(window.aoiDecrLarge, Qt.LeftButton)
-    qtbot.keyClicks(window.aoiNumber, "1")
-    qtbot.mouseClick(window.refresh, Qt.LeftButton)
-    qtbot.mouseClick(window.images, Qt.LeftButton)
+    #  model = Cosmos()
+    #  window = MainWindow(model, dataset_path)
+    #  qtbot.addWidget(window)
+    #  qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
+    #  qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)
+    #  qtbot.mouseClick(window.aoiIncrLarge, Qt.LeftButton)
+    #  qtbot.mouseClick(window.aoiDecrLarge, Qt.LeftButton)
+    #  qtbot.keyClicks(window.aoiNumber, "1")
+    #  qtbot.mouseClick(window.refresh, Qt.LeftButton)
+    #  qtbot.mouseClick(window.images, Qt.LeftButton)
 
 
 @requires_cuda
@@ -109,6 +119,14 @@ def test_commands_cuda(dataset_path):
             "tapqir",
             "fit",
             "multispot",
+            dataset_path,
+            "-it",
+            "100",
+        ],
+        [
+            "tapqir",
+            "fit",
+            "marginal",
             dataset_path,
             "-it",
             "100",
