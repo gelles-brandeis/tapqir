@@ -84,7 +84,7 @@ def main(args):
 
     marginal = CosmosMarginal(device=device, dtype=args.dtype)
     marginal.load(args.path)
-    marginal.init(args.lr, args.bs, args.jit)
+    marginal.init(args.lr, args.bs)
     marginal.run(args.it)
 
     model.init(args.lr, args.bs)
