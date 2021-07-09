@@ -48,7 +48,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             data.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
-    if model._classifier:
+    if model.pspecific is not None:
         ci_stats["d/m_probs"] = model.m_probs.data.cpu()
         ci_stats["d/z_probs"] = model.z_probs.data.cpu()
         ci_stats["d/j_probs"] = model.j_probs.data.cpu()
@@ -73,11 +73,11 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.params = ci_stats
 
     # snr
-    if model._classifier:
+    if model.pspecific is not None:
         data.loc["SNR", "Mean"] = model.snr().mean().item()
 
     # classification statistics
-    if model._classifier and model.data.ontarget.labels is not None:
+    if model.pspecific is not None and model.data.ontarget.labels is not None:
         pred_labels = model.z_map.cpu().numpy().ravel()
         true_labels = model.data.ontarget.labels["z"].ravel()
 
@@ -118,7 +118,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         for line in open(model.run_path / "run.log"):
             if "model converged" in line:
                 data.loc["trained", "Mean"] = True
-        torch.save(ci_stats, path / "params.tpqr")
+        torch.save(ci_stats, path / f"{model.name}-params.tpqr")
         if save_matlab:
             from scipy.io import savemat
 
