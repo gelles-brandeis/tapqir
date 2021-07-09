@@ -11,7 +11,7 @@ import torch
 from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
-from tapqir.models import Cosmos, MultiSpot
+from tapqir.models import Cosmos, CosmosMarginal
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
@@ -79,10 +79,10 @@ def main(args):
         simulate(model, args.N, args.F, args.P, seed=args.seed, params=params)
         pyro.clear_param_store()
 
-    multispot = MultiSpot(device=device, dtype=args.dtype)
-    multispot.load(args.path)
-    multispot.init(args.lr, args.bs, args.jit)
-    multispot.run(args.it)
+    marginal = CosmosMarginal(device=device, dtype=args.dtype)
+    marginal.load(args.path)
+    marginal.init(args.lr, args.bs, args.jit)
+    marginal.run(args.it)
 
     model.init(args.lr, args.bs, args.jit)
     model.run(args.it)
