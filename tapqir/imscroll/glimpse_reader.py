@@ -89,12 +89,14 @@ class GlimpseDataset:
 
         # calculate the cumulative sum of dx and dy relative to the aoiinfo frame
         aoiinfo_frame = int(aoi_df["ontarget"].at[1, "frame"])
-        drift_df.loc[aoiinfo_frame + 1 :] = drift_df.loc[aoiinfo_frame + 1 :].cumsum(
-            axis=0
+        drift_df.loc[aoiinfo_frame + 1 :] = (
+            drift_df.loc[aoiinfo_frame + 1 :].cumsum(axis=0).values
         )
         drift_df.loc[aoiinfo_frame - 1 :: -1] = (
-            -drift_df.loc[aoiinfo_frame : drift_df.index[1] : -1]
-        ).cumsum(axis=0)
+            (-drift_df.loc[aoiinfo_frame : drift_df.index[1] : -1])
+            .cumsum(axis=0)
+            .values
+        )
 
         if kwargs["frame_start"] and kwargs["frame_end"]:
             f1 = int(kwargs["frame_start"])
