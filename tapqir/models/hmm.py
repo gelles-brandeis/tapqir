@@ -28,7 +28,6 @@ class HMM(Cosmos):
         self.classify = True
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
         self._global_params = ["gain", "proximity", "lamda"]
-        self._classifier = True
 
     def TraceELBO(self, jit=False):
         return (infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO)(

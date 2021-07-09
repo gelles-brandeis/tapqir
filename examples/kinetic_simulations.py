@@ -10,7 +10,7 @@ import torch
 from pyroapi import distributions as dist
 from pyroapi import pyro, pyro_backend
 
-from tapqir.models import HMM, Cosmos, MultiSpot
+from tapqir.models import HMM, Cosmos, CosmosMarginal
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
@@ -82,10 +82,10 @@ def main(args):
         model.gaussian = hmm.gaussian
         pyro.clear_param_store()
 
-    multispot = MultiSpot(device=device, dtype=args.dtype)
-    multispot.load(args.path)
-    multispot.init(args.lr, args.bs)
-    multispot.run(args.it)
+    marginal = CosmosMarginal(device=device, dtype=args.dtype)
+    marginal.load(args.path)
+    marginal.init(args.lr, args.bs)
+    marginal.run(args.it)
 
     model.init(args.lr, args.bs)
     model.run(args.it)
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("-N", default=5, type=int)
     parser.add_argument("-F", default=500, type=int)
     parser.add_argument("-P", default=14, type=int)
-    parser.add_argument("-it", default=100, type=int)
+    parser.add_argument("-it", default=70000, type=int)
     parser.add_argument("-bs", default=0, type=int)
     parser.add_argument("-lr", default=0.005, type=float)
     parser.add_argument("--path", type=str)

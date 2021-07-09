@@ -152,9 +152,9 @@ class Model:
         self.logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results
-        if (self.path / "params.tpqr").is_file():
-            self.params = torch.load(self.path / "params.tpqr")
-            self.logger.info(f"Loaded parameters from {self.path / 'params.tpqr'}")
+        if (self.path / f"{self.name}-params.tpqr").is_file():
+            self.params = torch.load(self.path / f"{self.name}-params.tpqr")
+            self.logger.info(f"Loaded parameters from {self.name}-params.tpqr")
         if (self.path / "statistics.csv").is_file():
             self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
             self.logger.info(
@@ -295,7 +295,7 @@ class Model:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 self.writer.add_scalars(name, scalars, self.iter)
 
-        if self._classifier and self.data.ontarget.labels is not None:
+        if self.pspecific is not None and self.data.ontarget.labels is not None:
             pred_labels = self.z_map.cpu().numpy().ravel()
             true_labels = self.data.ontarget.labels["z"].ravel()
 

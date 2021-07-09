@@ -34,7 +34,6 @@ class MultiSpot(Model):
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "gain_loc"]
         self._global_params = ["gain"]
-        self._classifier = False
 
     def TraceELBO(self, jit=False):
         return (infer.JitTrace_ELBO if jit else infer.Trace_ELBO)(

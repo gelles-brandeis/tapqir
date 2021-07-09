@@ -15,18 +15,18 @@ from tapqir.distributions import AffineBeta
 from tapqir.models.model import Model
 
 
-class Cosmos(Model):
+class CosmosMarginal(Model):
     """
-    Time-independent model.
+    Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "cosmos"
+    name = "marginal"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
         self._global_params = ["gain", "proximity", "lamda"]
-        self._classifier = True
+        self._classify = False
 
     def TraceELBO(self, jit=False):
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
@@ -141,23 +141,33 @@ class Cosmos(Model):
             dim=-1,
         )
 
+    @property
+    def infer_config(self):
+        if self._classify:
+            return {
+                "expose_types": ["sample"],
+                "expose": ["d/theta_probs", "d/m_probs"],
+            }
+        return {"expose_types": ["sample", "param"]}
+
     def guide(self):
-        # global parameters
-        pyro.sample(
-            "gain",
-            dist.Gamma(
-                pyro.param("gain_loc") * pyro.param("gain_beta"),
-                pyro.param("gain_beta"),
-            ),
-        )
-        self.state_guide()
+        with handlers.block(**self.infer_config):
+            # global parameters
+            pyro.sample(
+                "gain",
+                dist.Gamma(
+                    pyro.param("gain_loc") * pyro.param("gain_beta"),
+                    pyro.param("gain_beta"),
+                ),
+            )
+            self.state_guide()
 
-        # test data
-        self.spot_guide(self.data.ontarget, prefix="d")
+            # test data
+            self.spot_guide(self.data.ontarget, prefix="d")
 
-        # control data
-        if self.data.offtarget.images is not None:
-            self.spot_guide(self.data.offtarget, prefix="c")
+            # control data
+            if self.data.offtarget.images is not None:
+                self.spot_guide(self.data.offtarget, prefix="c")
 
     def state_guide(self):
         pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
@@ -209,10 +219,17 @@ class Cosmos(Model):
 
                 # sample hidden model state (1+K*S,)
                 if prefix == "d":
-                    theta = pyro.sample(
-                        f"{prefix}/theta",
-                        dist.Categorical(self.probs_theta),
-                    )
+                    if self._classify:
+                        theta = pyro.sample(
+                            f"{prefix}/theta",
+                            dist.Categorical(self.probs_theta),
+                        )
+                    else:
+                        theta = pyro.sample(
+                            f"{prefix}/theta",
+                            dist.Categorical(self.probs_theta),
+                            infer={"enumerate": "parallel"},
+                        )
                 else:
                     theta = 0
 
@@ -317,7 +334,7 @@ class Cosmos(Model):
                         pyro.param(f"{prefix}/b_beta")[ndx],
                     ),
                 )
-                if prefix == "d":
+                if self._classify and prefix == "d":
                     theta = pyro.sample(
                         f"{prefix}/theta",
                         dist.Categorical(pyro.param(f"{prefix}/theta_probs")[ndx]),
@@ -327,9 +344,18 @@ class Cosmos(Model):
                 for kdx in spots:
                     # sample spot presence m
                     if prefix == "d":
-                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                            theta, kdx, ndx[:, None], fdx
-                        ]
+                        if self._classify:
+                            m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                                theta, kdx, ndx[:, None], fdx
+                            ]
+                        else:
+                            m_probs = Vindex(
+                                torch.einsum(
+                                    "sknft,nfs->knft",
+                                    pyro.param(f"{prefix}/m_probs"),
+                                    pyro.param(f"{prefix}/theta_probs"),
+                                )
+                            )[kdx, ndx[:, None], fdx, :]
                     else:
                         m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                             kdx, ndx[:, None], fdx
@@ -385,13 +411,6 @@ class Cosmos(Model):
                 )
 
     def init_parameters(self):
-        # load pre-trained paramters
-        self.load_checkpoint(
-            path=self.path / "multispot" / tapqir_version.split("+")[0],
-            param_only=True,
-            warnings=True,
-        )
-
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5),
@@ -415,24 +434,129 @@ class Cosmos(Model):
             "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
         )
         pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
+
+        pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
-            "d/theta_probs",
-            lambda: torch.ones(
-                self.data.ontarget.N, self.data.ontarget.F, 1 + self.K * self.S
-            ),
-            constraint=constraints.simplex,
+            "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
         )
-        m_probs = torch.ones(
-            1 + self.K * self.S, self.K, self.data.ontarget.N, self.data.ontarget.F, 2
-        )
-        m_probs[1, 0, :, :, 0] = 0
-        m_probs[2, 1, :, :, 0] = 0
-        pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
+
+        self.spot_parameters(self.data.ontarget, prefix="d")
+
         if self.data.offtarget.images is not None:
+            self.spot_parameters(self.data.offtarget, prefix="c")
+
+    def spot_parameters(self, data, prefix):
+        pyro.param(
+            f"{prefix}/background_mean_loc",
+            lambda: torch.full((data.N, 1), data.median - self.data.offset.mean),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            f"{prefix}/background_std_loc",
+            lambda: torch.ones(data.N, 1),
+            constraint=constraints.positive,
+        )
+
+        pyro.param(
+            f"{prefix}/b_loc",
+            lambda: torch.full((data.N, data.F), data.median - self.data.offset.mean),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            f"{prefix}/b_beta",
+            lambda: torch.ones(data.N, data.F),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            f"{prefix}/h_loc",
+            lambda: torch.full((self.K, data.N, data.F), 2000),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            f"{prefix}/h_beta",
+            lambda: torch.full((self.K, data.N, data.F), 0.001),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            f"{prefix}/w_mean",
+            lambda: torch.full((self.K, data.N, data.F), 1.5),
+            constraint=constraints.interval(
+                0.75 + torch.finfo(self.dtype).eps,
+                2.25 - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            f"{prefix}/w_size",
+            lambda: torch.full((self.K, data.N, data.F), 100),
+            constraint=constraints.greater_than(2.0),
+        )
+        pyro.param(
+            f"{prefix}/x_mean",
+            lambda: torch.zeros(self.K, data.N, data.F),
+            constraint=constraints.interval(
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            f"{prefix}/y_mean",
+            lambda: torch.zeros(self.K, data.N, data.F),
+            constraint=constraints.interval(
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+            ),
+        )
+        size = torch.full((self.K, data.N, data.F), 200)
+        if self.K == 2:
+            size[1] = 7
+        elif self.K == 3:
+            size[1] = 7
+            size[2] = 3
+        pyro.param(
+            f"{prefix}/size", lambda: size, constraint=constraints.greater_than(2.0)
+        )
+
+        # classification
+        if prefix == "d":
             pyro.param(
-                "c/m_probs",
-                lambda: torch.ones(
-                    self.K, self.data.offtarget.N, self.data.offtarget.F, 2
-                ),
+                "d/theta_probs",
+                lambda: torch.ones(data.N, data.F, 1 + self.K * self.S),
                 constraint=constraints.simplex,
             )
+            m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
+            m_probs[0, :, :, :, 0] = 0.75
+            m_probs[0, :, :, :, 1] = 0.25
+            m_probs[1, 0, :, :, 0] = 0
+            m_probs[1, 1, :, :, 0] = 0.75
+            m_probs[1, 1, :, :, 1] = 0.25
+            m_probs[2, 1, :, :, 0] = 0
+            m_probs[2, 0, :, :, 0] = 0.75
+            m_probs[2, 0, :, :, 1] = 0.25
+            pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
+        else:
+            pyro.param(
+                "c/m_probs",
+                lambda: torch.ones(self.K, data.N, data.F, 2),
+                constraint=constraints.simplex,
+            )
+
+
+class Cosmos(CosmosMarginal):
+    """
+    Time-independent Single Molecule Colocalization Model.
+    """
+
+    name = "cosmos"
+
+    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
+        super().__init__(S, K, device, dtype)
+        self.conv_params = ["-ELBO"]
+        self._classify = True
+
+    def init_parameters(self):
+        # load pre-trained paramters
+        self.load_checkpoint(
+            path=self.path / "marginal" / tapqir_version.split("+")[0],
+            param_only=True,
+            warnings=True,
+        )
