@@ -272,7 +272,7 @@ class Model:
                 for p in self.conv_params
             )
             if crit:
-                self._stop = False
+                self._stop = True
 
         # save the model state
         torch.save(
