@@ -36,14 +36,16 @@ class CosmosMarginal(Model):
     @property
     def probs_j(self):
         result = torch.zeros(2, self.K + 1, dtype=self.dtype)
-        result[0, : self.K] = (
-            dist.Poisson(self.lamda).log_prob(torch.arange(self.K).to(self.dtype)).exp()
+        result[0, : self.K] = torch.exp(
+            self.lamda.log() * torch.arange(self.K)
+            - self.lamda
+            - torch.arange(1, self.K + 1).lgamma()
         )
         result[0, -1] = 1 - result[0, : self.K].sum()
-        result[1, : self.K - 1] = (
-            dist.Poisson(self.lamda)
-            .log_prob(torch.arange(self.K - 1).to(self.dtype))
-            .exp()
+        result[0, : self.K - 1] = torch.exp(
+            self.lamda.log() * torch.arange(self.K - 1)
+            - self.lamda
+            - torch.arange(1, self.K).lgamma()
         )
         result[1, -2] = 1 - result[0, : self.K - 1].sum()
         return result
@@ -52,13 +54,14 @@ class CosmosMarginal(Model):
     def probs_m(self):
         # this only works for K=2
         result = torch.zeros(1 + self.K * self.S, self.K, 2, dtype=self.dtype)
-        result[0, :, 0] = self.probs_j[0, 0] + self.probs_j[0, 1] / 2
-        result[0, :, 1] = self.probs_j[0, 2] + self.probs_j[0, 1] / 2
+        probs_j = self.probs_j
+        result[0, :, 0] = probs_j[0, 0] + probs_j[0, 1] / 2
+        result[0, :, 1] = probs_j[0, 2] + probs_j[0, 1] / 2
         result[1, 0, 1] = 1
-        result[1, 1, 0] = self.probs_j[1, 0]
-        result[1, 1, 1] = self.probs_j[1, 1]
-        result[2, 0, 0] = self.probs_j[1, 0]
-        result[2, 0, 1] = self.probs_j[1, 1]
+        result[1, 1, 0] = probs_j[1, 0]
+        result[1, 1, 1] = probs_j[1, 1]
+        result[2, 0, 0] = probs_j[1, 0]
+        result[2, 0, 1] = probs_j[1, 1]
         result[2, 1, 1] = 1
         return result
 

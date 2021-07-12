@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import logging
+import math
 import os
 from collections import deque
 from pathlib import Path
@@ -64,11 +65,18 @@ class GaussianSpot:
         """
 
         spot_locs = target_locs + torch.stack((x, y), -1)
-        rv = dist.MultivariateNormal(
-            spot_locs[..., None, None, :],
-            scale_tril=torch.eye(2) * width[..., None, None, None, None],
+
+        scale = width[..., None, None, None]
+        loc = spot_locs[..., None, None, :]
+        value = self.ij_pixel
+        var = scale ** 2
+        gaussian_spot = torch.exp(
+            (
+                -((value - loc) ** 2) / (2 * var)
+                - scale.log()
+                - math.log(math.sqrt(2 * math.pi))
+            ).sum(-1)
         )
-        gaussian_spot = torch.exp(rv.log_prob(self.ij_pixel))  # N,F,D,D
         return height[..., None, None] * gaussian_spot
 
 
