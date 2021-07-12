@@ -10,7 +10,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from pyroapi import distributions as dist
 from pyroapi import infer, optim, pyro
 from sklearn.metrics import (
     confusion_matrix,
