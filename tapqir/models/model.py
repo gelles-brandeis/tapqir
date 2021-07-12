@@ -272,7 +272,7 @@ class Model:
                 for p in self.conv_params
             )
             if crit:
-                self._stop = True
+                self._stop = False
 
         # save the model state
         torch.save(
@@ -321,7 +321,7 @@ class Model:
     def load_checkpoint(self, path=None, param_only=False, warnings=False):
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
-        checkpoint = torch.load(path / "model", map_location=self.device)
+        checkpoint = torch.load(path / "model", map_location=torch.device("cpu"))
         pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
             self._stop = checkpoint["convergence_status"]
