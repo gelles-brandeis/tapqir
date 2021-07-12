@@ -200,7 +200,13 @@ class CosmosMarginal(Model):
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
         # aoi sites
-        aois = pyro.plate(f"{prefix}/aois", data.N, dim=-2)
+        aois = pyro.plate(
+            f"{prefix}/aois",
+            data.N,
+            subsample_size=self.batch_size,
+            subsample=self.n,
+            dim=-2,
+        )
         # time frames
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
 
