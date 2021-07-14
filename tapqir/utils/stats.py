@@ -44,6 +44,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
             data.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
             data.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
+            # Keq
+            data.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
+            data.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
+            data.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
         else:
             data.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()

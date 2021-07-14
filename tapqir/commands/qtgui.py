@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
 
         self.Model = model
         self.path = path
-        self.Model.load(path)
+        self.Model.load(path, data_only=False)
 
         self.initUI()
 
@@ -264,15 +264,15 @@ class MainWindow(QMainWindow):
             self.img[(f - f1) % 100].setImage(
                 self.Model.data.ontarget.images[int(self.aoiNumber.text()), f].numpy()
             )
-            if self.Model._classifier:
-                self.prob[(f - f1) % 100].setOpts(
-                    height=(
-                        self.Model.params["d/z_probs"][
-                            :, int(self.aoiNumber.text()), f
-                        ].sum()
-                        * self.Model.data.P,
-                    )
+            # if self.Model._classifier:
+            self.prob[(f - f1) % 100].setOpts(
+                height=(
+                    self.Model.params["d/z_probs"][
+                        :, int(self.aoiNumber.text()), f
+                    ].sum()
+                    * self.Model.data.P,
                 )
+            )
             # ideal image
             self.img_ideal[(f - f1) % 100].setImage(img_ideal[f - f1].cpu().numpy())
 
@@ -375,23 +375,23 @@ class MainWindow(QMainWindow):
 
         for p in self.params:
             if p == "z":
-                pass
-                #  self.item["z_label"] = pg.PlotDataItem(
-                #      pen=C[3],
-                #      symbol="o",
-                #      symbolBrush=C[3],
-                #      symbolPen=None,
-                #      symbolSize=5,
-                #      name="z_label",
-                #  )
-                #  self.item[f"{p}_probs"] = pg.PlotDataItem(
-                #      pen=C[2],
-                #      symbol="o",
-                #      symbolBrush=C[2],
-                #      symbolPen=None,
-                #      symbolSize=5,
-                #      name="z_probs",
-                #  )
+                # pass
+                self.item["z_label"] = pg.PlotDataItem(
+                    pen=C[3],
+                    symbol="o",
+                    symbolBrush=C[3],
+                    symbolPen=None,
+                    symbolSize=5,
+                    name="z_label",
+                )
+                self.item[f"{p}_probs"] = pg.PlotDataItem(
+                    pen=C[2],
+                    symbol="o",
+                    symbolBrush=C[2],
+                    symbolPen=None,
+                    symbolSize=5,
+                    name="z_probs",
+                )
             elif p.endswith("background"):
                 k = 0
                 self.item[f"{p}_mean"] = pg.PlotDataItem(
@@ -455,12 +455,15 @@ class MainWindow(QMainWindow):
         n = (int(self.aoiNumber.text()) + inc) % self.Model.data.ontarget.N
         self.aoiNumber.setText(str(n))
 
-        # self.item["zoom"].setData(self.Model.params["p(specific)"][n])
+        if "p(specific)" in self.Model.params:
+            self.item["zoom"].setData(self.Model.params["p(specific)"][n])
         for p in self.params:
             if p == "z":
-                pass
-                #  self.item[f"{p}_probs"].setData(self.Model.params["p(specific)"][n])
-                #  self.item["z_label"].setData(self.Model.data.ontarget.labels["z"][n])
+                if "p(specific)" in self.Model.params:
+                    self.item[f"{p}_probs"].setData(self.Model.params["p(specific)"][n])
+                    self.item["z_label"].setData(
+                        self.Model.data.ontarget.labels["z"][n]
+                    )
             elif p == "d/background":
                 k = 0
                 self.item[f"{p}_ul"].setData(self.Model.params[p]["UL"][n])
