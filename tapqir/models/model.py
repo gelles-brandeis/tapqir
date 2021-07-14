@@ -89,7 +89,7 @@ class Model:
     * :meth:`guide`
     """
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
+    def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
         self._S = S
         self._K = K
         self.batch_size = None
@@ -99,11 +99,13 @@ class Model:
         self.path = None
         self.run_path = None
         # logger
+        self.verbose = verbose
         self.logger = logger
-        self.logger.info("Tapqir version - {}".format(tapqir_version))
-        self.logger.info("Model - {}".format(self.name))
         # set device & dtype
         self.to(device, dtype)
+        if self.verbose:
+            self.logger.info("Tapqir version - {}".format(tapqir_version))
+            self.logger.info("Model - {}".format(self.name))
 
     def to(self, device, dtype="double"):
         self.dtype = getattr(torch, dtype)
@@ -125,8 +127,9 @@ class Model:
                 weights=self.data.offset.weights.to(self.device),
             )
             self.gaussian.ij_pixel = self.gaussian.ij_pixel.to(self.device)
-        self.logger.info("Device - {}".format(self.device))
-        self.logger.info("Floating precision - {}".format(self.dtype))
+        if self.verbose:
+            self.logger.info("Device - {}".format(self.device))
+            self.logger.info("Floating precision - {}".format(self.dtype))
 
     @lazy_property
     def S(self):
@@ -142,7 +145,7 @@ class Model:
         """
         return self._K
 
-    def load(self, path):
+    def load(self, path, data_only=True):
         # set path
         self.path = Path(path)
         self.run_path = self.path / f"{self.name}" / tapqir_version.split("+")[0]
@@ -156,17 +159,18 @@ class Model:
         # load data
         self.data = load(self.path, self.device)
         self.gaussian = GaussianSpot(self.data.P)
-        self.logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
+        if self.verbose:
+            self.logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results
-        if (self.path / f"{self.name}-params.tpqr").is_file():
+        if not data_only:
             self.params = torch.load(self.path / f"{self.name}-params.tpqr")
-            self.logger.info(f"Loaded parameters from {self.name}-params.tpqr")
-        if (self.path / "statistics.csv").is_file():
             self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
-            self.logger.info(
-                f"Loaded model statistics from {self.path / 'statistics.csv'}"
-            )
+            if self.verbose:
+                self.logger.info(f"Loaded parameters from {self.name}-params.tpqr")
+                self.logger.info(
+                    f"Loaded model statistics from {self.path / 'statistics.csv'}"
+                )
 
     def TraceELBO(self, jit):
         """
@@ -186,7 +190,7 @@ class Model:
         """
         raise NotImplementedError
 
-    def init(self, lr=0.005, batch_size=0, jit=False, verbose=True):
+    def init(self, lr=0.005, batch_size=0, jit=False):
         self.optim_fn = optim.Adam
         self.optim_args = {"lr": lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
@@ -205,10 +209,13 @@ class Model:
         # find max possible batch_size
         if batch_size == 0:
             batch_size = self._max_batch_size()
-            self.logger.info("Optimal batch size determined - {}".format(batch_size))
+            if self.verbose:
+                self.logger.info(
+                    "Optimal batch size determined - {}".format(batch_size)
+                )
         self.batch_size = batch_size
 
-        if verbose:
+        if self.verbose:
             self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
             self.logger.info("Learning rate - {}".format(lr))
             self.logger.info("Batch size - {}".format(self.batch_size))
