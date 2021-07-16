@@ -9,6 +9,12 @@ from torch.distributions import constraints
 
 
 def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
+    r"""
+    Calculates ideal shape of the 2D-Gaussian spots given spot parameters
+    and target positions.
+
+        :math:`\dfrac{h}{2 \pi \cdot w^2} \exp{\left( -\dfrac{(i-x)^2 + (j-y)^2}{2 \cdot w^2} \right)}`
+    """
     # create meshgrid of PxP pixel positions
     P_range = torch.arange(P)
     i_pixel, j_pixel = torch.meshgrid(P_range, P_range)
@@ -37,23 +43,23 @@ class KSpotGammaNoise(TorchDistribution):
     Offset + Background + K-number of Gaussian Spots Image Model with
     Gamma distributed noise.
 
-    :param torch.Tensor m: Spot presence indicator. Should have
-        the rightmost size ``K`` and be broadcastable to ``batch_size``.
-    :param torch.Tensor height: Integrated spot intensity. Should have
-        the rightmost size ``K`` and be broadcastable to ``batch_size``.
-    :param torch.Tensor width: Spot width. Should have
-        the rightmost size ``K`` and be broadcastable to ``batch_size``.
-    :param torch.Tensor x: Spot center on x-axis. Should have
-        the rightmost size ``K`` and be broadcastable to ``batch_size``.
-    :param torch.Tensor y: Spot center on y-axis. Should have
-        the rightmost size ``K`` and be broadcastable to ``batch_size``.
+    :param torch.Tensor height: Integrated spot intensity. Should be broadcastable
+        to ``(batch_shape, K)``.
+    :param torch.Tensor width: Spot width. Should be broadcastable
+        to ``(batch_shape, K)``.
+    :param torch.Tensor x: Spot center on x-axis. Should be broadcastable
+        to ``(batch_shape, K)``.
+    :param torch.Tensor y: Spot center on y-axis. Should be broadcastable
+        to ``(batch_shape, K)``.
     :param torch.Tensor target_locs: Target location. Should have
         the rightmost size ``2`` correspondnig to locations on
-        x- and y-axes, and be broadcastable to ``batch_size``.
+        x- and y-axes, and be broadcastable to ``(batch_shape,)``.
     :param torch.Tensor background: Background intensity. Should
-        be broadcastable to ``batch_size``.
+        be broadcastable to ``(batch_shape,)``.
     :param torch.Tensor offset: Offset intensity. Should be broadcastable
-        to ``(batch_size, P, P)``.
+        to ``(batch_shape, P, P)``.
+    :param torch.Tensor m: Spot presence indicator. Should be broadcastable
+        to ``(batch_shape, K)``.
     :param torch.Tensor gain: Camera gain.
     :param int P: Number of pixels along the axis.
     """

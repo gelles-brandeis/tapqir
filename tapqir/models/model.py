@@ -22,6 +22,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
 from tapqir import __version__ as tapqir_version
+from tapqir.distributions.kspotgammanoise import _gaussian_spots
 from tapqir.utils.dataset import load
 from tapqir.utils.stats import save_stats
 
@@ -35,48 +36,6 @@ formatter = logging.Formatter(
 )
 ch.setFormatter(formatter)
 logger.addHandler(ch)
-
-
-class GaussianSpot:
-    r"""
-    Calculates ideal shape of the 2D-Gaussian spot given spot parameters
-    and target positions.
-
-        :math:`\dfrac{h}{2 \pi \cdot w^2} \exp{\left( -\dfrac{(i-x)^2 + (j-y)^2}{2 \cdot w^2} \right)}`
-    """
-
-    def __init__(self, P):
-        super().__init__()
-        # create meshgrid of PxP pixel positions
-        P_range = torch.arange(P)
-        i_pixel, j_pixel = torch.meshgrid(P_range, P_range)
-        self.ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
-
-    # Ideal 2D gaussian spots
-    def __call__(self, height, width, x, y, target_locs):
-        r"""
-        :param height: integrated spot intensity.
-        :param width: width of the 2D-Gaussian spot.
-        :param x: relative :math:`x`-axis position relative to the target.
-        :param y: relative :math:`y`-axis position relative to the target.
-        :param target_locs: target position.
-        :return: Ideal shape 2D-Gaussian spot.
-        """
-
-        spot_locs = target_locs + torch.stack((x, y), -1)
-
-        scale = width[..., None, None, None]
-        loc = spot_locs[..., None, None, :]
-        value = self.ij_pixel
-        var = scale ** 2
-        gaussian_spot = torch.exp(
-            (
-                -((value - loc) ** 2) / (2 * var)
-                - scale.log()
-                - math.log(math.sqrt(2 * math.pi))
-            ).sum(-1)
-        )
-        return height[..., None, None] * gaussian_spot
 
 
 class Model:
@@ -126,7 +85,6 @@ class Model:
                 samples=self.data.offset.samples.to(self.device),
                 weights=self.data.offset.weights.to(self.device),
             )
-            self.gaussian.ij_pixel = self.gaussian.ij_pixel.to(self.device)
         if self.verbose:
             self.logger.info("Device - {}".format(self.device))
             self.logger.info("Floating precision - {}".format(self.dtype))
@@ -158,7 +116,6 @@ class Model:
 
         # load data
         self.data = load(self.path, self.device)
-        self.gaussian = GaussianSpot(self.data.P)
         if self.verbose:
             self.logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
 
@@ -377,12 +334,13 @@ class Model:
             \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
             \text{ for } \theta_{nf} = k`
         """
-        weights = self.gaussian(
+        weights = _gaussian_spots(
             torch.ones(1),
             self.params["d/width"]["Mean"],
             self.params["d/x"]["Mean"],
             self.params["d/y"]["Mean"],
             self.data.ontarget.xy.to(self.dtype),
+            self.data.ontarget.P,
         )
         signal = (
             (

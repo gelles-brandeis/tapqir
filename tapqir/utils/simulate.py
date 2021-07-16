@@ -6,7 +6,6 @@ import torch
 from pyro.infer import Predictive
 from pyroapi import handlers, pyro
 
-from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
 
 
@@ -72,7 +71,6 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         offset_weights=torch.ones(3) / 3,
         device=model.device,
     )
-    model.gaussian = GaussianSpot(P)
 
     # sample
     predictive = Predictive(
