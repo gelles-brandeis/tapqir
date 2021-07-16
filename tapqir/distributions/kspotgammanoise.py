@@ -21,7 +21,7 @@ def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
     ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
 
     # Ideal 2D gaussian spots
-    spot_locs = target_locs.unsqueeze(-2) + torch.stack((x, y), -1)
+    spot_locs = target_locs + torch.stack((x, y), -1)
     scale = width[..., None, None, None]
     loc = spot_locs[..., None, None, :]
     var = scale ** 2
@@ -34,8 +34,7 @@ def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
     )
     if m is not None:
         height = m * height
-    gaussian_spots = height[..., None, None] * normalized_gaussian
-    return gaussian_spots.sum(-3)
+    return height[..., None, None] * normalized_gaussian
 
 
 class KSpotGammaNoise(TorchDistribution):
@@ -84,8 +83,10 @@ class KSpotGammaNoise(TorchDistribution):
 
         if P is None:
             P = offset.shape[-1]
-        gaussian_spots = _gaussian_spots(height, width, x, y, target_locs, P, m)
-        image = background[..., None, None] + gaussian_spots
+        gaussian_spots = _gaussian_spots(
+            height, width, x, y, target_locs.unsqueeze(-2), P, m
+        )
+        image = background[..., None, None] + gaussian_spots.sum(-3)
 
         self.offset = offset
         self.concentration = image / gain
