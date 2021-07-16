@@ -290,7 +290,7 @@ class HMM(Cosmos):
                 obs, target_locs = data.fetch(ndx, fdx)
                 # observed data
                 pyro.sample(
-                    f"{prefix}/data",
+                    f"{prefix}/data_{fdx}",
                     KSpotGammaNoise(
                         torch.stack(heights, -1),
                         torch.stack(widths, -1),
