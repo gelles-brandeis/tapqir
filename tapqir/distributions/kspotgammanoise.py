@@ -34,14 +34,7 @@ class KSpotGammaNoise(TorchDistribution):
     :param int P: Number of pixels along the axis.
     """
 
-    arg_constraints = {
-        "height": constraints.positive,
-        "width": constraints.positive,
-        "x": constraints.real,
-        "y": constraints.real,
-        "background": constraints.positive,
-        "gain": constraints.positive,
-    }
+    arg_constraints = {}
     support = constraints.positive
 
     def __init__(

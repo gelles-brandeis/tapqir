@@ -11,7 +11,7 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir import __version__ as tapqir_version
-from tapqir.distributions import AffineBeta
+from tapqir.distributions import AffineBeta, KSpotGammaNoise
 from tapqir.models.model import Model
 
 
@@ -20,7 +20,7 @@ class CosmosMarginal(Model):
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "marginal"
+    name = "kspotmarginal"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
         super().__init__(S, K, device, dtype, verbose)
@@ -212,10 +212,9 @@ class CosmosMarginal(Model):
         )
         # time frames
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
+        ms, heights, widths, xs, ys = [], [], [], [], []
 
         with aois as ndx:
-            # fetch data
-            obs, target_locs = data.fetch(ndx)
             # background mean and std
             background_mean = pyro.sample(
                 f"{prefix}/background_mean", dist.HalfNormal(1000)
@@ -232,7 +231,6 @@ class CosmosMarginal(Model):
                         background_mean / background_std ** 2,
                     ),
                 )
-                locs = background[..., None, None]
 
                 # sample hidden model state (1+K*S,)
                 if prefix == "d":
@@ -291,10 +289,12 @@ class CosmosMarginal(Model):
                             ),
                         )
 
-                    # calculate image shape w/o offset
-                    height = height.masked_fill(m == 0, 0)
-                    gaussian = self.gaussian(height, width, x, y, target_locs)
-                    locs = locs + gaussian
+                    # append
+                    ms.append(m)
+                    heights.append(height)
+                    widths.append(width)
+                    xs.append(x)
+                    ys.append(y)
 
                 # subtract offset
                 odx = pyro.sample(
@@ -304,17 +304,23 @@ class CosmosMarginal(Model):
                     .to_event(2),
                 )
                 offset = self.data.offset.samples[odx]
-                offset_mask = obs > offset
-                obs = torch.where(offset_mask, obs - offset, obs.new_ones(()))
+                # fetch data
+                obs, target_locs = data.fetch(ndx)
                 # observed data
                 pyro.sample(
                     f"{prefix}/data",
-                    dist.Gamma(
-                        locs / self.gain,
-                        1 / self.gain,
-                    )
-                    .mask(mask=offset_mask)
-                    .to_event(2),
+                    KSpotGammaNoise(
+                        torch.stack(torch.broadcast_tensors(*ms), -1),
+                        torch.stack(heights, -1),
+                        torch.stack(widths, -1),
+                        torch.stack(xs, -1),
+                        torch.stack(ys, -1),
+                        target_locs,
+                        background,
+                        offset,
+                        self.gain,
+                        data.P,
+                    ),
                     obs=obs,
                 )
 
@@ -630,7 +636,7 @@ class Cosmos(CosmosMarginal):
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "cosmos"
+    name = "kspot"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
         super().__init__(S, K, device, dtype, verbose)
