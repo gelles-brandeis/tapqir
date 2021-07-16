@@ -8,6 +8,30 @@ from pyro.distributions import TorchDistribution
 from torch.distributions import constraints
 
 
+def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
+    # create meshgrid of PxP pixel positions
+    P_range = torch.arange(P)
+    i_pixel, j_pixel = torch.meshgrid(P_range, P_range)
+    ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
+
+    # Ideal 2D gaussian spots
+    spot_locs = target_locs.unsqueeze(-2) + torch.stack((x, y), -1)
+    scale = width[..., None, None, None]
+    loc = spot_locs[..., None, None, :]
+    var = scale ** 2
+    normalized_gaussian = torch.exp(
+        (
+            -((ij_pixel - loc) ** 2) / (2 * var)
+            - scale.log()
+            - math.log(math.sqrt(2 * math.pi))
+        ).sum(-1)
+    )
+    if m is not None:
+        height = m * height
+    gaussian_spots = height[..., None, None] * normalized_gaussian
+    return gaussian_spots.sum(-3)
+
+
 class KSpotGammaNoise(TorchDistribution):
     r"""
     Offset + Background + K-number of Gaussian Spots Image Model with
@@ -28,8 +52,8 @@ class KSpotGammaNoise(TorchDistribution):
         x- and y-axes, and be broadcastable to ``batch_size``.
     :param torch.Tensor background: Background intensity. Should
         be broadcastable to ``batch_size``.
-    :param torch.Tensor offset: Offset intensity. Should have
-        the rightmost shape ``(P, P)`` and be broadcastable to ``batch_size``.
+    :param torch.Tensor offset: Offset intensity. Should be broadcastable
+        to ``(batch_size, P, P)``.
     :param torch.Tensor gain: Camera gain.
     :param int P: Number of pixels along the axis.
     """
@@ -39,7 +63,6 @@ class KSpotGammaNoise(TorchDistribution):
 
     def __init__(
         self,
-        m,
         height,
         width,
         x,
@@ -49,30 +72,14 @@ class KSpotGammaNoise(TorchDistribution):
         offset,
         gain,
         P=None,
+        m=None,
         validate_args=None,
     ):
 
         if P is None:
             P = offset.shape[-1]
-        P_range = torch.arange(P)
-        i_pixel, j_pixel = torch.meshgrid(P_range, P_range)
-        ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
-
-        spot_locs = target_locs.unsqueeze(-2) + torch.stack((x, y), -1)
-        scale = width[..., None, None, None]
-        loc = spot_locs[..., None, None, :]
-        var = scale ** 2
-        normalized_gaussian = torch.exp(
-            (
-                -((ij_pixel - loc) ** 2) / (2 * var)
-                - scale.log()
-                - math.log(math.sqrt(2 * math.pi))
-            ).sum(-1)
-        )
-        gaussian_spots = height[..., None, None] * normalized_gaussian
-        image = background[..., None, None] + (m[..., None, None] * gaussian_spots).sum(
-            -3
-        )
+        gaussian_spots = _gaussian_spots(height, width, x, y, target_locs, P, m)
+        image = background[..., None, None] + gaussian_spots
 
         self.offset = offset
         self.concentration = image / gain

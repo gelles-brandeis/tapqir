@@ -20,7 +20,7 @@ class CosmosMarginal(Model):
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "kspotmarginal"
+    name = "marginal"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
         super().__init__(S, K, device, dtype, verbose)
@@ -42,7 +42,7 @@ class CosmosMarginal(Model):
             - torch.arange(1, self.K + 1).lgamma()
         )
         result[0, -1] = 1 - result[0, : self.K].sum()
-        result[0, : self.K - 1] = torch.exp(
+        result[1, : self.K - 1] = torch.exp(
             self.lamda.log() * torch.arange(self.K - 1)
             - self.lamda
             - torch.arange(1, self.K).lgamma()
@@ -212,7 +212,6 @@ class CosmosMarginal(Model):
         )
         # time frames
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
-        ms, heights, widths, xs, ys = [], [], [], [], []
 
         with aois as ndx:
             # background mean and std
@@ -248,6 +247,7 @@ class CosmosMarginal(Model):
                 else:
                     theta = 0
 
+                ms, heights, widths, xs, ys = [], [], [], [], []
                 for kdx in spots:
                     ontarget = Vindex(self.ontarget)[theta, kdx]
                     # spot presence
@@ -310,7 +310,6 @@ class CosmosMarginal(Model):
                 pyro.sample(
                     f"{prefix}/data",
                     KSpotGammaNoise(
-                        torch.stack(torch.broadcast_tensors(*ms), -1),
                         torch.stack(heights, -1),
                         torch.stack(widths, -1),
                         torch.stack(xs, -1),
@@ -320,6 +319,7 @@ class CosmosMarginal(Model):
                         offset,
                         self.gain,
                         data.P,
+                        torch.stack(torch.broadcast_tensors(*ms), -1),
                     ),
                     obs=obs,
                 )
@@ -636,7 +636,7 @@ class Cosmos(CosmosMarginal):
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "kspot"
+    name = "cosmos"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
         super().__init__(S, K, device, dtype, verbose)
