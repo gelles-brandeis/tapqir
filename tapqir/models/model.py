@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import logging
-import math
 import os
 from collections import deque
 from pathlib import Path
