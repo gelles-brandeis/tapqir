@@ -3,11 +3,10 @@
 
 from tapqir.models.cosmos import Cosmos, CosmosMarginal
 from tapqir.models.hmm import HMM
-from tapqir.models.model import GaussianSpot, Model
+from tapqir.models.model import Model
 from tapqir.models.multispot import MultiSpot
 
 __all__ = [
-    "GaussianSpot",
     "models",
     "Model",
     "Cosmos",
