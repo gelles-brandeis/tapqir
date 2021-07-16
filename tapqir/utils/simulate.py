@@ -6,7 +6,6 @@ import torch
 from pyro.infer import Predictive
 from pyroapi import handlers, pyro
 
-from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
 
 
@@ -72,7 +71,6 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         offset_weights=torch.ones(3) / 3,
         device=model.device,
     )
-    model.gaussian = GaussianSpot(P)
 
     # sample
     predictive = Predictive(
@@ -85,17 +83,15 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
     labels["aoi"] = np.arange(N).reshape(-1, 1)
     labels["frame"] = np.arange(F)
     if "pi" in params:
-        data = (samples["d/data"][0] + offset[samples["d/offset"][0]]).data.floor()
-        control = (samples["c/data"][0] + offset[samples["c/offset"][0]]).data.floor()
+        data = samples["d/data"][0].data.floor()
+        control = samples["c/data"][0].data.floor()
         labels["z"] = samples["d/theta"][0].cpu() > 0
     else:
         # kinetic simulations
         for f in range(F):
-            data[:, f : f + 1] = (
-                samples[f"d/data_{f}"][0] + offset[samples[f"d/offset_{f}"][0]]
-            ).data.floor()
+            data[:, f : f + 1] = samples[f"d/data_{f}"][0].data.floor()
             labels["z"][:, f : f + 1] = samples[f"d/theta_{f}"][0].cpu() > 0
-        control = (samples["c/data"][0] + offset[samples["c/offset"][0]]).data.floor()
+        control = samples["c/data"][0].data.floor()
     model.data = CosmosDataset(
         data.cpu(),
         target_locs.cpu(),

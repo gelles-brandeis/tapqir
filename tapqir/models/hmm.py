@@ -11,7 +11,7 @@ from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 
 from tapqir import __version__ as tapqir_version
-from tapqir.distributions import AffineBeta
+from tapqir.distributions import AffineBeta, KSpotGammaNoise
 from tapqir.models.cosmos import Cosmos
 
 
@@ -207,8 +207,6 @@ class HMM(Cosmos):
             ndx = ndx[..., None]
             theta_prev = None
             for fdx in frames:
-                # fetch data
-                obs, target_locs = data.fetch(ndx, fdx)
                 # sample background intensity
                 background = pyro.sample(
                     f"{prefix}/background_{fdx}",
@@ -217,7 +215,6 @@ class HMM(Cosmos):
                         background_mean / background_std ** 2,
                     ),
                 )
-                locs = background[..., None, None]
 
                 # sample hidden model state (1+K*S,)
                 if prefix == "d":
@@ -232,6 +229,7 @@ class HMM(Cosmos):
                 else:
                     theta_curr = 0
 
+                ms, heights, widths, xs, ys = [], [], [], [], []
                 for kdx in spots:
                     ontarget = Vindex(self.ontarget)[theta_curr, kdx]
                     # spot presence
@@ -273,10 +271,12 @@ class HMM(Cosmos):
                             ),
                         )
 
-                    # calculate image shape w/o offset
-                    height = height.masked_fill(m == 0, 0)
-                    gaussian = self.gaussian(height, width, x, y, target_locs)
-                    locs = locs + gaussian
+                    # append
+                    ms.append(m)
+                    heights.append(height)
+                    widths.append(width)
+                    xs.append(x)
+                    ys.append(y)
 
                 # subtract offset
                 odx = pyro.sample(
@@ -286,17 +286,23 @@ class HMM(Cosmos):
                     .to_event(2),
                 )
                 offset = self.data.offset.samples[odx]
-                offset_mask = obs > offset
-                obs = torch.where(offset_mask, obs - offset, obs.new_ones(()))
+                # fetch data
+                obs, target_locs = data.fetch(ndx, fdx)
                 # observed data
                 pyro.sample(
                     f"{prefix}/data_{fdx}",
-                    dist.Gamma(
-                        locs / self.gain,
-                        1 / self.gain,
-                    )
-                    .mask(mask=offset_mask)
-                    .to_event(2),
+                    KSpotGammaNoise(
+                        torch.stack(heights, -1),
+                        torch.stack(widths, -1),
+                        torch.stack(xs, -1),
+                        torch.stack(ys, -1),
+                        target_locs,
+                        background,
+                        offset,
+                        self.gain,
+                        data.P,
+                        torch.stack(torch.broadcast_tensors(*ms), -1),
+                    ),
                     obs=obs,
                 )
                 theta_prev = theta_curr
