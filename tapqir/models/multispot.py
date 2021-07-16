@@ -6,7 +6,7 @@ import torch.distributions.constraints as constraints
 from pyroapi import distributions as dist
 from pyroapi import infer, pyro
 
-from tapqir.distributions import AffineBeta
+from tapqir.distributions import AffineBeta, KSpotGammaNoise
 from tapqir.models.model import Model
 
 
@@ -81,8 +81,6 @@ class MultiSpot(Model):
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
 
         with aois as ndx:
-            # fetch data
-            obs, target_locs = data.fetch(ndx)
             # background mean and std
             background_mean = pyro.sample(
                 f"{prefix}/background_mean", dist.HalfNormal(1000)
@@ -99,8 +97,8 @@ class MultiSpot(Model):
                         background_mean / background_std ** 2,
                     ),
                 )
-                locs = background[..., None, None]
 
+                heights, widths, xs, ys = [], [], [], []
                 for kdx in spots:
                     # sample spot variables
                     height = pyro.sample(
@@ -134,9 +132,11 @@ class MultiSpot(Model):
                         ),
                     )
 
-                    # calculate image shape w/o offset
-                    gaussian = self.gaussian(height, width, x, y, target_locs)
-                    locs = locs + gaussian
+                    # append
+                    heights.append(height)
+                    widths.append(width)
+                    xs.append(x)
+                    ys.append(y)
 
                 # subtract offset
                 odx = pyro.sample(
@@ -146,17 +146,22 @@ class MultiSpot(Model):
                     .to_event(2),
                 )
                 offset = self.data.offset.samples[odx]
-                offset_mask = obs > offset
-                obs = torch.where(offset_mask, obs - offset, obs.new_ones(()))
+                # fetch data
+                obs, target_locs = data.fetch(ndx)
                 # observed data
                 pyro.sample(
                     f"{prefix}/data",
-                    dist.Gamma(
-                        locs / self.gain,
-                        1 / self.gain,
-                    )
-                    .mask(mask=offset_mask)
-                    .to_event(2),
+                    KSpotGammaNoise(
+                        torch.stack(heights, -1),
+                        torch.stack(widths, -1),
+                        torch.stack(xs, -1),
+                        torch.stack(ys, -1),
+                        target_locs,
+                        background,
+                        offset,
+                        self.gain,
+                        data.P,
+                    ),
                     obs=obs,
                 )
 
