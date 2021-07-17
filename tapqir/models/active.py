@@ -15,17 +15,17 @@ from tapqir.distributions import AffineBeta, KSpotGammaNoise
 from tapqir.models.model import Model
 
 
-class CosmosMarginal(Model):
+class ActiveMarginal(Model):
     """
-    Time-independent Single Molecule Colocalization Model.
+    Time-independent Active Fraction Model.
     """
 
-    name = "marginal"
+    name = "activemarginal"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
         super().__init__(S, K, device, dtype, verbose)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
-        self._global_params = ["gain", "proximity", "lamda", "pi"]
+        self._global_params = ["gain", "proximity", "lamda", "pi", "Af"]
         self._classify = False
 
     def TraceELBO(self, jit=False):
@@ -67,11 +67,12 @@ class CosmosMarginal(Model):
 
     @property
     def probs_theta(self):
-        result = torch.zeros(self.K * self.S + 1, dtype=self.dtype)
-        result[0] = self.pi[0]
+        result = torch.zeros(2, self.K * self.S + 1, dtype=self.dtype)
+        result[0, 0] = 1
+        result[1, 0] = self.pi[0]
         for s in range(self.S):
             for k in range(self.K):
-                result[self.K * s + k + 1] = self.pi[s + 1] / self.K
+                result[1, self.K * s + k + 1] = self.pi[s + 1] / self.K
         return result
 
     @lazy_property
@@ -90,7 +91,11 @@ class CosmosMarginal(Model):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return pyro.param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
+        return torch.einsum(
+            "nt,tnfs->nfs",
+            pyro.param("d/active_probs").data[:, 0, :],
+            pyro.param("d/theta_probs").data,
+        )[..., 1:].permute(2, 0, 1)
 
     @property
     def j_probs(self):
@@ -105,9 +110,10 @@ class CosmosMarginal(Model):
         Probability of a spot :math:`p(m_{knf})`.
         """
         return torch.einsum(
-            "sknf,nfs->knf",
+            "sknf,anfs,nfa->knf",
             pyro.param("d/m_probs").data[..., 1],
             pyro.param("d/theta_probs").data,
+            pyro.param("d/active_probs").data,
         )
 
     @property
@@ -131,6 +137,7 @@ class CosmosMarginal(Model):
             self.spot_model(self.data.offtarget, prefix="c")
 
     def state_model(self):
+        self.Af = pyro.sample("Af", dist.Dirichlet(torch.ones(self.S + 1))).squeeze()
         self.pi = pyro.sample(
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
@@ -149,7 +156,7 @@ class CosmosMarginal(Model):
         if self._classify:
             return {
                 "expose_types": ["sample"],
-                "expose": ["d/theta_probs", "d/m_probs"],
+                "expose": ["d/active_probs", "d/theta_probs", "d/m_probs"],
             }
         return {"expose_types": ["sample", "param"]}
 
@@ -174,6 +181,13 @@ class CosmosMarginal(Model):
                 self.spot_guide(self.data.offtarget, prefix="c")
 
     def state_guide(self):
+        pyro.sample(
+            "Af",
+            dist.Dirichlet(
+                pyro.param("Af_mean").to(self.device)
+                * pyro.param("Af_size").to(self.device)
+            ),
+        )
         pyro.sample(
             "pi",
             dist.Dirichlet(
@@ -221,6 +235,11 @@ class CosmosMarginal(Model):
             background_std = pyro.sample(
                 f"{prefix}/background_std", dist.HalfNormal(100)
             )
+            if prefix == "d":
+                active = pyro.sample(
+                    f"{prefix}/active",
+                    dist.Categorical(self.Af),
+                )
             with frames:
                 # sample background intensity
                 background = pyro.sample(
@@ -236,12 +255,12 @@ class CosmosMarginal(Model):
                     if self._classify:
                         theta = pyro.sample(
                             f"{prefix}/theta",
-                            dist.Categorical(self.probs_theta),
+                            dist.Categorical(self.probs_theta[active]),
                         )
                     else:
                         theta = pyro.sample(
                             f"{prefix}/theta",
-                            dist.Categorical(self.probs_theta),
+                            dist.Categorical(self.probs_theta[active]),
                             infer={"enumerate": "parallel"},
                         )
                 else:
@@ -351,6 +370,12 @@ class CosmosMarginal(Model):
                     pyro.param(f"{prefix}/background_std_loc")[ndx].to(self.device)
                 ),
             )
+            if prefix == "d":
+                active = pyro.sample(
+                    f"{prefix}/active",
+                    dist.Categorical(pyro.param("d/active_probs")[ndx].to(self.device)),
+                    infer={"enumerate": "parallel"},
+                )
             with frames as fdx:
                 # sample background intensity
                 pyro.sample(
@@ -365,7 +390,9 @@ class CosmosMarginal(Model):
                     theta = pyro.sample(
                         f"{prefix}/theta",
                         dist.Categorical(
-                            pyro.param(f"{prefix}/theta_probs")[ndx].to(self.device)
+                            Vindex(pyro.param(f"{prefix}/theta_probs"))[
+                                active, ndx[:, None], fdx
+                            ].to(self.device)
                         ),
                         infer={"enumerate": "parallel"},
                     )
@@ -378,19 +405,26 @@ class CosmosMarginal(Model):
                                 theta, kdx, ndx[:, None], fdx
                             ].to(self.device)
                         else:
-                            m_probs = torch.einsum(
-                                "snft,nfs->nft",
-                                Vindex(pyro.param(f"{prefix}/m_probs"))[
-                                    torch.arange(self.S * self.K + 1)[:, None, None],
-                                    kdx,
-                                    ndx[:, None],
-                                    fdx,
-                                    :,
-                                ].to(self.device),
-                                Vindex(pyro.param(f"{prefix}/theta_probs"))[
-                                    ndx[:, None], fdx, :
-                                ].to(self.device),
-                            )
+                            m_probs = Vindex(
+                                torch.einsum(
+                                    "snft,anfs,nfa->nft",
+                                    Vindex(pyro.param(f"{prefix}/m_probs"))[
+                                        torch.arange(self.S * self.K + 1)[
+                                            :, None, None
+                                        ],
+                                        kdx,
+                                        ndx[:, None],
+                                        fdx,
+                                        :,
+                                    ].to(self.device),
+                                    Vindex(pyro.param(f"{prefix}/theta_probs"))[
+                                        active, ndx[:, None], fdx, :
+                                    ].to(self.device),
+                                    Vindex(pyro.param(f"{prefix}/active_probs"))[
+                                        ndx[:, None], fdx, :
+                                    ].to(self.device),
+                                )
+                            )[kdx, ndx[:, None], fdx, :].to(self.device)
                     else:
                         m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                             kdx, ndx[:, None], fdx
@@ -401,7 +435,6 @@ class CosmosMarginal(Model):
                         infer={"enumerate": "parallel"},
                     )
                     with handlers.mask(mask=m > 0):
-                        # sample spot variables
                         pyro.sample(
                             f"{prefix}/height_{kdx}",
                             dist.Gamma(
@@ -488,6 +521,16 @@ class CosmosMarginal(Model):
         )
         pyro.param(
             "pi_size",
+            lambda: torch.tensor(2, device=torch.device("cpu")),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "Af_mean",
+            lambda: torch.ones(2, device=torch.device("cpu")),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "Af_size",
             lambda: torch.tensor(2, device=torch.device("cpu")),
             constraint=constraints.positive,
         )
@@ -598,10 +641,17 @@ class CosmosMarginal(Model):
         # classification
         if prefix == "d":
             pyro.param(
+                "d/active_probs",
+                lambda: torch.ones((data.N, 1, 2), device=torch.device("cpu")),
+                constraint=constraints.simplex,
+            )
+            theta_probs = torch.ones(
+                (2, data.N, data.F, 1 + self.K * self.S), device=torch.device("cpu")
+            )
+            theta_probs[0, :, :, 1:] = 0
+            pyro.param(
                 "d/theta_probs",
-                lambda: torch.ones(
-                    data.N, data.F, 1 + self.K * self.S, device=torch.device("cpu")
-                ),
+                lambda: theta_probs,
                 constraint=constraints.simplex,
             )
             m_probs = torch.ones(
@@ -625,12 +675,12 @@ class CosmosMarginal(Model):
             )
 
 
-class Cosmos(CosmosMarginal):
+class Active(ActiveMarginal):
     """
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "cosmos"
+    name = "active"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
         super().__init__(S, K, device, dtype, verbose)
@@ -640,7 +690,7 @@ class Cosmos(CosmosMarginal):
     def init_parameters(self):
         # load pre-trained paramters
         self.load_checkpoint(
-            path=self.path / "marginal" / tapqir_version.split("+")[0],
+            path=self.path / "activemarginal" / tapqir_version.split("+")[0],
             param_only=True,
             warnings=True,
         )
