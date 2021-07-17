@@ -612,14 +612,8 @@ class CosmosMarginal(Model):
                 2,
                 device=torch.device("cpu"),
             )
-            m_probs[0, :, :, :, 0] = 0.75
-            m_probs[0, :, :, :, 1] = 0.25
             m_probs[1, 0, :, :, 0] = 0
-            m_probs[1, 1, :, :, 0] = 0.75
-            m_probs[1, 1, :, :, 1] = 0.25
             m_probs[2, 1, :, :, 0] = 0
-            m_probs[2, 0, :, :, 0] = 0.75
-            m_probs[2, 0, :, :, 1] = 0.25
             pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
         else:
             pyro.param(

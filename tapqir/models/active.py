@@ -9,25 +9,23 @@ from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
-from tqdm import tqdm
 
 from tapqir import __version__ as tapqir_version
-from tapqir.distributions import AffineBeta
+from tapqir.distributions import AffineBeta, KSpotGammaNoise
 from tapqir.models.model import Model
-from tapqir.utils.dataset import CosmosData
 
 
 class ActiveMarginal(Model):
     """
-    Time-independent Active fraction Model.
+    Time-independent Active Fraction Model.
     """
 
     name = "activemarginal"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
-        super().__init__(S, K, device, dtype)
+    def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
+        super().__init__(S, K, device, dtype, verbose)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
-        self._global_params = ["gain", "proximity", "lamda"]
+        self._global_params = ["gain", "proximity", "lamda", "pi", "Af"]
         self._classify = False
 
     def TraceELBO(self, jit=False):
@@ -38,14 +36,16 @@ class ActiveMarginal(Model):
     @property
     def probs_j(self):
         result = torch.zeros(2, self.K + 1, dtype=self.dtype)
-        result[0, : self.K] = (
-            dist.Poisson(self.lamda).log_prob(torch.arange(self.K).to(self.dtype)).exp()
+        result[0, : self.K] = torch.exp(
+            self.lamda.log() * torch.arange(self.K)
+            - self.lamda
+            - torch.arange(1, self.K + 1).lgamma()
         )
         result[0, -1] = 1 - result[0, : self.K].sum()
-        result[1, : self.K - 1] = (
-            dist.Poisson(self.lamda)
-            .log_prob(torch.arange(self.K - 1).to(self.dtype))
-            .exp()
+        result[1, : self.K - 1] = torch.exp(
+            self.lamda.log() * torch.arange(self.K - 1)
+            - self.lamda
+            - torch.arange(1, self.K).lgamma()
         )
         result[1, -2] = 1 - result[0, : self.K - 1].sum()
         return result
@@ -54,13 +54,14 @@ class ActiveMarginal(Model):
     def probs_m(self):
         # this only works for K=2
         result = torch.zeros(1 + self.K * self.S, self.K, 2, dtype=self.dtype)
-        result[0, :, 0] = self.probs_j[0, 0] + self.probs_j[0, 1] / 2
-        result[0, :, 1] = self.probs_j[0, 2] + self.probs_j[0, 1] / 2
+        probs_j = self.probs_j
+        result[0, :, 0] = probs_j[0, 0] + probs_j[0, 1] / 2
+        result[0, :, 1] = probs_j[0, 2] + probs_j[0, 1] / 2
         result[1, 0, 1] = 1
-        result[1, 1, 0] = self.probs_j[1, 0]
-        result[1, 1, 1] = self.probs_j[1, 1]
-        result[2, 0, 0] = self.probs_j[1, 0]
-        result[2, 0, 1] = self.probs_j[1, 1]
+        result[1, 1, 0] = probs_j[1, 0]
+        result[1, 1, 1] = probs_j[1, 1]
+        result[2, 0, 0] = probs_j[1, 0]
+        result[2, 0, 1] = probs_j[1, 1]
         result[2, 1, 1] = 1
         return result
 
@@ -95,7 +96,6 @@ class ActiveMarginal(Model):
             pyro.param("d/active_probs").data[:, 0, :],
             pyro.param("d/theta_probs").data,
         )[..., 1:].permute(2, 0, 1)
-        # return pyro.param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
 
     @property
     def j_probs(self):
@@ -137,13 +137,12 @@ class ActiveMarginal(Model):
             self.spot_model(self.data.offtarget, prefix="c")
 
     def state_model(self):
+        self.Af = pyro.sample("Af", dist.Dirichlet(torch.ones(self.S + 1))).squeeze()
         self.pi = pyro.sample(
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
-        self.Af = pyro.sample("Af", dist.Dirichlet(torch.ones(self.S + 1))).squeeze()
         self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
-        # self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
-        self.proximity = torch.tensor(0.2)
+        self.proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
         self.size = torch.stack(
             (
                 torch.tensor(2.0),
@@ -167,8 +166,9 @@ class ActiveMarginal(Model):
             pyro.sample(
                 "gain",
                 dist.Gamma(
-                    pyro.param("gain_loc") * pyro.param("gain_beta"),
-                    pyro.param("gain_beta"),
+                    pyro.param("gain_loc").to(self.device)
+                    * pyro.param("gain_beta").to(self.device),
+                    pyro.param("gain_beta").to(self.device),
                 ),
             )
             self.state_guide()
@@ -181,36 +181,53 @@ class ActiveMarginal(Model):
                 self.spot_guide(self.data.offtarget, prefix="c")
 
     def state_guide(self):
-        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
-        pyro.sample("Af", dist.Dirichlet(pyro.param("Af_mean") * pyro.param("Af_size")))
+        pyro.sample(
+            "Af",
+            dist.Dirichlet(
+                pyro.param("Af_mean").to(self.device)
+                * pyro.param("Af_size").to(self.device)
+            ),
+        )
+        pyro.sample(
+            "pi",
+            dist.Dirichlet(
+                pyro.param("pi_mean").to(self.device)
+                * pyro.param("pi_size").to(self.device)
+            ),
+        )
         pyro.sample(
             "lamda",
             dist.Gamma(
-                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                pyro.param("lamda_beta"),
+                pyro.param("lamda_loc").to(self.device)
+                * pyro.param("lamda_beta").to(self.device),
+                pyro.param("lamda_beta").to(self.device),
             ),
         )
-        #  pyro.sample(
-        #      "proximity",
-        #      AffineBeta(
-        #          pyro.param("proximity_loc"),
-        #          pyro.param("proximity_size"),
-        #          0,
-        #          (self.data.P + 1) / math.sqrt(12),
-        #      ),
-        #  )
+        pyro.sample(
+            "proximity",
+            AffineBeta(
+                pyro.param("proximity_loc").to(self.device),
+                pyro.param("proximity_size").to(self.device),
+                0,
+                (self.data.P + 1) / math.sqrt(12),
+            ),
+        )
 
     def spot_model(self, data, prefix):
         # spots
         spots = pyro.plate(f"{prefix}/spots", self.K)
         # aoi sites
-        aois = pyro.plate(f"{prefix}/aois", data.N, dim=-2)
+        aois = pyro.plate(
+            f"{prefix}/aois",
+            data.N,
+            subsample_size=self.batch_size,
+            subsample=self.n,
+            dim=-2,
+        )
         # time frames
         frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
 
         with aois as ndx:
-            # fetch data
-            obs, target_locs = data.fetch(ndx)
             # background mean and std
             background_mean = pyro.sample(
                 f"{prefix}/background_mean", dist.HalfNormal(1000)
@@ -219,17 +236,10 @@ class ActiveMarginal(Model):
                 f"{prefix}/background_std", dist.HalfNormal(100)
             )
             if prefix == "d":
-                if self._classify:
-                    active = pyro.sample(
-                        f"{prefix}/active",
-                        dist.Categorical(self.Af),
-                    )
-                else:
-                    active = pyro.sample(
-                        f"{prefix}/active",
-                        dist.Categorical(self.Af),
-                        infer={"enumerate": "parallel"},
-                    )
+                active = pyro.sample(
+                    f"{prefix}/active",
+                    dist.Categorical(self.Af),
+                )
             with frames:
                 # sample background intensity
                 background = pyro.sample(
@@ -239,7 +249,6 @@ class ActiveMarginal(Model):
                         background_mean / background_std ** 2,
                     ),
                 )
-                locs = background[..., None, None]
 
                 # sample hidden model state (1+K*S,)
                 if prefix == "d":
@@ -257,6 +266,7 @@ class ActiveMarginal(Model):
                 else:
                     theta = 0
 
+                ms, heights, widths, xs, ys = [], [], [], [], []
                 for kdx in spots:
                     ontarget = Vindex(self.ontarget)[theta, kdx]
                     # spot presence
@@ -298,10 +308,12 @@ class ActiveMarginal(Model):
                             ),
                         )
 
-                    # calculate image shape w/o offset
-                    height = height.masked_fill(m == 0, 0)
-                    gaussian = self.gaussian(height, width, x, y, target_locs)
-                    locs = locs + gaussian
+                    # append
+                    ms.append(m)
+                    heights.append(height)
+                    widths.append(width)
+                    xs.append(x)
+                    ys.append(y)
 
                 # subtract offset
                 odx = pyro.sample(
@@ -311,17 +323,23 @@ class ActiveMarginal(Model):
                     .to_event(2),
                 )
                 offset = self.data.offset.samples[odx]
-                offset_mask = obs > offset
-                obs = torch.where(offset_mask, obs - offset, obs.new_ones(()))
+                # fetch data
+                obs, target_locs = data.fetch(ndx)
                 # observed data
                 pyro.sample(
                     f"{prefix}/data",
-                    dist.Gamma(
-                        locs / self.gain,
-                        1 / self.gain,
-                    )
-                    .mask(mask=offset_mask)
-                    .to_event(2),
+                    KSpotGammaNoise(
+                        torch.stack(heights, -1),
+                        torch.stack(widths, -1),
+                        torch.stack(xs, -1),
+                        torch.stack(ys, -1),
+                        target_locs,
+                        background,
+                        offset,
+                        self.gain,
+                        data.P,
+                        torch.stack(torch.broadcast_tensors(*ms), -1),
+                    ),
                     obs=obs,
                 )
 
@@ -342,16 +360,20 @@ class ActiveMarginal(Model):
         with aois as ndx:
             pyro.sample(
                 f"{prefix}/background_mean",
-                dist.Delta(pyro.param(f"{prefix}/background_mean_loc")[ndx]),
+                dist.Delta(
+                    pyro.param(f"{prefix}/background_mean_loc")[ndx].to(self.device)
+                ),
             )
             pyro.sample(
                 f"{prefix}/background_std",
-                dist.Delta(pyro.param(f"{prefix}/background_std_loc")[ndx]),
+                dist.Delta(
+                    pyro.param(f"{prefix}/background_std_loc")[ndx].to(self.device)
+                ),
             )
-            if self._classify and prefix == "d":
+            if prefix == "d":
                 active = pyro.sample(
                     f"{prefix}/active",
-                    dist.Categorical(pyro.param("d/active_probs")[ndx]),
+                    dist.Categorical(pyro.param("d/active_probs")[ndx].to(self.device)),
                     infer={"enumerate": "parallel"},
                 )
             with frames as fdx:
@@ -359,9 +381,9 @@ class ActiveMarginal(Model):
                 pyro.sample(
                     f"{prefix}/background",
                     dist.Gamma(
-                        pyro.param(f"{prefix}/b_loc")[ndx]
-                        * pyro.param(f"{prefix}/b_beta")[ndx],
-                        pyro.param(f"{prefix}/b_beta")[ndx],
+                        pyro.param(f"{prefix}/b_loc")[ndx].to(self.device)
+                        * pyro.param(f"{prefix}/b_beta")[ndx].to(self.device),
+                        pyro.param(f"{prefix}/b_beta")[ndx].to(self.device),
                     ),
                 )
                 if self._classify and prefix == "d":
@@ -370,7 +392,7 @@ class ActiveMarginal(Model):
                         dist.Categorical(
                             Vindex(pyro.param(f"{prefix}/theta_probs"))[
                                 active, ndx[:, None], fdx
-                            ]
+                            ].to(self.device)
                         ),
                         infer={"enumerate": "parallel"},
                     )
@@ -381,40 +403,59 @@ class ActiveMarginal(Model):
                         if self._classify:
                             m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                                 theta, kdx, ndx[:, None], fdx
-                            ]
+                            ].to(self.device)
                         else:
                             m_probs = Vindex(
                                 torch.einsum(
-                                    "sknft,anfs,nfa->knft",
-                                    pyro.param(f"{prefix}/m_probs"),
-                                    pyro.param(f"{prefix}/theta_probs"),
-                                    pyro.param(f"{prefix}/active_probs"),
+                                    "snft,anfs,nfa->nft",
+                                    Vindex(pyro.param(f"{prefix}/m_probs"))[
+                                        torch.arange(self.S * self.K + 1)[
+                                            :, None, None
+                                        ],
+                                        kdx,
+                                        ndx[:, None],
+                                        fdx,
+                                        :,
+                                    ].to(self.device),
+                                    Vindex(pyro.param(f"{prefix}/theta_probs"))[
+                                        active, ndx[:, None], fdx, :
+                                    ].to(self.device),
+                                    Vindex(pyro.param(f"{prefix}/active_probs"))[
+                                        ndx[:, None], fdx, :
+                                    ].to(self.device),
                                 )
-                            )[kdx, ndx[:, None], fdx, :]
+                            )[kdx, ndx[:, None], fdx, :].to(self.device)
                     else:
                         m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                             kdx, ndx[:, None], fdx
-                        ]
+                        ].to(self.device)
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}",
                         dist.Categorical(m_probs),
                         infer={"enumerate": "parallel"},
                     )
                     with handlers.mask(mask=m > 0):
-                        # sample spot variables
                         pyro.sample(
                             f"{prefix}/height_{kdx}",
                             dist.Gamma(
-                                pyro.param(f"{prefix}/h_loc")[kdx, ndx]
-                                * pyro.param(f"{prefix}/h_beta")[kdx, ndx],
-                                pyro.param(f"{prefix}/h_beta")[kdx, ndx],
+                                pyro.param(f"{prefix}/h_loc")[kdx, ndx].to(self.device)
+                                * pyro.param(f"{prefix}/h_beta")[kdx, ndx].to(
+                                    self.device
+                                ),
+                                pyro.param(f"{prefix}/h_beta")[kdx, ndx].to(
+                                    self.device
+                                ),
                             ),
                         )
                         pyro.sample(
                             f"{prefix}/width_{kdx}",
                             AffineBeta(
-                                pyro.param(f"{prefix}/w_mean")[kdx, ndx],
-                                pyro.param(f"{prefix}/w_size")[kdx, ndx],
+                                pyro.param(f"{prefix}/w_mean")[kdx, ndx].to(
+                                    self.device
+                                ),
+                                pyro.param(f"{prefix}/w_size")[kdx, ndx].to(
+                                    self.device
+                                ),
                                 0.75,
                                 2.25,
                             ),
@@ -422,8 +463,10 @@ class ActiveMarginal(Model):
                         pyro.sample(
                             f"{prefix}/x_{kdx}",
                             AffineBeta(
-                                pyro.param(f"{prefix}/x_mean")[kdx, ndx],
-                                pyro.param(f"{prefix}/size")[kdx, ndx],
+                                pyro.param(f"{prefix}/x_mean")[kdx, ndx].to(
+                                    self.device
+                                ),
+                                pyro.param(f"{prefix}/size")[kdx, ndx].to(self.device),
                                 -(data.P + 1) / 2,
                                 (data.P + 1) / 2,
                             ),
@@ -431,12 +474,15 @@ class ActiveMarginal(Model):
                         pyro.sample(
                             f"{prefix}/y_{kdx}",
                             AffineBeta(
-                                pyro.param(f"{prefix}/y_mean")[kdx, ndx],
-                                pyro.param(f"{prefix}/size")[kdx, ndx],
+                                pyro.param(f"{prefix}/y_mean")[kdx, ndx].to(
+                                    self.device
+                                ),
+                                pyro.param(f"{prefix}/size")[kdx, ndx].to(self.device),
                                 -(data.P + 1) / 2,
                                 (data.P + 1) / 2,
                             ),
                         )
+
                 pyro.sample(
                     f"{prefix}/offset",
                     dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
@@ -447,7 +493,7 @@ class ActiveMarginal(Model):
     def init_parameters(self):
         pyro.param(
             "proximity_loc",
-            lambda: torch.tensor(0.5),
+            lambda: torch.tensor(0.5, device=torch.device("cpu")),
             constraint=constraints.interval(
                 0,
                 (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
@@ -455,29 +501,49 @@ class ActiveMarginal(Model):
         )
         pyro.param(
             "proximity_size",
-            lambda: torch.tensor(100),
+            lambda: torch.tensor(100, device=torch.device("cpu")),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
-            "lamda_loc", lambda: torch.tensor(0.5), constraint=constraints.positive
+            "lamda_loc",
+            lambda: torch.tensor(0.5, device=torch.device("cpu")),
+            constraint=constraints.positive,
         )
         pyro.param(
-            "lamda_beta", lambda: torch.tensor(100), constraint=constraints.positive
+            "lamda_beta",
+            lambda: torch.tensor(100, device=torch.device("cpu")),
+            constraint=constraints.positive,
         )
         pyro.param(
-            "pi_mean", lambda: torch.ones(self.S + 1), constraint=constraints.simplex
-        )
-        pyro.param("pi_size", lambda: torch.tensor(2), constraint=constraints.positive)
-        pyro.param(
-            "Af_mean", lambda: torch.tensor([0.1, 0.9]), constraint=constraints.simplex
+            "pi_mean",
+            lambda: torch.ones(self.S + 1, device=torch.device("cpu")),
+            constraint=constraints.simplex,
         )
         pyro.param(
-            "Af_size", lambda: torch.tensor(100), constraint=constraints.positive
+            "pi_size",
+            lambda: torch.tensor(2, device=torch.device("cpu")),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "Af_mean",
+            lambda: torch.ones(2, device=torch.device("cpu")),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "Af_size",
+            lambda: torch.tensor(2, device=torch.device("cpu")),
+            constraint=constraints.positive,
         )
 
-        pyro.param("gain_loc", lambda: torch.tensor(5), constraint=constraints.positive)
         pyro.param(
-            "gain_beta", lambda: torch.tensor(100), constraint=constraints.positive
+            "gain_loc",
+            lambda: torch.tensor(5, device=torch.device("cpu")),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "gain_beta",
+            lambda: torch.tensor(100, device=torch.device("cpu")),
+            constraint=constraints.positive,
         )
 
         self.spot_parameters(self.data.ontarget, prefix="d")
@@ -488,37 +554,52 @@ class ActiveMarginal(Model):
     def spot_parameters(self, data, prefix):
         pyro.param(
             f"{prefix}/background_mean_loc",
-            lambda: torch.full((data.N, 1), data.median - self.data.offset.mean),
+            lambda: torch.full(
+                (data.N, 1),
+                data.median - self.data.offset.mean,
+                device=torch.device("cpu"),
+            ),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/background_std_loc",
-            lambda: torch.ones(data.N, 1),
+            lambda: torch.ones(data.N, 1, device=torch.device("cpu")),
             constraint=constraints.positive,
         )
+
         pyro.param(
             f"{prefix}/b_loc",
-            lambda: torch.full((data.N, data.F), data.median - self.data.offset.mean),
+            lambda: torch.full(
+                (data.N, data.F),
+                data.median - self.data.offset.mean,
+                device=torch.device("cpu"),
+            ),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/b_beta",
-            lambda: torch.ones(data.N, data.F),
+            lambda: torch.ones(data.N, data.F, device=torch.device("cpu")),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_loc",
-            lambda: torch.full((self.K, data.N, data.F), 2000),
+            lambda: torch.full(
+                (self.K, data.N, data.F), 2000, device=torch.device("cpu")
+            ),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_beta",
-            lambda: torch.full((self.K, data.N, data.F), 0.001),
+            lambda: torch.full(
+                (self.K, data.N, data.F), 0.001, device=torch.device("cpu")
+            ),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/w_mean",
-            lambda: torch.full((self.K, data.N, data.F), 1.5),
+            lambda: torch.full(
+                (self.K, data.N, data.F), 1.5, device=torch.device("cpu")
+            ),
             constraint=constraints.interval(
                 0.75 + torch.finfo(self.dtype).eps,
                 2.25 - torch.finfo(self.dtype).eps,
@@ -526,12 +607,14 @@ class ActiveMarginal(Model):
         )
         pyro.param(
             f"{prefix}/w_size",
-            lambda: torch.full((self.K, data.N, data.F), 100.0),
+            lambda: torch.full(
+                (self.K, data.N, data.F), 100, device=torch.device("cpu")
+            ),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             f"{prefix}/x_mean",
-            lambda: torch.zeros(self.K, data.N, data.F),
+            lambda: torch.zeros(self.K, data.N, data.F, device=torch.device("cpu")),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -539,13 +622,13 @@ class ActiveMarginal(Model):
         )
         pyro.param(
             f"{prefix}/y_mean",
-            lambda: torch.zeros(self.K, data.N, data.F),
+            lambda: torch.zeros(self.K, data.N, data.F, device=torch.device("cpu")),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
-        size = torch.full((self.K, data.N, data.F), 200)
+        size = torch.full((self.K, data.N, data.F), 200, device=torch.device("cpu"))
         if self.K == 2:
             size[1] = 7
         elif self.K == 3:
@@ -557,35 +640,37 @@ class ActiveMarginal(Model):
 
         # classification
         if prefix == "d":
-            theta_probs = torch.ones(2, data.N, data.F, 1 + self.K * self.S)
+            pyro.param(
+                "d/active_probs",
+                lambda: torch.ones((data.N, 1, 2), device=torch.device("cpu")),
+                constraint=constraints.simplex,
+            )
+            theta_probs = torch.ones(
+                (2, data.N, data.F, 1 + self.K * self.S), device=torch.device("cpu")
+            )
             theta_probs[0, :, :, 1:] = 0
             pyro.param(
                 "d/theta_probs",
                 lambda: theta_probs,
                 constraint=constraints.simplex,
             )
-            active_probs = torch.zeros(data.N, 1, 2)
-            active_probs[..., 0] = 0.1
-            active_probs[..., 1] = 0.9
-            pyro.param(
-                "d/active_probs",
-                lambda: active_probs,
-                constraint=constraints.simplex,
+            m_probs = torch.ones(
+                1 + self.K * self.S,
+                self.K,
+                data.N,
+                data.F,
+                2,
+                device=torch.device("cpu"),
             )
-            m_probs = torch.ones(1 + self.K * self.S, self.K, data.N, data.F, 2)
-            m_probs[0, :, :, :, 0] = 0.75
-            m_probs[0, :, :, :, 1] = 0.25
             m_probs[1, 0, :, :, 0] = 0
-            m_probs[1, 1, :, :, 0] = 0.75
-            m_probs[1, 1, :, :, 1] = 0.25
             m_probs[2, 1, :, :, 0] = 0
-            m_probs[2, 0, :, :, 0] = 0.75
-            m_probs[2, 0, :, :, 1] = 0.25
             pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
         else:
             pyro.param(
                 "c/m_probs",
-                lambda: torch.ones(self.K, data.N, data.F, 2),
+                lambda: torch.ones(
+                    self.K, data.N, data.F, 2, device=torch.device("cpu")
+                ),
                 constraint=constraints.simplex,
             )
 
@@ -597,8 +682,8 @@ class Active(ActiveMarginal):
 
     name = "active"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
-        super().__init__(S, K, device, dtype)
+    def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
+        super().__init__(S, K, device, dtype, verbose)
         self.conv_params = ["-ELBO"]
         self._classify = True
 
