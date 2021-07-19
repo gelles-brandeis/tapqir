@@ -458,9 +458,10 @@ class CosmosMarginal(Model):
                 )
 
     def init_parameters(self):
+        device = self.device
         pyro.param(
             "proximity_loc",
-            lambda: torch.tensor(0.5, device=torch.device("cpu")),
+            lambda: torch.tensor(0.5, device=device),
             constraint=constraints.interval(
                 0,
                 (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
@@ -468,38 +469,38 @@ class CosmosMarginal(Model):
         )
         pyro.param(
             "proximity_size",
-            lambda: torch.tensor(100, device=torch.device("cpu")),
+            lambda: torch.tensor(100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             "lamda_loc",
-            lambda: torch.tensor(0.5, device=torch.device("cpu")),
+            lambda: torch.tensor(0.5, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "lamda_beta",
-            lambda: torch.tensor(100, device=torch.device("cpu")),
+            lambda: torch.tensor(100, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "pi_mean",
-            lambda: torch.ones(self.S + 1, device=torch.device("cpu")),
+            lambda: torch.ones(self.S + 1, device=device),
             constraint=constraints.simplex,
         )
         pyro.param(
             "pi_size",
-            lambda: torch.tensor(2, device=torch.device("cpu")),
+            lambda: torch.tensor(2, device=device),
             constraint=constraints.positive,
         )
 
         pyro.param(
             "gain_loc",
-            lambda: torch.tensor(5, device=torch.device("cpu")),
+            lambda: torch.tensor(5, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "gain_beta",
-            lambda: torch.tensor(100, device=torch.device("cpu")),
+            lambda: torch.tensor(100, device=device),
             constraint=constraints.positive,
         )
 
@@ -509,18 +510,19 @@ class CosmosMarginal(Model):
             self.spot_parameters(self.data.offtarget, prefix="c")
 
     def spot_parameters(self, data, prefix):
+        device = self.device
         pyro.param(
             f"{prefix}/background_mean_loc",
             lambda: torch.full(
                 (data.N, 1),
                 data.median - self.data.offset.mean,
-                device=torch.device("cpu"),
+                device=device,
             ),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/background_std_loc",
-            lambda: torch.ones(data.N, 1, device=torch.device("cpu")),
+            lambda: torch.ones(data.N, 1, device=device),
             constraint=constraints.positive,
         )
 
@@ -529,34 +531,28 @@ class CosmosMarginal(Model):
             lambda: torch.full(
                 (data.N, data.F),
                 data.median - self.data.offset.mean,
-                device=torch.device("cpu"),
+                device=device,
             ),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/b_beta",
-            lambda: torch.ones(data.N, data.F, device=torch.device("cpu")),
+            lambda: torch.ones(data.N, data.F, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_loc",
-            lambda: torch.full(
-                (self.K, data.N, data.F), 2000, device=torch.device("cpu")
-            ),
+            lambda: torch.full((self.K, data.N, data.F), 2000, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_beta",
-            lambda: torch.full(
-                (self.K, data.N, data.F), 0.001, device=torch.device("cpu")
-            ),
+            lambda: torch.ones((self.K, data.N, data.F), device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/w_mean",
-            lambda: torch.full(
-                (self.K, data.N, data.F), 1.5, device=torch.device("cpu")
-            ),
+            lambda: torch.full((self.K, data.N, data.F), 1.5, device=device),
             constraint=constraints.interval(
                 0.75 + torch.finfo(self.dtype).eps,
                 2.25 - torch.finfo(self.dtype).eps,
@@ -564,14 +560,12 @@ class CosmosMarginal(Model):
         )
         pyro.param(
             f"{prefix}/w_size",
-            lambda: torch.full(
-                (self.K, data.N, data.F), 100, device=torch.device("cpu")
-            ),
+            lambda: torch.full((self.K, data.N, data.F), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             f"{prefix}/x_mean",
-            lambda: torch.zeros(self.K, data.N, data.F, device=torch.device("cpu")),
+            lambda: torch.zeros(self.K, data.N, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -579,29 +573,23 @@ class CosmosMarginal(Model):
         )
         pyro.param(
             f"{prefix}/y_mean",
-            lambda: torch.zeros(self.K, data.N, data.F, device=torch.device("cpu")),
+            lambda: torch.zeros(self.K, data.N, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
             ),
         )
-        size = torch.full((self.K, data.N, data.F), 200, device=torch.device("cpu"))
-        if self.K == 2:
-            size[1] = 7
-        elif self.K == 3:
-            size[1] = 7
-            size[2] = 3
         pyro.param(
-            f"{prefix}/size", lambda: size, constraint=constraints.greater_than(2.0)
+            f"{prefix}/size",
+            lambda: torch.full((self.K, data.N, data.F), 200, device=device),
+            constraint=constraints.greater_than(2.0),
         )
 
         # classification
         if prefix == "d":
             pyro.param(
                 "d/theta_probs",
-                lambda: torch.ones(
-                    data.N, data.F, 1 + self.K * self.S, device=torch.device("cpu")
-                ),
+                lambda: torch.ones(data.N, data.F, 1 + self.K * self.S, device=device),
                 constraint=constraints.simplex,
             )
             m_probs = torch.ones(
@@ -610,7 +598,7 @@ class CosmosMarginal(Model):
                 data.N,
                 data.F,
                 2,
-                device=torch.device("cpu"),
+                device=device,
             )
             m_probs[0, :, :, :, 0] = 0.75
             m_probs[0, :, :, :, 1] = 0.25
@@ -624,9 +612,7 @@ class CosmosMarginal(Model):
         else:
             pyro.param(
                 "c/m_probs",
-                lambda: torch.ones(
-                    self.K, data.N, data.F, 2, device=torch.device("cpu")
-                ),
+                lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
                 constraint=constraints.simplex,
             )
 
