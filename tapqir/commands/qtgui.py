@@ -25,6 +25,8 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
+from tapqir.distributions.kspotgammanoise import _gaussian_spots
+
 C = {}
 C[0] = (31, 119, 180)
 C[1] = (255, 127, 14)
@@ -248,7 +250,7 @@ class MainWindow(QMainWindow):
             self.Model.data.offset.mean
             + self.Model.params["d/background"]["Mean"][n, frames, None, None]
         )
-        gaussian = self.Model.gaussian(
+        gaussian = _gaussian_spots(
             self.Model.params["d/height"]["Mean"][:, n, frames],
             #  self.Model.params["d/height"]["Mean"][:, n, frames].masked_fill(
             #      self.Model.params["d/m_probs"][:, n, frames] < 0.5, 0.0
@@ -257,6 +259,7 @@ class MainWindow(QMainWindow):
             self.Model.params["d/x"]["Mean"][:, n, frames],
             self.Model.params["d/y"]["Mean"][:, n, frames],
             self.Model.data.ontarget.xy[n, frames],
+            self.Model.data.ontarget.P,
         )
         img_ideal = img_ideal + gaussian.sum(-4)
         for f in range(f1, f2):
