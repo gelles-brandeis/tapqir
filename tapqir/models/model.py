@@ -289,9 +289,10 @@ class Model:
         self.logger.debug("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None, param_only=False, warnings=False):
+        device = self.device
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
-        checkpoint = torch.load(path / "model", map_location=torch.device("cpu"))
+        checkpoint = torch.load(path / "model", map_location=device)
         pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
             self._stop = checkpoint["convergence_status"]
