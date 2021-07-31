@@ -1,6 +1,7 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import configparser
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -39,8 +40,23 @@ class GlimpseDataset:
     :param path: path to the folder containing options.cfg file.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, path):
         """Read Glimpse files"""
+
+        # read options.cfg file
+        config = configparser.ConfigParser(allow_no_value=True)
+        cfg_file = Path(path) / "options.cfg"
+        config.read(cfg_file)
+        kwargs = {}
+        kwargs["title"] = config["glimpse"]["title"]
+        kwargs["header_dir"] = config["glimpse"]["dir"]
+        kwargs["ontarget_aoiinfo"] = config["glimpse"]["ontarget_aoiinfo"]
+        kwargs["offtarget_aoiinfo"] = config["glimpse"]["offtarget_aoiinfo"]
+        kwargs["driftlist"] = config["glimpse"]["driftlist"]
+        kwargs["frame_start"] = config["glimpse"]["frame_start"]
+        kwargs["frame_end"] = config["glimpse"]["frame_end"]
+        kwargs["ontarget_labels"] = config["glimpse"]["ontarget_labels"]
+        kwargs["offtarget_labels"] = config["glimpse"]["offtarget_labels"]
 
         dtypes = ["ontarget"]
         if kwargs["offtarget_aoiinfo"] is not None:
@@ -177,13 +193,11 @@ class GlimpseDataset:
         return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
 
 
-def read_glimpse(**kwargs):
+def read_glimpse(path, P=14):
     """
     Preprocess glimpse files.
     """
-    P = kwargs.pop("P")
-    path = kwargs.pop("path")
-    glimpse = GlimpseDataset(**kwargs)
+    glimpse = GlimpseDataset(path)
 
     abs_locs = defaultdict(lambda: None)
     target_xy = defaultdict(lambda: None)
@@ -243,7 +257,7 @@ def read_glimpse(**kwargs):
         glimpse.labels["offtarget"],
         offset_samples,
         offset_weights,
-        title=kwargs["title"],
+        title=glimpse.title,
     )
     save(dataset, path)
 
