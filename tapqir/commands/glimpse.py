@@ -1,8 +1,6 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from pathlib import Path
-
 from cliff.command import Command
 
 from tapqir.imscroll import read_glimpse
