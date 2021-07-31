@@ -31,10 +31,12 @@ class Encoder(nn.Module):
         # first shape the mini-batch to have pixels in the rightmost dimension
         x = x.reshape(4, 500, 196)
         # then compute the hidden units
+        breakpoint()
         hidden = self.softplus(self.fc1(x))
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x z_dim
-        z_loc = torch.exp(self.fc21(hidden))
+        z_loc = self.softplus(self.fc21(hidden))
+        # z_loc = torch.exp(self.fc21(hidden))
         z_scale = torch.exp(self.fc22(hidden))
         return z_loc, z_scale
 
