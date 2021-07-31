@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from pyroapi import infer, optim, pyro
 from sklearn.metrics import (
     confusion_matrix,
@@ -37,7 +38,7 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-class Model:
+class Model(nn.Module):
     r"""
     Base class for tapqir models.
 
@@ -64,6 +65,7 @@ class Model:
         if self.verbose:
             self.logger.info("Tapqir version - {}".format(tapqir_version))
             self.logger.info("Model - {}".format(self.name))
+        super().__init__()
 
     def to(self, device, dtype="double"):
         self.dtype = getattr(torch, dtype)
