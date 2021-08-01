@@ -184,7 +184,6 @@ class Model:
         # pyro.enable_validation()
         self._stop = False
         for i in nrange(num_iter):
-            # try:
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
                 self.save_checkpoint()
@@ -192,9 +191,6 @@ class Model:
                     self.logger.info("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
-            #  except ValueError as error:
-            #      assert error.args[0].startswith("The parameter")
-            #      self.logger.info(error)
 
     def _max_batch_size(self):
         k = 0

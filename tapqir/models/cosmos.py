@@ -542,12 +542,12 @@ class CosmosMarginal(Model):
         )
         pyro.param(
             f"{prefix}/h_loc",
-            lambda: torch.full((self.K, data.N, data.F), 2000, device=device),
+            lambda: torch.full((self.K, data.N, data.F), 1000, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             f"{prefix}/h_beta",
-            lambda: torch.ones((self.K, data.N, data.F), device=device),
+            lambda: torch.full((self.K, data.N, data.F), 0.001, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
