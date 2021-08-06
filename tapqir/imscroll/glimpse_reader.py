@@ -199,11 +199,11 @@ def read_glimpse(path, P=14):
     """
     glimpse = GlimpseDataset(path)
 
-    abs_locs = defaultdict(lambda: None)
+    raw_target_xy = defaultdict(lambda: None)
     target_xy = defaultdict(lambda: None)
     data = defaultdict(lambda: None)
     for dtype in glimpse.dtypes:
-        abs_locs[dtype] = (
+        raw_target_xy[dtype] = (
             np.expand_dims(glimpse.aoiinfo[dtype][["x", "y"]].values, axis=1)
             + glimpse.cumdrift[["dx", "dy"]].values
         )
@@ -226,11 +226,11 @@ def read_glimpse(path, P=14):
         for dtype in glimpse.dtypes:
             # loop through each aoi
             for n, aoi in enumerate(glimpse.aoiinfo[dtype].index):
-                shiftx = round(abs_locs[dtype][n, f, 0] - 0.5 * (P - 1))
-                shifty = round(abs_locs[dtype][n, f, 1] - 0.5 * (P - 1))
+                shiftx = round(raw_target_xy[dtype][n, f, 0] - 0.5 * (P - 1))
+                shifty = round(raw_target_xy[dtype][n, f, 1] - 0.5 * (P - 1))
                 data[dtype][n, f, :, :] += img[shifty : shifty + P, shiftx : shiftx + P]
-                target_xy[dtype][n, f, 0] = abs_locs[dtype][n, f, 0] - shifty
-                target_xy[dtype][n, f, 1] = abs_locs[dtype][n, f, 1] - shiftx
+                target_xy[dtype][n, f, 0] = raw_target_xy[dtype][n, f, 0] - shiftx
+                target_xy[dtype][n, f, 1] = raw_target_xy[dtype][n, f, 1] - shifty
     offset = torch.tensor(offsets)
     for dtype in glimpse.dtypes:
         assert (target_xy[dtype] > 0.5 * P - 1).all()
