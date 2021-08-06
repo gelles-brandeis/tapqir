@@ -1,7 +1,7 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from pyro.ops.stats import pi
+from pyro.ops.stats import hpdi
 from pyro.poutine.messenger import Messenger
 
 
@@ -23,7 +23,7 @@ class StatsMessenger(Messenger):
         if name in self.sites:
             self.stats[name] = {}
             samples = msg["fn"].sample((self.num_samples,)).data.squeeze().cpu()
-            self.stats[name]["LL"], self.stats[name]["UL"] = pi(
+            self.stats[name]["LL"], self.stats[name]["UL"] = hpdi(
                 samples,
                 self.CI,
                 dim=0,
@@ -33,7 +33,7 @@ class StatsMessenger(Messenger):
             # calculate Keq
             if name == "pi":
                 self.stats["Keq"] = {}
-                self.stats["Keq"]["LL"], self.stats["Keq"]["UL"] = pi(
+                self.stats["Keq"]["LL"], self.stats["Keq"]["UL"] = hpdi(
                     samples[:, 1] / (1 - samples[:, 1]), self.CI, dim=0
                 )
                 self.stats["Keq"]["Mean"] = (samples[:, 1] / (1 - samples[:, 1])).mean()
