@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from pyro.ops.stats import pi, quantile
+from pyro.ops.stats import hpdi, quantile
 from sklearn.metrics import (
     confusion_matrix,
     matthews_corrcoef,
@@ -35,6 +35,15 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         "d/y_0",
         "d/y_1",
         "d/background",
+        "c/height_0",
+        "c/height_1",
+        "c/width_0",
+        "c/width_1",
+        "c/x_0",
+        "c/x_1",
+        "c/y_0",
+        "c/y_1",
+        "c/background",
     ]
     with StatsMessenger(global_params + local_params, CI=CI) as ci_stats:
         model.guide()
@@ -104,7 +113,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         mask = torch.from_numpy(model.data.ontarget.labels["z"])
         samples = torch.masked_select(model.pspecific.cpu(), mask)
         if len(samples):
-            z_ll, z_ul = pi(samples, 0.68)
+            z_ll, z_ul = hpdi(samples, CI)
             data.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()
             data.loc["p(specific)", "95% LL"] = z_ll.item()
             data.loc["p(specific)", "95% UL"] = z_ul.item()

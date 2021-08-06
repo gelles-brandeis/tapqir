@@ -18,7 +18,7 @@ def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
     # create meshgrid of PxP pixel positions
     P_range = torch.arange(P)
     i_pixel, j_pixel = torch.meshgrid(P_range, P_range)
-    ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
+    ji_pixel = torch.stack((j_pixel, i_pixel), dim=-1)
 
     # Ideal 2D gaussian spots
     spot_locs = target_locs + torch.stack((x, y), -1)
@@ -27,7 +27,7 @@ def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
     var = scale ** 2
     normalized_gaussian = torch.exp(
         (
-            -((ij_pixel - loc) ** 2) / (2 * var)
+            -((ji_pixel - loc) ** 2) / (2 * var)
             - scale.log()
             - math.log(math.sqrt(2 * math.pi))
         ).sum(-1)
@@ -114,5 +114,5 @@ class KSpotGammaNoise(TorchDistribution):
             - self.rate * (new_value)
             - torch.lgamma(self.concentration)
         )
-        result = torch.where(mask, result, result.new_zeros(()))
+        result = torch.where(mask, result, result.new_full((), -40))
         return result.sum((-2, -1))
