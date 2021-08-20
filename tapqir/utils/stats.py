@@ -1,10 +1,13 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import math
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyro
+import pyro.distributions as dist
 import torch
 from pyro.ops.stats import hpdi, quantile
 from sklearn.metrics import (
@@ -14,39 +17,116 @@ from sklearn.metrics import (
     recall_score,
 )
 
-from tapqir.handlers import StatsMessenger
+from tapqir.distributions import AffineBeta
 
 
 def save_stats(model, path, CI=0.95, save_matlab=False):
     # change device to cpu
     model.to("cpu")
+    # do calculations for all AOIs
     model.batch_size = model.n = None
     # global parameters
     global_params = model._global_params
-    data = pd.DataFrame(index=global_params, columns=["Mean", "95% LL", "95% UL"])
+    data = pd.DataFrame(
+        index=global_params,
+        columns=["Mean", f"{int(100*CI)}% LL", f"{int(100*CI)}% UL"],
+    )
     # local parameters
     local_params = [
-        "d/height_0",
-        "d/height_1",
-        "d/width_0",
-        "d/width_1",
-        "d/x_0",
-        "d/x_1",
-        "d/y_0",
-        "d/y_1",
+        "d/height",
+        "d/width",
+        "d/x",
+        "d/y",
         "d/background",
-        "c/height_0",
-        "c/height_1",
-        "c/width_0",
-        "c/width_1",
-        "c/x_0",
-        "c/x_1",
-        "c/y_0",
-        "c/y_1",
-        "c/background",
     ]
-    with StatsMessenger(global_params + local_params, CI=CI) as ci_stats:
-        model.guide()
+
+    ci_stats = {}
+    num_samples = 10000
+    for param in global_params:
+        if param == "gain":
+            fn = dist.Gamma(
+                pyro.param("gain_loc").cpu() * pyro.param("gain_beta").cpu(),
+                pyro.param("gain_beta").cpu(),
+            )
+        elif param == "pi":
+            fn = dist.Dirichlet(
+                pyro.param("pi_mean").cpu() * pyro.param("pi_size").cpu()
+            )
+        elif param == "lamda":
+            fn = dist.Gamma(
+                pyro.param("lamda_loc").cpu() * pyro.param("lamda_beta").cpu(),
+                pyro.param("lamda_beta").cpu(),
+            )
+        elif param == "proximity":
+            fn = AffineBeta(
+                pyro.param("proximity_loc").cpu(),
+                pyro.param("proximity_size").cpu(),
+                0,
+                (model.data.P + 1) / math.sqrt(12),
+            )
+        else:
+            raise NotImplementedError
+        samples = fn.sample((num_samples,)).data.squeeze()
+        ci_stats[param] = {}
+        ci_stats[param]["LL"], ci_stats[param]["UL"] = hpdi(
+            samples,
+            CI,
+            dim=0,
+        )
+        ci_stats[param]["Mean"] = fn.mean.data.squeeze()
+
+        # calculate Keq
+        if param == "pi":
+            ci_stats["Keq"] = {}
+            ci_stats["Keq"]["LL"], ci_stats["Keq"]["UL"] = hpdi(
+                samples[:, 1] / (1 - samples[:, 1]), CI, dim=0
+            )
+            ci_stats["Keq"]["Mean"] = (samples[:, 1] / (1 - samples[:, 1])).mean()
+
+    # this does not need to be very accurate
+    num_samples = 500
+    for param in local_params:
+        if param == "d/background":
+            fn = dist.Gamma(
+                pyro.param("d/b_loc").cpu() * pyro.param("d/b_beta").cpu(),
+                pyro.param("d/b_beta").cpu(),
+            )
+        elif param == "d/height":
+            fn = dist.Gamma(
+                pyro.param("d/h_loc").cpu() * pyro.param("d/h_beta").cpu(),
+                pyro.param("d/h_beta").cpu(),
+            )
+        elif param == "d/width":
+            fn = AffineBeta(
+                pyro.param("d/w_mean").cpu(),
+                pyro.param("d/w_size").cpu(),
+                0.75,
+                2.25,
+            )
+        elif param == "d/x":
+            fn = AffineBeta(
+                pyro.param("d/x_mean").cpu(),
+                pyro.param("d/size").cpu(),
+                -(model.data.P + 1) / 2,
+                (model.data.P + 1) / 2,
+            )
+        elif param == "d/y":
+            fn = AffineBeta(
+                pyro.param("d/y_mean").cpu(),
+                pyro.param("d/size").cpu(),
+                -(model.data.P + 1) / 2,
+                (model.data.P + 1) / 2,
+            )
+        else:
+            raise NotImplementedError
+        samples = fn.sample((num_samples,)).data.squeeze()
+        ci_stats[param] = {}
+        ci_stats[param]["LL"], ci_stats[param]["UL"] = hpdi(
+            samples,
+            CI,
+            dim=0,
+        )
+        ci_stats[param]["Mean"] = fn.mean.data.squeeze()
 
     for param in global_params:
         if param == "pi":
@@ -67,22 +147,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         ci_stats["d/j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
         ci_stats["z_map"] = model.z_map.data.cpu()
-    # combine K local params
-    for param in local_params:
-        if param.endswith("_0"):
-            base_name = param.split("_")[0]
-            ci_stats[base_name] = {}
-            ci_stats[base_name]["Mean"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.K)], dim=0
-            )
-            ci_stats[base_name]["LL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.K)], dim=0
-            )
-            ci_stats[base_name]["UL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.K)], dim=0
-            )
-            for k in range(model.K):
-                del ci_stats[f"{base_name}_{k}"]
+
     model.params = ci_stats
 
     # snr
