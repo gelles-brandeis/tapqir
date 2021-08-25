@@ -177,17 +177,21 @@ class Model:
             self.logger.info("Batch size - {}".format(self.batch_size))
             self.logger.info("{}".format("jit" if jit else "nojit"))
 
-    def run(self, num_iter=70000, nrange=trange):
+    def run(self, num_iter=0, nrange=trange):
         slurm = os.environ.get("SLURM_JOB_ID")
         if slurm is not None:
             nrange = range
         # pyro.enable_validation()
         self._stop = False
+        use_crit = False
+        if not num_iter:
+            use_crit = True
+            num_iter = 100000
         for i in nrange(num_iter):
             self.iter_loss = self.svi.step()
             if not self.iter % 100:
                 self.save_checkpoint()
-                if self._stop:
+                if use_crit and self._stop:
                     self.logger.info("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
