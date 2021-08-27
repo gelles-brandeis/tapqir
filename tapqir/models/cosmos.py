@@ -211,7 +211,7 @@ class CosmosMarginal(Model):
             dim=-2,
         )
         # time frames
-        frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
+        frames = pyro.plate(f"{prefix}/frames", data.F, subsample=self.f, dim=-1)
 
         with aois as ndx:
             # background mean and std
@@ -221,7 +221,7 @@ class CosmosMarginal(Model):
             background_std = pyro.sample(
                 f"{prefix}/background_std", dist.HalfNormal(100)
             )
-            with frames:
+            with frames as fdx:
                 # sample background intensity
                 background = pyro.sample(
                     f"{prefix}/background",
@@ -305,7 +305,7 @@ class CosmosMarginal(Model):
                 )
                 offset = self.data.offset.samples[odx]
                 # fetch data
-                obs, target_locs = data.fetch(ndx)
+                obs, target_locs = data.fetch(ndx[:, None], fdx)
                 # observed data
                 pyro.sample(
                     f"{prefix}/data",
@@ -336,7 +336,7 @@ class CosmosMarginal(Model):
             dim=-2,
         )
         # time frames
-        frames = pyro.plate(f"{prefix}/frames", data.F, dim=-1)
+        frames = pyro.plate(f"{prefix}/frames", data.F, subsample=self.f, dim=-1)
 
         with aois as ndx:
             pyro.sample(
@@ -356,16 +356,24 @@ class CosmosMarginal(Model):
                 pyro.sample(
                     f"{prefix}/background",
                     dist.Gamma(
-                        pyro.param(f"{prefix}/b_loc")[ndx].to(self.device)
-                        * pyro.param(f"{prefix}/b_beta")[ndx].to(self.device),
-                        pyro.param(f"{prefix}/b_beta")[ndx].to(self.device),
+                        Vindex(pyro.param(f"{prefix}/b_loc"))[ndx[:, None], fdx].to(
+                            self.device
+                        )
+                        * Vindex(pyro.param(f"{prefix}/b_beta"))[ndx[:, None], fdx].to(
+                            self.device
+                        ),
+                        Vindex(pyro.param(f"{prefix}/b_beta"))[ndx[:, None], fdx].to(
+                            self.device
+                        ),
                     ),
                 )
                 if self._classify and prefix == "d":
                     theta = pyro.sample(
                         f"{prefix}/theta",
                         dist.Categorical(
-                            pyro.param(f"{prefix}/theta_probs")[ndx].to(self.device)
+                            Vindex(pyro.param(f"{prefix}/theta_probs"))[
+                                ndx[:, None], fdx
+                            ].to(self.device)
                         ),
                         infer={"enumerate": "parallel"},
                     )
@@ -405,24 +413,26 @@ class CosmosMarginal(Model):
                         pyro.sample(
                             f"{prefix}/height_{kdx}",
                             dist.Gamma(
-                                pyro.param(f"{prefix}/h_loc")[kdx, ndx].to(self.device)
-                                * pyro.param(f"{prefix}/h_beta")[kdx, ndx].to(
-                                    self.device
-                                ),
-                                pyro.param(f"{prefix}/h_beta")[kdx, ndx].to(
-                                    self.device
-                                ),
+                                Vindex(pyro.param(f"{prefix}/h_loc"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device)
+                                * Vindex(pyro.param(f"{prefix}/h_beta"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
+                                Vindex(pyro.param(f"{prefix}/h_beta"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
                             ),
                         )
                         pyro.sample(
                             f"{prefix}/width_{kdx}",
                             AffineBeta(
-                                pyro.param(f"{prefix}/w_mean")[kdx, ndx].to(
-                                    self.device
-                                ),
-                                pyro.param(f"{prefix}/w_size")[kdx, ndx].to(
-                                    self.device
-                                ),
+                                Vindex(pyro.param(f"{prefix}/w_mean"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
+                                Vindex(pyro.param(f"{prefix}/w_size"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
                                 0.75,
                                 2.25,
                             ),
@@ -430,10 +440,12 @@ class CosmosMarginal(Model):
                         pyro.sample(
                             f"{prefix}/x_{kdx}",
                             AffineBeta(
-                                pyro.param(f"{prefix}/x_mean")[kdx, ndx].to(
-                                    self.device
-                                ),
-                                pyro.param(f"{prefix}/size")[kdx, ndx].to(self.device),
+                                Vindex(pyro.param(f"{prefix}/x_mean"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
+                                Vindex(pyro.param(f"{prefix}/size"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
                                 -(data.P + 1) / 2,
                                 (data.P + 1) / 2,
                             ),
@@ -441,10 +453,12 @@ class CosmosMarginal(Model):
                         pyro.sample(
                             f"{prefix}/y_{kdx}",
                             AffineBeta(
-                                pyro.param(f"{prefix}/y_mean")[kdx, ndx].to(
-                                    self.device
-                                ),
-                                pyro.param(f"{prefix}/size")[kdx, ndx].to(self.device),
+                                Vindex(pyro.param(f"{prefix}/y_mean"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
+                                Vindex(pyro.param(f"{prefix}/size"))[
+                                    kdx, ndx[:, None], fdx
+                                ].to(self.device),
                                 -(data.P + 1) / 2,
                                 (data.P + 1) / 2,
                             ),
