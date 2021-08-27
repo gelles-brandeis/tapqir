@@ -53,6 +53,7 @@ class Model:
         self.batch_size = None
         # for plotting
         self.n = None
+        self.f = None
         self.data_path = None
         self.path = None
         self.run_path = None

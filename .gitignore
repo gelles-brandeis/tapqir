@@ -7,8 +7,6 @@ tapqir/utils/__pycache__/
 tapqir/models/__pycache__/
 .ipynb_checkpoints/
 tapqir.egg-info/
-examples/data/
-notebooks/simulations/
 
 # sphinx documentation
 docs/build/
