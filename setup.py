@@ -79,13 +79,13 @@ setuptools.setup(
     ],
     python_requires=">=3.6",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.commands.app:main"],
-        "tapqir.app": [
-            "config=tapqir.commands.config:Config",
-            "fit=tapqir.commands.fit:Fit",
-            "show=tapqir.commands.show:Show",
-            "glimpse=tapqir.commands.glimpse:Glimpse",
-            "save=tapqir.commands.save:Save",
-        ],
+        "console_scripts": ["tapqir=tapqir.main:main"],
+        #  "tapqir.app": [
+        #      "config=tapqir.commands.config:Config",
+        #      "fit=tapqir.commands.fit:Fit",
+        #      "show=tapqir.commands.show:Show",
+        #      "glimpse=tapqir.commands.glimpse:Glimpse",
+        #      "save=tapqir.commands.save:Save",
+        #  ],
     },
 )

@@ -45,3 +45,9 @@ class Config(Command):
         cfg_file = Path(args.path) / "options.cfg"
         with open(cfg_file, "w") as configfile:
             config.write(configfile)
+
+def add_parser(subparsers):
+
+    parser = subparsers.add_parser(
+            "config",
+    )
