@@ -1,28 +1,27 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from cliff.command import Command
-
-from tapqir.imscroll import read_glimpse
+from pathlib import Path
 
 
-class Glimpse(Command):
-    """
-    Read the data from glimpse files and save it in the Cosmos compatible format, ``data.tpqr``.
-    Path names to glimpse files are read from the ``options.cfg`` file.
-    """
+def CmdGlimpse(args):
+    from tapqir.imscroll import read_glimpse
 
-    def get_parser(self, prog_name):
-        parser = super(Glimpse, self).get_parser(prog_name)
+    read_glimpse(
+        path=args.path,
+        P=14,
+    )
 
-        parser.add_argument(
-            "path", default=".", type=str, help="Path to the dataset folder"
-        )
 
-        return parser
+def add_parser(subparsers, parent_parser):
+    GLIMPSE_HELP = "Extract AOIs from raw images."
 
-    def take_action(self, args):
-        read_glimpse(
-            path=args.path,
-            P=14,
-        )
+    parser = subparsers.add_parser(
+        "glimpse",
+        parents=[parent_parser],
+        description=GLIMPSE_HELP,
+        help=GLIMPSE_HELP,
+    )
+    parser.add_argument("path", type=Path, help="Path to the dataset folder")
+
+    parser.set_defaults(func=CmdGlimpse)
