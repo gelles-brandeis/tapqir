@@ -1,56 +1,57 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import configparser
-import sys
 from pathlib import Path
 
-from cliff.command import Command
-from pyroapi import pyro_backend
-from PySide2.QtWidgets import QApplication
 
-from tapqir.commands.qtgui import MainWindow
-from tapqir.models import models
+def CmdShow(args):
+    import sys
+
+    from pyroapi import pyro_backend
+    from PySide2.QtWidgets import QApplication
+
+    from tapqir.commands.qtgui import MainWindow
+    from tapqir.models import models
+
+    backend = "funsor" if args.funsor else "pyro"
+    # pyro backend
+    if backend == "pyro":
+        PYRO_BACKEND = "pyro"
+    elif backend == "funsor":
+        PYRO_BACKEND = "contrib.funsor"
+    else:
+        raise ValueError("Only pyro and funsor backends are supported.")
+
+    with pyro_backend(PYRO_BACKEND):
+        model = models[args.model](1, 2, "cpu", "float")
+        app = QApplication(sys.argv)
+        MainWindow(model, args.path)
+        sys.exit(app.exec_())
 
 
-class Show(Command):
-    "Show fitting results."
+def add_parser(subparsers, parent_parser):
+    SHOW_HELP = "Show fitting results."
 
-    def get_parser(self, prog_name):
-        parser = super(Show, self).get_parser(prog_name)
+    parser = subparsers.add_parser(
+        "show",
+        parents=[parent_parser],
+        description=SHOW_HELP,
+        help=SHOW_HELP,
+    )
+    parser.add_argument(
+        "model",
+        type=str,
+        help="Tapqir model to fit the data",
+    )
+    parser.add_argument(
+        "path",
+        type=Path,
+        help="Path to the dataset folder",
+    )
+    parser.add_argument(
+        "--funsor",
+        help="Use funsor as backend",
+        action="store_true",
+    )
 
-        parser.add_argument(
-            "model",
-            default="cosmos",
-            type=str,
-            help="Available models: {}".format(", ".join(models.keys())),
-        )
-        parser.add_argument(
-            "path", default=".", type=str, help="Path to the dataset folder"
-        )
-        parser.add_argument(
-            "-backend", metavar="BACKEND", type=str, help="Pyro backend (default: pyro)"
-        )
-
-        return parser
-
-    def take_action(self, args):
-        # read options.cfg file
-        config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(args.path) / "options.cfg"
-        config.read(cfg_file)
-
-        backend = args.backend or config["fit"].get("backend")
-        # pyro backend
-        if backend == "pyro":
-            PYRO_BACKEND = "pyro"
-        elif backend == "funsor":
-            PYRO_BACKEND = "contrib.funsor"
-        else:
-            raise ValueError("Only pyro and funsor backends are supported.")
-
-        with pyro_backend(PYRO_BACKEND):
-            model = models[args.model](1, 2, "cpu", "float")
-            app = QApplication(sys.argv)
-            MainWindow(model, args.path)
-            sys.exit(app.exec_())
+    parser.set_defaults(func=CmdShow)

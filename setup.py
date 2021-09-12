@@ -20,8 +20,6 @@ with open("README.rst", "r") as fh:
 EXTRAS_REQUIRE = [
     "ipywidgets",
     "notebook",
-    "matplotlib",
-    "openpyxl",
 ]
 # tests
 TEST_REQUIRE = [
@@ -46,11 +44,11 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "cliff",
         "configparser",
         "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
         # "funsor==0.4.0",
         "future",
+        "matplotlib",
         "pandas",
         "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
         "pyqtgraph",
@@ -58,6 +56,7 @@ setuptools.setup(
         "scikit-learn",
         "scipy",
         "tensorboard",
+        "qtrangeslider",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
@@ -79,13 +78,6 @@ setuptools.setup(
     ],
     python_requires=">=3.6",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.commands.app:main"],
-        "tapqir.app": [
-            "config=tapqir.commands.config:Config",
-            "fit=tapqir.commands.fit:Fit",
-            "show=tapqir.commands.show:Show",
-            "glimpse=tapqir.commands.glimpse:Glimpse",
-            "save=tapqir.commands.save:Save",
-        ],
+        "console_scripts": ["tapqir=tapqir.main:main"],
     },
 )
