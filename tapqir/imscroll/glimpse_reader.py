@@ -45,7 +45,7 @@ class GlimpseDataset:
 
         # read options.cfg file
         config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(path) / "options.cfg"
+        cfg_file = Path(path) / ".tapqir" / "config"
         config.read(cfg_file)
         kwargs = {}
         kwargs["title"] = config["glimpse"]["title"]

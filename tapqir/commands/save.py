@@ -48,7 +48,13 @@ def add_parser(subparsers, parent_parser):
         type=str,
         help="Tapqir model to fit the data",
     )
-    parser.add_argument("path", type=Path, help="Path to the dataset folder")
+    parser.add_argument(
+        "path",
+        nargs="?",
+        type=Path,
+        help="Path to the Tapqir folder",
+        default=Path.cwd(),
+    )
     parser.add_argument(
         "--cuda",
         help="Run computations on GPU",
