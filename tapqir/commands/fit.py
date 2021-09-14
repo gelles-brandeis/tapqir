@@ -56,8 +56,10 @@ def add_parser(subparsers, parent_parser):
     )
     parser.add_argument(
         "path",
+        nargs="?",
         type=Path,
-        help="Path to the dataset folder",
+        help="Path to the Tapqir folder",
+        default=Path.cwd(),
     )
     parser.add_argument(
         "-k",

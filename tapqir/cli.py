@@ -8,12 +8,12 @@ from tapqir import __version__ as tapqir_version
 from .commands import config, fit, glimpse, init, save, show
 
 COMMANDS = [
-    config,
-    fit,
-    glimpse,
     init,
+    glimpse,
+    fit,
     save,
     show,
+    config,
 ]
 
 
