@@ -106,7 +106,7 @@ class Model:
     def load(self, path, data_only=True):
         # set path
         self.path = Path(path)
-        self.run_path = self.path / f"{self.name}" / tapqir_version.split("+")[0]
+        self.run_path = self.path / ".tapqir" / f"{self.name}" / tapqir_version.split("+")[0]
         # logger
         self.writer = SummaryWriter(log_dir=self.run_path / "tb")
         fh = logging.FileHandler(self.run_path / "run.log")

@@ -5,11 +5,17 @@ from pathlib import Path
 
 
 def CmdConfig(args):
+    import sys
     import configparser
 
     config = configparser.ConfigParser(allow_no_value=True)
     cfg_file = args.path / ".tapqir" / "config"
     config.read(cfg_file)
+
+    if args.list:
+        config.write(sys.stdout)
+        return
+
     section, option = args.name.split(".")
     if section not in config.sections():
         config[section] = {}
@@ -30,12 +36,12 @@ def add_parser(subparsers, parent_parser):
     )
     parser.add_argument(
         "name",
-        type=str,
+        nargs="?",
         help="Option name (command.option)",
     )
     parser.add_argument(
         "value",
-        type=str,
+        nargs="?",
         help="Option value",
     )
     parser.add_argument(
@@ -44,6 +50,13 @@ def add_parser(subparsers, parent_parser):
         type=Path,
         help="Path to the Tapqir folder",
         default=Path.cwd(),
+    )
+    parser.add_argument(
+        "-l",
+        "--list",
+        default=False,
+        action="store_true",
+        help="List all defined config values.",
     )
 
     parser.set_defaults(func=CmdConfig)

@@ -55,48 +55,50 @@ def add_parser(subparsers, parent_parser):
     )
     parser.add_argument(
         "--title",
-        type=str,
         help="Project name",
+        metavar="<name>",
     )
     parser.add_argument(
         "--header-dir",
-        type=Path,
         help="Path to the header/glimpse folder",
+        metavar="<path>",
     )
     parser.add_argument(
         "--ontarget-aoiinfo",
-        type=Path,
         help="Path to the on-target AOI locations file",
+        metavar="<path>",
     )
     parser.add_argument(
         "--offtarget-aoiinfo",
-        type=Path,
         help="Path to the off-target control AOI locations file",
+        metavar="<path>",
     )
     parser.add_argument(
         "--driftlist",
-        type=Path,
         help="Path to the driftlist file",
+        metavar="<path>",
     )
     parser.add_argument(
         "--frame-start",
         type=int,
         help="First frame to include in the analysis",
+        metavar="<number>",
     )
     parser.add_argument(
         "--frame-end",
         type=int,
         help="Last frame to include in the analysis",
+        metavar="<number>",
     )
     parser.add_argument(
         "--ontarget-labels",
-        type=int,
         help="On-target AOI binding labels",
+        metavar="<path>",
     )
     parser.add_argument(
         "--offtarget-labels",
-        type=int,
         help="Off-target AOI binding labels",
+        metavar="<path>",
     )
     parser.add_argument(
         "path",

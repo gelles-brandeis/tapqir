@@ -640,7 +640,7 @@ class Cosmos(CosmosMarginal):
     def init_parameters(self):
         # load pre-trained paramters
         self.load_checkpoint(
-            path=self.path / "marginal" / tapqir_version.split("+")[0],
+            path=self.path / ".tapqir" / "marginal" / tapqir_version.split("+")[0],
             param_only=True,
             warnings=True,
         )
