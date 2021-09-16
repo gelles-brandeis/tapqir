@@ -18,7 +18,6 @@ with open("README.rst", "r") as fh:
 
 # examples/tutorials
 EXTRAS_REQUIRE = [
-    "ipywidgets",
     "notebook",
 ]
 # tests
@@ -29,6 +28,15 @@ TEST_REQUIRE = [
     "pytest",
     "pytest-qt",
     "pytest-xvfb",
+]
+# docs
+DOCS_REQUIRE = [
+    "nbsphinx>=0.8.5",
+    "sphinx",
+    "pydata_sphinx_theme",
+    "sphinx-argparse",
+    "sphinx-gallery",
+    "sphinx-panels",
 ]
 
 setuptools.setup(
@@ -62,16 +70,10 @@ setuptools.setup(
     extras_require={
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
+        "docs": DOCS_REQUIRE,
         "dev": EXTRAS_REQUIRE
         + TEST_REQUIRE
-        + [
-            "nbsphinx",
-            "sphinx",
-            "pydata_sphinx_theme",
-            "sphinx-argparse",
-            "sphinx-gallery",
-            "sphinx-panels",
-        ],
+        + DOCS_REQUIRE,
     },
     classifiers=[
         "Programming Language :: Python :: 3",
