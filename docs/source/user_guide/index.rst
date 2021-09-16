@@ -133,7 +133,3 @@ What's next?
 ~~~~~~~~~~~~
 
 Checkout our google colab tutorial:
-
-.. nbgallery::
-
-   tutorial
