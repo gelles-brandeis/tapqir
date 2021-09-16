@@ -57,8 +57,8 @@ ordabayev@brandeis.edu
     ---
     :img-top: _static/fi-rr-layers.svg
 
-    Command Reference
-    ^^^^^^^^^^^^^^^^^
+    Commands
+    ^^^^^^^^
 
     The reference guide contains a detailed description of
     the tapqir commands.
@@ -67,7 +67,7 @@ ordabayev@brandeis.edu
 
     .. link-button:: commands/index
             :type: ref
-            :text: To the API reference
+            :text: To the command reference
             :classes: btn-block btn-secondary stretched-link
 
     ---

@@ -57,7 +57,6 @@ panels_add_bootstrap_css = False
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
 source_suffix = [".rst"]
 
 # do not execute cells
@@ -77,7 +76,7 @@ intersphinx_mapping = dict(
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["**.ipynb_checkpoints"]
+# exclude_patterns = ["**.ipynb_checkpoints"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -85,7 +84,7 @@ pygments_style = "sphinx"
 
 # This is processed by Jinja2 and inserted before each notebook
 nbsphinx_prolog = r"""
-{% set docname = 'notebooks/' + env.doc2path(env.docname, base=None).split('/')[-1] %}
+{% set docname = env.doc2path(env.docname, base=None) %}
 :github_url: https://github.com/gelles-brandeis/tapqir/blob/latest/{{ docname }}
 
 .. raw:: html
