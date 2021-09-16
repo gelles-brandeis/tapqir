@@ -1,4 +1,5 @@
 sphinx
+sphinx-argparse
 sphinx-panels
 sphinx-gallery
 pydata_sphinx_theme
