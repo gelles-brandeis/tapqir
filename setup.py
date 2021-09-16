@@ -71,9 +71,7 @@ setuptools.setup(
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
         "docs": DOCS_REQUIRE,
-        "dev": EXTRAS_REQUIRE
-        + TEST_REQUIRE
-        + DOCS_REQUIRE,
+        "dev": EXTRAS_REQUIRE + TEST_REQUIRE + DOCS_REQUIRE,
     },
     classifiers=[
         "Programming Language :: Python :: 3",
