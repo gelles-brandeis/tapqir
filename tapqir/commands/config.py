@@ -1,16 +1,6 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
-config
-~~~~~~
-
-Description
------------
-"""
-
-from pathlib import Path
-
 
 def CmdConfig(args):
     import configparser

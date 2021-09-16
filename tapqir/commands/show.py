@@ -1,18 +1,6 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
-show
-~~~~
-
-Fit the data to the selected model.
-
-Description
------------
-"""
-
-from pathlib import Path
-
 
 def CmdShow(args):
     import sys

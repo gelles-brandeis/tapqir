@@ -1,18 +1,6 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
-stats
-~~~~~
-
-Fit the data to the selected model.
-
-Description
------------
-"""
-
-from pathlib import Path
-
 
 def CmdStats(args):
     from pyroapi import pyro_backend

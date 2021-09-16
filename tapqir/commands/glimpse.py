@@ -1,18 +1,6 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
-glimpse
-~~~~~~~
-
-Fit the data to the selected model.
-
-Description
------------
-"""
-
-from pathlib import Path
-
 
 def CmdGlimpse(args):
     import configparser

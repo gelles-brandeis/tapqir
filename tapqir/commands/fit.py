@@ -13,8 +13,6 @@ Description
 Fitting
 """
 
-from pathlib import Path
-
 
 def CmdFit(args):
     import configparser
