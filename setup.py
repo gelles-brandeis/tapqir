@@ -44,6 +44,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
+        "colorama",
         "configparser",
         "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
         # "funsor==0.4.0",
@@ -67,6 +68,7 @@ setuptools.setup(
             "nbsphinx",
             "sphinx",
             "pydata_sphinx_theme",
+            "sphinx-argparse",
             "sphinx-gallery",
             "sphinx-panels",
         ],

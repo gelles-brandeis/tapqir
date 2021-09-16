@@ -1,6 +1,16 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""
+show
+~~~~
+
+Fit the data to the selected model.
+
+Description
+-----------
+"""
+
 from pathlib import Path
 
 
@@ -25,7 +35,7 @@ def CmdShow(args):
     with pyro_backend(PYRO_BACKEND):
         model = models[args.model](1, 2, "cpu", "float")
         app = QApplication(sys.argv)
-        MainWindow(model, args.path)
+        MainWindow(model, args.cd)
         sys.exit(app.exec_())
 
 
@@ -42,13 +52,6 @@ def add_parser(subparsers, parent_parser):
         "model",
         type=str,
         help="Tapqir model to fit the data",
-    )
-    parser.add_argument(
-        "path",
-        nargs="?",
-        type=Path,
-        help="Path to the Tapqir folder",
-        default=Path.cwd(),
     )
     parser.add_argument(
         "--funsor",

@@ -1,6 +1,16 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""
+glimpse
+~~~~~~~
+
+Fit the data to the selected model.
+
+Description
+-----------
+"""
+
 from pathlib import Path
 
 
@@ -11,7 +21,7 @@ def CmdGlimpse(args):
 
     # read config file
     config = configparser.ConfigParser(allow_no_value=True)
-    cfg_file = args.path / ".tapqir" / "config"
+    cfg_file = args.cd / ".tapqir" / "config"
     config.read(cfg_file)
     if "glimpse" not in config.sections():
         config["glimpse"] = {}
@@ -39,7 +49,7 @@ def CmdGlimpse(args):
         config.write(configfile)
 
     read_glimpse(
-        path=args.path,
+        path=args.cd,
         P=14,
     )
 
@@ -70,7 +80,7 @@ def add_parser(subparsers, parent_parser):
     )
     parser.add_argument(
         "--offtarget-aoiinfo",
-        help="Path to the off-target control AOI locations file",
+        help="Path to the off-target control AOI locations file (optional)",
         metavar="<path>",
     )
     parser.add_argument(
@@ -80,32 +90,23 @@ def add_parser(subparsers, parent_parser):
     )
     parser.add_argument(
         "--frame-start",
-        type=int,
-        help="First frame to include in the analysis",
+        help="First frame to include in the analysis (optional)",
         metavar="<number>",
     )
     parser.add_argument(
         "--frame-end",
-        type=int,
-        help="Last frame to include in the analysis",
+        help="Last frame to include in the analysis (optional)",
         metavar="<number>",
     )
     parser.add_argument(
         "--ontarget-labels",
-        help="On-target AOI binding labels",
+        help="On-target AOI binding labels (optional)",
         metavar="<path>",
     )
     parser.add_argument(
         "--offtarget-labels",
-        help="Off-target AOI binding labels",
+        help="Off-target AOI binding labels (optional)",
         metavar="<path>",
-    )
-    parser.add_argument(
-        "path",
-        nargs="?",
-        type=Path,
-        help="Path to the Tapqir folder",
-        default=Path.cwd(),
     )
 
     parser.set_defaults(func=CmdGlimpse)

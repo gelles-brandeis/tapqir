@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 # -- Project information -----------------------------------------------------
 
 project = "Tapqir"
-copyright = "2020, Gelles Lab"
+copyright = "2021, Gelles Lab"
 author = "Yerdos Ordabayev"
 
 # The full version, including alpha/beta/rc tags
@@ -47,6 +47,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_gallery.load_style",
     "sphinx_panels",
+    "sphinxarg.ext",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

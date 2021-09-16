@@ -1,15 +1,23 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""
+config
+~~~~~~
+
+Description
+-----------
+"""
+
 from pathlib import Path
 
 
 def CmdConfig(args):
-    import sys
     import configparser
+    import sys
 
     config = configparser.ConfigParser(allow_no_value=True)
-    cfg_file = args.path / ".tapqir" / "config"
+    cfg_file = args.cd / ".tapqir" / "config"
     config.read(cfg_file)
 
     if args.list:
@@ -27,11 +35,14 @@ def CmdConfig(args):
 
 def add_parser(subparsers, parent_parser):
     CONFIG_HELP = "Set config options."
+    CONFIG_DESC = """
+        Set config options.
+    """
 
     parser = subparsers.add_parser(
         "config",
         parents=[parent_parser],
-        description=CONFIG_HELP,
+        description=CONFIG_DESC,
         help=CONFIG_HELP,
     )
     parser.add_argument(
@@ -43,13 +54,6 @@ def add_parser(subparsers, parent_parser):
         "value",
         nargs="?",
         help="Option value",
-    )
-    parser.add_argument(
-        "path",
-        nargs="?",
-        type=Path,
-        help="Path to the Tapqir folder",
-        default=Path.cwd(),
     )
     parser.add_argument(
         "-l",

@@ -17,15 +17,6 @@ from tapqir.utils.dataset import CosmosDataset, save
 
 # logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.propagate = False
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-formatter = logging.Formatter(
-    fmt="%(levelname)s - %(message)s",
-)
-ch.setFormatter(formatter)
-logger.addHandler(ch)
 
 
 class GlimpseDataset:
@@ -53,10 +44,10 @@ class GlimpseDataset:
         kwargs["ontarget_aoiinfo"] = config["glimpse"]["ontarget_aoiinfo"]
         kwargs["offtarget_aoiinfo"] = config["glimpse"]["offtarget_aoiinfo"]
         kwargs["driftlist"] = config["glimpse"]["driftlist"]
-        kwargs["frame_start"] = config["glimpse"]["frame_start"]
-        kwargs["frame_end"] = config["glimpse"]["frame_end"]
-        kwargs["ontarget_labels"] = config["glimpse"]["ontarget_labels"]
-        kwargs["offtarget_labels"] = config["glimpse"]["offtarget_labels"]
+        kwargs["frame_start"] = config["glimpse"].get("frame_start", None)
+        kwargs["frame_end"] = config["glimpse"].get("frame_end", None)
+        kwargs["ontarget_labels"] = config["glimpse"].get("ontarget_labels", None)
+        kwargs["offtarget_labels"] = config["glimpse"].get("offtarget_labels", None)
 
         dtypes = ["ontarget"]
         if kwargs["offtarget_aoiinfo"] is not None:

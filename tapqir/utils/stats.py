@@ -192,10 +192,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     if path is not None:
         path = Path(path)
         # check convergence status
-        data.loc["trained", "Mean"] = False
-        for line in open(model.run_path / "run.log"):
-            if "model converged" in line:
-                data.loc["trained", "Mean"] = True
+        #  data.loc["trained", "Mean"] = False
+        #  for line in open(model.run_path / ".tapqir" / "log"):
+        #      if "model converged" in line:
+        #          data.loc["trained", "Mean"] = True
         torch.save(ci_stats, path / f"{model.name}-params.tpqr")
         if save_matlab:
             from scipy.io import savemat

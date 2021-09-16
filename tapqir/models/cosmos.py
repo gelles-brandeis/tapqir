@@ -22,8 +22,8 @@ class CosmosMarginal(Model):
 
     name = "marginal"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
-        super().__init__(S, K, device, dtype, verbose)
+    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
+        super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self._classify = False
@@ -632,8 +632,8 @@ class Cosmos(CosmosMarginal):
 
     name = "cosmos"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
-        super().__init__(S, K, device, dtype, verbose)
+    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
+        super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO"]
         self._classify = True
 

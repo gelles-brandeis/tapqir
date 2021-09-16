@@ -26,15 +26,6 @@ from tapqir.utils.dataset import load
 from tapqir.utils.stats import save_stats
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.propagate = False
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-formatter = logging.Formatter(
-    fmt="%(levelname)s - %(message)s",
-)
-ch.setFormatter(formatter)
-logger.addHandler(ch)
 
 
 class Model:
@@ -47,7 +38,7 @@ class Model:
     * :meth:`guide`
     """
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double", verbose=True):
+    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
         self._S = S
         self._K = K
         self.batch_size = None
@@ -57,14 +48,10 @@ class Model:
         self.data_path = None
         self.path = None
         self.run_path = None
-        # logger
-        self.verbose = verbose
-        self.logger = logger
+        logger.info("Tapqir version - {}".format(tapqir_version))
+        logger.info("Model - {}".format(self.name))
         # set device & dtype
         self.to(device, dtype)
-        if self.verbose:
-            self.logger.info("Tapqir version - {}".format(tapqir_version))
-            self.logger.info("Model - {}".format(self.name))
 
     def to(self, device, dtype="double"):
         self.dtype = getattr(torch, dtype)
@@ -85,9 +72,8 @@ class Model:
                 samples=self.data.offset.samples.to(self.device),
                 weights=self.data.offset.weights.to(self.device),
             )
-        if self.verbose:
-            self.logger.info("Device - {}".format(self.device))
-            self.logger.info("Floating precision - {}".format(self.dtype))
+        logger.info("Device - {}".format(self.device))
+        logger.info("Floating precision - {}".format(self.dtype))
 
     @lazy_property
     def S(self):
@@ -106,28 +92,21 @@ class Model:
     def load(self, path, data_only=True):
         # set path
         self.path = Path(path)
-        self.run_path = self.path / ".tapqir" / f"{self.name}" / tapqir_version.split("+")[0]
-        # logger
+        self.run_path = (
+            self.path / ".tapqir" / f"{self.name}" / tapqir_version.split("+")[0]
+        )
         self.writer = SummaryWriter(log_dir=self.run_path / "tb")
-        fh = logging.FileHandler(self.run_path / "run.log")
-        fh.setLevel(logging.DEBUG)
-        fh.setFormatter(formatter)
-        self.logger.addHandler(fh)
 
         # load data
         self.data = load(self.path, self.device)
-        if self.verbose:
-            self.logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
+        logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results
         if not data_only:
             self.params = torch.load(self.path / f"{self.name}-params.tpqr")
             self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
-            if self.verbose:
-                self.logger.info(f"Loaded parameters from {self.name}-params.tpqr")
-                self.logger.info(
-                    f"Loaded model statistics from {self.path / 'statistics.csv'}"
-                )
+            logger.info(f"Loaded parameters from {self.name}-params.tpqr")
+            logger.info(f"Loaded model statistics from {self.path / 'statistics.csv'}")
 
     def TraceELBO(self, jit):
         """
@@ -166,17 +145,12 @@ class Model:
         # find max possible batch_size
         if batch_size == 0:
             batch_size = self._max_batch_size()
-            if self.verbose:
-                self.logger.info(
-                    "Optimal batch size determined - {}".format(batch_size)
-                )
+            logger.info("Optimal batch size determined - {}".format(batch_size))
         self.batch_size = batch_size
 
-        if self.verbose:
-            self.logger.info("Optimizer - {}".format(self.optim_fn.__name__))
-            self.logger.info("Learning rate - {}".format(lr))
-            self.logger.info("Batch size - {}".format(self.batch_size))
-            self.logger.info("{}".format("jit" if jit else "nojit"))
+        logger.info("Optimizer - {}".format(self.optim_fn.__name__))
+        logger.info("Learning rate - {}".format(lr))
+        logger.info("Batch size - {}".format(self.batch_size))
 
     def run(self, num_iter=0, nrange=trange):
         slurm = os.environ.get("SLURM_JOB_ID")
@@ -193,7 +167,7 @@ class Model:
             if not self.iter % 100:
                 self.save_checkpoint()
                 if use_crit and self._stop:
-                    self.logger.info("Step #{} model converged.".format(self.iter))
+                    logger.info("Step #{} model converged.".format(self.iter))
                     break
             self.iter += 1
 
@@ -287,7 +261,7 @@ class Model:
             self.writer.add_scalars("NEGATIVES", neg, self.iter)
             self.writer.add_scalars("POSITIVES", pos, self.iter)
 
-        self.logger.debug("Step #{}.".format(self.iter))
+        logger.debug("Step #{}.".format(self.iter))
 
     def load_checkpoint(self, path=None, param_only=False, warnings=False):
         device = self.device
@@ -300,20 +274,20 @@ class Model:
             self._rolling = checkpoint["rolling"]
             self.iter = checkpoint["iter"]
             self.optim.set_state(checkpoint["optimizer"])
-            self.logger.info(
+            logger.info(
                 "Step #{}. Loaded model params and optimizer state from {}".format(
                     self.iter, path
                 )
             )
         if warnings and not checkpoint["convergence_status"]:
-            self.logger.warning(f"Model at {path} has not been fully trained")
+            logger.warning(f"Model at {path} has not been fully trained")
 
     def compute_stats(self, CI=0.95, save_matlab=False):
         save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
         if self.path is not None:
-            self.logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
+            logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
             if save_matlab:
-                self.logger.info(f"Parameters were saved in {self.path / 'params.mat'}")
+                logger.info(f"Parameters were saved in {self.path / 'params.mat'}")
 
     def snr(self):
         r"""

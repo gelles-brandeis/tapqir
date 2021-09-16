@@ -1,13 +1,37 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""
+fit
+~~~
+
+Fit the data to the selected model.
+
+Description
+-----------
+
+Fitting
+"""
+
 from pathlib import Path
 
 
 def CmdFit(args):
+    import configparser
+
     from pyroapi import pyro_backend
 
     from tapqir.models import models
+
+    # read config file
+    config = configparser.ConfigParser(allow_no_value=True)
+    cfg_file = args.cd / ".tapqir" / "config"
+    config.read(cfg_file)
+    if "fit" not in config.sections():
+        config["fit"] = {}
+
+    if args.bs is not None:
+        config["fit"]["bs"] = str(args.bs)
 
     states = 1
     dtype = "double"
@@ -17,6 +41,9 @@ def CmdFit(args):
     learning_rate = args.lr
     device = "cuda" if args.cuda else "cpu"
     backend = "funsor" if args.funsor else "pyro"
+
+    with open(cfg_file, "w") as configfile:
+        config.write(configfile)
 
     # pyro backend
     if backend == "pyro":
@@ -33,7 +60,7 @@ def CmdFit(args):
     with pyro_backend(PYRO_BACKEND):
 
         model = models[args.model](states, k_max, device, dtype)
-        model.load(args.path)
+        model.load(args.cd)
 
         model.init(learning_rate, batch_size)
         model.run(num_iter)
@@ -55,13 +82,6 @@ def add_parser(subparsers, parent_parser):
         help="Tapqir model to fit the data",
     )
     parser.add_argument(
-        "path",
-        nargs="?",
-        type=Path,
-        help="Path to the Tapqir folder",
-        default=Path.cwd(),
-    )
-    parser.add_argument(
         "-k",
         metavar="<number>",
         default=2,
@@ -78,7 +98,7 @@ def add_parser(subparsers, parent_parser):
         "-bs",
         metavar="<number>",
         type=int,
-        help="Batch size (default: 5)",
+        help="Batch size",
     )
     parser.add_argument(
         "-lr",

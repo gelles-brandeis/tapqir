@@ -2,48 +2,54 @@ Installation
 ============
 
 
-``tapqir`` can be installed via pip.  
+Tapqir can be installed via ``pip`` package manager.  
 
-Prerequisites
-~~~~~~~~~~~~~
+Install with pip
+~~~~~~~~~~~~~~~~
 
-1. Install CUDA_. Practical use of ``tapqir`` requires a computer with a CUDA-capable GPU.
+.. important::
 
-2. Install Anaconda_. We recommend to use Anaconda package manager to create virtual
-   environment and install ``tapqir`` in the virtual environment. After Anaconda
-   installation create and activate a new environment in Anaconda Prompt:
+  1. Install CUDA_. Practical use of ``tapqir`` requires a computer with
+     a CUDA-capable GPU.
 
-    .. code-block:: bash
+  2. We strongly recommend creating a virtual environment to encapsulate your
+     installation. For example creating a new environment using Anaconda_::
 
-        conda create --name tapqir-env python=3.8
-        conda activate tapqir-env
+          $ conda create --name tapqir-env python=3.8
+          $ conda activate tapqir-env
 
-If you are using Anaconda package manager make sure that your created environment
-is activated (you should see the environment name (e.g., ``tapqir-env``) in the command prompt.
+     Before installing & using Tapqir make sure that your created environment
+     is activated (you should see the environment name (e.g., ``tapqir-env``)
+     in the command prompt.
 
 .. _CUDA: https://developer.nvidia.com/cuda-downloads
 .. _Anaconda: https://docs.anaconda.com/anaconda/install/
 
-Pip
-~~~
+.. code:: bash
 
-Install Tapqir using pip::
+    $ pip install git+https://github.com/gelles-brandeis/tapqir.git
 
-    pip install git+https://github.com/gelles-brandeis/tapqir.git
+Install in google colab
+~~~~~~~~~~~~~~~~~~~~~~~
 
-Development
-~~~~~~~~~~~
+.. code:: bash
+
+    !pip install --quiet git+https://github.com/gelles-brandeis/tapqir.git > install.log
+
+Install from source
+~~~~~~~~~~~~~~~~~~~
 
 For development - install from source::
 
-    git clone https://github.com/gelles-brandeis/tapqir.git
-    cd tapqir
-    pip install -e .[dev]
+    $ git clone https://github.com/gelles-brandeis/tapqir.git
+    $ cd tapqir
+    $ make install
 
-Set up tapqir server (optional)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Set up a slurm server (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Linux machines can be set up to run as servers. Following is a short instruction for Arch Linux.
+Linux machines can be set up to run as servers. Following is a short instruction
+for Arch Linux.
 
 ssh server
 ----------

@@ -49,7 +49,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: notebooks/tutorial
+    .. link-button:: user_guide/index
             :type: ref
             :text: To the tutorial
             :classes: btn-block btn-secondary stretched-link
@@ -65,7 +65,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: api
+    .. link-button:: commands/index
             :type: ref
             :text: To the API reference
             :classes: btn-block btn-secondary stretched-link
@@ -80,18 +80,16 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: examples/index
+    .. link-button:: user_guide/tutorial
             :type: ref
             :text: To the examples
             :classes: btn-block btn-secondary stretched-link
 
 .. toctree::
-   :maxdepth: 3
    :titlesonly:
    :hidden:
 
    install
-   notebooks/tutorial
-   api
-   examples/index
+   user_guide/index
+   commands/index
    user_guide/commands

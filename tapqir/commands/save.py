@@ -1,6 +1,16 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""
+stats
+~~~~~
+
+Fit the data to the selected model.
+
+Description
+-----------
+"""
+
 from pathlib import Path
 
 
@@ -28,10 +38,10 @@ def CmdStats(args):
     with pyro_backend(PYRO_BACKEND):
 
         model = models[args.model](1, 2, "cpu", dtype)
-        model.load(args.path)
+        model.load(args.cd)
         model.load_checkpoint(param_only=True)
 
-        save_stats(model, args.path, save_matlab=args.matlab)
+        save_stats(model, args.cd, save_matlab=args.matlab)
 
 
 def add_parser(subparsers, parent_parser):
@@ -47,18 +57,6 @@ def add_parser(subparsers, parent_parser):
         "model",
         type=str,
         help="Tapqir model to fit the data",
-    )
-    parser.add_argument(
-        "path",
-        nargs="?",
-        type=Path,
-        help="Path to the Tapqir folder",
-        default=Path.cwd(),
-    )
-    parser.add_argument(
-        "--cuda",
-        help="Run computations on GPU",
-        action="store_true",
     )
     parser.add_argument(
         "--funsor",

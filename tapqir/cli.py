@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import argparse
+from pathlib import Path
 
 from tapqir import __version__ as tapqir_version
 
@@ -27,16 +28,22 @@ def get_main_parser():
         description=desc,
         parents=[parent_parser],
         formatter_class=argparse.RawTextHelpFormatter,
-        add_help=True,
     )
     parser.add_argument("-v", "--version", action="version", version=tapqir_version)
+    parser.add_argument(
+        "--cd",
+        type=Path,
+        help="Change working directory (default: current working directory)",
+        default=Path.cwd(),
+        metavar="<path>",
+    )
 
     # subparsers = parser.add_subparsers()
     subparsers = parser.add_subparsers(
-        title="Available Commands",
-        metavar="COMMAND",
+        title="Available sub-commands",
+        metavar="<command>",
         dest="cmd",
-        help="Use `tapqir COMMAND --help` for command-specific help.",
+        help="Use `tapqir <command> -h` for command-specific help.",
     )
 
     for cmd in COMMANDS:
@@ -49,5 +56,4 @@ def parse_args(argv=None):
     """Parses CLI arguments."""
     parser = get_main_parser()
     args = parser.parse_args()
-    args.func(args)
     return args
