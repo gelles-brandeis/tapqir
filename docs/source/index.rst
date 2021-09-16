@@ -42,10 +42,10 @@ ordabayev@brandeis.edu
     ---
     :img-top: _static/fi-rr-book-alt.svg
 
-    Tutorial
-    ^^^^^^^^
+    User Guide
+    ^^^^^^^^^^
 
-    The tutorial provides in-depth information on running tapqir models.
+    The user guide provides in-depth information on running tapqir models.
 
     +++
 
@@ -57,11 +57,11 @@ ordabayev@brandeis.edu
     ---
     :img-top: _static/fi-rr-layers.svg
 
-    API reference
-    ^^^^^^^^^^^^^
+    Command Reference
+    ^^^^^^^^^^^^^^^^^
 
     The reference guide contains a detailed description of
-    the tapqir API.
+    the tapqir commands.
 
     +++
 
@@ -92,4 +92,3 @@ ordabayev@brandeis.edu
    install
    user_guide/index
    commands/index
-   user_guide/commands
