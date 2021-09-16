@@ -107,16 +107,6 @@ nbsphinx_prolog = r"""
 """  # noqa: E501
 
 
-# -- Copy notebook files
-
-if not os.path.exists("notebooks"):
-    os.makedirs("notebooks")
-
-for src_file in glob.glob("../../notebooks/*.ipynb"):
-    dst_file = os.path.join("notebooks", src_file.split("/")[-1])
-    shutil.copy(src_file, "notebooks/")
-
-
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
