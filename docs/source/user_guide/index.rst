@@ -51,8 +51,8 @@ Options:
 
 * ``--frame-end`` - Last frame to include in the analysis (optional)
 
-Optionally starting and ending frames can be specified by ``frame_start`` and ``frame_end``,
-otherwise, full range of frames from the driftlist file will be analyzed.
+Optionally starting and ending frames can be specified by ``--frame-start`` and
+``--frame-end``, otherwise, full range of frames from the driftlist file will be analyzed.
 
 The program will output ``data.tpqr`` file containing extracted AOIs, target
 (and off-target control) locations, empirical offset distirbution.

@@ -58,7 +58,7 @@ panels_add_bootstrap_css = False
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = [".rst", ".ipynb"]
+source_suffix = [".rst"]
 
 # do not execute cells
 nbsphinx_execute = "never"
