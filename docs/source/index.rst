@@ -80,7 +80,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: user_guide/tutorial
+    .. link-button:: user_guide/index
             :type: ref
             :text: To the examples
             :classes: btn-block btn-secondary stretched-link
