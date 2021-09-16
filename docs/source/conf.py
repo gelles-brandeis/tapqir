@@ -40,8 +40,6 @@ release = __version__
 # ones.
 extensions = [
     "nbsphinx",
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
     "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
@@ -64,9 +62,6 @@ source_suffix = [".rst", ".ipynb"]
 
 # do not execute cells
 nbsphinx_execute = "never"
-
-# Generate the API documentation when building
-autosummary_generate = True
 
 intersphinx_mapping = dict(
     ipython=("https://ipython.readthedocs.io/en/stable/", None),
@@ -147,5 +142,3 @@ html_context = {
 html_static_path = ["_static"]
 html_css_files = ["css/sphinx_gallery.css"]
 html_logo = "_static/logo.png"
-
-autodoc_default_options = {"member-order": "bysource"}
