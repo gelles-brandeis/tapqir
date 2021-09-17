@@ -136,4 +136,4 @@ Checkout our google colab tutorial:
 
 .. nbgallery::
 
-   tutorial
+   ../notebooks/tutorial

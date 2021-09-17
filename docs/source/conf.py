@@ -84,7 +84,7 @@ pygments_style = "sphinx"
 
 # This is processed by Jinja2 and inserted before each notebook
 nbsphinx_prolog = r"""
-{% set docname = env.doc2path(env.docname, base=None) %}
+{% set docname = 'notebooks/' + env.doc2path(env.docname, base=None).split('/')[-1] %}
 :github_url: https://github.com/gelles-brandeis/tapqir/blob/latest/{{ docname }}
 
 .. raw:: html
@@ -99,6 +99,16 @@ nbsphinx_prolog = r"""
       </span>
     </div>
 """  # noqa: E501
+
+
+# -- Copy notebook files
+
+if not os.path.exists("notebooks"):
+    os.makedirs("notebooks")
+
+for src_file in glob.glob("../../notebooks/*.ipynb"):
+    dst_file = os.path.join("notebooks", src_file.split("/")[-1])
+    shutil.copy(src_file, "notebooks/")
 
 
 # -- Options for HTML output -------------------------------------------------
