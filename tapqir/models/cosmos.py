@@ -23,9 +23,9 @@ class Cosmos(Model):
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", marginal=False):
         super().__init__(S, K, device, dtype)
+        self._global_params = ["gain", "proximity", "lamda", "pi"]
         if marginal:
             self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
-            self._global_params = ["gain", "proximity", "lamda", "pi"]
             self._classify = False
         else:
             self.conv_params = ["-ELBO"]

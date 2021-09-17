@@ -47,13 +47,13 @@ def add_parser(subparsers, parent_parser):
         help="Tapqir model to fit the data",
     )
     parser.add_argument(
-        "--funsor",
-        help="Use funsor as backend",
+        "--matlab",
+        help="Save parameters in matlab format (default: False)",
         action="store_true",
     )
     parser.add_argument(
-        "--matlab",
-        help="Save parameters in matlab format (default: False)",
+        "--funsor",
+        help="Use funsor as backend",
         action="store_true",
     )
     parser.set_defaults(func=CmdStats)
