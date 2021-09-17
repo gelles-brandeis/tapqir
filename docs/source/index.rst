@@ -51,7 +51,7 @@ ordabayev@brandeis.edu
 
     .. link-button:: user_guide/index
             :type: ref
-            :text: To the tutorial
+            :text: To the user guide
             :classes: btn-block btn-secondary stretched-link
 
     ---

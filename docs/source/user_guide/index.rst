@@ -149,7 +149,7 @@ configured on the machine Tapqir analysis can be submitted as a slurm job::
 What's next?
 ~~~~~~~~~~~~
 
-Checkout our google colab tutorial:
+Checkout analysis examples:
 
 .. nbgallery::
 

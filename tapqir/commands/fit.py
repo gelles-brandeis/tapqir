@@ -85,17 +85,9 @@ def add_parser(subparsers, parent_parser):
         action="store_true",
     )
     parser.add_argument(
-        "-k",
-        metavar="<number>",
-        default=2,
-        type=int,
-        help="Maximum number of spots (default: 2)",
-    )
-    parser.add_argument(
-        "-it",
-        metavar="<number>",
-        type=int,
-        help="Number of iterations (default: 0)",
+        "--cuda",
+        help="Run computations on GPU",
+        action="store_true",
     )
     parser.add_argument(
         "-bs",
@@ -111,9 +103,17 @@ def add_parser(subparsers, parent_parser):
         help="Learning rate (default: 0.005)",
     )
     parser.add_argument(
-        "--cuda",
-        help="Run computations on GPU",
-        action="store_true",
+        "-it",
+        metavar="<number>",
+        type=int,
+        help="Number of iterations (default: 0)",
+    )
+    parser.add_argument(
+        "-k",
+        metavar="<number>",
+        default=2,
+        type=int,
+        help="Maximum number of spots (default: 2)",
     )
     parser.add_argument(
         "--funsor",
