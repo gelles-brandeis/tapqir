@@ -14,7 +14,7 @@ by running  ``tapqir init`` inside the new folder::
     $ tapqir init
 
 ``tapqir init`` command will create a ``.tapqir`` folder that will store internal files
-such as ``config`` file and ``log`` file.
+such as ``config`` file, ``log`` file, and checkpoints.
 
 Preprocessing raw input data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,18 +75,18 @@ Options:
   Memory-Usage and GPU-Util values. Our recommendation is to increase batch size till
   GPU-Util is high (> 70%) but not maxed out.
 
-* ``-it <number>`` - Number of fitting iterations. Setting it to 0 will run the program
-  till our custom convergence criteria is satisfied. We recommend to set it to 0 (default)
+* ``-it <number>`` - Number of fitting iterations. Setting it to 0 will run the program till 
+  Tapqir's custom convergence criteria is satisfied. We recommend to set it to 0 (default)
   and then run for additional number of iterations if necessary. Convergence of global
-  parameters can be visually checked using `tensorboard`_.
+  parameters can be visually checked using tensorboard_.
 
-The program will save checkpoint every 100 iterations (checkpoint is saved in ``.tapqir`` folder).
+The program will save a checkpoint every 100 iterations (checkpoint is saved in ``.tapqir`` folder).
 Starting the program again will resume from the last saved checkpoint. At every checkpoint the values of
 global parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``, ``pi_mean``, ``lamda_loc``) are also recorded
-for visualization by `tensorboard`_. Plateaued plots is a sign of convergence.
+for visualization by tensorboard_. Plateaued plots is a sign of convergence.
 
 After marginalized (``--marginal``) model has converged run the full ``cosmos`` model (usually
-15000-20000 iterations is enough)::
+15,000-20,000 iterations is enough)::
 
     $ tapqir fit cosmos --cuda -bs <number> -it <number>
 
@@ -99,11 +99,9 @@ After marginalized (``--marginal``) model has converged run the full ``cosmos`` 
 Tensorboard
 -----------
 
-Fitting progress can be inspected using tensorboard_ program::
+Fitting progress can be inspected using `tensorboard program <https://www.tensorflow.org/tensorboard>`_::
 
     tensorboard --logdir=.
-
-.. _tensorboard: https://www.tensorflow.org/tensorboard
 
 Posterior distributions
 -----------------------
@@ -123,8 +121,22 @@ To visualize analysis results run::
 
     $ tapqir show cosmos
 
-which will display parameter values (mean and 95% CI), original images along with
-the best fit estimates.
+which will open GUI displaying parameter values (mean and 95% CI). Clicking on the ``Images`` button
+will show original images along with the best fit estimates.
+
+..
+    Configuration file
+    ~~~~~~~~~~~~~~~~~~
+
+    Tapqir stores command options in the configuration file ``.tapqir/config``. When the program is run
+    command option values are automatically saved in the ``config`` file and used as a default value in
+    the next invocation. To manually change option values ``tapqir config`` command can be used::
+
+        $ tapqir config <name> <value>
+
+    where
+
+    * ``<value>`` - Option name (command.option). For example ``fit.bs``
 
 Using slurm
 ~~~~~~~~~~~
