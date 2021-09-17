@@ -37,6 +37,7 @@ def CmdFit(args):
     num_iter = args.it
     batch_size = args.bs
     learning_rate = args.lr
+    marginal = args.marginal
     device = "cuda" if args.cuda else "cpu"
     backend = "funsor" if args.funsor else "pyro"
 
@@ -57,12 +58,11 @@ def CmdFit(args):
 
     with pyro_backend(PYRO_BACKEND):
 
-        model = models[args.model](states, k_max, device, dtype)
+        model = models[args.model](states, k_max, device, dtype, marginal)
         model.load(args.cd)
 
         model.init(learning_rate, batch_size)
         model.run(num_iter)
-        # model.compute_stats()
 
 
 def add_parser(subparsers, parent_parser):
@@ -78,6 +78,11 @@ def add_parser(subparsers, parent_parser):
         "model",
         type=str,
         help="Tapqir model to fit the data",
+    )
+    parser.add_argument(
+        "--marginal",
+        help="Marginalize out theta in the model (default: False)",
+        action="store_true",
     )
     parser.add_argument(
         "-k",

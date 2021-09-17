@@ -10,23 +10,26 @@ from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
-from tapqir import __version__ as tapqir_version
 from tapqir.distributions import AffineBeta, KSpotGammaNoise
 from tapqir.models.model import Model
 
 
-class CosmosMarginal(Model):
+class Cosmos(Model):
     """
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "marginal"
+    name = "cosmos"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
+    def __init__(self, S=1, K=2, device="cpu", dtype="double", marginal=False):
         super().__init__(S, K, device, dtype)
-        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
-        self._global_params = ["gain", "proximity", "lamda", "pi"]
-        self._classify = False
+        if marginal:
+            self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+            self._global_params = ["gain", "proximity", "lamda", "pi"]
+            self._classify = False
+        else:
+            self.conv_params = ["-ELBO"]
+            self._classify = True
 
     def TraceELBO(self, jit=False):
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
@@ -623,24 +626,3 @@ class CosmosMarginal(Model):
                 lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
                 constraint=constraints.simplex,
             )
-
-
-class Cosmos(CosmosMarginal):
-    """
-    Time-independent Single Molecule Colocalization Model.
-    """
-
-    name = "cosmos"
-
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
-        super().__init__(S, K, device, dtype)
-        self.conv_params = ["-ELBO"]
-        self._classify = True
-
-    def init_parameters(self):
-        # load pre-trained paramters
-        self.load_checkpoint(
-            path=self.path / ".tapqir" / "marginal" / tapqir_version.split("+")[0],
-            param_only=True,
-            warnings=True,
-        )

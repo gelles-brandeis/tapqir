@@ -60,10 +60,10 @@ The program will output ``data.tpqr`` file containing extracted AOIs, target
 Data analysis
 ~~~~~~~~~~~~~
 
-Fit the data to the ``marginal`` model (time-independent model with :math:`\theta`
-marginalized out)::
+Fit the data to the time-independent ``cosmos`` model with :math:`\theta`
+marginalized out (``--marginal``)::
 
-    $ tapqir fit marginal --cuda -bs <number> -it <number>
+    $ tapqir fit cosmos --marginal --cuda -bs <number> -it <number>
 
 Options:
 
@@ -80,7 +80,12 @@ Options:
   and then run for additional number of iterations if necessary. Convergence of global
   parameters can be visually checked using `tensorboard`_.
 
-After ``marginal`` model has converged run the full ``cosmos`` model (usually
+The program will save checkpoint every 100 iterations (checkpoint is saved in ``.tapqir`` folder).
+Starting the program again will resume from the last saved checkpoint. At every checkpoint the values of
+global parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``, ``pi_mean``, ``lamda_loc``) are also recorded
+for visualization by `tensorboard`_. Plateaued plots is a sign of convergence.
+
+After marginalized (``--marginal``) model has converged run the full ``cosmos`` model (usually
 15000-20000 iterations is enough)::
 
     $ tapqir fit cosmos --cuda -bs <number> -it <number>
@@ -94,7 +99,7 @@ After ``marginal`` model has converged run the full ``cosmos`` model (usually
 Tensorboard
 -----------
 
-Fitting progress can be visualized using tensorboard_ program::
+Fitting progress can be inspected using tensorboard_ program::
 
     tensorboard --logdir=.
 
@@ -112,7 +117,7 @@ Options:
 * ``--matlab`` - Save parameters in matlab format (default: False)
 
 Parameters with their mean value, 95% CI lower limit and upper limit are saved in
-``cosmos-params.tqpr``, ``params.mat``, and ``statistics.csv`` files.
+``cosmos-params.tqpr``, ``cosmos-params.mat``, and ``statistics.csv`` files.
 
 To visualize analysis results run::
 
