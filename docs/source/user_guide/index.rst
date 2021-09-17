@@ -149,8 +149,4 @@ configured on the machine Tapqir analysis can be submitted as a slurm job::
 What's next?
 ~~~~~~~~~~~~
 
-Checkout analysis examples:
-
-.. nbgallery::
-
-   ../notebooks/tutorial
+Checkout :doc:`../examples/index`.

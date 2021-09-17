@@ -80,7 +80,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: notebooks/tutorial
+    .. link-button:: examples/index
             :type: ref
             :text: To the examples
             :classes: btn-block btn-secondary stretched-link
@@ -92,3 +92,4 @@ ordabayev@brandeis.edu
    install
    user_guide/index
    commands/index
+   examples/index
