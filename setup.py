@@ -31,6 +31,7 @@ TEST_REQUIRE = [
 ]
 # docs
 DOCS_REQUIRE = [
+    "IPython",
     "nbsphinx>=0.8.5",
     "sphinx",
     "pydata_sphinx_theme",
