@@ -3,18 +3,23 @@
 User Guide
 ==========
 
+.. note::
+
+    Checkout an :doc:`example <../examples/Rpb1SNAP549>` analysis of a sample data set that
+    can be followed along with this user guide or used as a template for your own analysis.
+
 Initialize Tapqir analysis folder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To start the analysis with Tapqir create an empty folder and initialize it
-by running  ``tapqir init`` inside the new folder::
+To start the analysis create an empty folder and initialize it by running
+``tapqir init`` inside the new folder::
 
     $ mkdir new_folder
     $ cd new_folder
     $ tapqir init
 
 ``tapqir init`` command will create a ``.tapqir`` folder that will store internal files
-such as ``config`` file, ``log`` file, and checkpoints.
+such as ``config`` file, ``log`` file, and model checkpoints.
 
 Preprocessing raw input data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,8 +150,3 @@ If `Slurm Workload Manager <https://slurm.schedmd.com/documentation.html>`_ is
 configured on the machine Tapqir analysis can be submitted as a slurm job::
 
     $ sbatch --job-name <name> --gres gpu:1 tapqir fit <model> --cuda -bs <number> -it <number>
-
-What's next?
-~~~~~~~~~~~~
-
-Checkout :doc:`../examples/index`.
