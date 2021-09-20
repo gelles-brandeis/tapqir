@@ -1,5 +1,5 @@
-Commands
-========
+Command Reference
+=================
 
 .. argparse::
    :ref: tapqir.cli.get_main_parser

@@ -56,8 +56,8 @@ ordabayev@brandeis.edu
     ---
     :img-top: _static/fi-rr-layers.svg
 
-    Commands
-    ^^^^^^^^
+    Command Reference
+    ^^^^^^^^^^^^^^^^^
 
     The reference guide contains a detailed description of
     the tapqir commands.
@@ -90,5 +90,5 @@ ordabayev@brandeis.edu
 
    install
    user_guide/index
-   commands/index
    examples/index
+   commands/index
