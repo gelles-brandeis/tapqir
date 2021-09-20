@@ -3,4 +3,4 @@ Examples
 
 .. nbgallery::
 
-   ../notebooks/Rpb1SNAP549
+   Rpb1SNAP549

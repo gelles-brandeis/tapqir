@@ -104,12 +104,8 @@ nbsphinx_prolog = r"""
 
 # -- Copy notebook files
 
-if not os.path.exists("notebooks"):
-    os.makedirs("notebooks")
-
 for src_file in glob.glob("../../notebooks/*.ipynb"):
-    dst_file = os.path.join("notebooks", src_file.split("/")[-1])
-    shutil.copy(src_file, "notebooks/")
+    shutil.copy(src_file, "examples/")
 
 
 # -- Options for HTML output -------------------------------------------------

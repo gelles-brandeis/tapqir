@@ -1,12 +1,11 @@
-Documentation
-=============
+Tapqir Documentation
+====================
 
-:mod:`tapqir` is software to analyze images from single-molecule fluorescence colocalization experiments 
-using a Bayesian statistics-based image classification method.
+Tapqir is software to analyze images from single-molecule fluorescence colocalization experiments 
+using a Bayesian statistics-based image classification method. Tapqir is implemented in
+`Pyro <https://pyro.ai/>`_, a Python-based probabilistic programming language.
 
-:mod:`tapqir` is implemented in `Pyro <https://pyro.ai/>`_, a Python-based probabilistic programming language.
-
-:mod:`tapqir` is open source software licensed under the `GNU General Public License, version 3 <http://www.gnu.org/licenses/gpl-3.0.txt>`_.
+**License**: Tapqir is open source software licensed under the `GNU General Public License, version 3 <http://www.gnu.org/licenses/gpl-3.0.txt>`_.
 
 **Author**:
 Yerdos Ordabayev;
