@@ -7,4 +7,5 @@ for your own analysis.
 
 .. nbgallery::
 
-   Rpb1SNAP549
+   example_part_i
+   example_part_ii
