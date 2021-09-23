@@ -17,7 +17,7 @@ Linux
 .. important::
 
    We strongly recommend creating a virtual environment to encapsulate your
-   installation. For example use Anaconda_ package manager to create
+   installation. For example use Anaconda_ package manager to create and activate
    a new environment::
 
         $ conda create --name tapqir-env python=3.8
