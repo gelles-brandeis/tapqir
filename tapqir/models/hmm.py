@@ -118,7 +118,7 @@ class HMM(Cosmos):
         return result
 
     @property
-    def theta_probs(self):
+    def theta_trans_marginal(self):
         result = self._sequential_logmatmulexp(pyro.param("d/theta_trans").data.log())
         return result[..., 0, :].exp()
 
@@ -127,7 +127,7 @@ class HMM(Cosmos):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return self.theta_probs.data[..., 1:].permute(2, 0, 1)
+        return self.theta_trans_marginal.data[..., 1:].permute(2, 0, 1)
 
     @property
     def m_probs(self):
@@ -135,7 +135,9 @@ class HMM(Cosmos):
         Probability of a spot :math:`p(m_{knf})`.
         """
         return torch.einsum(
-            "sknf,nfs->knf", pyro.param("d/m_probs").data[..., 1], self.theta_probs
+            "sknf,nfs->knf",
+            pyro.param("d/m_probs").data[..., 1],
+            self.theta_trans_marginal,
         )
 
     def model(self):
