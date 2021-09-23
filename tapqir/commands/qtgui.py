@@ -301,7 +301,7 @@ class MainWindow(QMainWindow):
             # if self.Model._classifier:
             self.prob[(f - f1) % 100].setOpts(
                 height=(
-                    self.Model.params["d/z_probs"][
+                    self.Model.params["d/theta_probs"][
                         :, int(self.aoiNumber.text()), f
                     ].sum()
                     * self.Model.data.P,

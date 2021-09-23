@@ -123,7 +123,7 @@ class HMM(Cosmos):
         return result[..., 0, :].exp()
 
     @property
-    def z_probs(self):
+    def theta_probs(self):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """

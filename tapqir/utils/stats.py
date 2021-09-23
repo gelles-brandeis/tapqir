@@ -143,7 +143,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
     if model.pspecific is not None:
         ci_stats["d/m_probs"] = model.m_probs.data.cpu()
-        ci_stats["d/z_probs"] = model.z_probs.data.cpu()
+        ci_stats["d/theta_probs"] = model.theta_probs.data.cpu()
         ci_stats["d/j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
         ci_stats["z_map"] = model.z_map.data.cpu()
@@ -203,7 +203,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             for param, field in ci_stats.items():
                 if param in (
                     "d/m_probs",
-                    "d/z_probs",
+                    "d/theta_probs",
                     "d/j_probs",
                     "p(specific)",
                     "z_map",

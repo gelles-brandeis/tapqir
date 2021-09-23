@@ -330,5 +330,5 @@ class Model:
             + self.params["d/background"]["Mean"] * self.params["gain"]["Mean"]
         ).sqrt()
         result = signal / noise
-        mask = self.z_probs > 0.5
+        mask = self.theta_probs > 0.5
         return result[mask]

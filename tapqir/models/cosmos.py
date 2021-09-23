@@ -89,7 +89,7 @@ class Cosmos(Model):
         return torch.clamp(self.theta_to_z, min=0, max=1)
 
     @property
-    def z_probs(self):
+    def theta_probs(self):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
@@ -100,7 +100,7 @@ class Cosmos(Model):
         r"""
         Probability of an off-target spot :math:`p(j_{knf})`.
         """
-        return self.m_probs - self.z_probs
+        return self.m_probs - self.theta_probs
 
     @property
     def m_probs(self):
@@ -115,7 +115,7 @@ class Cosmos(Model):
 
     @property
     def pspecific(self):
-        return self.z_probs.sum(-3)
+        return self.theta_probs.sum(-3)
 
     @property
     def z_map(self):
