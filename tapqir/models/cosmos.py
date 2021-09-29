@@ -19,7 +19,7 @@ class Cosmos(Model):
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "cosmos"
+    name = "cosmosmz"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", marginal=False):
         super().__init__(S, K, device, dtype)
@@ -70,11 +70,10 @@ class Cosmos(Model):
 
     @property
     def probs_theta(self):
-        result = torch.zeros(self.K * self.S + 1, dtype=self.dtype)
-        result[0] = self.pi[0]
-        for s in range(self.S):
-            for k in range(self.K):
-                result[self.K * s + k + 1] = self.pi[s + 1] / self.K
+        result = torch.zeros(2, self.K * self.S + 1, dtype=self.dtype)
+        result[0, 0] = 1
+        result[1, 1] = 0.5
+        result[1, 2] = 0.5
         return result
 
     @lazy_property
@@ -115,7 +114,7 @@ class Cosmos(Model):
 
     @property
     def pspecific(self):
-        return self.theta_probs.sum(-3)
+        return pyro.param("d/z_probs")[..., 1].data
 
     @property
     def z_map(self):
@@ -237,17 +236,23 @@ class Cosmos(Model):
                 # sample hidden model state (1+K*S,)
                 if prefix == "d":
                     if self._classify:
-                        theta = pyro.sample(
-                            f"{prefix}/theta",
-                            dist.Categorical(self.probs_theta),
+                        z = pyro.sample(
+                            f"{prefix}/z",
+                            dist.Categorical(self.pi),
                         )
                     else:
-                        theta = pyro.sample(
-                            f"{prefix}/theta",
-                            dist.Categorical(self.probs_theta),
+                        z = pyro.sample(
+                            f"{prefix}/z",
+                            dist.Categorical(self.pi),
                             infer={"enumerate": "parallel"},
                         )
+                    theta = pyro.sample(
+                        f"{prefix}/theta",
+                        dist.Categorical(self.probs_theta[z]),
+                        infer={"enumerate": "parallel"},
+                    )
                 else:
+                    z = 0
                     theta = 0
 
                 ms, heights, widths, xs, ys = [], [], [], [], []
@@ -371,10 +376,10 @@ class Cosmos(Model):
                     ),
                 )
                 if self._classify and prefix == "d":
-                    theta = pyro.sample(
-                        f"{prefix}/theta",
+                    pyro.sample(
+                        f"{prefix}/z",
                         dist.Categorical(
-                            Vindex(pyro.param(f"{prefix}/theta_probs"))[
+                            Vindex(pyro.param(f"{prefix}/z_probs"))[
                                 ndx[:, None], fdx
                             ].to(self.device)
                         ),
@@ -383,29 +388,9 @@ class Cosmos(Model):
 
                 for kdx in spots:
                     # sample spot presence m
-                    if prefix == "d":
-                        if self._classify:
-                            m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                                theta, kdx, ndx[:, None], fdx
-                            ].to(self.device)
-                        else:
-                            m_probs = torch.einsum(
-                                "snft,nfs->nft",
-                                Vindex(pyro.param(f"{prefix}/m_probs"))[
-                                    torch.arange(self.S * self.K + 1)[:, None, None],
-                                    kdx,
-                                    ndx[:, None],
-                                    fdx,
-                                    :,
-                                ].to(self.device),
-                                Vindex(pyro.param(f"{prefix}/theta_probs"))[
-                                    ndx[:, None], fdx, :
-                                ].to(self.device),
-                            )
-                    else:
-                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                            kdx, ndx[:, None], fdx
-                        ].to(self.device)
+                    m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                        kdx, ndx[:, None], fdx
+                    ].to(self.device)
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}",
                         dist.Categorical(m_probs),
@@ -605,24 +590,12 @@ class Cosmos(Model):
         # classification
         if prefix == "d":
             pyro.param(
-                "d/theta_probs",
-                lambda: torch.ones(data.N, data.F, 1 + self.K * self.S, device=device),
+                "d/z_probs",
+                lambda: torch.ones(data.N, data.F, 1 + self.S, device=device),
                 constraint=constraints.simplex,
             )
-            m_probs = torch.ones(
-                1 + self.K * self.S,
-                self.K,
-                data.N,
-                data.F,
-                2,
-                device=device,
-            )
-            m_probs[1, 0, :, :, 0] = 0
-            m_probs[2, 1, :, :, 0] = 0
-            pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
-        else:
-            pyro.param(
-                "c/m_probs",
-                lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
-                constraint=constraints.simplex,
-            )
+        pyro.param(
+            f"{prefix}/m_probs",
+            lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
+            constraint=constraints.simplex,
+        )
