@@ -151,7 +151,7 @@ class Cosmos(Model):
         if self._classify:
             return {
                 "expose_types": ["sample"],
-                "expose": ["d/theta_probs", "d/m_probs"],
+                "expose": ["d/z_probs"],
             }
         return {"expose_types": ["sample", "param"]}
 
