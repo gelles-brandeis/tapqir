@@ -104,4 +104,4 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         device=model.device,
     )
 
-    return model
+    return samples
