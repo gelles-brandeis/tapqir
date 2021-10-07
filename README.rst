@@ -24,7 +24,7 @@ Bayesian analysis of co-localization single-molecule microscopy image data.
 Disclaimer
 ==========
 
-This is an alpha version of the program. It may contain bugs and is subject to change. A preprint describing the model and algorithm is forthcoming.
+This is an alpha version of the program. It may contain bugs and is subject to change.
 
 Installing
 ==========
@@ -41,13 +41,12 @@ Documentation and tutorial available at `tapqir.readthedocs.io <https://tapqir.r
 Citation
 ========
 
-If you use Tapqir, please consider citing::
+If you use Tapqir, please consider citing our preprint::
 
-  @article{ordabayev2021tapqir,
-    author    = {Yerdos A. Ordabayev and
-                 Larry Friedman and
-                 Douglas L. Theobald and
-                 Jeff Gelles},
-    title     = {Bayesian Analysis of the Colocalization Single Molecule Image Data},
-    year      = {2021},
+  @article{ordabayev2021bayesian,
+    title={Bayesian machine learning analysis of single-molecule fluorescence colocalization images},
+    author={Ordabayev, Yerdos A and Friedman, Larry J and Gelles, Jeff and Theobald, Douglas},
+    journal={bioRxiv},
+    year={2021},
+    publisher={Cold Spring Harbor Laboratory}
   }
