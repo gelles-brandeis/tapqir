@@ -1,5 +1,5 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 import argparse
 import glob
@@ -18,7 +18,7 @@ dirty = []
 for basename, comment in file_types:
     copyright_line = comment.format("Copyright Contributors to the Tapqir project.\n")
     # See https://spdx.org/ids-how
-    spdx_line = comment.format("SPDX-License-Identifier: GPL-3.0-or-later\n")
+    spdx_line = comment.format("SPDX-License-Identifier: Apache-2.0\n")
 
     filenames = glob.glob(os.path.join(root, "**", basename), recursive=True)
     filenames.sort()
