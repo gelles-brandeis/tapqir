@@ -1,13 +1,11 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 from subprocess import check_call
 
 import pytest
 import torch
-from PySide2.QtCore import Qt
 
-from tapqir.commands.qtgui import MainWindow
 from tapqir.models import Cosmos
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
@@ -43,84 +41,83 @@ def dataset_path(tmp_path):
 def test_commands_cpu(dataset_path, qtbot):
 
     commands = [
-        ["tapqir", "config", dataset_path],
+        ["tapqir", "--cd", dataset_path, "init"],
         [
             "tapqir",
+            "--cd",
+            dataset_path,
             "fit",
             "cosmos",
-            dataset_path,
+            "--marginal",
+            "-bs",
+            "2",
             "-it",
             "100",
-            "-nsamples",
-            "2",
-            "-dev",
-            "cpu",
         ],
         [
             "tapqir",
-            "save",
-            "cosmos",
+            "--cd",
             dataset_path,
-            "-dev",
-            "cpu",
+            "fit",
+            "cosmos",
+            "-bs",
+            "2",
+            "-it",
+            "100",
         ],
-        #  [
-        #      "tapqir",
-        #      "fit",
-        #      "cosmos",
-        #      dataset_path,
-        #      "-it",
-        #      "100",
-        #      "-nsamples",
-        #      "2",
-        #      "-dev",
-        #      "cpu",
-        #      "-backend",
-        #      "funsor",
-        #  ],
+        [
+            "tapqir",
+            "--cd",
+            dataset_path,
+            "stats",
+            "cosmos",
+        ],
     ]
 
     for command in commands:
         check_call(command)
 
-    model = Cosmos()
-    window = MainWindow(model, dataset_path)
-    qtbot.addWidget(window)
-    qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
-    qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)
-    qtbot.mouseClick(window.aoiIncrLarge, Qt.LeftButton)
-    qtbot.mouseClick(window.aoiDecrLarge, Qt.LeftButton)
-    qtbot.keyClicks(window.aoiNumber, "1")
-    qtbot.mouseClick(window.refresh, Qt.LeftButton)
-    qtbot.mouseClick(window.images, Qt.LeftButton)
+    #  model = Cosmos()
+    #  window = MainWindow(model, dataset_path)
+    #  qtbot.addWidget(window)
+    #  qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
+    #  qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)
+    #  qtbot.mouseClick(window.aoiIncrLarge, Qt.LeftButton)
+    #  qtbot.mouseClick(window.aoiDecrLarge, Qt.LeftButton)
+    #  qtbot.keyClicks(window.aoiNumber, "1")
+    #  qtbot.mouseClick(window.refresh, Qt.LeftButton)
+    #  qtbot.mouseClick(window.images, Qt.LeftButton)
 
 
 @requires_cuda
 def test_commands_cuda(dataset_path):
     commands = [
-        ["tapqir", "config", dataset_path],
+        ["tapqir", "--cd", dataset_path, "init"],
         [
             "tapqir",
+            "--cd",
+            dataset_path,
             "fit",
             "cosmos",
-            dataset_path,
+            "--marginal",
+            "--cuda",
+            "-bs",
+            "2",
             "-it",
             "100",
-            "-nsamples",
-            "2",
         ],
-        #  [
-        #      "tapqir",
-        #      "fit",
-        #      "cosmos",
-        #      dataset_path,
-        #      "-it",
-        #      "100",
-        #      "-nsamples",
-        #      "2",
-        #      "-backend",
-        #      "funsor",
-        #  ],
+        [
+            "tapqir",
+            "--cd",
+            dataset_path,
+            "fit",
+            "cosmos",
+            "--cuda",
+            "-bs",
+            "2",
+            "-it",
+            "100",
+        ],
     ]
 
     for command in commands:

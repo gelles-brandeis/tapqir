@@ -1,82 +1,59 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
-
-import configparser
-from pathlib import Path
-
-from cliff.command import Command
-from pyroapi import pyro_backend
-
-from tapqir.imscroll.utils import save_matlab
-from tapqir.models import models
-from tapqir.utils.stats import save_stats
+# SPDX-License-Identifier: Apache-2.0
 
 
-class Save(Command):
-    """
-    Compute 95% confidence intervals for model parameters.
-    """
+def CmdStats(args):
+    from pyroapi import pyro_backend
 
-    def get_parser(self, prog_name):
-        parser = super(Save, self).get_parser(prog_name)
+    from tapqir.models import models
+    from tapqir.utils.stats import save_stats
 
-        parser.add_argument(
-            "model",
-            default="cosmos",
-            type=str,
-            help="Available models: {}".format(", ".join(models.keys())),
-        )
-        parser.add_argument(
-            "path", default=".", type=str, help="Path to the dataset folder"
-        )
-        parser.add_argument(
-            "-backend", metavar="BACKEND", type=str, help="Pyro backend (default: pyro)"
-        )
+    backend = "funsor" if args.funsor else "pyro"
+    dtype = "double"
 
-        parser.add_argument(
-            "-dev", metavar="DEVICE", type=str, help="Compute device (default: cuda)"
-        )
-        parser.add_argument(
-            "-dtype",
-            metavar="DTYPE",
-            type=str,
-            help="Floating number precision (default: float32)",
-        )
-        parser.add_argument(
-            "--matlab",
-            action="store_true",
-            help="Save parameters in matlab format (default: False)",
-        )
+    # pyro backend
+    if backend == "pyro":
+        PYRO_BACKEND = "pyro"
+    elif backend == "funsor":
+        import funsor
+        import pyro.contrib.funsor  # noqa: F401
 
-        return parser
+        funsor.set_backend("torch")
+        PYRO_BACKEND = "contrib.funsor"
+    else:
+        raise ValueError("Only pyro and funsor backends are supported.")
 
-    def take_action(self, args):
-        # read options.cfg file
-        config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(args.path) / "options.cfg"
-        config.read(cfg_file)
+    with pyro_backend(PYRO_BACKEND):
 
-        backend = args.backend or config["fit"].get("backend")
-        dtype = args.dtype or config["fit"].get("dtype")
+        model = models[args.model](1, 2, "cpu", dtype)
+        model.load(args.cd)
+        model.load_checkpoint(param_only=True)
 
-        # pyro backend
-        if backend == "pyro":
-            PYRO_BACKEND = "pyro"
-        elif backend == "funsor":
-            import funsor
-            import pyro.contrib.funsor  # noqa: F401
+        save_stats(model, args.cd, save_matlab=args.matlab)
 
-            funsor.set_backend("torch")
-            PYRO_BACKEND = "contrib.funsor"
-        else:
-            raise ValueError("Only pyro and funsor backends are supported.")
 
-        with pyro_backend(PYRO_BACKEND):
+def add_parser(subparsers, parent_parser):
+    STATS_HELP = "Compute credible intervals for model parameters."
 
-            model = models[args.model](1, 2, "cpu", dtype)
-            model.load(args.path)
-            model.load_checkpoint(param_only=True)
-
-            save_stats(model, args.path)
-            if args.matlab:
-                save_matlab(model, args.path)
+    parser = subparsers.add_parser(
+        "stats",
+        parents=[parent_parser],
+        description=STATS_HELP,
+        help=STATS_HELP,
+    )
+    parser.add_argument(
+        "model",
+        type=str,
+        help="Tapqir model to fit the data",
+    )
+    parser.add_argument(
+        "--matlab",
+        help="Save parameters in matlab format (default: False)",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--funsor",
+        help="Use funsor as backend",
+        action="store_true",
+    )
+    parser.set_defaults(func=CmdStats)

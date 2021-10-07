@@ -1,6 +1,7 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
+import configparser
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -16,15 +17,6 @@ from tapqir.utils.dataset import CosmosDataset, save
 
 # logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-formatter = logging.Formatter(
-    fmt="%(asctime)s - %(message)s",
-    datefmt="%m/%d/%Y %I:%M %p",
-)
-ch.setFormatter(formatter)
-logger.addHandler(ch)
 
 
 class GlimpseDataset:
@@ -39,8 +31,23 @@ class GlimpseDataset:
     :param path: path to the folder containing options.cfg file.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, path):
         """Read Glimpse files"""
+
+        # read options.cfg file
+        config = configparser.ConfigParser(allow_no_value=True)
+        cfg_file = Path(path) / ".tapqir" / "config"
+        config.read(cfg_file)
+        kwargs = {}
+        kwargs["title"] = config["glimpse"]["title"]
+        kwargs["header_dir"] = config["glimpse"]["dir"]
+        kwargs["ontarget_aoiinfo"] = config["glimpse"]["ontarget_aoiinfo"]
+        kwargs["offtarget_aoiinfo"] = config["glimpse"]["offtarget_aoiinfo"]
+        kwargs["driftlist"] = config["glimpse"]["driftlist"]
+        kwargs["frame_start"] = config["glimpse"].get("frame_start", None)
+        kwargs["frame_end"] = config["glimpse"].get("frame_end", None)
+        kwargs["ontarget_labels"] = config["glimpse"].get("ontarget_labels", None)
+        kwargs["offtarget_labels"] = config["glimpse"].get("offtarget_labels", None)
 
         dtypes = ["ontarget"]
         if kwargs["offtarget_aoiinfo"] is not None:
@@ -56,7 +63,7 @@ class GlimpseDataset:
         drift_mat = loadmat(kwargs["driftlist"])
         # convert driftlist into DataFrame
         drift_df = pd.DataFrame(
-            drift_mat["driftlist"][:, :3], columns=["frame", "dx", "dy"]
+            drift_mat["driftlist"][:, :3], columns=["frame", "dy", "dx"]
         )
         drift_df = drift_df.astype({"frame": int}).set_index("frame")
 
@@ -71,16 +78,16 @@ class GlimpseDataset:
             try:
                 aoi_df[dtype] = pd.DataFrame(
                     aoi_mat[dtype]["aoiinfo2"],
-                    columns=["frame", "ave", "x", "y", "pixnum", "aoi"],
+                    columns=["frame", "ave", "y", "x", "pixnum", "aoi"],
                 )
             except KeyError:
                 aoi_df[dtype] = pd.DataFrame(
                     aoi_mat[dtype]["aoifits"]["aoiinfo2"][0, 0],
-                    columns=["frame", "ave", "x", "y", "pixnum", "aoi"],
+                    columns=["frame", "ave", "y", "x", "pixnum", "aoi"],
                 )
             except IndexError:
                 aoi_df[dtype] = pd.DataFrame(
-                    aoi_mat[dtype], columns=["frame", "ave", "x", "y", "pixnum", "aoi"]
+                    aoi_mat[dtype], columns=["frame", "ave", "y", "x", "pixnum", "aoi"]
                 )
             aoi_df[dtype] = aoi_df[dtype].astype({"aoi": int}).set_index("aoi")
             # adjust to python indexing
@@ -89,12 +96,14 @@ class GlimpseDataset:
 
         # calculate the cumulative sum of dx and dy relative to the aoiinfo frame
         aoiinfo_frame = int(aoi_df["ontarget"].at[1, "frame"])
-        drift_df.loc[aoiinfo_frame + 1 :] = drift_df.loc[aoiinfo_frame + 1 :].cumsum(
-            axis=0
+        drift_df.loc[aoiinfo_frame + 1 :] = (
+            drift_df.loc[aoiinfo_frame + 1 :].cumsum(axis=0).values
         )
         drift_df.loc[aoiinfo_frame - 1 :: -1] = (
-            -drift_df.loc[aoiinfo_frame : drift_df.index[1] : -1]
-        ).cumsum(axis=0)
+            (-drift_df.loc[aoiinfo_frame : drift_df.index[1] : -1])
+            .cumsum(axis=0)
+            .values
+        )
 
         if kwargs["frame_start"] and kwargs["frame_end"]:
             f1 = int(kwargs["frame_start"])
@@ -175,19 +184,17 @@ class GlimpseDataset:
         return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
 
 
-def read_glimpse(**kwargs):
+def read_glimpse(path, P=14):
     """
     Preprocess glimpse files.
     """
-    P = kwargs.pop("P")
-    path = kwargs.pop("path")
-    glimpse = GlimpseDataset(**kwargs)
+    glimpse = GlimpseDataset(path)
 
-    abs_locs = defaultdict(lambda: None)
+    raw_target_xy = defaultdict(lambda: None)
     target_xy = defaultdict(lambda: None)
     data = defaultdict(lambda: None)
     for dtype in glimpse.dtypes:
-        abs_locs[dtype] = (
+        raw_target_xy[dtype] = (
             np.expand_dims(glimpse.aoiinfo[dtype][["x", "y"]].values, axis=1)
             + glimpse.cumdrift[["dx", "dy"]].values
         )
@@ -199,21 +206,22 @@ def read_glimpse(**kwargs):
         )
     offsets = np.zeros((len(glimpse.cumdrift), 4, 30, 30), dtype="int")
     # loop through each frame
-    for i, frame in enumerate(tqdm(glimpse.cumdrift.index)):
+    logger.info("Processing glimpse files ...")
+    for f, frame in enumerate(tqdm(glimpse.cumdrift.index)):
         img = glimpse[frame]
 
-        offsets[i, 0, :, :] += img[10:40, 10:40]
-        offsets[i, 1, :, :] += img[10:40, -40:-10]
-        offsets[i, 2, :, :] += img[-40:-10, 10:40]
-        offsets[i, 3, :, :] += img[-40:-10, -40:-10]
+        offsets[f, 0, :, :] += img[10:40, 10:40]
+        offsets[f, 1, :, :] += img[10:40, -40:-10]
+        offsets[f, 2, :, :] += img[-40:-10, 10:40]
+        offsets[f, 3, :, :] += img[-40:-10, -40:-10]
         for dtype in glimpse.dtypes:
             # loop through each aoi
-            for j, aoi in enumerate(glimpse.aoiinfo[dtype].index):
-                top_x = round(abs_locs[dtype][j, i, 0] - 0.5 * (P - 1))
-                left_y = round(abs_locs[dtype][j, i, 1] - 0.5 * (P - 1))
-                data[dtype][j, i, :, :] += img[top_x : top_x + P, left_y : left_y + P]
-                target_xy[dtype][j, i, 0] = abs_locs[dtype][j, i, 0] - top_x
-                target_xy[dtype][j, i, 1] = abs_locs[dtype][j, i, 1] - left_y
+            for n, aoi in enumerate(glimpse.aoiinfo[dtype].index):
+                shiftx = round(raw_target_xy[dtype][n, f, 0] - 0.5 * (P - 1))
+                shifty = round(raw_target_xy[dtype][n, f, 1] - 0.5 * (P - 1))
+                data[dtype][n, f, :, :] += img[shifty : shifty + P, shiftx : shiftx + P]
+                target_xy[dtype][n, f, 0] = raw_target_xy[dtype][n, f, 0] - shiftx
+                target_xy[dtype][n, f, 1] = raw_target_xy[dtype][n, f, 1] - shifty
     offset = torch.tensor(offsets)
     for dtype in glimpse.dtypes:
         assert (target_xy[dtype] > 0.5 * P - 1).all()
@@ -240,7 +248,7 @@ def read_glimpse(**kwargs):
         glimpse.labels["offtarget"],
         offset_samples,
         offset_weights,
-        title=kwargs["title"],
+        title=glimpse.title,
     )
     save(dataset, path)
 
@@ -250,10 +258,10 @@ def read_glimpse(**kwargs):
         f"P={dataset.ontarget.P} pixels, "
         f"P={dataset.ontarget.P} pixels"
     )
-    if dataset.offtarget.data is not None:
+    if dataset.offtarget.images is not None:
         logger.info(
-            f"Off-target data: Nc={dataset.offtarget.N} AOIs, "
-            f"Fc={dataset.offtarget.F} frames, "
+            f"Off-target data: N={dataset.offtarget.N} AOIs, "
+            f"F={dataset.offtarget.F} frames, "
             f"P={dataset.offtarget.P} pixels, "
             f"P={dataset.offtarget.P} pixels"
         )

@@ -1,43 +1,100 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
-
-import configparser
-from pathlib import Path
-
-from cliff.command import Command
-
-from tapqir.imscroll import read_glimpse
+# SPDX-License-Identifier: Apache-2.0
 
 
-class Glimpse(Command):
-    """
-    Read the data from glimpse files and save it in the Cosmos compatible format, ``data.tpqr``.
-    Path names to glimpse files are read from the ``options.cfg`` file.
-    """
+def CmdGlimpse(args):
+    import configparser
 
-    def get_parser(self, prog_name):
-        parser = super(Glimpse, self).get_parser(prog_name)
+    from tapqir.imscroll import read_glimpse
 
-        parser.add_argument(
-            "path", default=".", type=str, help="Path to the dataset folder"
-        )
+    # read config file
+    config = configparser.ConfigParser(allow_no_value=True)
+    cfg_file = args.cd / ".tapqir" / "config"
+    config.read(cfg_file)
+    if "glimpse" not in config.sections():
+        config["glimpse"] = {}
 
-        return parser
+    if args.title is not None:
+        config["glimpse"]["title"] = args.title
+    if args.header_dir is not None:
+        config["glimpse"]["dir"] = args.header_dir
+    if args.ontarget_aoiinfo is not None:
+        config["glimpse"]["ontarget_aoiinfo"] = args.ontarget_aoiinfo
+    if args.offtarget_aoiinfo is not None:
+        config["glimpse"]["offtarget_aoiinfo"] = args.offtarget_aoiinfo
+    if args.driftlist is not None:
+        config["glimpse"]["driftlist"] = args.driftlist
+    if args.frame_start is not None:
+        config["glimpse"]["frame_start"] = args.frame_start
+    if args.frame_end is not None:
+        config["glimpse"]["frame_end"] = args.frame_end
+    if args.ontarget_labels is not None:
+        config["glimpse"]["ontarget_labels"] = args.ontarget_labels
+    if args.offtarget_labels is not None:
+        config["glimpse"]["offtarget_labels"] = args.offtarget_labels
 
-    def take_action(self, args):
-        # read options.cfg file
-        config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(args.path) / "options.cfg"
-        config.read(cfg_file)
-        read_glimpse(
-            path=args.path,
-            P=14,
-            header_dir=config["glimpse"]["dir"],
-            ontarget_aoiinfo=config["glimpse"]["ontarget_aoiinfo"],
-            offtarget_aoiinfo=config["glimpse"]["offtarget_aoiinfo"],
-            driftlist=config["glimpse"]["driftlist"],
-            frame_start=config["glimpse"]["frame_start"],
-            frame_end=config["glimpse"]["frame_end"],
-            ontarget_labels=config["glimpse"]["ontarget_labels"],
-            offtarget_labels=config["glimpse"]["offtarget_labels"],
-        )
+    with open(cfg_file, "w") as configfile:
+        config.write(configfile)
+
+    read_glimpse(
+        path=args.cd,
+        P=14,
+    )
+
+
+def add_parser(subparsers, parent_parser):
+    GLIMPSE_HELP = "Extract AOIs from raw images."
+
+    parser = subparsers.add_parser(
+        "glimpse",
+        parents=[parent_parser],
+        description=GLIMPSE_HELP,
+        help=GLIMPSE_HELP,
+    )
+    parser.add_argument(
+        "--title",
+        help="Project name",
+        metavar="<name>",
+    )
+    parser.add_argument(
+        "--header-dir",
+        help="Path to the header/glimpse folder",
+        metavar="<path>",
+    )
+    parser.add_argument(
+        "--ontarget-aoiinfo",
+        help="Path to the on-target AOI locations file",
+        metavar="<path>",
+    )
+    parser.add_argument(
+        "--offtarget-aoiinfo",
+        help="Path to the off-target control AOI locations file (optional)",
+        metavar="<path>",
+    )
+    parser.add_argument(
+        "--driftlist",
+        help="Path to the driftlist file",
+        metavar="<path>",
+    )
+    parser.add_argument(
+        "--frame-start",
+        help="First frame to include in the analysis (optional)",
+        metavar="<number>",
+    )
+    parser.add_argument(
+        "--frame-end",
+        help="Last frame to include in the analysis (optional)",
+        metavar="<number>",
+    )
+    parser.add_argument(
+        "--ontarget-labels",
+        help="On-target AOI binding labels (optional)",
+        metavar="<path>",
+    )
+    parser.add_argument(
+        "--offtarget-labels",
+        help="Off-target AOI binding labels (optional)",
+        metavar="<path>",
+    )
+
+    parser.set_defaults(func=CmdGlimpse)

@@ -1,13 +1,15 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
+import math
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyro
+import pyro.distributions as dist
 import torch
-from pyro.ops.stats import pi, quantile
-from pyroapi import handlers
+from pyro.ops.stats import hpdi, quantile
 from sklearn.metrics import (
     confusion_matrix,
     matthews_corrcoef,
@@ -15,105 +17,145 @@ from sklearn.metrics import (
     recall_score,
 )
 
-
-def ci_from_trace(tr, sites, ci=0.95, num_samples=500):
-    ci_stats = {}
-    for name in sites:
-        ci_stats[name] = {}
-        samples = tr.nodes[name]["fn"].sample((num_samples,)).data.squeeze().cpu()
-        hpd = pi(
-            samples,
-            ci,
-            dim=0,
-        )
-        mean = tr.nodes[name]["fn"].mean.data.squeeze().cpu()
-        ci_stats[name]["ul"] = hpd[1]
-        ci_stats[name]["ll"] = hpd[0]
-        ci_stats[name]["mean"] = mean
-
-        # calculate Keq
-        if name == "pi":
-            hpd = pi(samples[:, 1] / (1 - samples[:, 1]), ci, dim=0)
-            mean = (samples[:, 1] / (1 - samples[:, 1])).mean()
-            ci_stats["Keq"] = {}
-            ci_stats["Keq"]["ul"] = hpd[1]
-            ci_stats["Keq"]["ll"] = hpd[0]
-            ci_stats["Keq"]["mean"] = mean
-
-    return ci_stats
+from tapqir.distributions import AffineBeta
 
 
-def save_stats(model, path):
+def save_stats(model, path, CI=0.95, save_matlab=False):
     # change device to cpu
     model.to("cpu")
+    # do calculations for all AOIs
     model.batch_size = model.n = None
     # global parameters
-    global_params = ["gain", "pi", "lamda", "proximity"]
-    data = pd.DataFrame(index=global_params, columns=["Mean", "95% LL", "95% UL"])
-    # parameters
-    guide_tr = handlers.trace(model.guide).get_trace()
+    global_params = model._global_params
+    data = pd.DataFrame(
+        index=global_params,
+        columns=["Mean", f"{int(100*CI)}% LL", f"{int(100*CI)}% UL"],
+    )
+    # local parameters
     local_params = [
-        "d/height_0",
-        "d/height_1",
-        "d/width_0",
-        "d/width_1",
-        "d/x_0",
-        "d/x_1",
-        "d/y_0",
-        "d/y_1",
+        "d/height",
+        "d/width",
+        "d/x",
+        "d/y",
         "d/background",
     ]
-    ci_stats = ci_from_trace(guide_tr, global_params + local_params)
-    params_dict = {}
-    for param in global_params + ["Keq"]:
-        if param == "pi":
-            data.loc[param, "Mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
-                "mean"
-            ][1].item()
-            data.loc[param, "95% LL"] = params_dict[f"{param}_ll"] = ci_stats[param][
-                "ll"
-            ][1].item()
-            data.loc[param, "95% UL"] = params_dict[f"{param}_ul"] = ci_stats[param][
-                "ul"
-            ][1].item()
+
+    ci_stats = {}
+    num_samples = 10000
+    for param in global_params:
+        if param == "gain":
+            fn = dist.Gamma(
+                pyro.param("gain_loc").cpu() * pyro.param("gain_beta").cpu(),
+                pyro.param("gain_beta").cpu(),
+            )
+        elif param == "pi":
+            fn = dist.Dirichlet(
+                pyro.param("pi_mean").cpu() * pyro.param("pi_size").cpu()
+            )
+        elif param == "lamda":
+            fn = dist.Gamma(
+                pyro.param("lamda_loc").cpu() * pyro.param("lamda_beta").cpu(),
+                pyro.param("lamda_beta").cpu(),
+            )
+        elif param == "proximity":
+            fn = AffineBeta(
+                pyro.param("proximity_loc").cpu(),
+                pyro.param("proximity_size").cpu(),
+                0,
+                (model.data.P + 1) / math.sqrt(12),
+            )
         else:
-            data.loc[param, "Mean"] = params_dict[f"{param}_mean"] = ci_stats[param][
-                "mean"
-            ].item()
-            data.loc[param, "95% LL"] = params_dict[f"{param}_ll"] = ci_stats[param][
-                "ll"
-            ].item()
-            data.loc[param, "95% UL"] = params_dict[f"{param}_ul"] = ci_stats[param][
-                "ul"
-            ].item()
+            raise NotImplementedError
+        samples = fn.sample((num_samples,)).data.squeeze()
+        ci_stats[param] = {}
+        ci_stats[param]["LL"], ci_stats[param]["UL"] = hpdi(
+            samples,
+            CI,
+            dim=0,
+        )
+        ci_stats[param]["Mean"] = fn.mean.data.squeeze()
+
+        # calculate Keq
+        if param == "pi":
+            ci_stats["Keq"] = {}
+            ci_stats["Keq"]["LL"], ci_stats["Keq"]["UL"] = hpdi(
+                samples[:, 1] / (1 - samples[:, 1]), CI, dim=0
+            )
+            ci_stats["Keq"]["Mean"] = (samples[:, 1] / (1 - samples[:, 1])).mean()
+
+    # this does not need to be very accurate
+    num_samples = 500
     for param in local_params:
         if param == "d/background":
-            params_dict[f"{param}_mean"] = ci_stats[param]["mean"]
-            params_dict[f"{param}_ll"] = ci_stats[param]["ll"]
-            params_dict[f"{param}_ul"] = ci_stats[param]["ul"]
-        elif param.endswith("_0"):
-            base_name = param.split("_")[0]
-            params_dict[f"{base_name}_mean"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["mean"] for k in range(model.K)], dim=0
+            fn = dist.Gamma(
+                pyro.param("d/b_loc").cpu() * pyro.param("d/b_beta").cpu(),
+                pyro.param("d/b_beta").cpu(),
             )
-            params_dict[f"{base_name}_ll"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["ll"] for k in range(model.K)], dim=0
+        elif param == "d/height":
+            fn = dist.Gamma(
+                pyro.param("d/h_loc").cpu() * pyro.param("d/h_beta").cpu(),
+                pyro.param("d/h_beta").cpu(),
             )
-            params_dict[f"{base_name}_ul"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["ul"] for k in range(model.K)], dim=0
+        elif param == "d/width":
+            fn = AffineBeta(
+                pyro.param("d/w_mean").cpu(),
+                pyro.param("d/w_size").cpu(),
+                0.75,
+                2.25,
             )
-    params_dict["d/m_probs"] = model.m_probs.data
-    params_dict["d/z_probs"] = model.z_probs.data
-    params_dict["d/j_probs"] = model.j_probs.data
-    params_dict["z_marginal"] = model.z_marginal.data
-    params_dict["z_map"] = model.z_map.data
-    model.params = params_dict
+        elif param == "d/x":
+            fn = AffineBeta(
+                pyro.param("d/x_mean").cpu(),
+                pyro.param("d/size").cpu(),
+                -(model.data.P + 1) / 2,
+                (model.data.P + 1) / 2,
+            )
+        elif param == "d/y":
+            fn = AffineBeta(
+                pyro.param("d/y_mean").cpu(),
+                pyro.param("d/size").cpu(),
+                -(model.data.P + 1) / 2,
+                (model.data.P + 1) / 2,
+            )
+        else:
+            raise NotImplementedError
+        samples = fn.sample((num_samples,)).data.squeeze()
+        ci_stats[param] = {}
+        ci_stats[param]["LL"], ci_stats[param]["UL"] = hpdi(
+            samples,
+            CI,
+            dim=0,
+        )
+        ci_stats[param]["Mean"] = fn.mean.data.squeeze()
+
+    for param in global_params:
+        if param == "pi":
+            data.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
+            data.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
+            data.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
+            # Keq
+            data.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
+            data.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
+            data.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
+        else:
+            data.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
+            data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
+            data.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+    if model.pspecific is not None:
+        ci_stats["d/m_probs"] = model.m_probs.data.cpu()
+        ci_stats["d/theta_probs"] = model.theta_probs.data.cpu()
+        ci_stats["d/j_probs"] = model.j_probs.data.cpu()
+        ci_stats["p(specific)"] = model.pspecific.data.cpu()
+        ci_stats["z_map"] = model.z_map.data.cpu()
+
+    model.params = ci_stats
 
     # snr
-    data.loc["SNR", "Mean"] = model.snr().mean().item()
+    if model.pspecific is not None:
+        data.loc["SNR", "Mean"] = model.snr().mean().item()
 
     # classification statistics
-    if model.data.ontarget.labels is not None:
+    if model.pspecific is not None and model.data.ontarget.labels is not None:
         pred_labels = model.z_map.cpu().numpy().ravel()
         true_labels = model.data.ontarget.labels["z"].ravel()
 
@@ -134,9 +176,9 @@ def save_stats(model, path):
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
         mask = torch.from_numpy(model.data.ontarget.labels["z"])
-        samples = torch.masked_select(model.z_marginal.cpu(), mask)
+        samples = torch.masked_select(model.pspecific.cpu(), mask)
         if len(samples):
-            z_ll, z_ul = pi(samples, 0.68)
+            z_ll, z_ul = hpdi(samples, CI)
             data.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()
             data.loc["p(specific)", "95% LL"] = z_ll.item()
             data.loc["p(specific)", "95% UL"] = z_ul.item()
@@ -150,11 +192,27 @@ def save_stats(model, path):
     if path is not None:
         path = Path(path)
         # check convergence status
-        data.loc["trained", "Mean"] = False
-        for line in open(model.run_path / "run.log"):
-            if "model converged" in line:
-                data.loc["trained", "Mean"] = True
-        torch.save(params_dict, path / "params.tpqr")
+        #  data.loc["trained", "Mean"] = False
+        #  for line in open(model.run_path / ".tapqir" / "log"):
+        #      if "model converged" in line:
+        #          data.loc["trained", "Mean"] = True
+        torch.save(ci_stats, path / f"{model.name}-params.tpqr")
+        if save_matlab:
+            from scipy.io import savemat
+
+            for param, field in ci_stats.items():
+                if param in (
+                    "d/m_probs",
+                    "d/theta_probs",
+                    "d/j_probs",
+                    "p(specific)",
+                    "z_map",
+                ):
+                    ci_stats[param] = field.numpy()
+                    continue
+                for stat, value in field.items():
+                    ci_stats[param][stat] = value.numpy()
+            savemat(path / f"{model.name}-params.mat", ci_stats)
         data.to_csv(
             path / "statistics.csv",
         )

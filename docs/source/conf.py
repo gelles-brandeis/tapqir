@@ -1,5 +1,5 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # Configuration file for the Sphinx documentation builder.
 
@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 # -- Project information -----------------------------------------------------
 
 project = "Tapqir"
-copyright = "2020, Gelles Lab"
+copyright = "2021, Gelles Lab"
 author = "Yerdos Ordabayev"
 
 # The full version, including alpha/beta/rc tags
@@ -40,13 +40,13 @@ release = __version__
 # ones.
 extensions = [
     "nbsphinx",
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
     "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx_gallery.load_style",
     "sphinx_panels",
+    "sphinxarg.ext",
+    "IPython.sphinxext.ipython_console_highlighting",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -58,14 +58,10 @@ panels_add_bootstrap_css = False
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = [".rst", ".ipynb"]
+source_suffix = [".rst"]
 
 # do not execute cells
 nbsphinx_execute = "never"
-
-# Generate the API documentation when building
-autosummary_generate = True
 
 intersphinx_mapping = dict(
     ipython=("https://ipython.readthedocs.io/en/stable/", None),
@@ -81,7 +77,7 @@ intersphinx_mapping = dict(
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["**.ipynb_checkpoints"]
+# exclude_patterns = ["**.ipynb_checkpoints"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -108,12 +104,8 @@ nbsphinx_prolog = r"""
 
 # -- Copy notebook files
 
-if not os.path.exists("notebooks"):
-    os.makedirs("notebooks")
-
 for src_file in glob.glob("../../notebooks/*.ipynb"):
-    dst_file = os.path.join("notebooks", src_file.split("/")[-1])
-    shutil.copy(src_file, "notebooks/")
+    shutil.copy(src_file, "examples/")
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -133,7 +125,7 @@ html_theme_options = {
     ],
     "external_links": [
         {
-            "name": "Discussion",
+            "name": "Discussions",
             "url": "https://github.com/gelles-brandeis/tapqir/discussions",
         },
     ],
@@ -156,5 +148,3 @@ html_context = {
 html_static_path = ["_static"]
 html_css_files = ["css/sphinx_gallery.css"]
 html_logo = "_static/logo.png"
-
-autodoc_default_options = {"member-order": "bysource"}

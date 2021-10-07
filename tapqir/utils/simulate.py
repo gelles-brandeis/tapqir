@@ -1,12 +1,11 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
 import torch
 from pyro.infer import Predictive
 from pyroapi import handlers, pyro
 
-from tapqir.models import GaussianSpot
 from tapqir.utils.dataset import CosmosDataset
 
 
@@ -72,7 +71,6 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         offset_weights=torch.ones(3) / 3,
         device=model.device,
     )
-    model.gaussian = GaussianSpot(P)
 
     # sample
     predictive = Predictive(
@@ -106,4 +104,4 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         device=model.device,
     )
 
-    return model
+    return samples

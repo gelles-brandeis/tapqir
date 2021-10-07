@@ -1,6 +1,0 @@
-sphinx
-sphinx-panels
-sphinx-gallery
-pydata_sphinx_theme
-nbsphinx>=0.8.5
-git+https://github.com/gelles-brandeis/tapqir.git
