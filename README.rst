@@ -17,7 +17,7 @@ Bayesian analysis of co-localization single-molecule microscopy image data.
 
 |ci| |docs| |black|
 
-`Documentation <https://tapqir.readthedocs.io/en/latest/>`_ |
+`Documentation <https://tapqir.readthedocs.io/en/stable/>`_ |
 `Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
 
 
@@ -36,7 +36,7 @@ Using pip::
 Documentation
 =============
 
-Documentation and tutorial available at `tapqir.readthedocs.io <https://tapqir.readthedocs.io/>`_.  Please note that the documentation is not yet complete and may not be up to date.
+Documentation and tutorial available at `tapqir.readthedocs.io <https://tapqir.readthedocs.io/en/stable/>`_.  Please note that the documentation is not yet complete and may not be up to date.
 
 Citation
 ========
