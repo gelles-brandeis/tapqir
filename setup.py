@@ -1,5 +1,5 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 import os
 
@@ -49,7 +49,7 @@ setuptools.setup(
     description="Bayesian analysis of the single-molecule image data",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ordabayevy/tapqir",
+    url="https://tapqir.readthedocs.io",
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
@@ -74,12 +74,16 @@ setuptools.setup(
         "docs": DOCS_REQUIRE,
         "dev": EXTRAS_REQUIRE + TEST_REQUIRE + DOCS_REQUIRE,
     },
+    keywords="image-classification probabilistic-programming cosmos pyro",
+    license="Apache 2.0",
     classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     entry_points={
         "console_scripts": ["tapqir=tapqir.main:main"],
     },
