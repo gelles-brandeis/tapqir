@@ -19,7 +19,7 @@ class HMM(Cosmos):
     Hidden Markov model.
     """
 
-    name = "hmm"
+    name = "hmmz"
 
     def __init__(
         self, S=1, K=2, device="cpu", dtype="double", marginal=False, vectorized=True
@@ -27,7 +27,7 @@ class HMM(Cosmos):
         self.vectorized = vectorized
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
-        self._global_params = ["gain", "proximity", "lamda"]
+        self._global_params = ["gain", "proximity", "lamda", "trans"]
 
     def TraceELBO(self, jit=False):
         if self.vectorized:
@@ -37,27 +37,6 @@ class HMM(Cosmos):
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True
         )
-
-    @property
-    def init_theta(self):
-        result = torch.zeros(self.K * self.S + 1, dtype=self.dtype)
-        result[0] = self.init[0]
-        for s in range(self.S):
-            for k in range(self.K):
-                result[self.K * s + k + 1] = self.init[s + 1] / self.K
-        return result
-
-    @property
-    def trans_theta(self):
-        result = torch.zeros(self.K * self.S + 1, self.K * self.S + 1, dtype=self.dtype)
-        for i in range(self.K * self.S + 1):
-            # FIXME
-            j = (i + 1) // self.K
-            result[i, 0] = self.trans[j, 0]
-            for s in range(self.S):
-                for k in range(self.K):
-                    result[i, self.K * s + k + 1] = self.trans[j, s + 1] / self.K
-        return result
 
     def _sequential_logmatmulexp(self, logits):
         """
@@ -118,27 +97,9 @@ class HMM(Cosmos):
         return result
 
     @property
-    def theta_trans_marginal(self):
-        result = self._sequential_logmatmulexp(pyro.param("d/theta_trans").data.log())
-        return result[..., 0, :].exp()
-
-    @property
-    def theta_probs(self):
-        r"""
-        Probability of an on-target spot :math:`p(z_{knf})`.
-        """
-        return self.theta_trans_marginal.data[..., 1:].permute(2, 0, 1)
-
-    @property
-    def m_probs(self):
-        r"""
-        Probability of a spot :math:`p(m_{knf})`.
-        """
-        return torch.einsum(
-            "sknf,nfs->knf",
-            pyro.param("d/m_probs").data[..., 1],
-            self.theta_trans_marginal,
-        )
+    def pspecific(self):
+        result = self._sequential_logmatmulexp(pyro.param("d/z_trans").data.log())
+        return result[..., 0, 1].exp()
 
     def model(self):
         # global parameters
@@ -242,7 +203,7 @@ class HMM(Cosmos):
                 f"{prefix}/background_std", dist.HalfNormal(100)
             )
             ndx = ndx[..., None]
-            theta_prev = None
+            z_prev = None
             for fdx in frames:
                 if self.vectorized:
                     fsx, fdx = fdx
@@ -257,26 +218,26 @@ class HMM(Cosmos):
                     ),
                 )
 
-                # sample hidden model state (1+K*S,)
-                if prefix == "d":
-                    probs = (
-                        self.init_theta
-                        if isinstance(fdx, int) and fdx < 1
-                        else self.trans_theta[theta_prev]
-                    )
-                    theta_curr = pyro.sample(
-                        f"{prefix}/theta_{fsx}", dist.Categorical(probs)
-                    )
-                else:
-                    theta_curr = 0
+                # sample hidden model state (1+S,)
+                probs = (
+                    self.init
+                    if isinstance(fdx, int) and fdx < 1
+                    else self.trans[z_prev]
+                )
+                z_curr = pyro.sample(f"{prefix}/z_{fsx}", dist.Categorical(probs))
+                theta = pyro.sample(
+                    f"{prefix}/theta_{fsx}",
+                    dist.Categorical(self.probs_theta[z_curr]),
+                    infer={"enumerate": "parallel"},
+                )
 
                 ms, heights, widths, xs, ys = [], [], [], [], []
                 for kdx in spots:
-                    ontarget = Vindex(self.ontarget)[theta_curr, kdx]
+                    ontarget = Vindex(self.ontarget)[theta, kdx]
                     # spot presence
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}_{fsx}",
-                        dist.Categorical(Vindex(self.probs_m)[theta_curr, kdx]),
+                        dist.Categorical(Vindex(self.probs_m)[theta, kdx]),
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
@@ -346,7 +307,7 @@ class HMM(Cosmos):
                     ),
                     obs=obs,
                 )
-                theta_prev = theta_curr
+                z_prev = z_curr
 
     def spot_guide(self, data, prefix):
         # use time-independent model for control data
@@ -370,9 +331,6 @@ class HMM(Cosmos):
         )
 
         with aois as ndx:
-            if prefix == "d":
-                self.batch_idx = ndx.cpu()
-
             pyro.sample(
                 f"{prefix}/background_mean",
                 dist.Delta(pyro.param(f"{prefix}/background_mean_loc")[ndx]),
@@ -382,7 +340,7 @@ class HMM(Cosmos):
                 dist.Delta(pyro.param(f"{prefix}/background_std_loc")[ndx]),
             )
             ndx = ndx[..., None]
-            theta_prev = None
+            z_prev = None
             for fdx in frames:
                 if self.vectorized:
                     fsx, fdx = fdx
@@ -399,23 +357,21 @@ class HMM(Cosmos):
                 )
 
                 # sample hidden model state (3,1,1,1)
-                theta_probs = (
-                    Vindex(pyro.param(f"{prefix}/theta_trans"))[ndx, fdx, 0]
+                z_probs = (
+                    Vindex(pyro.param(f"{prefix}/z_trans"))[ndx, fdx, 0]
                     if isinstance(fdx, int) and fdx < 1
-                    else Vindex(pyro.param(f"{prefix}/theta_trans"))[
-                        ndx, fdx, theta_prev
-                    ]
+                    else Vindex(pyro.param(f"{prefix}/z_trans"))[ndx, fdx, z_prev]
                 )
-                theta_curr = pyro.sample(
-                    f"{prefix}/theta_{fsx}",
-                    dist.Categorical(theta_probs),
+                z_curr = pyro.sample(
+                    f"{prefix}/z_{fsx}",
+                    dist.Categorical(z_probs),
                     infer={"enumerate": "parallel"},
                 )
 
                 for kdx in spots:
                     # spot presence
                     m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                        theta_curr, kdx, ndx, fdx
+                        z_curr, kdx, ndx, fdx
                     ]
                     m = pyro.sample(
                         f"{prefix}/m_{kdx}_{fsx}",
@@ -466,7 +422,7 @@ class HMM(Cosmos):
                     .expand([data.P, data.P])
                     .to_event(2),
                 )
-                theta_prev = theta_curr
+                z_prev = z_curr
 
     def init_parameters(self):
         device = self.device
@@ -609,27 +565,28 @@ class HMM(Cosmos):
         # classification
         if prefix == "d":
             pyro.param(
-                "d/theta_trans",
+                "d/z_trans",
                 lambda: torch.ones(
                     data.N,
                     data.F,
-                    1 + self.K * self.S,
-                    1 + self.K * self.S,
+                    1 + self.S,
+                    1 + self.S,
                     device=device,
                 ),
                 constraint=constraints.simplex,
             )
-            m_probs = torch.ones(
-                1 + self.K * self.S,
-                self.K,
-                data.N,
-                data.F,
-                2,
-                device=device,
+            pyro.param(
+                "d/m_probs",
+                lambda: torch.ones(
+                    1 + self.S,
+                    self.K,
+                    data.N,
+                    data.F,
+                    2,
+                    device=device,
+                ),
+                constraint=constraints.simplex,
             )
-            m_probs[1, 0, :, :, 0] = 0
-            m_probs[2, 1, :, :, 0] = 0
-            pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
         else:
             pyro.param(
                 "c/m_probs",

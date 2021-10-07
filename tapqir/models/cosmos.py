@@ -19,7 +19,7 @@ class Cosmos(Model):
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "cosmosmz"
+    name = "cosmosz"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", marginal=False):
         super().__init__(S, K, device, dtype)
@@ -70,14 +70,13 @@ class Cosmos(Model):
 
     @property
     def probs_theta(self):
-        result = torch.zeros(2, self.K * self.S + 1, dtype=self.dtype)
+        result = torch.zeros(1 + self.S, self.K * self.S + 1, dtype=self.dtype)
         result[0, 0] = 1
-        result[1, 1] = 0.5
-        result[1, 2] = 0.5
+        result[1, 1:] = 0.5
         return result
 
     @lazy_property
-    def theta_to_z(self):
+    def theta_onehot(self):
         result = torch.zeros(self.K * self.S + 1, self.K, dtype=torch.long)
         for s in range(self.S):
             result[1 + s * self.K : 1 + (s + 1) * self.K] = torch.eye(self.K) * (s + 1)
@@ -85,21 +84,7 @@ class Cosmos(Model):
 
     @lazy_property
     def ontarget(self):
-        return torch.clamp(self.theta_to_z, min=0, max=1)
-
-    @property
-    def theta_probs(self):
-        r"""
-        Probability of an on-target spot :math:`p(z_{knf})`.
-        """
-        return pyro.param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
-
-    @property
-    def j_probs(self):
-        r"""
-        Probability of an off-target spot :math:`p(j_{knf})`.
-        """
-        return self.m_probs - self.theta_probs
+        return torch.clamp(self.theta_onehot, min=0, max=1)
 
     @property
     def m_probs(self):
@@ -109,7 +94,7 @@ class Cosmos(Model):
         return torch.einsum(
             "sknf,nfs->knf",
             pyro.param("d/m_probs").data[..., 1],
-            pyro.param("d/theta_probs").data,
+            pyro.param("d/z_probs").data,
         )
 
     @property
@@ -148,11 +133,11 @@ class Cosmos(Model):
 
     @property
     def infer_config(self):
-        if self._classify:
-            return {
-                "expose_types": ["sample"],
-                "expose": ["d/z_probs"],
-            }
+        #  if self._classify:
+        #      return {
+        #          "expose_types": ["sample"],
+        #          "expose": ["d/z_probs", "d/m_probs"],
+        #      }
         return {"expose_types": ["sample", "param"]}
 
     def guide(self):
@@ -376,7 +361,7 @@ class Cosmos(Model):
                     ),
                 )
                 if self._classify and prefix == "d":
-                    pyro.sample(
+                    z = pyro.sample(
                         f"{prefix}/z",
                         dist.Categorical(
                             Vindex(pyro.param(f"{prefix}/z_probs"))[
@@ -388,6 +373,29 @@ class Cosmos(Model):
 
                 for kdx in spots:
                     # sample spot presence m
+                    #  if prefix == "d":
+                    #      if self._classify:
+                    #          m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                    #              z, kdx, ndx[:, None], fdx
+                    #          ].to(self.device)
+                    #      else:
+                    #          m_probs = torch.einsum(
+                    #              "snft,nfs->nft",
+                    #              Vindex(pyro.param(f"{prefix}/m_probs"))[
+                    #                  torch.arange(self.S + 1)[:, None, None],
+                    #                  kdx,
+                    #                  ndx[:, None],
+                    #                  fdx,
+                    #                  :,
+                    #              ].to(self.device),
+                    #              Vindex(pyro.param(f"{prefix}/z_probs"))[
+                    #                  ndx[:, None], fdx, :
+                    #              ].to(self.device),
+                    #          )
+                    #  else:
+                    #      m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
+                    #          kdx, ndx[:, None], fdx
+                    #      ].to(self.device)
                     m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
                         kdx, ndx[:, None], fdx
                     ].to(self.device)
@@ -594,8 +602,26 @@ class Cosmos(Model):
                 lambda: torch.ones(data.N, data.F, 1 + self.S, device=device),
                 constraint=constraints.simplex,
             )
-        pyro.param(
-            f"{prefix}/m_probs",
-            lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
-            constraint=constraints.simplex,
-        )
+            #  pyro.param(
+            #      "d/m_probs",
+            #      lambda: torch.ones(
+            #          1 + self.S,
+            #          self.K,
+            #          data.N,
+            #          data.F,
+            #          2,
+            #          device=device,
+            #      ),
+            #      constraint=constraints.simplex,
+            #  )
+            pyro.param(
+                "d/m_probs",
+                lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
+                constraint=constraints.simplex,
+            )
+        else:
+            pyro.param(
+                "c/m_probs",
+                lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
+                constraint=constraints.simplex,
+            )

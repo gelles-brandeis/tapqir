@@ -64,6 +64,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                 0,
                 (model.data.P + 1) / math.sqrt(12),
             )
+        elif param == "trans":
+            fn = dist.Dirichlet(
+                pyro.param("trans_mean").cpu() * pyro.param("trans_size").cpu()
+            ).to_event(1)
         else:
             raise NotImplementedError
         samples = fn.sample((num_samples,)).data.squeeze()
@@ -137,22 +141,29 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
             data.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
             data.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
+        if param == "trans":
+            data.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
+            data.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
+            data.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
+            data.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
+            data.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
+            data.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
         else:
             data.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             data.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
     if model.pspecific is not None:
-        ci_stats["d/m_probs"] = model.m_probs.data.cpu()
-        ci_stats["d/theta_probs"] = model.theta_probs.data.cpu()
-        ci_stats["d/j_probs"] = model.j_probs.data.cpu()
+        #  ci_stats["d/m_probs"] = model.m_probs.data.cpu()
+        #  ci_stats["d/theta_probs"] = model.theta_probs.data.cpu()
+        #  ci_stats["d/j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
         ci_stats["z_map"] = model.z_map.data.cpu()
 
     model.params = ci_stats
 
     # snr
-    if model.pspecific is not None:
-        data.loc["SNR", "Mean"] = model.snr().mean().item()
+    #  if model.pspecific is not None:
+    #      data.loc["SNR", "Mean"] = model.snr().mean().item()
 
     # classification statistics
     if model.pspecific is not None and model.data.ontarget.labels is not None:
@@ -202,9 +213,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
             for param, field in ci_stats.items():
                 if param in (
-                    "d/m_probs",
-                    "d/theta_probs",
-                    "d/j_probs",
+                    #  "d/m_probs",
+                    #  "d/theta_probs",
+                    #  "d/j_probs",
                     "p(specific)",
                     "z_map",
                 ):
