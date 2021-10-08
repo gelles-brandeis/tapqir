@@ -1,60 +1,34 @@
-Installation
-============
+Install on Linux
+================
 
-
-Tapqir is a Python program and can be installed via ``pip`` package manager.
-
-.. important::
-
-   Practical use of Tapqir requires a computer with a CUDA-capable GPU. If you are
-   using a Linux or a Windows machine first `install CUDA`_. Alternatively, 
-   Tapqir can be run in `Colab notebooks`_, Google's cloud servers that provide
-   free access to GPUs.
-
-Linux
------
+First, make sure that `CUDA is installed`_ on the computer.
 
 .. important::
 
    We strongly recommend creating a virtual environment to encapsulate your
-   installation. For example use Anaconda_ package manager to create and activate
-   a new environment::
+   installation. Below we use a popular package manager Anaconda to create
+   and manage a virtual environment.
 
-        $ conda create --name tapqir-env python=3.8
-        $ conda activate tapqir-env
+1. `Install Anaconda`_ package manager.
 
-   Before installing & using Tapqir make sure that your created environment
-   is activated (you should see the environment name (e.g., ``tapqir-env``)
-   in the command prompt).
+2. Create a new environment and give it a name (e.g., ``tapqir-env``)::
 
-.. _install CUDA: https://developer.nvidia.com/cuda-downloads
-.. _Colab notebooks: https://colab.research.google.com/notebooks/intro.ipynb
-.. _Anaconda: https://docs.anaconda.com/anaconda/install/
+    $ conda create --name tapqir-env python=3.8
 
-In the terminal run::
+3. Activate the environement (you should see the environment name
+   (i.e., ``tapqir-env``) in the command prompt)::
+
+    $ conda activate tapqir-env
+
+4. To install ``tapqir``, in the terminal run::
 
     $ pip install git+https://github.com/gelles-brandeis/tapqir.git
 
-Google Colab
-------------
+.. _CUDA is installed: https://developer.nvidia.com/cuda-downloads
+.. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
 
-Colab notebooks start in a fresh environment and thus require installation for each new
-start. Before installing ``tapqir``, switch runtime to GPU (in menu select ``Runtime ->
-Change runtime type -> GPU``) and mount Google Drive to save analysis output. Install
-``tapqir`` using pip (installation output is silenced)::
 
-    !pip install --quiet git+https://github.com/gelles-brandeis/tapqir.git > install.log
-
-Development
------------
-
-For development - install from source::
-
-    $ git clone https://github.com/gelles-brandeis/tapqir.git
-    $ cd tapqir
-    $ make install
-
-Set up a slurm server (optional)
+Set up a Slurm server (optional)
 --------------------------------
 
 Linux machines can be set up to run as servers. Following is a short instruction
