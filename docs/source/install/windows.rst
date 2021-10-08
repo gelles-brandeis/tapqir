@@ -28,7 +28,7 @@ First, make sure that `CUDA is installed`_ on the computer.
 
 5. To install ``tapqir``, in the Anaconda Prompt, run::
 
-    > pip install git+https://github.com/gelles-brandeis/tapqir.git
+    > pip install git+https://github.com/gelles-brandeis/tapqir.git -f https://download.pytorch.org/whl/torch_stable.html
 
 .. _CUDA is installed: https://developer.nvidia.com/cuda-downloads
 .. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
