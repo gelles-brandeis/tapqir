@@ -14,9 +14,10 @@ Set up the environment
 Windows/Linux
 ^^^^^^^^^^^^^
 
-1. :doc:`Install Tapqir </install/index>` if it is not installed already.
+1. If Tapqir is not installed, please follow these :doc:`instructions </install/index>` to do so.
 
-2. On Windows open the Anaconda Prompt. On Linux open the terminal.
+2. Running Tapqir requires command-line interface. On Windows open the Anaconda Prompt.
+   On Linux open the terminal.
 
 3. Activate the virtual environment (e.g., if named ``tapqir-env``)::
 
