@@ -141,7 +141,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
             data.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
             data.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
-        if param == "trans":
+        elif param == "trans":
             data.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
             data.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
             data.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
@@ -153,7 +153,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             data.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
     if model.pspecific is not None:
-        #  ci_stats["d/m_probs"] = model.m_probs.data.cpu()
+        ci_stats["d/m_probs"] = model.m_probs.data.cpu()
         #  ci_stats["d/theta_probs"] = model.theta_probs.data.cpu()
         #  ci_stats["d/j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
@@ -213,7 +213,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
             for param, field in ci_stats.items():
                 if param in (
-                    #  "d/m_probs",
+                    "d/m_probs",
                     #  "d/theta_probs",
                     #  "d/j_probs",
                     "p(specific)",
