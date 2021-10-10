@@ -301,9 +301,7 @@ class MainWindow(QMainWindow):
             # if self.Model._classifier:
             self.prob[(f - f1) % 100].setOpts(
                 height=(
-                    self.Model.params["d/theta_probs"][
-                        :, int(self.aoiNumber.text()), f
-                    ].sum()
+                    self.Model.params["p(specific)"][int(self.aoiNumber.text()), f]
                     * self.Model.data.P,
                 )
             )
@@ -411,7 +409,7 @@ class MainWindow(QMainWindow):
             if p == "z":
                 if "p(specific)" in self.Model.params:
                     self.item["pspecific"].set_ydata(
-                        self.Model.data.ontarget.labels["z"][self.n]
+                        self.Model.params["p(specific)"][self.n]
                     )
             elif p == "background":
                 self.item[f"{p}_fill"].remove()

@@ -5,11 +5,30 @@ User Guide
 
 .. note::
 
-    Checkout an :doc:`example <../examples/Rpb1SNAP549>` analysis of a sample data set that
+    Checkout an :doc:`example </examples/example_part_i>` analysis of a sample data set that
     can be followed along with this user guide or used as a template for your own analysis.
 
-Initialize Tapqir analysis folder
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Set up the environment
+----------------------
+
+Windows/Linux
+^^^^^^^^^^^^^
+
+1. :doc:`Install Tapqir </install/index>` if it is not installed already.
+
+2. On Windows open the Anaconda Prompt. On Linux open the terminal.
+
+3. Activate the virtual environment (e.g., if named ``tapqir-env``)::
+
+   $ conda activate tapqir-env
+
+Google Colab
+^^^^^^^^^^^^
+
+To get started in Google Colab follow :doc:`the installation guide </install/colab>`.
+
+Create & initialize Tapqir analysis folder
+------------------------------------------
 
 To start the analysis create an empty folder and initialize it by running
 ``tapqir init`` inside the new folder::
@@ -22,10 +41,10 @@ To start the analysis create an empty folder and initialize it by running
 such as ``config`` file, ``log`` file, and model checkpoints.
 
 Preprocessing raw input data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------
 
 Data from glimpse/imscroll
---------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Analyzing data acquired with `Glimpse <https://github.com/gelles-brandeis/Glimpse>`_ and pre-processed with 
 the `imscroll <https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki>`_ program
@@ -42,7 +61,7 @@ To extract AOIs from raw images run::
 
 Options:
 
-* ``--title`` - Project name
+* ``--title`` - Project/experiment name
 
 * ``--header-dir`` - Path to the header/glimpse folder
 
@@ -63,7 +82,7 @@ The program will output ``data.tpqr`` file containing extracted AOIs, target
 (and off-target control) locations, empirical offset distirbution.
 
 Data analysis
-~~~~~~~~~~~~~
+-------------
 
 Fit the data to the time-independent ``cosmos`` model with :math:`\theta`
 marginalized out (``--marginal``)::
@@ -72,25 +91,25 @@ marginalized out (``--marginal``)::
 
 Options:
 
-* ``--cuda`` - Run computations on GPU
+* ``--cuda`` - Run computations on GPU.
 
 * ``-bs <number>`` - Batch size is the size of the subset of AOIs that is used
   for fitting at each iteration. It affects the amount of memory consumed and
-  computation time and can be adjusted accordingly. ``nvidia-smi`` command shows
+  computation time and can be adjusted accordingly. ``nvidia-smi`` shell command shows
   Memory-Usage and GPU-Util values. Our recommendation is to increase batch size till
-  GPU-Util is high (> 70%) but not maxed out.
+  GPU-Util is high (> 60%) but not maxed out.
 
 * ``-it <number>`` - Number of fitting iterations. Setting it to 0 will run the program till 
   Tapqir's custom convergence criteria is satisfied. We recommend to set it to 0 (default)
-  and then run for additional number of iterations if necessary. Convergence of global
+  and then run for additional number of iterations as required. Convergence of global
   parameters can be visually checked using tensorboard_.
 
-The program will save a checkpoint every 100 iterations (checkpoint is saved in ``.tapqir`` folder).
-Starting the program again will resume from the last saved checkpoint. At every checkpoint the values of
-global parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``, ``pi_mean``, ``lamda_loc``) are also recorded
-for visualization by tensorboard_. Plateaued plots is a sign of convergence.
+The program will save a checkpoint every 100 iterations (checkpoint is saved in ``.tapqir/cosmos`` folder).
+Starting the program again will resume from the last saved checkpoint. At every checkpoint the values of global
+variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``, ``pi_mean``, ``lamda_loc``) are also
+recorded for visualization by tensorboard_. Plateaued plots signify convergence.
 
-After marginalized (``--marginal``) model has converged run the full ``cosmos`` model (usually
+After the marginalized (``--marginal``) model has converged run the full ``cosmos`` model (usually
 15,000-20,000 iterations is enough)::
 
     $ tapqir fit cosmos --cuda -bs <number> -it <number>
@@ -101,15 +120,19 @@ After marginalized (``--marginal``) model has converged run the full ``cosmos`` 
 
         $ CUDA_VISIBLE_DEVICES=1 tapqir fit ...
 
+    To view available devices run::
+
+        $ nvidia-smi
+
 Tensorboard
------------
+^^^^^^^^^^^
 
 Fitting progress can be inspected using `tensorboard program <https://www.tensorflow.org/tensorboard>`_::
 
-    tensorboard --logdir=.
+    $ tensorboard --logdir=.
 
 Posterior distributions
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 
 To compute 95% credible intervals of model parameters run::
 
@@ -119,8 +142,8 @@ Options:
 
 * ``--matlab`` - Save parameters in matlab format (default: False)
 
-Parameters with their mean value, 95% CI lower limit and upper limit are saved in
-``cosmos-params.tqpr``, ``cosmos-params.mat``, and ``statistics.csv`` files.
+Parameters with their mean value, 95% CI (credible interval) lower limit and upper limit
+are saved in ``cosmos-params.tqpr``, ``cosmos-params.mat``, and ``statistics.csv`` files.
 
 To visualize analysis results run::
 
@@ -143,10 +166,15 @@ will show original images along with the best fit estimates.
 
     * ``<value>`` - Option name (command.option). For example ``fit.bs``
 
-Using slurm
-~~~~~~~~~~~
+Using Slurm
+-----------
 
 If `Slurm Workload Manager <https://slurm.schedmd.com/documentation.html>`_ is
 configured on the machine Tapqir analysis can be submitted as a slurm job::
 
     $ sbatch --job-name <name> --gres gpu:1 tapqir fit <model> --cuda -bs <number> -it <number>
+
+Sbatch command options:
+
+* ``--job-name`` - Job name.
+* ``--gres`` - Generic Resources (``<type>:<amount>``).

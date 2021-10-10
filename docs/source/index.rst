@@ -5,7 +5,7 @@ Tapqir is software to analyze images from single-molecule fluorescence colocaliz
 using a Bayesian statistics-based image classification method. Tapqir is implemented in
 `Pyro <https://pyro.ai/>`_, a Python-based probabilistic programming language.
 
-**License**: Tapqir is open source software licensed under the `GNU General Public License, version 3 <http://www.gnu.org/licenses/gpl-3.0.txt>`_.
+**License**: Tapqir is open source software licensed under the `Apache License 2.0 <https://www.apache.org/licenses/LICENSE-2.0.txt>`_.
 
 **Author**:
 Yerdos Ordabayev;
@@ -17,7 +17,15 @@ ordabayev@brandeis.edu
 
 **Acknowledgements**:  Development was funded by grants from `NIGMS <http://www.nigms.nih.gov>`_.
 
-**Citation**:  If you publish research that uses this software, you can cite https://github.com/gelles-brandeis/tapqir
+**Citation**:  If you publish research that uses this software, you can cite our preprint::
+
+  @article{ordabayev2021bayesian,
+    title={Bayesian machine learning analysis of single-molecule fluorescence colocalization images},
+    author={Ordabayev, Yerdos A and Friedman, Larry J and Gelles, Jeff and Theobald, Douglas},
+    journal={bioRxiv},
+    year={2021},
+    publisher={Cold Spring Harbor Laboratory}
+  }
 
 .. panels::
     :card: + intro-card text-center
@@ -33,7 +41,7 @@ ordabayev@brandeis.edu
 
     +++
 
-    .. link-button:: install
+    .. link-button:: install/index
             :type: ref
             :text: To the installation guide
             :classes: btn-block btn-secondary stretched-link
@@ -88,7 +96,7 @@ ordabayev@brandeis.edu
    :titlesonly:
    :hidden:
 
-   install
+   install/index
    user_guide/index
    examples/index
    commands/index
