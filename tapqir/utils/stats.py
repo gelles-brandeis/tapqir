@@ -187,7 +187,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc["p(specific)", "95% LL"] = 0.0
             data.loc["p(specific)", "95% UL"] = 0.0
 
-    model.statistics = data
+    model.summary = data
 
     if path is not None:
         path = Path(path)
@@ -214,5 +214,5 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     ci_stats[param][stat] = value.numpy()
             savemat(path / f"{model.name}-params.mat", ci_stats)
         data.to_csv(
-            path / "statistics.csv",
+            path / f"{model.name}-summary.csv",
         )
