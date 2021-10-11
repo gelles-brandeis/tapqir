@@ -19,7 +19,7 @@ class Cosmos(Model):
     Time-independent Single Molecule Colocalization Model.
     """
 
-    name = "marginal"
+    name = "cosmos"
 
     def __init__(self, S=1, K=2, device="cpu", dtype="double", marginal=False):
         super().__init__(S, K, device, dtype)
