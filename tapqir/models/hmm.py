@@ -27,7 +27,7 @@ class HMM(Cosmos):
         self.vectorized = vectorized
         super().__init__(S, K, device, dtype)
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
-        self._global_params = ["gain", "proximity", "lamda"]
+        self._global_params = ["gain", "proximity", "lamda", "trans"]
 
     def TraceELBO(self, jit=False):
         if self.vectorized:

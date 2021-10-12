@@ -92,10 +92,8 @@ class Model:
     def load(self, path, data_only=True):
         # set path
         self.path = Path(path)
-        self.run_path = (
-            self.path / ".tapqir" / f"{self.name}" / tapqir_version.split("+")[0]
-        )
-        self.writer = SummaryWriter(log_dir=self.run_path / "tb")
+        self.run_path = self.path / ".tapqir"
+        self.writer = SummaryWriter(log_dir=self.run_path / "logs" / self.name)
 
         # load data
         self.data = load(self.path, self.device)
@@ -104,9 +102,9 @@ class Model:
         # load fit results
         if not data_only:
             self.params = torch.load(self.path / f"{self.name}-params.tpqr")
-            self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
-            logger.info(f"Loaded parameters from {self.name}-params.tpqr")
-            logger.info(f"Loaded model statistics from {self.path / 'statistics.csv'}")
+            self.summary = pd.read_csv(
+                self.path / f"{self.name}-summary.csv", index_col=0
+            )
 
     def TraceELBO(self, jit):
         """
@@ -228,7 +226,7 @@ class Model:
                 "rolling": self._rolling,
                 "convergence_status": self._stop,
             },
-            self.run_path / "model",
+            self.run_path / f"{self.name}-model.tpqr",
         )
 
         # save global paramters for tensorboard
@@ -267,7 +265,7 @@ class Model:
         device = self.device
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
-        checkpoint = torch.load(path / "model", map_location=device)
+        checkpoint = torch.load(path / f"{self.name}-model.tpqr", map_location=device)
         pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
             self._stop = checkpoint["convergence_status"]

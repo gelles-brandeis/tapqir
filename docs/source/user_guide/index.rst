@@ -107,7 +107,7 @@ Options:
   and then run for additional number of iterations as required. Convergence of global
   parameters can be visually checked using tensorboard_.
 
-The program will save a checkpoint every 100 iterations (checkpoint is saved in ``.tapqir/cosmos`` folder).
+The program will save a checkpoint every 100 iterations (checkpoint is saved in ``.tapqir/cosmos-model.tpqr`` folder).
 Starting the program again will resume from the last saved checkpoint. At every checkpoint the values of global
 variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``, ``pi_mean``, ``lamda_loc``) are also
 recorded for visualization by tensorboard_. Plateaued plots signify convergence.
@@ -146,7 +146,7 @@ Options:
 * ``--matlab`` - Save parameters in matlab format (default: False)
 
 Parameters with their mean value, 95% CI (credible interval) lower limit and upper limit
-are saved in ``cosmos-params.tqpr``, ``cosmos-params.mat``, and ``statistics.csv`` files.
+are saved in ``cosmos-params.tqpr``, ``cosmos-params.mat``, and ``cosmos-summary.csv`` files.
 
 To visualize analysis results run::
 
