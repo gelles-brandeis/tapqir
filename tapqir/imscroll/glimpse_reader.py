@@ -21,14 +21,8 @@ logger = logging.getLogger(__name__)
 class GlimpseDataset:
     """
     GlimpseDataset parses header, aoiinfo, driftlist, and intervals (optional)
-    files and creates
+    files.
 
-    1. aoiinfo and cumdrift DataFrames
-    2. __getitem__ method to retrieve glimpse image for a given frame
-    3. labels np.array
-
-        title, header_dir, ontarget_aoiinfo, offtarget_aoiinfo
-        driftlist, frame_start, frame_end, ontarget_labels, offtarget_labels
     :param title: Project/experiment name.
     :param header_dir: Path to the header/glimpse folder.
     :param ontarget_aoiinfo: Path to the on-target AOI locations file.
