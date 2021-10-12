@@ -14,31 +14,59 @@ def CmdGlimpse(args):
     if "glimpse" not in config.sections():
         config["glimpse"] = {}
 
-    if args.title is not None:
-        config["glimpse"]["title"] = args.title
-    if args.header_dir is not None:
-        config["glimpse"]["dir"] = args.header_dir
-    if args.ontarget_aoiinfo is not None:
-        config["glimpse"]["ontarget_aoiinfo"] = args.ontarget_aoiinfo
-    if args.offtarget_aoiinfo is not None:
-        config["glimpse"]["offtarget_aoiinfo"] = args.offtarget_aoiinfo
-    if args.driftlist is not None:
-        config["glimpse"]["driftlist"] = args.driftlist
-    if args.frame_start is not None:
-        config["glimpse"]["frame_start"] = args.frame_start
-    if args.frame_end is not None:
-        config["glimpse"]["frame_end"] = args.frame_end
-    if args.ontarget_labels is not None:
-        config["glimpse"]["ontarget_labels"] = args.ontarget_labels
-    if args.offtarget_labels is not None:
-        config["glimpse"]["offtarget_labels"] = args.offtarget_labels
-
-    with open(cfg_file, "w") as configfile:
-        config.write(configfile)
+    kwargs = {}
+    kwargs["title"] = (
+        args.title if args.title is not None else config["glimpse"].get("title", None)
+    )
+    kwargs["aoi_size"] = (
+        args.aoi_size
+        if args.aoi_size is not None
+        else config["glimpse"].get("aoi_size", 14)
+    )
+    kwargs["header_dir"] = (
+        args.header_dir
+        if args.header_dir is not None
+        else config["glimpse"].get("header_dir", None)
+    )
+    kwargs["ontarget_aoiinfo"] = (
+        args.ontarget_aoiinfo
+        if args.ontarget_aoiinfo is not None
+        else config["glimpse"].get("ontarget_aoiinfo", None)
+    )
+    kwargs["offtarget_aoiinfo"] = (
+        args.offtarget_aoiinfo
+        if args.offtarget_aoiinfo is not None
+        else config["glimpse"].get("offtarget_aoiinfo", None)
+    )
+    kwargs["driftlist"] = (
+        args.driftlist
+        if args.driftlist is not None
+        else config["glimpse"].get("driftlist", None)
+    )
+    kwargs["frame_start"] = (
+        args.frame_start
+        if args.frame_start is not None
+        else config["glimpse"].get("frame_start", None)
+    )
+    kwargs["frame_end"] = (
+        args.frame_end
+        if args.frame_end is not None
+        else config["glimpse"].get("frame_end", None)
+    )
+    kwargs["ontarget_labels"] = (
+        args.ontarget_labels
+        if args.ontarget_labels is not None
+        else config["glimpse"].get("ontarget_labels", None)
+    )
+    kwargs["offtarget_labels"] = (
+        args.offtarget_labels
+        if args.offtarget_labels is not None
+        else config["glimpse"].get("offtarget_labels", None)
+    )
 
     read_glimpse(
         path=args.cd,
-        P=14,
+        **kwargs,
     )
 
 
@@ -53,8 +81,13 @@ def add_parser(subparsers, parent_parser):
     )
     parser.add_argument(
         "--title",
-        help="Project name",
+        help="Project/experiment name",
         metavar="<name>",
+    )
+    parser.add_argument(
+        "--aoi-size",
+        help="AOI image size - number of pixels along the axis (default: 14)",
+        metavar="<number>",
     )
     parser.add_argument(
         "--header-dir",

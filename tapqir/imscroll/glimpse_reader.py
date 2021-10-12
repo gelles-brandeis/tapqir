@@ -1,7 +1,6 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
-import configparser
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -22,33 +21,20 @@ logger = logging.getLogger(__name__)
 class GlimpseDataset:
     """
     GlimpseDataset parses header, aoiinfo, driftlist, and intervals (optional)
-    files and creates
+    files.
 
-    1. aoiinfo and cumdrift DataFrames
-    2. __getitem__ method to retrieve glimpse image for a given frame
-    3. labels np.array
-
-    :param path: path to the folder containing options.cfg file.
+    :param title: Project/experiment name.
+    :param header_dir: Path to the header/glimpse folder.
+    :param ontarget_aoiinfo: Path to the on-target AOI locations file.
+    :param offtarget_aoiinfo: Path to the off-target control AOI locations file (optional).
+    :param driftlist: Path to the driftlist file.
+    :param frame_start: First frame to include in the analysis (optional).
+    :param frame_end: Last frame to include in the analysis (optional).
+    :param ontarget_labels: Path to the on-target label intervals file.
+    :param offtarget_labels: Path to the off-target label intervals file.
     """
 
-    def __init__(self, path):
-        """Read Glimpse files"""
-
-        # read options.cfg file
-        config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(path) / ".tapqir" / "config"
-        config.read(cfg_file)
-        kwargs = {}
-        kwargs["title"] = config["glimpse"]["title"]
-        kwargs["header_dir"] = config["glimpse"]["dir"]
-        kwargs["ontarget_aoiinfo"] = config["glimpse"]["ontarget_aoiinfo"]
-        kwargs["offtarget_aoiinfo"] = config["glimpse"]["offtarget_aoiinfo"]
-        kwargs["driftlist"] = config["glimpse"]["driftlist"]
-        kwargs["frame_start"] = config["glimpse"].get("frame_start", None)
-        kwargs["frame_end"] = config["glimpse"].get("frame_end", None)
-        kwargs["ontarget_labels"] = config["glimpse"].get("ontarget_labels", None)
-        kwargs["offtarget_labels"] = config["glimpse"].get("offtarget_labels", None)
-
+    def __init__(self, **kwargs):
         dtypes = ["ontarget"]
         if kwargs["offtarget_aoiinfo"] is not None:
             dtypes.append("offtarget")
@@ -184,11 +170,12 @@ class GlimpseDataset:
         return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
 
 
-def read_glimpse(path, P=14):
+def read_glimpse(path, **kwargs):
     """
     Preprocess glimpse files.
     """
-    glimpse = GlimpseDataset(path)
+    P = int(kwargs.pop("aoi_size"))
+    glimpse = GlimpseDataset(**kwargs)
 
     raw_target_xy = defaultdict(lambda: None)
     target_xy = defaultdict(lambda: None)

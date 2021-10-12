@@ -28,21 +28,21 @@ def CmdFit(args):
     if "fit" not in config.sections():
         config["fit"] = {}
 
-    if args.bs is not None:
-        config["fit"]["bs"] = str(args.bs)
-
     states = 1
     dtype = "double"
-    k_max = args.k
-    num_iter = args.it
-    batch_size = args.bs
-    learning_rate = args.lr
+    k_max = args.k_max if args.k_max is not None else config["fit"].getint("k_max", 2)
+    batch_size = args.bs if args.bs is not None else config["fit"].getint("bs", 0)
+    learning_rate = (
+        args.lr if args.lr is not None else config["fit"].getfloat("lr", 0.005)
+    )
+    num_iter = (
+        args.num_iter
+        if args.num_iter is not None
+        else config["fit"].getint("num_iter", 0)
+    )
     marginal = args.marginal
     device = "cuda" if args.cuda else "cpu"
     backend = "funsor" if args.funsor else "pyro"
-
-    with open(cfg_file, "w") as configfile:
-        config.write(configfile)
 
     # pyro backend
     if backend == "pyro":
@@ -90,28 +90,26 @@ def add_parser(subparsers, parent_parser):
         action="store_true",
     )
     parser.add_argument(
-        "-bs",
+        "--bs",
         metavar="<number>",
         type=int,
         help="Batch size",
     )
     parser.add_argument(
-        "-lr",
+        "--lr",
         metavar="<number>",
-        default=0.005,
         type=float,
         help="Learning rate (default: 0.005)",
     )
     parser.add_argument(
-        "-it",
+        "--num-iter",
         metavar="<number>",
         type=int,
         help="Number of iterations (default: 0)",
     )
     parser.add_argument(
-        "-k",
+        "--k-max",
         metavar="<number>",
-        default=2,
         type=int,
         help="Maximum number of spots (default: 2)",
     )
