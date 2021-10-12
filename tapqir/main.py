@@ -27,8 +27,8 @@ def main(argv=None):
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    if "path" in args and (args.path / ".tapqir").is_dir():
-        fh = logging.FileHandler(args.path / ".tapqir" / "log")
+    if "cd" in args and (args.cd / ".tapqir").is_dir():
+        fh = logging.FileHandler(args.cd / ".tapqir" / "log")
         fh.setLevel(logging.DEBUG)
         formatter = logging.Formatter(
             fmt="%(asctime)s - %(levelname)s - %(message)s",
