@@ -6,13 +6,13 @@ from pathlib import Path
 
 from tapqir import __version__ as tapqir_version
 
-from .commands import config, fit, glimpse, init, save, show
+from .commands import config, fit, glimpse, init, show, stats
 
 COMMANDS = [
     init,
     glimpse,
     fit,
-    save,
+    stats,
     show,
     config,
 ]

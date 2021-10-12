@@ -64,6 +64,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                 0,
                 (model.data.P + 1) / math.sqrt(12),
             )
+        elif param == "trans":
+            fn = dist.Dirichlet(
+                pyro.param("trans_mean").cpu() * pyro.param("trans_size").cpu()
+            ).to_event(1)
         else:
             raise NotImplementedError
         samples = fn.sample((num_samples,)).data.squeeze()
@@ -137,6 +141,13 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
             data.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
             data.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
+        elif param == "trans":
+            data.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
+            data.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
+            data.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
+            data.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
+            data.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
+            data.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
         else:
             data.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             data.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
@@ -187,7 +198,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             data.loc["p(specific)", "95% LL"] = 0.0
             data.loc["p(specific)", "95% UL"] = 0.0
 
-    model.statistics = data
+    model.summary = data
 
     if path is not None:
         path = Path(path)
@@ -214,5 +225,5 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     ci_stats[param][stat] = value.numpy()
             savemat(path / f"{model.name}-params.mat", ci_stats)
         data.to_csv(
-            path / "statistics.csv",
+            path / f"{model.name}-summary.csv",
         )
