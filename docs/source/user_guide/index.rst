@@ -58,11 +58,13 @@ will require the following files:
 
 To extract AOIs from raw images run::
 
-    $ tapqir glimpse --title <name> --header-dir <path> --ontarget-aoiinfo <path> --offtarget-aoiinfo <path> --driftlist <path> --frame-start <number> --frame-end <number>
+    $ tapqir glimpse --title <name> --header-dir <path> --aoi-size <number> --ontarget-aoiinfo <path> --offtarget-aoiinfo <path> --driftlist <path> --frame-start <number> --frame-end <number>
 
 Options:
 
 * ``--title`` - Project/experiment name
+
+* ``--aoi-size`` - AOI image size - number of pixels along the axis (default: 14)
 
 * ``--header-dir`` - Path to the header/glimpse folder
 
@@ -88,19 +90,19 @@ Data analysis
 Fit the data to the time-independent ``cosmos`` model with :math:`\theta`
 marginalized out (``--marginal``)::
 
-    $ tapqir fit cosmos --marginal --cuda -bs <number> -it <number>
+    $ tapqir fit cosmos --marginal --cuda --bs <number> --num-iter <number>
 
 Options:
 
 * ``--cuda`` - Run computations on GPU.
 
-* ``-bs <number>`` - Batch size is the size of the subset of AOIs that is used
+* ``--bs <number>`` - Batch size is the size of the subset of AOIs that is used
   for fitting at each iteration. It affects the amount of memory consumed and
   computation time and can be adjusted accordingly. ``nvidia-smi`` shell command shows
   Memory-Usage and GPU-Util values. Our recommendation is to increase batch size till
   GPU-Util is high (> 60%) but not maxed out.
 
-* ``-it <number>`` - Number of fitting iterations. Setting it to 0 will run the program till 
+* ``--num-iter <number>`` - Number of fitting iterations. Setting it to 0 will run the program till 
   Tapqir's custom convergence criteria is satisfied. We recommend to set it to 0 (default)
   and then run for additional number of iterations as required. Convergence of global
   parameters can be visually checked using tensorboard_.
@@ -113,7 +115,7 @@ recorded for visualization by tensorboard_. Plateaued plots signify convergence.
 After the marginalized (``--marginal``) model has converged run the full ``cosmos`` model (usually
 15,000-20,000 iterations is enough)::
 
-    $ tapqir fit cosmos --cuda -bs <number> -it <number>
+    $ tapqir fit cosmos --cuda --bs <number> --num-iter <number>
 
 .. tip::
 
@@ -173,7 +175,7 @@ Using Slurm
 If `Slurm Workload Manager <https://slurm.schedmd.com/documentation.html>`_ is
 configured on the machine Tapqir analysis can be submitted as a slurm job::
 
-    $ sbatch --job-name <name> --gres gpu:1 tapqir fit <model> --cuda -bs <number> -it <number>
+    $ sbatch --job-name <name> --gres gpu:1 tapqir fit <model> --cuda --bs <number> --num-iter <number>
 
 Sbatch command options:
 
