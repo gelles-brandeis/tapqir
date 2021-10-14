@@ -155,6 +155,13 @@ To visualize analysis results run::
 which will open GUI displaying parameter values (mean and 95% CI). Clicking on the ``Images`` button
 will show original images along with the best fit estimates.
 
+Viewing logging info
+--------------------
+
+Tapqir logs console output to a ``.tapqir/loginfo`` text file. It can be viewed by running::
+
+    $ tapqir log
+
 ..
     Configuration file
     ~~~~~~~~~~~~~~~~~~
