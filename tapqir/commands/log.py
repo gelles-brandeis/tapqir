@@ -11,9 +11,9 @@ def CmdLog(args):
 
 
 def add_parser(subparsers, parent_parser):
-    LOG_HELP = "Show run logs."
+    LOG_HELP = "Show logging info."
     LOG_DESC = """
-        Show run logs.
+        Show logging info.
     """
 
     parser = subparsers.add_parser(
