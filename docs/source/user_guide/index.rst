@@ -130,7 +130,7 @@ After the marginalized (``--marginal``) model has converged run the full ``cosmo
 Tensorboard
 ^^^^^^^^^^^
 
-Fitting progress can be inspected using `tensorboard program <https://www.tensorflow.org/tensorboard>`_::
+Fitting progress can be inspected while fitting is taking place or afterwards using `tensorboard program <https://www.tensorflow.org/tensorboard>`_::
 
     $ tensorboard --logdir=.
 
