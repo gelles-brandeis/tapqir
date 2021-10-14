@@ -130,7 +130,7 @@ After the marginalized (``--marginal``) model has converged run the full ``cosmo
 Tensorboard
 ^^^^^^^^^^^
 
-Fitting progress can be inspected using `tensorboard program <https://www.tensorflow.org/tensorboard>`_::
+Fitting progress can be inspected while fitting is taking place or afterwards using `tensorboard program <https://www.tensorflow.org/tensorboard>`_::
 
     $ tensorboard --logdir=.
 
@@ -154,6 +154,13 @@ To visualize analysis results run::
 
 which will open GUI displaying parameter values (mean and 95% CI). Clicking on the ``Images`` button
 will show original images along with the best fit estimates.
+
+Viewing logging info
+--------------------
+
+Tapqir logs console output to a ``.tapqir/loginfo`` text file. It can be viewed by running::
+
+    $ tapqir log
 
 ..
     Configuration file
