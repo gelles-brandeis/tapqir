@@ -102,7 +102,9 @@ class Model:
         # load fit results
         if not data_only:
             self.params = torch.load(self.path / f"{self.name}-params.tpqr")
-            self.summary = pd.read_csv(self.path / f"{self.name}-summary.csv", index_col=0)
+            self.summary = pd.read_csv(
+                self.path / f"{self.name}-summary.csv", index_col=0
+            )
 
     def TraceELBO(self, jit):
         """

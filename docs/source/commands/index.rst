@@ -14,5 +14,6 @@ Command Reference
    fit
    glimpse
    init
+   log
    show
    stats
