@@ -133,32 +133,32 @@ class Cosmos(Model):
 
     @property
     def infer_config(self):
-        #  if self._classify:
-        #      return {
-        #          "expose_types": ["sample"],
-        #          "expose": ["d/z_probs", "d/m_probs"],
-        #      }
+        if self._classify:
+            return {
+                "expose_types": ["sample"],
+                "expose": ["d/z_probs", "d/m_probs"],
+            }
         return {"expose_types": ["sample", "param"]}
 
     def guide(self):
-        # with handlers.block(**self.infer_config):
-        # global parameters
-        pyro.sample(
-            "gain",
-            dist.Gamma(
-                pyro.param("gain_loc").to(self.device)
-                * pyro.param("gain_beta").to(self.device),
-                pyro.param("gain_beta").to(self.device),
-            ),
-        )
-        self.state_guide()
+        with handlers.block(**self.infer_config):
+            # global parameters
+            pyro.sample(
+                "gain",
+                dist.Gamma(
+                    pyro.param("gain_loc").to(self.device)
+                    * pyro.param("gain_beta").to(self.device),
+                    pyro.param("gain_beta").to(self.device),
+                ),
+            )
+            self.state_guide()
 
-        # test data
-        self.spot_guide(self.data.ontarget, prefix="d")
+            # test data
+            self.spot_guide(self.data.ontarget, prefix="d")
 
-        # control data
-        if self.data.offtarget.images is not None:
-            self.spot_guide(self.data.offtarget, prefix="c")
+            # control data
+            if self.data.offtarget.images is not None:
+                self.spot_guide(self.data.offtarget, prefix="c")
 
     def state_guide(self):
         pyro.sample(
