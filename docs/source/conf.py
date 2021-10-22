@@ -105,7 +105,7 @@ nbsphinx_prolog = r"""
 # -- Copy notebook files
 
 for src_file in glob.glob("../../notebooks/*.ipynb"):
-    shutil.copy(src_file, "examples/")
+    shutil.copy(src_file, "tutorials/")
 
 
 # -- Options for HTML output -------------------------------------------------

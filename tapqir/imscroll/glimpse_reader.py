@@ -2,12 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from matplotlib.patches import Rectangle
 from scipy.io import loadmat
 from tqdm import tqdm
 
@@ -178,18 +180,20 @@ def read_glimpse(path, **kwargs):
     name = kwargs.pop("dataset")
     channels = kwargs.pop("channels")
 
-    offsets = []
+    offsets = defaultdict(int)
     # iterate over channels
     data = defaultdict(list)
     target_xy = defaultdict(list)
     for c in range(C):
         glimpse = GlimpseDataset(**kwargs, **channels[c])
+
+        raw_target_xy = {}
+        colors = {}
+        colors["ontarget"] = "#AA3377"
+        colors["offtarget"] = "#CCBB44"
         for dtype in glimpse.dtypes:
             N = len(glimpse.aoiinfo[dtype])
             F = len(glimpse.cumdrift)
-
-        raw_target_xy = {}
-        for dtype in glimpse.dtypes:
             raw_target_xy[dtype] = (
                 np.expand_dims(glimpse.aoiinfo[dtype][["x", "y"]].values, axis=1)
                 + glimpse.cumdrift[["dx", "dy"]].values
@@ -201,15 +205,63 @@ def read_glimpse(path, **kwargs):
                     dtype="int",
                 )
             )
+
+            # plot AOIs in raw FOV images
+            fig = plt.figure(figsize=(10, 10 * glimpse.height / glimpse.width))
+            ax = fig.add_subplot(1, 1, 1)
+            fov = glimpse[glimpse.cumdrift.index[0]]
+            vmin = np.percentile(fov, 1)
+            vmax = np.percentile(fov, 99)
+            ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
+            for aoi in glimpse.aoiinfo[dtype].index:
+                # areas of interest
+                y_pos = round(glimpse.aoiinfo[dtype].at[aoi, "y"] - 0.5 * (P - 1)) - 0.5
+                x_pos = round(glimpse.aoiinfo[dtype].at[aoi, "x"] - 0.5 * (P - 1)) - 0.5
+                ax.add_patch(
+                    Rectangle(
+                        (x_pos, y_pos),
+                        P,
+                        P,
+                        edgecolor=colors[dtype],
+                        lw=1,
+                        facecolor="none",
+                    )
+                )
+            ax.set_title(f"{dtype} AOI locations for channel {c}", fontsize=16)
+            ax.set_xlabel("x", fontsize=16)
+            ax.set_ylabel("y", fontsize=16)
+            plt.savefig(path / f"{dtype}-channel{c}.png", dpi=300)
+
+        # plot offset in raw FOV images
+        fig = plt.figure(figsize=(10, 10 * glimpse.height / glimpse.width))
+        ax = fig.add_subplot(1, 1, 1)
+        fov = glimpse[glimpse.cumdrift.index[0]]
+        vmin = np.percentile(fov, 1)
+        vmax = np.percentile(fov, 99)
+        ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
+        ax.add_patch(
+            Rectangle(
+                (10, 10),
+                30,
+                30,
+                edgecolor="#CCBB44",
+                lw=1,
+                facecolor="none",
+            )
+        )
+        ax.set_title(f"offset location for channel {c}", fontsize=16)
+        ax.set_xlabel("x", fontsize=16)
+        ax.set_ylabel("y", fontsize=16)
+        plt.savefig(path / f"offset-channel{c}.png", dpi=300)
+
         # loop through each frame
         logger.info("Processing glimpse files ...")
         for f, frame in enumerate(tqdm(glimpse.cumdrift.index)):
             img = glimpse[frame]
 
-            offsets.append(img[10:40, 10:40])
-            offsets.append(img[10:40, -40:-10])
-            offsets.append(img[-40:-10, 10:40])
-            offsets.append(img[-40:-10, -40:-10])
+            values, counts = np.unique(img[10:40, 10:40], return_counts=True)
+            for value, count in zip(values, counts):
+                offsets[value] += count
             for dtype in glimpse.dtypes:
                 # loop through each aoi
                 for n, aoi in enumerate(glimpse.aoiinfo[dtype].index):
@@ -224,10 +276,14 @@ def read_glimpse(path, **kwargs):
                     target_xy[dtype][c][n, f, 1] = (
                         raw_target_xy[dtype][n, f, 1] - shifty
                     )
+
+        # assert that target positions are within central pixel
         for dtype in glimpse.dtypes:
             assert (target_xy[dtype][c] > 0.5 * P - 1).all()
             assert (target_xy[dtype][c] < 0.5 * P).all()
+
     for dtype in data.keys():
+        # concatenate channels
         data[dtype] = np.stack(data[dtype], -3)
         target_xy[dtype] = np.stack(target_xy[dtype], -2)
         # convert data into torch tensor
@@ -235,15 +291,33 @@ def read_glimpse(path, **kwargs):
         target_xy[dtype] = torch.tensor(target_xy[dtype])
 
     # process offset data
-    offset = np.concatenate(offsets, axis=0).ravel()
-    offset_min = np.percentile(offset, 0.5)
-    offset_max = np.percentile(offset, 99.5)
-    clamped_offset = np.clip(offset, offset_min, offset_max)
-    offset_samples, offset_weights = np.unique(clamped_offset, return_counts=True)
+    offsets = OrderedDict(sorted(offsets.items()))
+    offset_samples = np.array(list(offsets.keys()))
+    offset_weights = np.array(list(offsets.values()))
     offset_weights = offset_weights / offset_weights.sum()
+    # remove values from lower and upper 0.5 percentile
+    low_mask = offset_weights.cumsum() < 0.005
+    low_weights = offset_weights[low_mask].sum()
+    offset_samples = offset_samples[~low_mask]
+    offset_weights = offset_weights[~low_mask]
+    offset_weights[0] += low_weights
+    high_mask = offset_weights.cumsum() > 0.995
+    high_weights = offset_weights[high_mask].sum()
+    offset_samples = offset_samples[~high_mask]
+    offset_weights = offset_weights[~high_mask]
+    offset_weights[-1] += high_weights
     # convert data into torch tensor
     offset_samples = torch.tensor(offset_samples, dtype=torch.int)
     offset_weights = torch.tensor(offset_weights)
+
+    # plot offset distribution
+    plt.figure(figsize=(3, 3))
+    plt.bar(offset_samples, offset_weights)
+    plt.title("Empirical Distribution", fontsize=12)
+    plt.ylabel("Density", fontsize=12)
+    plt.xlabel("Intensity", fontsize=12)
+    plt.tight_layout()
+    plt.savefig(path / "offset-distribution.png", dpi=300)
 
     data = defaultdict(lambda: None, data)
     target_xy = defaultdict(lambda: None, target_xy)
@@ -264,6 +338,7 @@ def read_glimpse(path, **kwargs):
     logger.info(
         f"On-target data: N={dataset.ontarget.N} AOIs, "
         f"F={dataset.ontarget.F} frames, "
+        f"C={dataset.ontarget.C} channels, "
         f"P={dataset.ontarget.P} pixels, "
         f"P={dataset.ontarget.P} pixels"
     )
@@ -271,6 +346,7 @@ def read_glimpse(path, **kwargs):
         logger.info(
             f"Off-target data: N={dataset.offtarget.N} AOIs, "
             f"F={dataset.offtarget.F} frames, "
+            f"C={dataset.offtarget.C} channels, "
             f"P={dataset.offtarget.P} pixels, "
             f"P={dataset.offtarget.P} pixels"
         )

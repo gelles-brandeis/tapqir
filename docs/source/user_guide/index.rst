@@ -5,7 +5,7 @@ User Guide
 
 .. note::
 
-    Checkout an :doc:`example </examples/example_part_i>` analysis of a sample data set that
+    Checkout a :doc:`tutorial </tutorials/tutorial_part_i>` analysis of a sample data set that
     can be followed along with this user guide or used as a template for your own analysis.
 
 Set up the environment
