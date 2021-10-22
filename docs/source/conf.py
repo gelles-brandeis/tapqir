@@ -46,7 +46,6 @@ extensions = [
     "sphinx_click",
     "sphinx_gallery.load_style",
     "sphinx_panels",
-    "sphinxarg.ext",
     "IPython.sphinxext.ipython_console_highlighting",
 ]
 
