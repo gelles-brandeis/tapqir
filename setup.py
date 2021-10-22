@@ -35,7 +35,7 @@ DOCS_REQUIRE = [
     "nbsphinx>=0.8.5",
     "sphinx",
     "pydata_sphinx_theme",
-    "sphinx-argparse",
+    "sphinx-click",
     "sphinx-gallery",
     "sphinx-panels",
 ]
@@ -85,6 +85,6 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.main:main"],
+        "console_scripts": ["tapqir=tapqir.main:app"],
     },
 )

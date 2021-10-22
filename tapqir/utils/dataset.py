@@ -20,8 +20,12 @@ class CosmosData(namedtuple("CosmosData", ["images", "xy", "labels", "device"]))
         return self.images.shape[1]
 
     @property
-    def P(self):
+    def C(self):
         return self.images.shape[2]
+
+    @property
+    def P(self):
+        return self.images.shape[3]
 
     @property
     def x(self):
@@ -35,12 +39,10 @@ class CosmosData(namedtuple("CosmosData", ["images", "xy", "labels", "device"]))
     def median(self):
         return torch.median(self.images).item()
 
-    def fetch(self, ndx, fdx=None):
-        if fdx is not None:
-            return Vindex(self.images)[ndx, fdx].to(self.device), self.xy[ndx, fdx].to(
-                self.device
-            )
-        return self.images[ndx].to(self.device), self.xy[ndx].to(self.device)
+    def fetch(self, ndx, fdx, cdx):
+        return Vindex(self.images)[ndx, fdx, cdx].to(self.device), Vindex(self.xy)[
+            ndx, fdx, cdx
+        ].to(self.device)
 
 
 class OffsetData(namedtuple("OffsetData", ["samples", "weights"])):
@@ -81,18 +83,22 @@ class CosmosDataset:
         offset_samples=None,
         offset_weights=None,
         device=torch.device("cpu"),
-        title=None,
+        name=None,
     ):
         self.ontarget = CosmosData(ontarget_data, ontarget_xy, ontarget_labels, device)
         self.offtarget = CosmosData(
             offtarget_data, offtarget_xy, offtarget_labels, device
         )
         self.offset = OffsetData(offset_samples.to(device), offset_weights.to(device))
-        self.title = title
+        self.name = name
 
     @property
     def P(self):
         return self.ontarget.P
+
+    @property
+    def C(self):
+        return self.ontarget.C
 
     @lazy_property
     def vmin(self):
@@ -140,7 +146,7 @@ def save(obj, path):
             "offtarget_labels": obj.offtarget.labels,
             "offset_samples": obj.offset.samples,
             "offset_weights": obj.offset.weights,
-            "title": obj.title,
+            "name": obj.name,
         },
         path / "data.tpqr",
     )

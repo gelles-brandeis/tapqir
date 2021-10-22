@@ -11,18 +11,24 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import AffineBeta, KSpotGammaNoise
+from tapqir.distributions.kspotgammanoise import _gaussian_spots
 from tapqir.models.model import Model
 
 
 class Cosmos(Model):
     """
-    Time-independent Single Molecule Colocalization Model.
+    Single-color Time-independent Colocalization Model.
     """
 
     name = "cosmos"
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double", marginal=False):
-        super().__init__(S, K, device, dtype)
+    def __init__(
+        self, S=1, K=2, channels=(0,), device="cpu", dtype="double", marginal=False
+    ):
+        super().__init__(S, K, channels, device, dtype)
+        assert len(self.channels) == 1, "Please specify exactly one color channel"
+        self.cdx = self.channels[0]
+        self.full_name = f"{self.name}-channel{self.cdx}"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         if marginal:
             self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
@@ -209,12 +215,18 @@ class Cosmos(Model):
         aois = pyro.plate(
             f"{prefix}/aois",
             data.N,
-            subsample_size=self.batch_size,
+            subsample_size=self.nbatch_size,
             subsample=self.n,
             dim=-2,
         )
         # time frames
-        frames = pyro.plate(f"{prefix}/frames", data.F, subsample=self.f, dim=-1)
+        frames = pyro.plate(
+            f"{prefix}/frames",
+            data.F,
+            subsample_size=self.fbatch_size,
+            subsample=self.f,
+            dim=-1,
+        )
 
         with aois as ndx:
             # background mean and std
@@ -308,7 +320,7 @@ class Cosmos(Model):
                 )
                 offset = self.data.offset.samples[odx]
                 # fetch data
-                obs, target_locs = data.fetch(ndx[:, None], fdx)
+                obs, target_locs = data.fetch(ndx[:, None], fdx, self.cdx)
                 # observed data
                 pyro.sample(
                     f"{prefix}/data",
@@ -334,12 +346,18 @@ class Cosmos(Model):
         aois = pyro.plate(
             f"{prefix}/aois",
             data.N,
-            subsample_size=self.batch_size,
+            subsample_size=self.nbatch_size,
             subsample=self.n,
             dim=-2,
         )
         # time frames
-        frames = pyro.plate(f"{prefix}/frames", data.F, subsample=self.f, dim=-1)
+        frames = pyro.plate(
+            f"{prefix}/frames",
+            data.F,
+            subsample_size=self.fbatch_size,
+            subsample=self.f,
+            dim=-1,
+        )
 
         with aois as ndx:
             pyro.sample(
@@ -626,3 +644,47 @@ class Cosmos(Model):
                 lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
                 constraint=constraints.simplex,
             )
+
+    def snr(self):
+        r"""
+        Calculate the signal-to-noise ratio.
+
+        Total signal:
+
+            :math:`\mu_{knf} =  \sum_{ij} I_{nfij}
+            \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
+
+        Noise:
+
+            :math:`\sigma^2_{knf} = \sigma^2_{\text{offset}}
+            + \mu_{knf} \text{gain}`
+
+        Signal-to-noise ratio:
+
+            :math:`\text{SNR}_{knf} =
+            \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
+            \text{ for } \theta_{nf} = k`
+        """
+        weights = _gaussian_spots(
+            torch.ones(1),
+            self.params["d/width"]["Mean"],
+            self.params["d/x"]["Mean"],
+            self.params["d/y"]["Mean"],
+            self.data.ontarget.xy[:, :, self.cdx, :].to(self.device),
+            self.data.ontarget.P,
+        )
+        signal = (
+            (
+                self.data.ontarget.images[:, :, self.cdx, :, :]
+                - self.params["d/background"]["Mean"][..., None, None]
+                - self.data.offset.mean
+            )
+            * weights
+        ).sum(dim=(-2, -1))
+        noise = (
+            self.data.offset.var
+            + self.params["d/background"]["Mean"] * self.params["gain"]["Mean"]
+        ).sqrt()
+        result = signal / noise
+        mask = self.theta_probs > 0.5
+        return result[mask]
