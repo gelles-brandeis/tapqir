@@ -94,7 +94,6 @@ class GlimpseDataset:
             f1 = int(kwargs["frame-start"])
             f2 = int(kwargs["frame-end"])
             drift_df = drift_df.loc[f1:f2]
-        aoi_df["ontarget"] = aoi_df["ontarget"].drop(labels=77)
 
         labels = defaultdict(lambda: None)
         for dtype in dtypes:
