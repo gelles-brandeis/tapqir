@@ -1,19 +1,6 @@
 Command Reference
 =================
 
-.. argparse::
-   :ref: tapqir.cli.get_main_parser
-   :nodefault:
-   :nosubcommands:
-
-.. toctree::
-   :titlesonly:
-   :hidden:
-
-   config
-   fit
-   glimpse
-   init
-   log
-   show
-   stats
+.. click:: tapqir.main:typer_click_object
+   :prog: tapqir
+   :nested: full

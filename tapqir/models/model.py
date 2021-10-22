@@ -21,7 +21,6 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
 from tapqir import __version__ as tapqir_version
-from tapqir.distributions.kspotgammanoise import _gaussian_spots
 from tapqir.utils.dataset import load
 from tapqir.utils.stats import save_stats
 
@@ -38,10 +37,12 @@ class Model:
     * :meth:`guide`
     """
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
+    def __init__(self, S=1, K=2, channels=(0,), device="cpu", dtype="double"):
         self._S = S
         self._K = K
-        self.batch_size = None
+        self.channels = channels
+        self.nbatch_size = None
+        self.fbatch_size = None
         # for plotting
         self.n = None
         self.f = None
@@ -93,7 +94,7 @@ class Model:
         # set path
         self.path = Path(path)
         self.run_path = self.path / ".tapqir"
-        self.writer = SummaryWriter(log_dir=self.run_path / "logs" / self.name)
+        self.writer = SummaryWriter(log_dir=self.run_path / "logs" / self.full_name)
 
         # load data
         self.data = load(self.path, self.device)
@@ -101,9 +102,9 @@ class Model:
 
         # load fit results
         if not data_only:
-            self.params = torch.load(self.path / f"{self.name}-params.tpqr")
+            self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
             self.summary = pd.read_csv(
-                self.path / f"{self.name}-summary.csv", index_col=0
+                self.path / f"{self.full_name}-summary.csv", index_col=0
             )
 
     def TraceELBO(self, jit):
@@ -124,7 +125,7 @@ class Model:
         """
         raise NotImplementedError
 
-    def init(self, lr=0.005, batch_size=0, jit=False):
+    def init(self, lr=0.005, nbatch_size=5, fbatch_size=1000, jit=False):
         self.optim_fn = optim.Adam
         self.optim_args = {"lr": lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
@@ -141,14 +142,16 @@ class Model:
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
         # find max possible batch_size
-        if batch_size == 0:
-            batch_size = self._max_batch_size()
-            logger.info("Optimal batch size determined - {}".format(batch_size))
-        self.batch_size = batch_size
+        if nbatch_size == 0:
+            nbatch_size = self._max_batch_size()
+            logger.info("Optimal batch size determined - {}".format(nbatch_size))
+        self.nbatch_size = nbatch_size
+        self.fbatch_size = fbatch_size
 
         logger.info("Optimizer - {}".format(self.optim_fn.__name__))
         logger.info("Learning rate - {}".format(lr))
-        logger.info("Batch size - {}".format(self.batch_size))
+        logger.info("AOI batch size - {}".format(self.nbatch_size))
+        logger.info("Frame batch size - {}".format(self.fbatch_size))
 
     def run(self, num_iter=0, nrange=trange):
         slurm = os.environ.get("SLURM_JOB_ID")
@@ -226,7 +229,7 @@ class Model:
                 "rolling": self._rolling,
                 "convergence_status": self._stop,
             },
-            self.run_path / f"{self.name}-model.tpqr",
+            self.run_path / f"{self.full_name}-model.tpqr",
         )
 
         # save global paramters for tensorboard
@@ -265,7 +268,9 @@ class Model:
         device = self.device
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
-        checkpoint = torch.load(path / f"{self.name}-model.tpqr", map_location=device)
+        checkpoint = torch.load(
+            path / f"{self.full_name}-model.tpqr", map_location=device
+        )
         pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
             self._stop = checkpoint["convergence_status"]
@@ -286,47 +291,3 @@ class Model:
             logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
             if save_matlab:
                 logger.info(f"Parameters were saved in {self.path / 'params.mat'}")
-
-    def snr(self):
-        r"""
-        Calculate the signal-to-noise ratio.
-
-        Total signal:
-
-            :math:`\mu_{knf} =  \sum_{ij} I_{nfij}
-            \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
-
-        Noise:
-
-            :math:`\sigma^2_{knf} = \sigma^2_{\text{offset}}
-            + \mu_{knf} \text{gain}`
-
-        Signal-to-noise ratio:
-
-            :math:`\text{SNR}_{knf} =
-            \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
-            \text{ for } \theta_{nf} = k`
-        """
-        weights = _gaussian_spots(
-            torch.ones(1),
-            self.params["d/width"]["Mean"],
-            self.params["d/x"]["Mean"],
-            self.params["d/y"]["Mean"],
-            self.data.ontarget.xy.to(self.dtype),
-            self.data.ontarget.P,
-        )
-        signal = (
-            (
-                self.data.ontarget.images
-                - self.params["d/background"]["Mean"][..., None, None]
-                - self.data.offset.mean
-            )
-            * weights
-        ).sum(dim=(-2, -1))
-        noise = (
-            self.data.offset.var
-            + self.params["d/background"]["Mean"] * self.params["gain"]["Mean"]
-        ).sqrt()
-        result = signal / noise
-        mask = self.theta_probs > 0.5
-        return result[mask]

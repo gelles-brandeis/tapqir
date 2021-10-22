@@ -59,12 +59,12 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
             samples[f"c/height_{k}"] = torch.full((1, N, F), params["height"])
 
     offset = torch.full((3,), params["offset"])
-    target_locs = torch.full((N, F, 2), (P - 1) / 2)
+    target_locs = torch.full((N, F, 1, 2), (P - 1) / 2)
     model.data = CosmosDataset(
-        torch.full((N, F, P, P), params["background"] + params["offset"]),
+        torch.full((N, F, 1, P, P), params["background"] + params["offset"]),
         target_locs,
         None,
-        torch.full((N, F, P, P), params["background"] + params["offset"]),
+        torch.full((N, F, 1, P, P), params["background"] + params["offset"]),
         target_locs,
         None,
         offset_samples=offset,
@@ -77,21 +77,21 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         handlers.uncondition(model.model), posterior_samples=samples, num_samples=1
     )
     samples = predictive()
-    data = torch.zeros(N, F, P, P)
-    control = torch.zeros(N, F, P, P)
-    labels = np.zeros((N, F), dtype=[("aoi", int), ("frame", int), ("z", bool)])
-    labels["aoi"] = np.arange(N).reshape(-1, 1)
-    labels["frame"] = np.arange(F)
+    data = torch.zeros(N, F, 1, P, P)
+    control = torch.zeros(N, F, 1, P, P)
+    labels = np.zeros((N, F, 1), dtype=[("aoi", int), ("frame", int), ("z", bool)])
+    labels["aoi"] = np.arange(N).reshape(-1, 1, 1)
+    labels["frame"] = np.arange(F).reshape(-1, 1)
     if "pi" in params:
-        data = samples["d/data"][0].data.floor()
-        control = samples["c/data"][0].data.floor()
-        labels["z"] = samples["d/theta"][0].cpu() > 0
+        data[:, :, 0] = samples["d/data"][0].data.floor()
+        control[:, :, 0] = samples["c/data"][0].data.floor()
+        labels["z"][:, :, 0] = samples["d/theta"][0].cpu() > 0
     else:
         # kinetic simulations
         for f in range(F):
-            data[:, f : f + 1] = samples[f"d/data_{f}"][0].data.floor()
-            labels["z"][:, f : f + 1] = samples[f"d/theta_{f}"][0].cpu() > 0
-        control = samples["c/data"][0].data.floor()
+            data[:, f : f + 1, 0] = samples[f"d/data_{f}"][0].data.floor()
+            labels["z"][:, f : f + 1, 0] = samples[f"d/theta_{f}"][0].cpu() > 0
+        control[:, :, 0] = samples["c/data"][0].data.floor()
     model.data = CosmosDataset(
         data.cpu(),
         target_locs.cpu(),

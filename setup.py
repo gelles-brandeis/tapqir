@@ -35,7 +35,7 @@ DOCS_REQUIRE = [
     "nbsphinx>=0.8.5",
     "sphinx",
     "pydata_sphinx_theme",
-    "sphinx-argparse",
+    "sphinx-click",
     "sphinx-gallery",
     "sphinx-panels",
 ]
@@ -54,7 +54,6 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "colorama",
-        "configparser",
         "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
         # "funsor==0.4.0",
         "future",
@@ -66,7 +65,9 @@ setuptools.setup(
         "scikit-learn",
         "scipy",
         "tensorboard",
+        "typer",
         "qtrangeslider",
+        "pyyaml",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
@@ -85,6 +86,6 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.main:main"],
+        "console_scripts": ["tapqir=tapqir.main:app"],
     },
 )

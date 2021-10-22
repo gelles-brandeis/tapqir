@@ -289,14 +289,16 @@ class MainWindow(QMainWindow):
             self.Model.params[f"{self.prefix}/width"]["Mean"][:, n, frames],
             self.Model.params[f"{self.prefix}/x"]["Mean"][:, n, frames],
             self.Model.params[f"{self.prefix}/y"]["Mean"][:, n, frames],
-            self.Model.data.ontarget.xy[n, frames],
+            self.Model.data.ontarget.xy[n, frames, self.Model.cdx],
             self.Model.data.ontarget.P,
         )
         img_ideal = img_ideal + gaussian.sum(-4)
         for f in range(f1, f1 + 100):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
-                self.Model.data.ontarget.images[int(self.aoiNumber.text()), f].numpy()
+                self.Model.data.ontarget.images[
+                    int(self.aoiNumber.text()), f, self.Model.cdx
+                ].numpy()
             )
             # if self.Model._classifier:
             self.prob[(f - f1) % 100].setOpts(
@@ -353,7 +355,7 @@ class MainWindow(QMainWindow):
         )
 
         self.ax["height"] = fig.add_subplot(gs[1])
-        config_axis(self.ax["height"], r"$h$", f1, f2, -100, 6000)
+        config_axis(self.ax["height"], r"$h$", f1, f2, -100, 8000)
 
         self.ax["width"] = fig.add_subplot(gs[2])
         config_axis(self.ax["width"], r"$w$", f1, f2, 0.5, 2.5)
