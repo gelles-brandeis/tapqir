@@ -205,7 +205,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc["TP", "Mean"],
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
-        mask = torch.from_numpy(model.data.ontarget.labels["z"])
+        mask = torch.from_numpy(model.data.ontarget.labels["z"][:, :, model.cdx])
         samples = torch.masked_select(model.pspecific.cpu(), mask)
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)

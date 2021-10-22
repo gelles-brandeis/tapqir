@@ -41,7 +41,8 @@ class Model:
         self._S = S
         self._K = K
         self.channels = channels
-        self.batch_size = None
+        self.nbatch_size = None
+        self.fbatch_size = None
         # for plotting
         self.n = None
         self.f = None
