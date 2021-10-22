@@ -66,6 +66,7 @@ setuptools.setup(
         "scikit-learn",
         "scipy",
         "tensorboard",
+        "typer",
         "qtrangeslider",
     ],
     extras_require={
