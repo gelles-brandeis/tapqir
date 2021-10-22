@@ -143,48 +143,50 @@ def glimpse(
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
     DEFAULTS["num-channels"] = num_channels
-    frame_range = typer.confirm(
-        "Specify frame range?", default=("frame-start" in DEFAULTS)
-    )
-    if frame_range:
-        DEFAULTS["frame-start"] = typer.prompt(
-            desc["frame-start"], default=DEFAULTS["frame-start"], type=int
-        )
-        DEFAULTS["frame-end"] = typer.prompt(
-            desc["frame-end"], default=DEFAULTS["frame-end"], type=int
-        )
-    else:
-        if "frame-start" in DEFAULTS:
-            del DEFAULTS["frame-start"]
-        if "frame-end" in DEFAULTS:
-            del DEFAULTS["frame-end"]
 
-    if "channels" not in DEFAULTS:
-        DEFAULTS["channels"] = []
-    for c in range(num_channels):
-        if len(DEFAULTS["channels"]) < c + 1:
-            DEFAULTS["channels"].append(defaultdict(lambda: None))
-        keys = [
-            "name",
-            "glimpse-folder",
-            "ontarget-aoiinfo",
-            "offtarget-aoiinfo",
-            "driftlist",
-        ]
-        typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
-        for key in keys:
-            if key == "offtarget-aoiinfo":
-                offtarget = typer.confirm(
-                    "Add off-target AOI locations?",
-                    default=("offtarget-aoiinfo" in DEFAULTS["channels"][c]),
-                )
-                if not offtarget:
-                    if "offtarget-aoiinfo" in DEFAULTS["channels"][c]:
-                        del DEFAULTS["channels"][c]["offtarget-aoiinfo"]
-                    continue
-            DEFAULTS["channels"][c][key] = typer.prompt(
-                desc[key], default=DEFAULTS["channels"][c][key]
+    if not quiet:
+        frame_range = typer.confirm(
+            "Specify frame range?", default=("frame-start" in DEFAULTS)
+        )
+        if frame_range:
+            DEFAULTS["frame-start"] = typer.prompt(
+                desc["frame-start"], default=DEFAULTS["frame-start"], type=int
             )
+            DEFAULTS["frame-end"] = typer.prompt(
+                desc["frame-end"], default=DEFAULTS["frame-end"], type=int
+            )
+        else:
+            if "frame-start" in DEFAULTS:
+                del DEFAULTS["frame-start"]
+            if "frame-end" in DEFAULTS:
+                del DEFAULTS["frame-end"]
+
+        if "channels" not in DEFAULTS:
+            DEFAULTS["channels"] = []
+        for c in range(num_channels):
+            if len(DEFAULTS["channels"]) < c + 1:
+                DEFAULTS["channels"].append(defaultdict(lambda: None))
+            keys = [
+                "name",
+                "glimpse-folder",
+                "ontarget-aoiinfo",
+                "offtarget-aoiinfo",
+                "driftlist",
+            ]
+            typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
+            for key in keys:
+                if key == "offtarget-aoiinfo":
+                    offtarget = typer.confirm(
+                        "Add off-target AOI locations?",
+                        default=("offtarget-aoiinfo" in DEFAULTS["channels"][c]),
+                    )
+                    if not offtarget:
+                        if "offtarget-aoiinfo" in DEFAULTS["channels"][c]:
+                            del DEFAULTS["channels"][c]["offtarget-aoiinfo"]
+                        continue
+                DEFAULTS["channels"][c][key] = typer.prompt(
+                    desc[key], default=DEFAULTS["channels"][c][key]
+                )
 
     DEFAULTS = dict(DEFAULTS)
     for i, channel in enumerate(DEFAULTS["channels"]):

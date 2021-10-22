@@ -80,14 +80,14 @@ ordabayev@brandeis.edu
     ---
     :img-top: _static/fi-rr-gallery.svg
 
-    Examples
-    ^^^^^^^^
+    Tutorials
+    ^^^^^^^^^
 
     Examples of analysis of experimental data using tapqir.
 
     +++
 
-    .. link-button:: examples/index
+    .. link-button:: tutorials/index
             :type: ref
             :text: To the examples
             :classes: btn-block btn-secondary stretched-link
@@ -98,5 +98,5 @@ ordabayev@brandeis.edu
 
    install/index
    user_guide/index
-   examples/index
+   tutorials/index
    commands/index
