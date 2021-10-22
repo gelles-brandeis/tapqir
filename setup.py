@@ -68,6 +68,7 @@ setuptools.setup(
         "tensorboard",
         "typer",
         "qtrangeslider",
+        "yaml",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
