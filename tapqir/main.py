@@ -57,11 +57,26 @@ def init():
     Initializing a Tapqir workspace creates a ``.tapqir`` sub-directory for storing ``config.yml``
     file, ``loginfo`` file, and files that are created by commands such as ``tapqir fit``.
     """
-    cd = DEFAULTS["cd"]
+    global DEFAULTS
+    cd = DEFAULTS.pop("cd")
+
     TAPQIR_PATH = cd / ".tapqir"
-    TAPQIR_PATH.mkdir(exist_ok=True)
+
+    if TAPQIR_PATH.is_dir():
+        typer.echo(".tapqir already exists.")
+        raise typer.Exit()
+
+    # initialize directory
+    TAPQIR_PATH.mkdir()
     CONFIG_FILE = TAPQIR_PATH / "config.yml"
-    CONFIG_FILE.touch(exist_ok=True)
+    # CONFIG_FILE.touch(exist_ok=True)
+    with open(CONFIG_FILE, "w") as cfg_file:
+        DEFAULTS["P"] = 14
+        DEFAULTS["nbatch-size"] = 5
+        DEFAULTS["fbatch-size"] = 512
+        DEFAULTS["learning-rate"] = 0.005
+        DEFAULTS["num-channels"] = 1
+        yaml.dump(dict(DEFAULTS), cfg_file, sort_keys=False)
 
     typer.echo(
         (
