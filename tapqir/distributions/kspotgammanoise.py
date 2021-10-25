@@ -4,8 +4,9 @@
 import math
 
 import torch
+from pykeops.torch import Genred
 from pyro.distributions import TorchDistribution
-from torch.distributions import constraints
+from torch.distributions import Categorical, constraints
 
 
 def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
@@ -17,7 +18,7 @@ def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
     """
     # create meshgrid of PxP pixel positions
     P_range = torch.arange(P)
-    j_pixel, i_pixel = torch.meshgrid(P_range, P_range)
+    i_pixel, j_pixel = torch.meshgrid(P_range, P_range, indexing="xy")
     ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
 
     # Ideal 2D gaussian spots
@@ -55,11 +56,12 @@ class KSpotGammaNoise(TorchDistribution):
         x- and y-axes, and be broadcastable to ``(batch_shape,)``.
     :param torch.Tensor background: Background intensity. Should
         be broadcastable to ``(batch_shape,)``.
-    :param torch.Tensor offset: Offset intensity. Should be broadcastable
-        to ``(batch_shape, P, P)``.
+    :param torch.Tensor gain: Camera gain.
+    :param torch.Tensor offset_samples: Offset samples from the empirical distribution.
+    :param torch.Tensor offset_logits: Offset log weights corresponding to the samples.
     :param torch.Tensor m: Spot presence indicator. Should be broadcastable
         to ``(batch_shape, K)``.
-    :param torch.Tensor gain: Camera gain.
+    :param bool use_pykeops: Use pykeops as backend to marginalize out offset.
     :param int P: Number of pixels along the axis.
     """
 
@@ -74,28 +76,35 @@ class KSpotGammaNoise(TorchDistribution):
         y,
         target_locs,
         background,
-        offset,
         gain,
-        P=None,
+        offset_samples,
+        offset_logits,
+        P,
         m=None,
+        use_pykeops=True,
         validate_args=None,
     ):
 
-        if P is None:
-            P = offset.shape[-1]
         gaussian_spots = _gaussian_spots(
             height, width, x, y, target_locs.unsqueeze(-2), P, m
         )
         image = background[..., None, None] + gaussian_spots.sum(-3)
 
-        self.offset = offset
         self.concentration = image / gain
         self.rate = 1 / gain
+        self.offset_samples = offset_samples
+        self.offset_logits = offset_logits
+        self.use_pykeops = use_pykeops
+        if self.use_pykeops:
+            device = self.concentration.device.type
+            self.device_pykeops = "GPU" if device == "cuda" else "CPU"
         batch_shape = image.shape[:-2]
         event_shape = image.shape[-2:]
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     def rsample(self, sample_shape=torch.Size()):
+        odx = Categorical(logits=self.offset_logits).expand(self.batch_shape).sample()
+        offset = self.offset_samples[odx]
         shape = self._extended_shape(sample_shape)
         value = torch._standard_gamma(
             self.concentration.expand(shape)
@@ -103,16 +112,55 @@ class KSpotGammaNoise(TorchDistribution):
         value.detach().clamp_(
             min=torch.finfo(value.dtype).tiny
         )  # do not record in autograd graph
-        return value + self.offset
+        return value + offset
 
     def log_prob(self, value):
-        mask = value > self.offset
-        new_value = torch.where(mask, value - self.offset, value.new_ones(()))
-        result = (
-            self.concentration * torch.log(self.rate)
-            + (self.concentration - 1) * torch.log(new_value)
-            - self.rate * (new_value)
-            - torch.lgamma(self.concentration)
-        )
-        result = torch.where(mask, result, result.new_full((), -40))
+        if self.use_pykeops:
+            formula = "wj+Log(Step(xi-gj-IntCst(1)))+(ai-IntCst(1))*Log(IfElse(xi-gj-IntCst(1),xi-gj,xi))-b*(xi-gj)"
+            variables = [
+                "wj = Vj(1)",
+                "gj = Vj(1)",
+                "ai = Vi(1)",
+                "b = Pm(1)",
+                "xi = Vi(1)",
+            ]
+            dtype = self.concentration.dtype
+            my_routine = Genred(
+                formula,
+                variables,
+                reduction_op="LogSumExp",
+                axis=1,
+                dtype=str(dtype).split(".")[1],
+            )
+            concentration, value = torch.broadcast_tensors(self.concentration, value)
+            shape = value.shape
+            result = my_routine(
+                self.offset_logits.reshape(-1, 1),
+                self.offset_samples.reshape(-1, 1).to(dtype),
+                concentration.reshape(-1, 1),
+                self.rate.reshape(1),
+                value.reshape(-1, 1).to(dtype),
+                backend=self.device_pykeops,
+            )
+            result = result.reshape(shape)
+            result = (
+                self.concentration * torch.log(self.rate)
+                - torch.lgamma(self.concentration)
+                + result
+            )
+        else:
+            value = torch.as_tensor(value).unsqueeze(-1)
+            concentration = self.concentration.unsqueeze(-1)
+            mask = value > self.offset_samples
+            new_value = torch.where(
+                mask, value - self.offset_samples, value.new_ones(())
+            )
+            obs_logits = (
+                concentration * torch.log(self.rate)
+                + (concentration - 1) * torch.log(new_value)
+                - self.rate * (new_value)
+                - torch.lgamma(concentration)
+            )
+            result = obs_logits + self.offset_logits + torch.log(mask)
+            result = torch.logsumexp(result, -1)
         return result.sum((-2, -1))
