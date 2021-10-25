@@ -22,7 +22,7 @@ EXTRAS_REQUIRE = [
 ]
 # tests
 TEST_REQUIRE = [
-    "black",
+    "black[jupyter]",
     "flake8",
     "isort",
     "pytest",
