@@ -331,7 +331,6 @@ class Cosmos(Model):
                         torch.stack(ys, -1),
                         target_locs,
                         background,
-                        # offset,
                         self.gain,
                         self.data.offset.samples,
                         self.data.offset.logits.to(self.dtype),
