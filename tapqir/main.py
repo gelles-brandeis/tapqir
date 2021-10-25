@@ -166,12 +166,17 @@ def glimpse(
         for c in range(num_channels):
             if len(DEFAULTS["channels"]) < c + 1:
                 DEFAULTS["channels"].append(defaultdict(lambda: None))
+            else:
+                DEFAULTS["channels"][c] = defaultdict(
+                    lambda: None, DEFAULTS["channels"][c]
+                )
             keys = [
                 "name",
                 "glimpse-folder",
                 "ontarget-aoiinfo",
                 "offtarget-aoiinfo",
                 "driftlist",
+                "ontarget-labels",
             ]
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
             for key in keys:
@@ -183,6 +188,15 @@ def glimpse(
                     if not offtarget:
                         if "offtarget-aoiinfo" in DEFAULTS["channels"][c]:
                             del DEFAULTS["channels"][c]["offtarget-aoiinfo"]
+                        continue
+                elif key == "ontarget-labels":
+                    labels = typer.confirm(
+                        "Add on-target labels?",
+                        default=("ontarget-labels" in DEFAULTS["channels"][c]),
+                    )
+                    if not labels:
+                        if "ontarget-labels" in DEFAULTS["channels"][c]:
+                            del DEFAULTS["channels"][c]["ontarget-labels"]
                         continue
                 DEFAULTS["channels"][c][key] = typer.prompt(
                     desc[key], default=DEFAULTS["channels"][c][key]

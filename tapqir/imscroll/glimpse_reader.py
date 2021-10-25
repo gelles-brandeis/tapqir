@@ -282,11 +282,13 @@ def read_glimpse(path, **kwargs):
             assert (target_xy[dtype][c] > 0.5 * P - 1).all()
             assert (target_xy[dtype][c] < 0.5 * P).all()
 
+    min_data = np.inf
     for dtype in data.keys():
         # concatenate channels
         data[dtype] = np.stack(data[dtype], -3)
         target_xy[dtype] = np.stack(target_xy[dtype], -2)
-        # convert data into torch tensor
+        min_data = min(min_data, data[dtype].min())
+        # convert data to torch tensor
         data[dtype] = torch.tensor(data[dtype])
         target_xy[dtype] = torch.tensor(target_xy[dtype])
 
@@ -294,19 +296,14 @@ def read_glimpse(path, **kwargs):
     offsets = OrderedDict(sorted(offsets.items()))
     offset_samples = np.array(list(offsets.keys()))
     offset_weights = np.array(list(offsets.values()))
+    # if data.min() is smaller than the smallest offset then
+    # add a single point to offset samples with that value - 1
+    if min_data <= offset_samples[0]:
+        offset_samples = np.insert(offset_samples, 0, min_data - 1)
+        offset_weights = np.insert(offset_weights, 0, 1)
+    # normalize weights
     offset_weights = offset_weights / offset_weights.sum()
-    # remove values from lower and upper 0.5 percentile
-    low_mask = offset_weights.cumsum() < 0.005
-    low_weights = offset_weights[low_mask].sum()
-    offset_samples = offset_samples[~low_mask]
-    offset_weights = offset_weights[~low_mask]
-    offset_weights[0] += low_weights
-    high_mask = offset_weights.cumsum() > 0.995
-    high_weights = offset_weights[high_mask].sum()
-    offset_samples = offset_samples[~high_mask]
-    offset_weights = offset_weights[~high_mask]
-    offset_weights[-1] += high_weights
-    # convert data into torch tensor
+    # convert data to torch tensor
     offset_samples = torch.tensor(offset_samples, dtype=torch.int)
     offset_weights = torch.tensor(offset_weights)
 
