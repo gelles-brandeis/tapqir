@@ -35,7 +35,6 @@ def format_link(link):
 # available models
 class Model(str, Enum):
     cosmos = "cosmos"
-    hmm = "hmm"
 
 
 def _get_default(key):
@@ -272,6 +271,11 @@ def fit(
     funsor: bool = typer.Option(
         False, "--funsor/--pyro", help="Use funsor or pyro backend"
     ),
+    pykeops: bool = typer.Option(
+        True,
+        "--pykeops",
+        help="Use pykeops backend for offset marginalization",
+    ),
     overwrite: bool = typer.Option(
         True,
         "--overwrite",
@@ -294,7 +298,6 @@ def fit(
     Available models:
 
     * cosmos: single-color time-independent co-localization model.\n
-    * hmm: single-color two-state hidden Markov co-localization model.\n
     """
     global DEFAULTS
     cd = DEFAULTS.pop("cd")
@@ -303,11 +306,14 @@ def fit(
 
     from tapqir.models import models
 
-    states = 1
-    dtype = "double"
-    device = "cuda" if cuda else "cpu"
-    backend = "funsor" if funsor else "pyro"
-    channels = [int(c) for c in channels.split()]
+    settings = {}
+    settings["S"] = 1
+    settings["K"] = k_max
+    settings["channels"] = [int(c) for c in channels.split()]
+    settings["device"] = "cuda" if cuda else "cpu"
+    settings["dtype"] = "double"
+    settings["use_pykeops"] = pykeops
+    settings["marginal"] = marginal
 
     if overwrite:
         DEFAULTS["marginal"] = marginal
@@ -318,7 +324,7 @@ def fit(
         with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
             yaml.dump(dict(DEFAULTS), cfg_file, sort_keys=False)
 
-    # pyro backend
+    backend = "funsor" if funsor else "pyro"
     if backend == "pyro":
         PYRO_BACKEND = "pyro"
     elif backend == "funsor":
@@ -332,7 +338,7 @@ def fit(
 
     with pyro_backend(PYRO_BACKEND):
 
-        model = models[model](states, k_max, channels, device, dtype, marginal)
+        model = models[model](**settings)
         model.load(cd)
 
         model.init(learning_rate, nbatch_size, fbatch_size)

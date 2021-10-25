@@ -23,13 +23,21 @@ class Cosmos(Model):
     name = "cosmos"
 
     def __init__(
-        self, S=1, K=2, channels=(0,), device="cpu", dtype="double", marginal=False
+        self,
+        S=1,
+        K=2,
+        channels=(0,),
+        device="cpu",
+        dtype="double",
+        use_pykeops=True,
+        marginal=False,
     ):
         super().__init__(S, K, channels, device, dtype)
         assert len(self.channels) == 1, "Please specify exactly one color channel"
         self.cdx = self.channels[0]
         self.full_name = f"{self.name}-channel{self.cdx}"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
+        self.use_pykeops = use_pykeops
         if marginal:
             self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
             self._classify = False
@@ -311,14 +319,6 @@ class Cosmos(Model):
                     xs.append(x)
                     ys.append(y)
 
-                # subtract offset
-                odx = pyro.sample(
-                    f"{prefix}/offset",
-                    dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
-                    .expand([data.P, data.P])
-                    .to_event(2),
-                )
-                offset = self.data.offset.samples[odx]
                 # fetch data
                 obs, target_locs = data.fetch(ndx[:, None], fdx, self.cdx)
                 # observed data
@@ -331,10 +331,12 @@ class Cosmos(Model):
                         torch.stack(ys, -1),
                         target_locs,
                         background,
-                        offset,
                         self.gain,
+                        self.data.offset.samples,
+                        self.data.offset.logits.to(self.dtype),
                         data.P,
                         torch.stack(torch.broadcast_tensors(*ms), -1),
+                        self.use_pykeops,
                     ),
                     obs=obs,
                 )
@@ -484,13 +486,6 @@ class Cosmos(Model):
                                 (data.P + 1) / 2,
                             ),
                         )
-
-                pyro.sample(
-                    f"{prefix}/offset",
-                    dist.Categorical(logits=self.data.offset.logits.to(self.dtype))
-                    .expand([data.P, data.P])
-                    .to_event(2),
-                )
 
     def init_parameters(self):
         device = self.device

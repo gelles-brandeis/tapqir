@@ -1,8 +1,6 @@
 Install on Linux
 ================
 
-First, make sure that `CUDA is installed`_ on the computer.
-
 .. important::
 
    We strongly recommend creating a virtual environment to encapsulate your
@@ -20,11 +18,21 @@ First, make sure that `CUDA is installed`_ on the computer.
 
     $ conda activate tapqir-env
 
-4. To install ``tapqir``, in the terminal run::
+4. Install CUDA and ensure that it is version 11.5 or later::
+
+    $ conda install cuda -c nvidia
+    $ nvcc --version
+
+    nvcc: NVIDIA (R) Cuda compiler driver
+    Copyright (c) 2005-2021 NVIDIA Corporation
+    Built on Mon_Sep_13_19:13:29_PDT_2021
+    Cuda compilation tools, release 11.5, V11.5.50
+    Build cuda_11.5.r11.5/compiler.30411180_0
+
+5. To install ``tapqir``, in the terminal run::
 
     $ pip install git+https://github.com/gelles-brandeis/tapqir.git
 
-.. _CUDA is installed: https://developer.nvidia.com/cuda-downloads
 .. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
 
 
