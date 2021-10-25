@@ -94,6 +94,7 @@ class KSpotGammaNoise(TorchDistribution):
         self.rate = 1 / gain
         self.offset_samples = offset_samples
         self.offset_logits = offset_logits
+        self.P = P
         self.use_pykeops = use_pykeops
         if self.use_pykeops:
             device = self.concentration.device.type
@@ -103,7 +104,11 @@ class KSpotGammaNoise(TorchDistribution):
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     def rsample(self, sample_shape=torch.Size()):
-        odx = Categorical(logits=self.offset_logits).expand(self.batch_shape).sample()
+        odx = (
+            Categorical(logits=self.offset_logits)
+            .expand(self.batch_shape + (self.P, self.P))
+            .sample()
+        )
         offset = self.offset_samples[odx]
         shape = self._extended_shape(sample_shape)
         value = torch._standard_gamma(
