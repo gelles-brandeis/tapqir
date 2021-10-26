@@ -1,96 +1,80 @@
-Tapqir Documentation
-====================
+Disclaimer
+==========
 
-Tapqir is software to analyze images from single-molecule fluorescence colocalization experiments 
-using a Bayesian statistics-based image classification method. Tapqir is implemented in
-`Pyro <https://pyro.ai/>`_, a Python-based probabilistic programming language.
+This is an alpha version of the program. It may contain bugs and is subject to change.
 
-**License**: Tapqir is open source software licensed under the `Apache License 2.0 <https://www.apache.org/licenses/LICENSE-2.0.txt>`_.
+Tapqir
+======
 
-**Author**:
-Yerdos Ordabayev;
-Department of Biochemistry, MS009;
-Brandeis University;
-PO Box 549110;
-Waltham, MA 02454-9110;
-ordabayev@brandeis.edu
+Bayesian analysis of co-localization single-molecule microscopy image data.
 
-**Acknowledgements**:  Development was funded by grants from `NIGMS <http://www.nigms.nih.gov>`_.
+.. |ci| image:: https://github.com/gelles-brandeis/tapqir/workflows/build/badge.svg
+  :target: https://github.com/gelles-brandeis/tapqir/actions
 
-**Citation**:  If you publish research that uses this software, you can cite our preprint::
+.. |docs| image:: https://readthedocs.org/projects/tapqir/badge/?version=latest
+    :alt: Documentation Status
+    :scale: 100%
+    :target: https://tapqir.readthedocs.io/en/latest/?badge=latest
 
-  @article{ordabayev2021bayesian,
-    title={Bayesian machine learning analysis of single-molecule fluorescence colocalization images},
-    author={Ordabayev, Yerdos A and Friedman, Larry J and Gelles, Jeff and Theobald, Douglas},
-    journal={bioRxiv},
-    year={2021},
-    publisher={Cold Spring Harbor Laboratory}
-  }
+.. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
+  :target: https://github.com/ambv/black
+  
+.. |DOI| image:: https://img.shields.io/badge/DOI-10.1101%2F2021.09.30.462536-blue
+   :target: https://doi.org/10.1101/2021.09.30.462536
+   :alt: DOI
 
-.. panels::
-    :card: + intro-card text-center
-    :column: col-lg-6 col-md-6 col-sm-6 col-xs-12 d-flex
+|DOI| |ci| |docs| |black|
 
-    ---
-    :img-top: _static/fi-rr-cloud-download.svg
+`Preprint <https://doi.org/10.1101/2021.09.30.462536>`_ |
+`Documentation <https://tapqir.readthedocs.io/en/latest/>`_ |
+`Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
 
-    Installation
-    ^^^^^^^^^^^^
+**Tapqir** is an **open-source** (Python) program for modeling and analysis of single-molecule image data.
+Key features:
 
-    New to *tapqir*? Check out the installation guide.
+1. Tapqir's analysis method is based on a **holistic**, **physics-informed** causal model of CoSMoS image data.
+2. Instead of yielding a binary "spot/no spot" classification, Tapqir calculates the **probability** of a target-specific spot being present.
+3. Tapqir's model is implemented in the Python-based probabilistic programming language `Pyro <https://pyro.ai/>`_.
+4. Tapqir has a simple command-line interface implemented in `Typer <https://typer.tiangolo.com/>`_.
 
-    +++
+Installation
+============
 
-    .. link-button:: install/index
-            :type: ref
-            :text: To the installation guide
-            :classes: btn-block btn-secondary stretched-link
+OS-specific installation instructions are `here <https://tapqir.readthedocs.io/en/latest/install/index.html>`_.
 
-    ---
-    :img-top: _static/fi-rr-book-alt.svg
+To install using **pip**, run::
 
-    User Guide
-    ^^^^^^^^^^
+  pip install git+https://github.com/gelles-brandeis/tapqir.git
 
-    The user guide provides in-depth information on running tapqir models.
 
-    +++
+Documentation
+=============
 
-    .. link-button:: user_guide/index
-            :type: ref
-            :text: To the user guide
-            :classes: btn-block btn-secondary stretched-link
+Documentation and tutorial available at `tapqir.readthedocs.io <https://tapqir.readthedocs.io/>`_. 
+Please note that the documentation is not yet complete and may not be up to date.
+  
+Tapqir workflow
+===============
 
-    ---
-    :img-top: _static/fi-rr-layers.svg
+.. image:: Tapqir_workflow.png
+   :alt: Tapqir workflow
 
-    Command Reference
-    ^^^^^^^^^^^^^^^^^
+License
+=======
 
-    The reference guide contains a detailed description of
-    the tapqir commands.
+This project is licensed under the `Apache License 2.0 <https://www.apache.org/licenses/LICENSE-2.0.txt>`_.
 
-    +++
+By submitting a pull request to this project, you agree to license your contribution under the Apache license version 2.0 to this project.
 
-    .. link-button:: commands/index
-            :type: ref
-            :text: To the command reference
-            :classes: btn-block btn-secondary stretched-link
+Citation
+========
 
-    ---
-    :img-top: _static/fi-rr-gallery.svg
+If you use Tapqir, please consider citing our preprint:
 
-    Tutorials
-    ^^^^^^^^^
+|DOI|
 
-    Examples of analysis of experimental data using tapqir.
-
-    +++
-
-    .. link-button:: tutorials/index
-            :type: ref
-            :text: To the examples
-            :classes: btn-block btn-secondary stretched-link
+Ordabayev YA, Friedman LJ, Gelles J, Theobald DL. *Bayesian machine learning analysis of single-molecule fluorescence colocalization images*.
+bioRxiv. 2021 Oct.
 
 .. toctree::
    :titlesonly:

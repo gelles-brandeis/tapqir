@@ -241,7 +241,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     ci_stats[param] = field.numpy()
                     continue
                 for stat, value in field.items():
-                    ci_stats[param][stat] = value.numpy()
+                    ci_stats[param][stat] = value.cpu().numpy()
             savemat(path / f"{model.full_name}-params.mat", ci_stats)
         summary.to_csv(
             path / f"{model.full_name}-summary.csv",
