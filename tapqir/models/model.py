@@ -134,7 +134,7 @@ class Model:
             self.load_checkpoint()
         except (FileNotFoundError, TypeError):
             pyro.clear_param_store()
-            self.iter = 0
+            self.epoch = 0
             self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
             self.init_parameters()
 
@@ -153,24 +153,29 @@ class Model:
         logger.info("AOI batch size - {}".format(self.nbatch_size))
         logger.info("Frame batch size - {}".format(self.fbatch_size))
 
-    def run(self, num_iter=0, nrange=trange):
+    def run(self, num_epochs=0, nrange=trange):
         slurm = os.environ.get("SLURM_JOB_ID")
         if slurm is not None:
             nrange = range
         # pyro.enable_validation()
         self._stop = False
         use_crit = False
-        if not num_iter:
+        if not num_epochs:
             use_crit = True
-            num_iter = 100000
-        for i in nrange(num_iter):
-            self.iter_loss = self.svi.step()
-            if not self.iter % 100:
-                self.save_checkpoint()
-                if use_crit and self._stop:
-                    logger.info("Step #{} model converged.".format(self.iter))
-                    break
-            self.iter += 1
+            num_epochs = 1000
+        for i in nrange(num_epochs):
+            losses = []
+            for ndx in torch.split(torch.randperm(self.data.N), self.nbatch_size):
+                for fdx in torch.split(torch.randperm(self.data.F), self.fbatch_size):
+                    self.n = ndx
+                    self.f = fdx
+                    losses.append(self.svi.step())
+            self.epoch_loss = sum(losses) / len(losses)
+            self.save_checkpoint()
+            if use_crit and self._stop:
+                logger.info("Step #{} model converged.".format(self.epoch))
+                break
+            self.epoch += 1
 
     def _max_batch_size(self):
         k = 0
@@ -199,13 +204,13 @@ class Model:
         for k, v in pyro.get_param_store().items():
             if torch.isnan(v).any() or torch.isinf(v).any():
                 raise ValueError(
-                    "Step #{}. Detected NaN values in {}".format(self.iter, k)
+                    "Step #{}. Detected NaN values in {}".format(self.epoch, k)
                 )
 
         # update convergence criteria parameters
         for name in self.conv_params:
             if name == "-ELBO":
-                self._rolling["-ELBO"].append(self.iter_loss)
+                self._rolling["-ELBO"].append(self.epoch_loss)
             else:
                 self._rolling[name].append(pyro.param(name).item())
 
@@ -223,7 +228,7 @@ class Model:
         # save the model state
         torch.save(
             {
-                "iter": self.iter,
+                "epoch": self.epoch,
                 "params": pyro.get_param_store().get_state(),
                 "optimizer": self.optim.get_state(),
                 "rolling": self._rolling,
@@ -233,17 +238,17 @@ class Model:
         )
 
         # save global paramters for tensorboard
-        self.writer.add_scalar("-ELBO", self.iter_loss, self.iter)
+        self.writer.add_scalar("-ELBO", self.epoch_loss, self.epoch)
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
-                self.writer.add_scalar(name, val.item(), self.iter)
+                self.writer.add_scalar(name, val.item(), self.epoch)
             elif val.dim() == 1 and len(val) <= self.S + 1:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
-                self.writer.add_scalars(name, scalars, self.iter)
+                self.writer.add_scalars(name, scalars, self.epoch)
 
-        if self.pspecific is not None and self.data.ontarget.labels is not None:
-            pred_labels = self.z_map.cpu().numpy().ravel()
-            true_labels = self.data.ontarget.labels["z"].ravel()
+        if self.pspecific is not None and self.data.labels is not None:
+            pred_labels = self.z_map[self.data.is_ontarget].cpu().numpy().ravel()
+            true_labels = self.data.labels["z"].ravel()
 
             metrics = {}
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -258,11 +263,11 @@ class Model:
                 true_labels, pred_labels, labels=(0, 1)
             ).ravel()
 
-            self.writer.add_scalars("ACCURACY", metrics, self.iter)
-            self.writer.add_scalars("NEGATIVES", neg, self.iter)
-            self.writer.add_scalars("POSITIVES", pos, self.iter)
+            self.writer.add_scalars("ACCURACY", metrics, self.epoch)
+            self.writer.add_scalars("NEGATIVES", neg, self.epoch)
+            self.writer.add_scalars("POSITIVES", pos, self.epoch)
 
-        logger.debug("Step #{}.".format(self.iter))
+        logger.debug("Step #{}.".format(self.epoch))
 
     def load_checkpoint(self, path=None, param_only=False, warnings=False):
         device = self.device
@@ -275,11 +280,11 @@ class Model:
         if not param_only:
             self._stop = checkpoint["convergence_status"]
             self._rolling = checkpoint["rolling"]
-            self.iter = checkpoint["iter"]
+            self.epoch = checkpoint["epoch"]
             self.optim.set_state(checkpoint["optimizer"])
             logger.info(
                 "Step #{}. Loaded model params and optimizer state from {}".format(
-                    self.iter, path
+                    self.epoch, path
                 )
             )
         if warnings and not checkpoint["convergence_status"]:

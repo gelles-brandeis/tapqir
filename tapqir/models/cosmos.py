@@ -84,11 +84,14 @@ class Cosmos(Model):
 
     @property
     def probs_theta(self):
-        result = torch.zeros(self.K * self.S + 1, dtype=self.dtype)
-        result[0] = self.pi[0]
+        # 0 (False) - offtarget
+        # 1 (True) - ontarget
+        result = torch.zeros(2, self.K * self.S + 1, dtype=self.dtype)
+        result[0, 0] = 1
+        result[1, 0] = self.pi[0]
         for s in range(self.S):
             for k in range(self.K):
-                result[self.K * s + k + 1] = self.pi[s + 1] / self.K
+                result[1, self.K * s + k + 1] = self.pi[s + 1] / self.K
         return result
 
     @lazy_property
@@ -107,7 +110,7 @@ class Cosmos(Model):
         r"""
         Probability of an on-target spot :math:`p(z_{knf})`.
         """
-        return pyro.param("d/theta_probs").data[..., 1:].permute(2, 0, 1)
+        return pyro.param("theta_probs").data[..., 1:].permute(2, 0, 1)
 
     @property
     def j_probs(self):
@@ -123,8 +126,8 @@ class Cosmos(Model):
         """
         return torch.einsum(
             "sknf,nfs->knf",
-            pyro.param("d/m_probs").data[..., 1],
-            pyro.param("d/theta_probs").data,
+            pyro.param("m_probs").data[..., 1],
+            pyro.param("theta_probs").data,
         )
 
     @property
@@ -140,12 +143,8 @@ class Cosmos(Model):
         self.gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
         self.state_model()
 
-        # test data
-        self.spot_model(self.data.ontarget, prefix="d")
-
-        # control data
-        if self.data.offtarget.images is not None:
-            self.spot_model(self.data.offtarget, prefix="c")
+        # local parameters
+        self.spot_model(self.data)
 
     def state_model(self):
         self.pi = pyro.sample(
@@ -166,7 +165,7 @@ class Cosmos(Model):
         if self._classify:
             return {
                 "expose_types": ["sample"],
-                "expose": ["d/theta_probs", "d/m_probs"],
+                "expose": ["theta_probs", "m_probs"],
             }
         return {"expose_types": ["sample", "param"]}
 
@@ -183,12 +182,8 @@ class Cosmos(Model):
             )
             self.state_guide()
 
-            # test data
-            self.spot_guide(self.data.ontarget, prefix="d")
-
-            # control data
-            if self.data.offtarget.images is not None:
-                self.spot_guide(self.data.offtarget, prefix="c")
+            # local parameters
+            self.spot_guide(self.data)
 
     def state_guide(self):
         pyro.sample(
@@ -216,38 +211,34 @@ class Cosmos(Model):
             ),
         )
 
-    def spot_model(self, data, prefix):
+    def spot_model(self, data):
         # spots
-        spots = pyro.plate(f"{prefix}/spots", self.K)
+        spots = pyro.plate("spots", self.K)
         # aoi sites
         aois = pyro.plate(
-            f"{prefix}/aois",
+            "aois",
             data.N,
-            subsample_size=self.nbatch_size,
             subsample=self.n,
             dim=-2,
         )
         # time frames
         frames = pyro.plate(
-            f"{prefix}/frames",
+            "frames",
             data.F,
-            subsample_size=self.fbatch_size,
             subsample=self.f,
             dim=-1,
         )
 
         with aois as ndx:
             # background mean and std
-            background_mean = pyro.sample(
-                f"{prefix}/background_mean", dist.HalfNormal(1000)
-            )
-            background_std = pyro.sample(
-                f"{prefix}/background_std", dist.HalfNormal(100)
-            )
+            background_mean = pyro.sample("background_mean", dist.HalfNormal(1000))
+            background_std = pyro.sample("background_std", dist.HalfNormal(100))
             with frames as fdx:
+                # fetch data
+                obs, target_locs, is_ontarget = data.fetch(ndx[:, None], fdx, self.cdx)
                 # sample background intensity
                 background = pyro.sample(
-                    f"{prefix}/background",
+                    "background",
                     dist.Gamma(
                         (background_mean / background_std) ** 2,
                         background_mean / background_std ** 2,
@@ -255,37 +246,34 @@ class Cosmos(Model):
                 )
 
                 # sample hidden model state (1+K*S,)
-                if prefix == "d":
-                    if self._classify:
-                        theta = pyro.sample(
-                            f"{prefix}/theta",
-                            dist.Categorical(self.probs_theta),
-                        )
-                    else:
-                        theta = pyro.sample(
-                            f"{prefix}/theta",
-                            dist.Categorical(self.probs_theta),
-                            infer={"enumerate": "parallel"},
-                        )
+                if self._classify:
+                    theta = pyro.sample(
+                        "theta",
+                        dist.Categorical(self.probs_theta[is_ontarget.long()]),
+                    )
                 else:
-                    theta = 0
+                    theta = pyro.sample(
+                        "theta",
+                        dist.Categorical(self.probs_theta[is_ontarget.long()]),
+                        infer={"enumerate": "parallel"},
+                    )
 
                 ms, heights, widths, xs, ys = [], [], [], [], []
                 for kdx in spots:
                     ontarget = Vindex(self.ontarget)[theta, kdx]
                     # spot presence
                     m = pyro.sample(
-                        f"{prefix}/m_{kdx}",
+                        f"m_{kdx}",
                         dist.Categorical(Vindex(self.probs_m)[theta, kdx]),
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
                         height = pyro.sample(
-                            f"{prefix}/height_{kdx}",
+                            f"height_{kdx}",
                             dist.HalfNormal(10000),
                         )
                         width = pyro.sample(
-                            f"{prefix}/width_{kdx}",
+                            f"width_{kdx}",
                             AffineBeta(
                                 1.5,
                                 2,
@@ -294,7 +282,7 @@ class Cosmos(Model):
                             ),
                         )
                         x = pyro.sample(
-                            f"{prefix}/x_{kdx}",
+                            f"x_{kdx}",
                             AffineBeta(
                                 0,
                                 self.size[ontarget],
@@ -303,7 +291,7 @@ class Cosmos(Model):
                             ),
                         )
                         y = pyro.sample(
-                            f"{prefix}/y_{kdx}",
+                            f"y_{kdx}",
                             AffineBeta(
                                 0,
                                 self.size[ontarget],
@@ -319,11 +307,9 @@ class Cosmos(Model):
                     xs.append(x)
                     ys.append(y)
 
-                # fetch data
-                obs, target_locs = data.fetch(ndx[:, None], fdx, self.cdx)
                 # observed data
                 pyro.sample(
-                    f"{prefix}/data",
+                    "data",
                     KSpotGammaNoise(
                         torch.stack(heights, -1),
                         torch.stack(widths, -1),
@@ -341,147 +327,132 @@ class Cosmos(Model):
                     obs=obs,
                 )
 
-    def spot_guide(self, data, prefix):
+    def spot_guide(self, data):
         # spots
-        spots = pyro.plate(f"{prefix}/spots", self.K)
+        spots = pyro.plate("spots", self.K)
         # aoi sites
         aois = pyro.plate(
-            f"{prefix}/aois",
+            "aois",
             data.N,
-            subsample_size=self.nbatch_size,
             subsample=self.n,
             dim=-2,
         )
         # time frames
         frames = pyro.plate(
-            f"{prefix}/frames",
+            "frames",
             data.F,
-            subsample_size=self.fbatch_size,
             subsample=self.f,
             dim=-1,
         )
 
         with aois as ndx:
             pyro.sample(
-                f"{prefix}/background_mean",
-                dist.Delta(
-                    pyro.param(f"{prefix}/background_mean_loc")[ndx].to(self.device)
-                ),
+                "background_mean",
+                dist.Delta(pyro.param("background_mean_loc")[ndx].to(self.device)),
             )
             pyro.sample(
-                f"{prefix}/background_std",
-                dist.Delta(
-                    pyro.param(f"{prefix}/background_std_loc")[ndx].to(self.device)
-                ),
+                "background_std",
+                dist.Delta(pyro.param("background_std_loc")[ndx].to(self.device)),
             )
             with frames as fdx:
                 # sample background intensity
                 pyro.sample(
-                    f"{prefix}/background",
+                    "background",
                     dist.Gamma(
-                        Vindex(pyro.param(f"{prefix}/b_loc"))[ndx[:, None], fdx].to(
-                            self.device
-                        )
-                        * Vindex(pyro.param(f"{prefix}/b_beta"))[ndx[:, None], fdx].to(
+                        Vindex(pyro.param("b_loc"))[ndx[:, None], fdx].to(self.device)
+                        * Vindex(pyro.param("b_beta"))[ndx[:, None], fdx].to(
                             self.device
                         ),
-                        Vindex(pyro.param(f"{prefix}/b_beta"))[ndx[:, None], fdx].to(
-                            self.device
-                        ),
+                        Vindex(pyro.param("b_beta"))[ndx[:, None], fdx].to(self.device),
                     ),
                 )
-                if self._classify and prefix == "d":
+                if self._classify:
                     theta = pyro.sample(
-                        f"{prefix}/theta",
+                        "theta",
                         dist.Categorical(
-                            Vindex(pyro.param(f"{prefix}/theta_probs"))[
-                                ndx[:, None], fdx
-                            ].to(self.device)
+                            Vindex(pyro.param("theta_probs"))[ndx[:, None], fdx].to(
+                                self.device
+                            )
                         ),
                         infer={"enumerate": "parallel"},
                     )
 
                 for kdx in spots:
                     # sample spot presence m
-                    if prefix == "d":
-                        if self._classify:
-                            m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                                theta, kdx, ndx[:, None], fdx
-                            ].to(self.device)
-                        else:
-                            m_probs = torch.einsum(
-                                "snft,nfs->nft",
-                                Vindex(pyro.param(f"{prefix}/m_probs"))[
-                                    torch.arange(self.S * self.K + 1)[:, None, None],
-                                    kdx,
-                                    ndx[:, None],
-                                    fdx,
-                                    :,
-                                ].to(self.device),
-                                Vindex(pyro.param(f"{prefix}/theta_probs"))[
-                                    ndx[:, None], fdx, :
-                                ].to(self.device),
-                            )
-                    else:
-                        m_probs = Vindex(pyro.param(f"{prefix}/m_probs"))[
-                            kdx, ndx[:, None], fdx
+                    if self._classify:
+                        m_probs = Vindex(pyro.param("m_probs"))[
+                            theta, kdx, ndx[:, None], fdx
                         ].to(self.device)
+                    else:
+                        m_probs = torch.einsum(
+                            "snft,nfs->nft",
+                            Vindex(pyro.param("m_probs"))[
+                                torch.arange(self.S * self.K + 1)[:, None, None],
+                                kdx,
+                                ndx[:, None],
+                                fdx,
+                                :,
+                            ].to(self.device),
+                            Vindex(pyro.param("theta_probs"))[ndx[:, None], fdx, :].to(
+                                self.device
+                            ),
+                        )
                     m = pyro.sample(
-                        f"{prefix}/m_{kdx}",
+                        f"m_{kdx}",
                         dist.Categorical(m_probs),
                         infer={"enumerate": "parallel"},
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
                         pyro.sample(
-                            f"{prefix}/height_{kdx}",
+                            f"height_{kdx}",
                             dist.Gamma(
-                                Vindex(pyro.param(f"{prefix}/h_loc"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device)
-                                * Vindex(pyro.param(f"{prefix}/h_beta"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device),
-                                Vindex(pyro.param(f"{prefix}/h_beta"))[
+                                Vindex(pyro.param("h_loc"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                )
+                                * Vindex(pyro.param("h_beta"))[
                                     kdx, ndx[:, None], fdx
                                 ].to(self.device),
+                                Vindex(pyro.param("h_beta"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                ),
                             ),
                         )
                         pyro.sample(
-                            f"{prefix}/width_{kdx}",
+                            f"width_{kdx}",
                             AffineBeta(
-                                Vindex(pyro.param(f"{prefix}/w_mean"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device),
-                                Vindex(pyro.param(f"{prefix}/w_size"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device),
+                                Vindex(pyro.param("w_mean"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                ),
+                                Vindex(pyro.param("w_size"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                ),
                                 0.75,
                                 2.25,
                             ),
                         )
                         pyro.sample(
-                            f"{prefix}/x_{kdx}",
+                            f"x_{kdx}",
                             AffineBeta(
-                                Vindex(pyro.param(f"{prefix}/x_mean"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device),
-                                Vindex(pyro.param(f"{prefix}/size"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device),
+                                Vindex(pyro.param("x_mean"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                ),
+                                Vindex(pyro.param("size"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                ),
                                 -(data.P + 1) / 2,
                                 (data.P + 1) / 2,
                             ),
                         )
                         pyro.sample(
-                            f"{prefix}/y_{kdx}",
+                            f"y_{kdx}",
                             AffineBeta(
-                                Vindex(pyro.param(f"{prefix}/y_mean"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device),
-                                Vindex(pyro.param(f"{prefix}/size"))[
-                                    kdx, ndx[:, None], fdx
-                                ].to(self.device),
+                                Vindex(pyro.param("y_mean"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                ),
+                                Vindex(pyro.param("size"))[kdx, ndx[:, None], fdx].to(
+                                    self.device
+                                ),
                                 -(data.P + 1) / 2,
                                 (data.P + 1) / 2,
                             ),
@@ -534,15 +505,12 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
 
-        self.spot_parameters(self.data.ontarget, prefix="d")
+        self.spot_parameters(self.data)
 
-        if self.data.offtarget.images is not None:
-            self.spot_parameters(self.data.offtarget, prefix="c")
-
-    def spot_parameters(self, data, prefix):
+    def spot_parameters(self, data):
         device = self.device
         pyro.param(
-            f"{prefix}/background_mean_loc",
+            "background_mean_loc",
             lambda: torch.full(
                 (data.N, 1),
                 data.median - self.data.offset.mean,
@@ -551,13 +519,13 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
         pyro.param(
-            f"{prefix}/background_std_loc",
+            "background_std_loc",
             lambda: torch.ones(data.N, 1, device=device),
             constraint=constraints.positive,
         )
 
         pyro.param(
-            f"{prefix}/b_loc",
+            "b_loc",
             lambda: torch.full(
                 (data.N, data.F),
                 data.median - self.data.offset.mean,
@@ -566,22 +534,22 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
         pyro.param(
-            f"{prefix}/b_beta",
+            "b_beta",
             lambda: torch.ones(data.N, data.F, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
-            f"{prefix}/h_loc",
+            "h_loc",
             lambda: torch.full((self.K, data.N, data.F), 2000, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
-            f"{prefix}/h_beta",
+            "h_beta",
             lambda: torch.full((self.K, data.N, data.F), 0.001, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
-            f"{prefix}/w_mean",
+            "w_mean",
             lambda: torch.full((self.K, data.N, data.F), 1.5, device=device),
             constraint=constraints.interval(
                 0.75 + torch.finfo(self.dtype).eps,
@@ -589,12 +557,12 @@ class Cosmos(Model):
             ),
         )
         pyro.param(
-            f"{prefix}/w_size",
+            "w_size",
             lambda: torch.full((self.K, data.N, data.F), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
-            f"{prefix}/x_mean",
+            "x_mean",
             lambda: torch.zeros(self.K, data.N, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
@@ -602,7 +570,7 @@ class Cosmos(Model):
             ),
         )
         pyro.param(
-            f"{prefix}/y_mean",
+            "y_mean",
             lambda: torch.zeros(self.K, data.N, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
@@ -610,35 +578,31 @@ class Cosmos(Model):
             ),
         )
         pyro.param(
-            f"{prefix}/size",
+            "size",
             lambda: torch.full((self.K, data.N, data.F), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
 
         # classification
-        if prefix == "d":
-            pyro.param(
-                "d/theta_probs",
-                lambda: torch.ones(data.N, data.F, 1 + self.K * self.S, device=device),
-                constraint=constraints.simplex,
-            )
-            m_probs = torch.ones(
-                1 + self.K * self.S,
-                self.K,
-                data.N,
-                data.F,
-                2,
-                device=device,
-            )
-            m_probs[1, 0, :, :, 0] = 0
-            m_probs[2, 1, :, :, 0] = 0
-            pyro.param("d/m_probs", lambda: m_probs, constraint=constraints.simplex)
-        else:
-            pyro.param(
-                "c/m_probs",
-                lambda: torch.ones(self.K, data.N, data.F, 2, device=device),
-                constraint=constraints.simplex,
-            )
+        theta_probs = torch.zeros(data.N, data.F, 1 + self.K * self.S, device=device)
+        theta_probs[self.data.is_ontarget] = 1 / (1 + self.K * self.S)
+        theta_probs[~self.data.is_ontarget, :, 0] = 1
+        pyro.param(
+            "theta_probs",
+            lambda: theta_probs,
+            constraint=constraints.simplex,
+        )
+        m_probs = torch.ones(
+            1 + self.K * self.S,
+            self.K,
+            data.N,
+            data.F,
+            2,
+            device=device,
+        )
+        m_probs[1, 0, :, :, 0] = 0
+        m_probs[2, 1, :, :, 0] = 0
+        pyro.param("m_probs", lambda: m_probs, constraint=constraints.simplex)
 
     def snr(self):
         r"""

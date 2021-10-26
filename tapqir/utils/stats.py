@@ -32,11 +32,11 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     )
     # local parameters
     local_params = [
-        "d/height",
-        "d/width",
-        "d/x",
-        "d/y",
-        "d/background",
+        "height",
+        "width",
+        "x",
+        "y",
+        "background",
     ]
 
     ci_stats = defaultdict(partial(defaultdict, list))
@@ -90,43 +90,41 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     num_samples = 1000
     for param in local_params:
         LL, UL, Mean = [], [], []
-        for ndx in torch.split(torch.arange(model.data.ontarget.N), model.nbatch_size):
+        for ndx in torch.split(torch.arange(model.data.N), model.nbatch_size):
             ndx = ndx[:, None]
             kdx = torch.arange(model.K)[:, None, None]
             ll, ul, mean = [], [], []
-            for fdx in torch.split(
-                torch.arange(model.data.ontarget.F), model.fbatch_size
-            ):
-                if param == "d/background":
+            for fdx in torch.split(torch.arange(model.data.F), model.fbatch_size):
+                if param == "background":
                     fn = dist.Gamma(
-                        Vindex(pyro.param("d/b_loc"))[ndx, fdx]
-                        * Vindex(pyro.param("d/b_beta"))[ndx, fdx],
-                        Vindex(pyro.param("d/b_beta"))[ndx, fdx],
+                        Vindex(pyro.param("b_loc"))[ndx, fdx]
+                        * Vindex(pyro.param("b_beta"))[ndx, fdx],
+                        Vindex(pyro.param("b_beta"))[ndx, fdx],
                     )
-                elif param == "d/height":
+                elif param == "height":
                     fn = dist.Gamma(
-                        Vindex(pyro.param("d/h_loc"))[kdx, ndx, fdx]
-                        * Vindex(pyro.param("d/h_beta"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("d/h_beta"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("h_loc"))[kdx, ndx, fdx]
+                        * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
                     )
-                elif param == "d/width":
+                elif param == "width":
                     fn = AffineBeta(
-                        Vindex(pyro.param("d/w_mean"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("d/w_size"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
                         0.75,
                         2.25,
                     )
-                elif param == "d/x":
+                elif param == "x":
                     fn = AffineBeta(
-                        Vindex(pyro.param("d/x_mean"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("d/size"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("x_mean"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("size"))[kdx, ndx, fdx],
                         -(model.data.P + 1) / 2,
                         (model.data.P + 1) / 2,
                     )
-                elif param == "d/y":
+                elif param == "y":
                     fn = AffineBeta(
-                        Vindex(pyro.param("d/y_mean"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("d/size"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("y_mean"))[kdx, ndx, fdx],
+                        Vindex(pyro.param("size"))[kdx, ndx, fdx],
                         -(model.data.P + 1) / 2,
                         (model.data.P + 1) / 2,
                     )
@@ -172,9 +170,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
     if model.pspecific is not None:
-        ci_stats["d/m_probs"] = model.m_probs.data.cpu()
-        ci_stats["d/theta_probs"] = model.theta_probs.data.cpu()
-        ci_stats["d/j_probs"] = model.j_probs.data.cpu()
+        ci_stats["m_probs"] = model.m_probs.data.cpu()
+        ci_stats["theta_probs"] = model.theta_probs.data.cpu()
+        ci_stats["j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
         ci_stats["z_map"] = model.z_map.data.cpu()
 
@@ -185,9 +183,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     #      summary.loc["SNR", "Mean"] = model.snr().mean().item()
 
     # classification statistics
-    if model.pspecific is not None and model.data.ontarget.labels is not None:
-        pred_labels = model.z_map.cpu().numpy().ravel()
-        true_labels = model.data.ontarget.labels["z"].ravel()
+    if model.pspecific is not None and model.data.labels is not None:
+        pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
+        true_labels = model.data.labels["z"].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             summary.loc["MCC", "Mean"] = matthews_corrcoef(true_labels, pred_labels)
@@ -205,8 +203,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc["TP", "Mean"],
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
-        mask = torch.from_numpy(model.data.ontarget.labels["z"][:, :, model.cdx])
-        samples = torch.masked_select(model.pspecific.cpu(), mask)
+        mask = torch.from_numpy(model.data.labels["z"])
+        samples = torch.masked_select(
+            model.pspecific[model.data.is_ontarget].cpu(), mask
+        )
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)
             summary.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()
@@ -232,9 +232,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
             for param, field in ci_stats.items():
                 if param in (
-                    "d/m_probs",
-                    "d/theta_probs",
-                    "d/j_probs",
+                    "m_probs",
+                    "theta_probs",
+                    "j_probs",
                     "p(specific)",
                     "z_map",
                 ):

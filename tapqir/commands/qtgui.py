@@ -122,7 +122,6 @@ class MainWindow(QMainWindow):
         self.Model = model
         self.path = path
         self.Model.load(path, data_only=False)
-        self.prefix = "d"
 
         self.initUI()
 
@@ -166,25 +165,25 @@ class MainWindow(QMainWindow):
         self.aoiDecrLarge.clicked.connect(partial(self.updateParams, -10))
 
         self.aoiNumber = QLineEdit("0")
-        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.ontarget.N - 1))
+        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.N - 1))
         self.aoiNumber.setMaximumWidth(50)
         self.aoiNumber.setAlignment(Qt.AlignRight)
         self.aoiNumber.returnPressed.connect(partial(self.updateParams, 0))
 
         self.aoiLabel = QLabel("AOI")
-        self.aoiMax = QLabel(f"/{self.Model.data.ontarget.N}")
+        self.aoiMax = QLabel(f"/{self.Model.data.N}")
         self.hspacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.frame1Label = QLabel("FrameMin")
         self.frame1 = QLineEdit("0")
-        self.frame1.setValidator(QIntValidator(0, self.Model.data.ontarget.F - 2))
+        self.frame1.setValidator(QIntValidator(0, self.Model.data.F - 2))
         self.frame1.setMaximumWidth(50)
         self.frame1.setAlignment(Qt.AlignRight)
         self.frame1.returnPressed.connect(self.frameChanged)
 
         self.frame2Label = QLabel("FrameMax")
         self.frame2 = QLineEdit("2")
-        self.frame2.setValidator(QIntValidator(1, self.Model.data.ontarget.F - 1))
+        self.frame2.setValidator(QIntValidator(1, self.Model.data.F - 1))
         self.frame2.setMaximumWidth(50)
         self.frame2.setAlignment(Qt.AlignRight)
         self.frame2.returnPressed.connect(self.frameChanged)
@@ -261,9 +260,9 @@ class MainWindow(QMainWindow):
             self.img_ideal[i] = pg.ImageItem()
             self.box_ideal[i].addItem(self.img_ideal[i])
 
-        img = pg.ImageItem(self.Model.data.ontarget.images.numpy())
-        range_min = np.percentile(self.Model.data.ontarget.images.numpy(), 0.5)
-        range_max = np.percentile(self.Model.data.ontarget.images.numpy(), 99.5)
+        img = pg.ImageItem(self.Model.data.images.numpy())
+        range_min = np.percentile(self.Model.data.images.numpy(), 0.5)
+        range_max = np.percentile(self.Model.data.images.numpy(), 99.5)
         self.hist = HistogramLUTGraph(self.img, image=img)
         self.hist.setLevels(min=self.Model.data.vmin, max=self.Model.data.vmax)
         self.hist.setHistogramRange(range_min, range_max)
@@ -277,26 +276,24 @@ class MainWindow(QMainWindow):
         frames = torch.arange(f1, f1 + 100)
         img_ideal = (
             self.Model.data.offset.mean
-            + self.Model.params[f"{self.prefix}/background"]["Mean"][
-                n, frames, None, None
-            ]
+            + self.Model.params["background"]["Mean"][n, frames, None, None]
         )
         gaussian = _gaussian_spots(
-            self.Model.params[f"{self.prefix}/height"]["Mean"][:, n, frames],
+            self.Model.params["height"]["Mean"][:, n, frames],
             #  self.Model.params["d/height"]["Mean"][:, n, frames].masked_fill(
             #      self.Model.params["d/m_probs"][:, n, frames] < 0.5, 0.0
             #  ),
-            self.Model.params[f"{self.prefix}/width"]["Mean"][:, n, frames],
-            self.Model.params[f"{self.prefix}/x"]["Mean"][:, n, frames],
-            self.Model.params[f"{self.prefix}/y"]["Mean"][:, n, frames],
-            self.Model.data.ontarget.xy[n, frames, self.Model.cdx],
-            self.Model.data.ontarget.P,
+            self.Model.params["width"]["Mean"][:, n, frames],
+            self.Model.params["x"]["Mean"][:, n, frames],
+            self.Model.params["y"]["Mean"][:, n, frames],
+            self.Model.data.xy[n, frames, self.Model.cdx],
+            self.Model.data.P,
         )
         img_ideal = img_ideal + gaussian.sum(-4)
         for f in range(f1, f1 + 100):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
-                self.Model.data.ontarget.images[
+                self.Model.data.images[
                     int(self.aoiNumber.text()), f, self.Model.cdx
                 ].numpy()
             )
@@ -314,7 +311,7 @@ class MainWindow(QMainWindow):
             self.img_ideal[(f - f1) % 100].setLevels(self.hist.getLevels())
 
     def initParams(self):
-        f1, f2 = 0, self.Model.data.ontarget.F
+        f1, f2 = 0, self.Model.data.F
 
         sc = MplCanvas(self, width=5, height=4, dpi=100)
         toolbar = NavigationToolbar(sc, self)
@@ -346,7 +343,7 @@ class MainWindow(QMainWindow):
         self.ax["pspecific"] = fig.add_subplot(gs[0])
         config_axis(self.ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
         (self.item["pspecific"],) = self.ax["pspecific"].plot(
-            torch.arange(0, self.Model.data.ontarget.F),
+            torch.arange(0, self.Model.data.F),
             self.Model.params["p(specific)"][0],
             "o-",
             ms=3,
@@ -373,38 +370,38 @@ class MainWindow(QMainWindow):
         for p in ["height", "width", "x", "y"]:
             for k in range(self.Model.K):
                 (self.item[f"{p}_{k}_mean"],) = self.ax[p].plot(
-                    torch.arange(0, self.Model.data.ontarget.F),
-                    self.Model.params[f"d/{p}"]["Mean"][k, 0],
+                    torch.arange(0, self.Model.data.F),
+                    self.Model.params[p]["Mean"][k, 0],
                     "o-",
                     ms=3,
                     lw=1,
                     color=f"C{k}",
                 )
                 self.item[f"{p}_{k}_fill"] = self.ax[p].fill_between(
-                    torch.arange(0, self.Model.data.ontarget.F),
-                    self.Model.params[f"d/{p}"]["LL"][k, 0],
-                    self.Model.params[f"d/{p}"]["UL"][k, 0],
+                    torch.arange(0, self.Model.data.F),
+                    self.Model.params[p]["LL"][k, 0],
+                    self.Model.params[p]["UL"][k, 0],
                     alpha=0.3,
                     color=f"C{k}",
                 )
         (self.item["background_mean"],) = self.ax["background"].plot(
-            torch.arange(0, self.Model.data.ontarget.F),
-            self.Model.params["d/background"]["Mean"][0],
+            torch.arange(0, self.Model.data.F),
+            self.Model.params["background"]["Mean"][0],
             "o-",
             ms=3,
             lw=1,
             color="k",
         )
         self.item["background_fill"] = self.ax["background"].fill_between(
-            torch.arange(0, self.Model.data.ontarget.F),
-            self.Model.params["d/background"]["LL"][0],
-            self.Model.params["d/background"]["UL"][0],
+            torch.arange(0, self.Model.data.F),
+            self.Model.params["background"]["LL"][0],
+            self.Model.params["background"]["UL"][0],
             alpha=0.3,
             color="k",
         )
 
     def updateParams(self, inc):
-        self.n = (int(self.aoiNumber.text()) + inc) % self.Model.data.ontarget.N
+        self.n = (int(self.aoiNumber.text()) + inc) % self.Model.data.N
         self.aoiNumber.setText(str(self.n))
 
         for p in self.params:
@@ -416,27 +413,25 @@ class MainWindow(QMainWindow):
             elif p == "background":
                 self.item[f"{p}_fill"].remove()
                 self.item[f"{p}_fill"] = self.ax[p].fill_between(
-                    torch.arange(0, self.Model.data.ontarget.F),
-                    self.Model.params[f"d/{p}"]["LL"][self.n],
-                    self.Model.params[f"d/{p}"]["UL"][self.n],
+                    torch.arange(0, self.Model.data.F),
+                    self.Model.params[p]["LL"][self.n],
+                    self.Model.params[p]["UL"][self.n],
                     alpha=0.3,
                     color="k",
                 )
-                self.item[f"{p}_mean"].set_ydata(
-                    self.Model.params[f"{self.prefix}/{p}"]["Mean"][self.n]
-                )
+                self.item[f"{p}_mean"].set_ydata(self.Model.params[p]["Mean"][self.n])
             else:
                 for k in range(self.Model.K):
                     self.item[f"{p}_{k}_fill"].remove()
                     self.item[f"{p}_{k}_fill"] = self.ax[p].fill_between(
-                        torch.arange(0, self.Model.data.ontarget.F),
-                        self.Model.params[f"d/{p}"]["LL"][k, self.n],
-                        self.Model.params[f"d/{p}"]["UL"][k, self.n],
+                        torch.arange(0, self.Model.data.F),
+                        self.Model.params[p]["LL"][k, self.n],
+                        self.Model.params[p]["UL"][k, self.n],
                         alpha=0.3,
                         color=f"C{k}",
                     )
                     self.item[f"{p}_{k}_mean"].set_ydata(
-                        self.Model.params[f"{self.prefix}/{p}"]["Mean"][k, self.n]
+                        self.Model.params[p]["Mean"][k, self.n]
                     )
         self.sc.draw()
 
