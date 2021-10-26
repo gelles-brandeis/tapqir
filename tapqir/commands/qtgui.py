@@ -293,9 +293,9 @@ class MainWindow(QMainWindow):
         for f in range(f1, f1 + 100):
             self.label[(f - f1) % 100].setText(text=str(f))
             self.img[(f - f1) % 100].setImage(
-                self.Model.data.images[
-                    int(self.aoiNumber.text()), f, self.Model.cdx
-                ].numpy()
+                self.Model.data.images[int(self.aoiNumber.text()), f, self.Model.cdx]
+                .numpy()
+                .T
             )
             # if self.Model._classifier:
             self.prob[(f - f1) % 100].setOpts(
@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
                 )
             )
             # ideal image
-            self.img_ideal[(f - f1) % 100].setImage(img_ideal[f - f1].cpu().numpy())
+            self.img_ideal[(f - f1) % 100].setImage(img_ideal[f - f1].cpu().numpy().T)
 
             self.img[(f - f1) % 100].setLevels(self.hist.getLevels())
             self.img_ideal[(f - f1) % 100].setLevels(self.hist.getLevels())

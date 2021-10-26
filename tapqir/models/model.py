@@ -173,7 +173,7 @@ class Model:
             self.epoch_loss = sum(losses) / len(losses)
             self.save_checkpoint()
             if use_crit and self._stop:
-                logger.info("Step #{} model converged.".format(self.epoch))
+                logger.info("Epoch #{} model converged.".format(self.epoch))
                 break
             self.epoch += 1
 
@@ -204,7 +204,7 @@ class Model:
         for k, v in pyro.get_param_store().items():
             if torch.isnan(v).any() or torch.isinf(v).any():
                 raise ValueError(
-                    "Step #{}. Detected NaN values in {}".format(self.epoch, k)
+                    "Epoch #{}. Detected NaN values in {}".format(self.epoch, k)
                 )
 
         # update convergence criteria parameters
@@ -267,7 +267,7 @@ class Model:
             self.writer.add_scalars("NEGATIVES", neg, self.epoch)
             self.writer.add_scalars("POSITIVES", pos, self.epoch)
 
-        logger.debug("Step #{}.".format(self.epoch))
+        logger.debug("Epoch #{}.".format(self.epoch))
 
     def load_checkpoint(self, path=None, param_only=False, warnings=False):
         device = self.device
@@ -283,7 +283,7 @@ class Model:
             self.epoch = checkpoint["epoch"]
             self.optim.set_state(checkpoint["optimizer"])
             logger.info(
-                "Step #{}. Loaded model params and optimizer state from {}".format(
+                "Epoch #{}. Loaded model params and optimizer state from {}".format(
                     self.epoch, path
                 )
             )
