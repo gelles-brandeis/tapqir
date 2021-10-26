@@ -273,12 +273,12 @@ def fit(
         help="Learning rate",
         prompt="Learning rate",
     ),
-    num_iter: int = typer.Option(
+    num_epochs: int = typer.Option(
         0,
-        "--num-iter",
-        "-it",
-        help="Number of iterations",
-        prompt="Number of iterations",
+        "--num_epochs",
+        "-e",
+        help="Number of epochs",
+        prompt="Number of epochs",
     ),
     k_max: int = typer.Option(
         2, "--k-max", "-k", help="Maximum number of spots per image"
@@ -357,7 +357,7 @@ def fit(
         model.load(cd)
 
         model.init(learning_rate, nbatch_size, fbatch_size)
-        model.run(num_iter)
+        model.run(num_epochs)
 
 
 @app.command()

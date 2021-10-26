@@ -303,6 +303,12 @@ def read_glimpse(path, **kwargs):
         offset_weights = np.insert(offset_weights, 0, 1)
     # normalize weights
     offset_weights = offset_weights / offset_weights.sum()
+    # remove values from the upper 0.5 percentile
+    high_mask = offset_weights.cumsum() > 0.995
+    high_weights = offset_weights[high_mask].sum()
+    offset_samples = offset_samples[~high_mask]
+    offset_weights = offset_weights[~high_mask]
+    offset_weights[-1] += high_weights
     # convert data to torch tensor
     offset_samples = torch.tensor(offset_samples, dtype=torch.int)
     offset_weights = torch.tensor(offset_weights)
@@ -318,14 +324,24 @@ def read_glimpse(path, **kwargs):
 
     data = defaultdict(lambda: None, data)
     target_xy = defaultdict(lambda: None, target_xy)
+    # concatenate ontarget and offtarget
+    is_ontarget = torch.cat(
+        tuple(
+            torch.full(
+                target_xy[dtype].shape[:1], dtype == "ontarget", dtype=torch.bool
+            )
+            for dtype in glimpse.dtypes
+        ),
+        0,
+    )
+    data = torch.cat(tuple(data[dtype] for dtype in glimpse.dtypes), 0)
+    target_xy = torch.cat(tuple(target_xy[dtype] for dtype in glimpse.dtypes), 0)
 
     dataset = CosmosDataset(
-        data["ontarget"],
-        target_xy["ontarget"],
+        data,
+        target_xy,
+        is_ontarget,
         glimpse.labels["ontarget"],
-        data["offtarget"],
-        target_xy["offtarget"],
-        glimpse.labels["offtarget"],
         offset_samples,
         offset_weights,
         name=name,
@@ -333,18 +349,10 @@ def read_glimpse(path, **kwargs):
     save(dataset, path)
 
     logger.info(
-        f"On-target data: N={dataset.ontarget.N} AOIs, "
-        f"F={dataset.ontarget.F} frames, "
-        f"C={dataset.ontarget.C} channels, "
-        f"P={dataset.ontarget.P} pixels, "
-        f"P={dataset.ontarget.P} pixels"
+        f"Dataset: N={dataset.N} AOIs, "
+        f"F={dataset.F} frames, "
+        f"C={dataset.C} channels, "
+        f"P={dataset.P} pixels, "
+        f"P={dataset.P} pixels"
     )
-    if dataset.offtarget.images is not None:
-        logger.info(
-            f"Off-target data: N={dataset.offtarget.N} AOIs, "
-            f"F={dataset.offtarget.F} frames, "
-            f"C={dataset.offtarget.C} channels, "
-            f"P={dataset.offtarget.P} pixels, "
-            f"P={dataset.offtarget.P} pixels"
-        )
     logger.info(f"Data is saved in {Path(path) / 'data.tpqr'}")
