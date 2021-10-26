@@ -309,7 +309,7 @@ class Cosmos(Model):
 
                 # observed data
                 pyro.sample(
-                    f"data",
+                    "data",
                     KSpotGammaNoise(
                         torch.stack(heights, -1),
                         torch.stack(widths, -1),

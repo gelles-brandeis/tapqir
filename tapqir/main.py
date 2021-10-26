@@ -275,7 +275,7 @@ def fit(
     ),
     num_epochs: int = typer.Option(
         0,
-        "--num_epochs",
+        "--num-epochs",
         "-e",
         help="Number of epochs",
         prompt="Number of epochs",
