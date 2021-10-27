@@ -76,17 +76,22 @@ differentiation. We also use `KeOps`_ library for kernel operations on the GPU w
 Interface
 ---------
 
-Tapqir is a command-line application and needs to be run in the terminal. Its command line interface
-is implemented in `Typer`_. The usage is ``tapqir COMMAND [OPTIONS]``. For example::
+Tapqir is a command-line application and needs to be run in the terminal (``$`` signifies a terminal prompt).
+Its command line interface is implemented in `Typer`_. The usage is ``tapqir COMMAND [OPTIONS]``. For example::
 
-    tapqir fit --model cosmos --cuda
+    $ tapqir fit --model cosmos --cuda
 
 where 
 
 * ``tapqir`` is the *program*.
 * ``fit`` is the *command*.
-* ``--model cosmos`` is a command *option* where ``--model`` is the option name and ``cosmos`` is the option value.
-* ``--cuda`` is a command *option flag* where it is True/Yes if provided and False/No if not provided.
+* ``--model cosmos`` is a command *option (flag)* where ``--model`` is the option name and ``cosmos`` is the option value.
+* ``--cuda`` is a Yes or No command *option (flag)* where its value is True/Yes if provided and False/No if not provided.
+
+Some options have a one-letter version as well. For example, both ``--help`` and ``-h`` will display help.
+
+``tapqir --help`` will display an overall help and ``tapqir COMMAND --help`` will display
+a command-specific help that will show which options are available for that specific command.
 
 *Commands* are one of the:
 
@@ -118,19 +123,24 @@ The default for yes/no prompt is shown in capital::
 Default option values are read from the ``.tapqir/config.yml`` configuration file. When the
 command is run it will ask to overwrite default values (or use ``--overwrite`` flag).
 
-To force default values without opening a prompt provide a ``--quiet`` flag (e.g., ``tapqir fit --quiet``).
+To disablle all prompts use a ``--no-input`` flag (e.g., ``tapqir fit --no-input``).
 This is useful after the first invocation of the command when the option values have been saved and you
 want to re-run the command with the same option values.
 
 To summarize:
 
-1. If provided, the option value is accepted from the command line.
-2. If not provided, the prompt will ask for the missing value.
-3. Use the ``--quiet`` flag to silence the prompt and try to directly read the value from
-   the configuration file.
+1. If provided, the option value is accepted from the command line as a flag.
+2. If not provided, the prompt will ask for the missing option value.
+3. To disable all prompts use the ``--no-input`` flag. The program will first look for command flags and then
+   default values from the configuration file. If the required option value is missing the program will
+   fail and ask to pass the information as a flag.
 
-To get help type ``tapqir --help`` for an overall help and ``tapqir COMMAND --help`` for
-a command-specific help.
+To escape the program use ``Ctrl-C``.
+
+Raw input data
+--------------
+
+WIP
 
 Workflow
 --------
