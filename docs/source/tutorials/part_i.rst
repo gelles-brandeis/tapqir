@@ -34,13 +34,9 @@ For *N* AOIs, *F* frames, and *K* spots model parameters are:
 | ``pi`` - :math:`\pi`   | (1,)      | average binding probability of      |
 |                        |           | target-specific binding             |
 +------------------------+-----------+-------------------------------------+
-| ``p(specific)`` - |ps| | (N, F)    | probability of there being          |
-|                        |           | a target-specific spot in the image |
+| ``theta`` - |theta|    | (N, F)    | target-specific spot index          |
 +------------------------+-----------+-------------------------------------+
-| ``theta_probs`` - |pt| | (N, F, 3) | target-specific spot index          |
-|                        |           | probability                         |
-+------------------------+-----------+-------------------------------------+
-| ``m_probs`` - |mp|     | (K, N, F) | spot presence probability           |
+| ``m`` - :math:`m`      | (K, N, F) | spot presence indicator             |
 +------------------------+-----------+-------------------------------------+
 | ``height`` - :math:`h` | (K, N, F) | spot intensity                      |
 +------------------------+-----------+-------------------------------------+
@@ -52,15 +48,17 @@ For *N* AOIs, *F* frames, and *K* spots model parameters are:
 +------------------------+-----------+-------------------------------------+
 | ``background`` - |b|   | (N, F)    | background intensity                |
 +------------------------+-----------+-------------------------------------+
+| ``p(specific)`` - |ps| | (N, F)    | probability of there being          |
+|                        |           | a target-specific spot in the image |
++------------------------+-----------+-------------------------------------+
 
 where shape provides dimensionality information about parameters, e.g., (1,) shape means
 a global parameter and ``height`` with (K, N, F) shape means that *each* spot for *each*
 AOI for *each* frame has an intensity parameter.
 
 .. |ps| replace:: :math:`p(\mathsf{specific})`
-.. |pt| replace:: :math:`p(\theta|D)`
+.. |theta| replace:: :math:`\theta`
 .. |prox| replace:: :math:`\sigma^{xy}`
-.. |mp| replace:: :math:`p(m|D)`
 .. |ld| replace:: :math:`\lambda`
 .. |b| replace:: :math:`b`
 
