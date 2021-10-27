@@ -122,8 +122,8 @@ The default for yes/no prompt is shown in capital::
 
     Run computations on GPU? [Y/n]: y
 
-Default option values are read from the ``.tapqir/config.yml`` configuration file. When the
-command is run it will ask to overwrite default values (or use ``--overwrite`` flag).
+Default option values are read from the ``.tapqir/config.yml`` configuration file (`YAML`_ format file).
+When the command is run it will ask to overwrite default values (or use ``--overwrite`` flag).
 
 To disablle all prompts use a ``--no-input`` flag (e.g., ``tapqir fit --no-input``).
 This is useful after the first invocation of the command when the option values have been saved and you
@@ -138,6 +138,22 @@ To summarize:
    fail and ask to pass the information as a flag.
 
 To escape the program use ``Ctrl-C``.
+
+Some basic Linux commands
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For a quick reference, some commonly used Linux commands:
+
+1. ``pwd`` - Print the name of the current working directory.
+2. ``ls`` - List files and folders.
+3. ``cd`` - Change the working directory (e.g., ``cd Downloads``)
+4. ``mkdir`` - Create a folder (e.g., ``mkdir new_folder``). Tip: try to avoid spaces in file & folder
+   names because spaces need a special escape character ``\``.
+5. ``rm`` - Delete files. Use ``rm -r`` to delete folders. Be careful, files delted with ``rm`` command
+   do not go to the recycle bin and are permanently deleted!
+6. ``cp`` - Copy files. Usage is ``cp <from> <to>``.
+7. ``mv`` - Move or rename files. Usage is ``mv <from> <to>``.
+8. Use double ``[TAB]`` for command or filename completion.
 
 Raw input data
 --------------
@@ -167,6 +183,7 @@ Workflow
 .. _PyTorch: https://pytorch.org/
 .. _KeOps: https://www.kernel-operations.io/keops/index.html
 .. _Typer: https://typer.tiangolo.com/
+.. _YAML: https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki
 .. _new issue: https://github.com/gelles-brandeis/tapqir/issues/new/choose
