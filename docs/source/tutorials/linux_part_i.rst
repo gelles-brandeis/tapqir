@@ -1,14 +1,11 @@
 Part I: Tapqir analysis
 =======================
 
-Intro
------
+In this tutorial we will analyze the data from Rpb1-SNAP\ :sup:`549` binding to DNA\ :sup:`488`
+experiment (`Rosen et al., 2020`_).
 
-This tutorial shows you how to use Tapqir program and its commands, step by step. As an example we will
-use the data from Rpb1-SNAP\ :sup:`549` binding to DNA\ :sup:`488` experiment (`Rosen GA et. al.`_).
-
-We will analyze the data using the single-color time-independent colocalization model ``cosmos``.
-Please checkout our preprint (`Ordabayev YA et. al.`_) to familiarize yourself with the model.
+.. image:: cosmos_experiment.png
+   :width: 700
 
 Set up the environment
 ----------------------
@@ -45,12 +42,7 @@ such as ``config.yml`` configuration file, ``loginfo`` logging file, and model c
 Preprocessing raw input data
 ----------------------------
 
-In this tutorial we will analyze the data from Rpb1-SNAP binding to DNA experiment (`Rosen GA et. al.`_).
-
-.. image:: cosmos_experiment.png
-   :width: 700
-
-This data was acquired with `Glimpse`_ and pre-processed with `imscroll`_ program (`Friedman LJ et. al.`_).
+This data was acquired with `Glimpse`_ and pre-processed with `imscroll`_ program (`Friedman et al., 2015`_).
 Let's download data files using `wget`_ and then unzip files::
 
   $ wget http://centaur.biochem.brandeis.edu/Rpb1SNAP549_glimpse.zip
@@ -94,16 +86,6 @@ Extract AOIs from raw images using ``tapqir glimpse`` command which will run int
 
 .. note::
 
-   At the prompt enter a new value by typing and then hitting ENTER. To use a default value shown in ``[...]``
-   brackets press ENTER. For yes/no prompts type ``y`` for yes and ``n`` for no and then hit ENTER.
-   The default for yes/no prompt is shown in capital.
-
-.. note::
-
-   Default option values are saved (if you select overwrite default values) in ``.tapqir/config.yml`` file in `YAML`_ format.
-
-.. note::
-
    In Python indexing starts with 0. We stick to this convention and index AOIs, frames, color channels, and
    pixels starting with 0.
 
@@ -138,8 +120,17 @@ Make sure that AOIs are *inside* of the FOV and offset is *outside* of the FOV.
 Data analysis
 -------------
 
-Now the data is ready for analysis. We will first fit the data to the time-independent ``cosmos`` model with :math:`\theta`
-marginalized out (``--marginal``)::
+Now the data is ready for analysis. We will first fit the data to the time-independent ``cosmos`` model (`Ordabayev et al., 2021`).
+
+.. note::
+   We use variational inference to fit the model. For a better convergence we marginalize out :math:`\theta` parameter
+   in the model ("marginalization" is a term in Bayesian inference meaning integrating out the variable). This is what
+   we call the marginal (``--marginal``) model. However, to calculate :math:`p(\mathsf{specific})` we need the probability values
+   of :math:`\theta` parameter. Therefore, at the second step we fit the "full" model where :math:`\theta` is not marginalized
+   out. At this step we also "freeze" all other parameters since they already have converged to a good value. In short,
+   we first need to fit the "marginal" model and then the "full" model.
+
+First, fit the data to the ``cosmos`` model with :math:`\theta` marginalized out (``--marginal``)::
 
     $ tapqir fit
 
@@ -182,9 +173,9 @@ Options that we selected:
 * Number of epochs - use default (``0``)
 
 .. note::
-   **About batch size**. In theory, batch size should impact *training time* and
-   *memory consumption*, not the *performance*. It can be optimized for a particular
-   GPU hardware by trying different batch size values and comparing training time/memory usage
+   **About batch size**. In theory, batch size should impact *training time* and *memory consumption*,
+   but not the *performance*. It can be optimized for a particular GPU hardware by
+   trying different batch size values and comparing training time/memory usage
    (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values). In particular,
    if there is a memory overflow you can decrease either AOI batch size (e.g., to ``5``)
    or frame batch size (e.g., to ``128`` or ``256``).
@@ -204,7 +195,7 @@ At every checkpoint the values of global variational parameters (``-ELBO``, ``ga
 After the marginalized model has converged run the full ``cosmos`` model (usually
 100-150 epochs is enough)::
 
-    $ tapqir fit cosmos --cuda --bs <number> --num-iter <number>
+    $ tapqir fit
 
     Use the marginalized model? [Y/n]: n
     Run computations on GPU? [Y/n]:
@@ -282,9 +273,9 @@ Tapqir logs console output to a ``.tapqir/loginfo`` text file. It can be viewed 
 
     $ tapqir log
 
-.. _Rosen GA et. al.: https://dx.doi.org/10.1073/pnas.2011224117
-.. _Ordabayev YA et. al.: https://doi.org/10.1101/2021.09.30.462536 
-.. _Friedman LJ et. al.: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
+.. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
+.. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536 
+.. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki
 .. _wget: https://www.gnu.org/software/wget/
