@@ -108,6 +108,8 @@ a command-specific help that will show which options are available for that spec
 +------------------------+-----------------------------------+
 | | ``$ tapqir show``    | Visualize results                 |
 +------------------------+-----------------------------------+
+| | ``$ tapqir log``     | Show logging info                 |
++------------------------+-----------------------------------+
 
 Command *options* do not depend on their order. For command options that are not provided ``tapqir``
 will interactively ask for the missing value::
@@ -132,7 +134,7 @@ To summarize:
 1. If provided, the option value is accepted from the command line as a flag.
 2. If not provided, the prompt will ask for the missing option value.
 3. To disable all prompts use the ``--no-input`` flag. The program will first look for command flags and then
-   default values from the configuration file. If the required option value is missing the program will
+   for default values from the configuration file. If the required option value is missing the program will
    fail and ask to pass the information as a flag.
 
 To escape the program use ``Ctrl-C``.
@@ -140,7 +142,17 @@ To escape the program use ``Ctrl-C``.
 Raw input data
 --------------
 
-WIP
+Tapqir analyzes a small area of interest (AOI) around each target or off-target location. AOIs (usually ``14x14`` pixels)
+are extracted from raw input data. Currently Tapqir supports raw input images in `Glimpse`_ format and pre-processed
+with the `imscroll`_ program:
+
+* image data in glimpse format and header file
+* aoiinfo file designating the locations of target molecules (on-target AOIs) in the binder channel
+* (optional) aoiinfo file designating the off-target control locations (off-target AOIs) in the binder channel
+* driftlist file recording the stage movement that took place during the experiment
+
+We plan to extend the support to other data formats as well. Please start a `new issue`_ if you have a file format
+that is not supported yet.
 
 Workflow
 --------
@@ -155,3 +167,6 @@ Workflow
 .. _PyTorch: https://pytorch.org/
 .. _KeOps: https://www.kernel-operations.io/keops/index.html
 .. _Typer: https://typer.tiangolo.com/
+.. _Glimpse: https://github.com/gelles-brandeis/Glimpse
+.. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki
+.. _new issue: https://github.com/gelles-brandeis/tapqir/issues/new/choose
