@@ -116,11 +116,10 @@ def glimpse(
         help="Overwrite defaults values.",
         prompt="Overwrite defaults values?",
     ),
-    quiet: bool = typer.Option(
+    no_input: bool = typer.Option(
         False,
-        "--quiet",
-        "-q",
-        help="Use defaults values.",
+        "--no-input",
+        help="Disable interactive prompt.",
         is_eager=True,
         callback=deactivate_prompts,
     ),
@@ -158,7 +157,7 @@ def glimpse(
     DEFAULTS["P"] = P
     DEFAULTS["num-channels"] = num_channels
 
-    if not quiet:
+    if not no_input:
         frame_range = typer.confirm(
             "Specify frame range?", default=("frame-start" in DEFAULTS)
         )
@@ -298,11 +297,10 @@ def fit(
         help="Overwrite defaults values.",
         prompt="Overwrite defaults values?",
     ),
-    quiet: bool = typer.Option(
+    no_input: bool = typer.Option(
         False,
-        "--quiet",
-        "-q",
-        help="Use defaults values.",
+        "--no-input",
+        help="Disable interactive prompt.",
         is_eager=True,
         callback=deactivate_prompts,
     ),
@@ -398,10 +396,9 @@ def stats(
     funsor: bool = typer.Option(
         False, "--funsor/--pyro", help="Use funsor or pyro backend"
     ),
-    quiet: bool = typer.Option(
+    no_input: bool = typer.Option(
         False,
-        "--quiet",
-        "-q",
+        "--no-input",
         help="Use defaults values.",
         is_eager=True,
         callback=deactivate_prompts,
@@ -454,10 +451,9 @@ def show(
     funsor: bool = typer.Option(
         False, "--funsor/--pyro", help="Use funsor or pyro backend"
     ),
-    quiet: bool = typer.Option(
+    no_input: bool = typer.Option(
         False,
-        "--quiet",
-        "-q",
+        "--no-input",
         help="Use defaults values.",
         is_eager=True,
         callback=deactivate_prompts,

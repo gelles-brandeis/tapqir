@@ -60,7 +60,7 @@ def test_commands_cpu(dataset_path, qtbot):
             "--num-epochs",
             "1",
             "--cpu",
-            "-q",
+            "--no-input",
         ],
         [
             "--cd",
@@ -77,7 +77,7 @@ def test_commands_cpu(dataset_path, qtbot):
             "--num-epochs",
             "1",
             "--cpu",
-            "-q",
+            "--no-input",
         ],
         [
             "--cd",
@@ -90,7 +90,7 @@ def test_commands_cpu(dataset_path, qtbot):
             "--fbatch-size",
             "5",
             "--cpu",
-            "-q",
+            "--no-input",
         ],
     ]
 
@@ -130,7 +130,7 @@ def test_commands_cuda(dataset_path):
             "5",
             "--num-epochs",
             "1",
-            "-q",
+            "--no-input",
         ],
         [
             "--cd",
@@ -147,7 +147,7 @@ def test_commands_cuda(dataset_path):
             "5",
             "--num-epochs",
             "1",
-            "-q",
+            "--no-input",
         ],
     ]
 
