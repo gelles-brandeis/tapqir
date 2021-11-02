@@ -54,7 +54,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "colorama",
-        "funsor @ git+git://github.com/ordabayevy/funsor.git@tapqir",
+        "funsor==0.4.1",
         "future",
         "matplotlib",
         "pandas",
