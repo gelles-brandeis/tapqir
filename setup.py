@@ -54,8 +54,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "colorama",
-        "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
-        # "funsor==0.4.0",
+        "funsor @ git+git://github.com/ordabayevy/funsor.git@tapqir",
         "future",
         "matplotlib",
         "pandas",
