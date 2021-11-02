@@ -59,7 +59,7 @@ setuptools.setup(
         "matplotlib",
         "pandas",
         "pykeops",
-        "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
+        "pyro-ppl==1.7.0",
         "pyqtgraph",
         "PySide2",
         "pyyaml",
