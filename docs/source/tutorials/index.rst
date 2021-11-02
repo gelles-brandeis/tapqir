@@ -5,6 +5,15 @@ Examples provided in this section demonstrate the application of Tapqir analysis
 Each example is a Jupyter notebook that can be run on Google Colab (links provided) and used as a template
 for your own analysis.
 
+Tutorials
+---------
+
+.. nbgallery::
+   :caption: Tutorials
+
+   part_i
+   linux_part_i
+
 Colab Tutorials
 ---------------
 
@@ -13,11 +22,3 @@ Colab Tutorials
 
    tutorial_part_i
    tutorial_part_ii
-
-Linux Tutorials
----------------
-
-.. nbgallery::
-   :caption: Linux Tutorials
-
-   linux_part_i
