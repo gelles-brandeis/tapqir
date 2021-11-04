@@ -10,7 +10,7 @@ from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 
-from tapqir.distributions import AffineBeta, KSpotGammaNoise
+from tapqir.distributions import AffineBeta, KSMOGN
 from tapqir.models.cosmos import Cosmos
 
 
@@ -332,7 +332,7 @@ class HMM(Cosmos):
                 # observed data
                 pyro.sample(
                     f"{prefix}/data_{fsx}",
-                    KSpotGammaNoise(
+                    KSMOGN(
                         torch.stack(heights, -1),
                         torch.stack(widths, -1),
                         torch.stack(xs, -1),
