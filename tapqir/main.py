@@ -80,12 +80,10 @@ def init():
 
     typer.echo(
         (
-            "{yellow}Tapqir is a Bayesian program for single-molecule data analysis.{nc}\n"
+            "Initialized Tapqir in the working directory.\n"
             "{yellow}---------------------------------------------------------------{nc}\n"
             f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
-            f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}\n"
-            f"- Star us on GitHub: {format_link('https://github.com/gelles-brandeis/tapqir')}\n"
-            "\nInitialized Tapqir in the working directory."
+            f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
         ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
     )
 
@@ -287,7 +285,7 @@ def fit(
     ),
     pykeops: bool = typer.Option(
         True,
-        "--pykeops",
+        "--pykeops/--no-pykeops",
         help="Use pykeops backend for offset marginalization",
     ),
     overwrite: bool = typer.Option(

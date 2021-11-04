@@ -28,13 +28,11 @@ To start the analysis create an empty folder (here named ``tutorial``) and initi
   $ cd tutorial
   $ tapqir init
 
-  Tapqir is a Bayesian program for single-molecule data analysis.
+  Initialized Tapqir in the working directory.
   ---------------------------------------------------------------
   - Checkout the documentation: <https://tapqir.readthedocs.io/>
   - Get help on our forum: <https://github.com/gelles-brandeis/tapqir/discussions>
-  - Star us on GitHub: <https://github.com/gelles-brandeis/tapqir>
 
-  Initialized Tapqir in the working directory.
 
 ``tapqir init`` command has created a ``.tapqir`` sub-folder that will store internal files
 such as ``config.yml`` configuration file, ``loginfo`` logging file, and model checkpoints.
