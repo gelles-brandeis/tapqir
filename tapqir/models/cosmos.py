@@ -10,14 +10,30 @@ from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
-from tapqir.distributions import AffineBeta, KSpotGammaNoise
-from tapqir.distributions.kspotgammanoise import _gaussian_spots
+from tapqir.distributions import KSMOGN, AffineBeta
+from tapqir.distributions.util import _gaussian_spots
 from tapqir.models.model import Model
 
 
 class Cosmos(Model):
     """
+    ``cosmos`` model.
+
     Single-color Time-independent Colocalization Model.
+
+    Reference:
+
+    1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
+       Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
+       bioRxiv. 2021 Oct. doi: 10.1101/2021.09.30.462536.
+
+    :param int S: Number of distinct molecular states for the binder molecules.
+    :param int K: Maximum number of spots that can be present in a single image.
+    :param int channels: Number of color channels.
+    :param str device: Computation device (cpu or gpu).
+    :param str dtype: Floating point precision.
+    :param bool use_pykeops: Use pykeops as backend to marginalize out offset.
+    :param bool marginal: Marginalize out theta in the model.
     """
 
     name = "cosmos"
@@ -33,6 +49,7 @@ class Cosmos(Model):
         marginal=False,
     ):
         super().__init__(S, K, channels, device, dtype)
+        assert S == 1, "This is a single-state model!"
         assert len(self.channels) == 1, "Please specify exactly one color channel"
         self.cdx = self.channels[0]
         self.full_name = f"{self.name}-channel{self.cdx}"
@@ -310,7 +327,7 @@ class Cosmos(Model):
                 # observed data
                 pyro.sample(
                     "data",
-                    KSpotGammaNoise(
+                    KSMOGN(
                         torch.stack(heights, -1),
                         torch.stack(widths, -1),
                         torch.stack(xs, -1),

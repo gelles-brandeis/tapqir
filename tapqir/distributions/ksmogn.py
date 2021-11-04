@@ -1,47 +1,35 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
-import math
-
 import torch
 from pykeops.torch import Genred
 from pyro.distributions import TorchDistribution
 from torch.distributions import Categorical, constraints
 
+from .util import _gaussian_spots
 
-def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
+
+class KSMOGN(TorchDistribution):
     r"""
-    Calculates ideal shape of the 2D-Gaussian spots given spot parameters
-    and target positions.
+    K Gaussian Spots, Marginal Offset, Gamma Noise Image Distribution.
 
-        :math:`\dfrac{h}{2 \pi \cdot w^2} \exp{\left( -\dfrac{(i-x)^2 + (j-y)^2}{2 \cdot w^2} \right)}`
-    """
-    # create meshgrid of PxP pixel positions
-    P_range = torch.arange(P)
-    i_pixel, j_pixel = torch.meshgrid(P_range, P_range, indexing="xy")
-    ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
+    .. math::
+        \mu^S_{\mathsf{pixelX}(i), \mathsf{pixelY}(j)} =
+        \dfrac{m \cdot h}{2 \pi w^2}
+        \exp{\left( -\dfrac{(i-x-x^\mathsf{target})^2 + (j-y-y^\mathsf{target})^2}{2 w^2} \right)}
 
-    # Ideal 2D gaussian spots
-    spot_locs = target_locs + torch.stack((x, y), -1)
-    scale = width[..., None, None, None]
-    loc = spot_locs[..., None, None, :]
-    var = scale ** 2
-    normalized_gaussian = torch.exp(
-        (
-            -((ij_pixel - loc) ** 2) / (2 * var)
-            - scale.log()
-            - math.log(math.sqrt(2 * math.pi))
-        ).sum(-1)
-    )
-    if m is not None:
-        height = m * height
-    return height[..., None, None] * normalized_gaussian
+    .. math::
+        \mu^I = b + \sum_{\mathsf{spot}} \mu^S
 
+    .. math::
+        p(D|\mu^I, g) = \sum_\delta \delta_\mathsf{weights}
+        \cdot \mathrm{Gamma}(D - \delta_\mathsf{samples} | \mu^I, g)
 
-class KSpotGammaNoise(TorchDistribution):
-    r"""
-    Offset + Background + K-number of Gaussian Spots Image Model with
-    Gamma distributed noise.
+    Reference:
+
+    1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
+       Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
+       bioRxiv. 2021 Oct. doi: 10.1101/2021.09.30.462536.
 
     :param torch.Tensor height: Integrated spot intensity. Should be broadcastable
         to ``(batch_shape, K)``.
@@ -53,12 +41,12 @@ class KSpotGammaNoise(TorchDistribution):
         to ``(batch_shape, K)``.
     :param torch.Tensor target_locs: Target location. Should have
         the rightmost size ``2`` correspondnig to locations on
-        x- and y-axes, and be broadcastable to ``(batch_shape,)``.
+        x- and y-axes, and be broadcastable to ``(batch_shape, 2)``.
     :param torch.Tensor background: Background intensity. Should
         be broadcastable to ``(batch_shape,)``.
     :param torch.Tensor gain: Camera gain.
     :param torch.Tensor offset_samples: Offset samples from the empirical distribution.
-    :param torch.Tensor offset_logits: Offset log weights corresponding to the samples.
+    :param torch.Tensor offset_logits: Offset log weights corresponding to the offset samples.
     :param torch.Tensor m: Spot presence indicator. Should be broadcastable
         to ``(batch_shape, K)``.
     :param bool use_pykeops: Use pykeops as backend to marginalize out offset.
