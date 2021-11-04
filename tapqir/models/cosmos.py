@@ -11,7 +11,7 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import _gaussian_spots, _truncated_poisson_probs
+from tapqir.distributions.util import _gaussian_spots
 from tapqir.models.model import Model
 
 
