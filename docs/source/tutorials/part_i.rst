@@ -4,7 +4,12 @@ Part I: Intro
 Models
 ------
 
-Tapqir is a modular program that uses a chosen probabilistic model to interpret experimental data.  There currently exists only a single model, ``cosmos``, developed for analysis of simple CoSMoS experiments. The ``cosmos`` model is for *time-independent* analysis of *single-channel* (i.e., one-binder) data sets. Our preprint (`Ordabayev et al., 2021`_) contains a comprehensive description of the ``cosmos`` model. In the future, we plan to add addional models to Tapqir, for example to integrate hidden-Markov kinetic analysis or to handle global analysis with multiple wavelength channels.
+Tapqir is a modular program that uses a chosen probabilistic model to interpret experimental data.
+There currently exists only a single model, ``cosmos``, developed for analysis of simple CoSMoS
+experiments. The ``cosmos`` model is for *time-independent* analysis of *single-channel* (i.e., one-binder)
+data sets. Our preprint (`Ordabayev et al., 2021`_) contains a comprehensive description of the
+``cosmos`` model. In the future, we plan to add addional models to Tapqir, for example to integrate
+hidden-Markov kinetic analysis or to handle global analysis with multiple wavelength channels.
 
 Tapqir uses *Bayesian* models; this means that each model parameter has an associated probability
 distribution (uncertainty). For those who are interested, `Kinz-Thompson et al., 2021`_ is
@@ -24,7 +29,7 @@ Tapqir estimates the values of the ``cosmos`` parameters:
 +------------------------+-----------+-------------------------------------+
 | ``proximity`` - |prox| | (1,)      | proximity                           |
 +------------------------+-----------+-------------------------------------+
-| ``lambda`` - |ld|       | (1,)      | average rate of target-nonspecific  |
+| ``lamda`` - |ld|       | (1,)      | average rate of target-nonspecific  |
 |                        |           | binding                             |
 +------------------------+-----------+-------------------------------------+
 | ``pi`` - :math:`\pi`   | (1,)      | average binding probability of      |
@@ -45,13 +50,13 @@ Tapqir estimates the values of the ``cosmos`` parameters:
 | ``background`` - |b|   | (N, F)    | background intensity                |
 +------------------------+-----------+-------------------------------------+
 | ``p(specific)`` - |ps| | (N, F)    | probability of there being          |
-|                        |           | a target-specific spot in the AOI |
+|                        |           | a target-specific spot in the AOI   |
 +------------------------+-----------+-------------------------------------+
 
-where "shape" is the dimensionality of the parameters, e.g., (1,) shape means
-a scalar parameter and (K, N, F) shape means that *each* spot in *each*
-AOI in *each* frame has a separate value of the parameter.  `Ordabayev et al., 2021`_ has a more detailed description of
-the parameters.
+where "shape" is the dimensionality of the parameters, e.g., (1,) shape means a scalar
+parameter and (K, N, F) shape means that *each* spot in *each* AOI in *each* frame
+has a separate value of the parameter. `Ordabayev et al., 2021`_ has a more detailed
+description of the parameters.
 
 .. |ps| replace:: :math:`p(\mathsf{specific})`
 .. |theta| replace:: :math:`\theta`
@@ -75,8 +80,8 @@ The Tapqir command line interface is implemented in `Typer`_.
 Interface
 ---------
 
-Tapqir is a command-line application that runs in the terminal (``$`` signifies a terminal prompt in the information below).
-The usage is ``tapqir COMMAND [OPTIONS]``. For example::
+Tapqir is a command-line application that runs in the terminal (``$`` signifies a terminal prompt in
+the information below). The usage is ``tapqir COMMAND [OPTIONS]``. For example::
 
     $ tapqir fit --model cosmos --cuda
 
@@ -110,8 +115,8 @@ Commands have the following meanings:
 | | ``$ tapqir log``     | Show logging info                 |
 +------------------------+-----------------------------------+
 
-Command *options* do not depend on their order. For command options that require specifying a value that are not provided ``tapqir``
-will interactively ask for the missing value::
+Command *options* do not depend on their order. For command options that require specifying a value
+that are not provided ``tapqir`` will interactively ask for the missing value::
 
     Tapqir model [cosmos]: cosmos
 
@@ -155,11 +160,11 @@ For a quick reference, some commonly used Linux commands:
 8. Use double ``[TAB]`` for command or filename completion.
 
 Input data
---------------
+----------
 
 Tapqir analyzes a small area of interest (AOI) around each target or off-target location. AOIs (usually ``14x14`` pixels)
-are extracted from raw input data. Currently Tapqir supports raw input images in `Glimpse`_ format and pre-processing information files
-from the `imscroll`_ program:
+are extracted from raw input data. Currently Tapqir supports raw input images in `Glimpse`_ format and pre-processing
+information files from the `imscroll`_ program:
 
 * image data folder in glimpse format (contains glimpse.header file)
 * aoiinfo file designating the locations of target molecules (on-target AOIs) in the binder channel
@@ -172,7 +177,10 @@ to extend support to file formats used in your processing pipeline.
 Workflow
 --------
 
-The following diagram shows the steps in a Tapqir data processing run (using the ``cosmos`` model), the Tapqir command used to run each step, and the input files used and output files produced (color highlights) in each step.  All the Tapqir commands for a single processing run should be run in the same default working directory ("new_folder" in the diagram) in order to keep the filess associated with the run organized in a single location.
+The following diagram shows the steps in a Tapqir data processing run (using the ``cosmos`` model), the Tapqir command
+used to run each step, and the input files used and output files produced (color highlights) in each step. All the
+Tapqir commands for a single processing run should be run in the same default working directory (``new_folder`` in
+the diagram) in order to keep the files associated with the run organized in a single location.
 
 .. image:: ../Tapqir_workflow.png
    :alt: Tapqir workflow
