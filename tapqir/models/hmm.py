@@ -10,7 +10,7 @@ from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 
-from tapqir.distributions import AffineBeta, KSMOGN
+from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.models.cosmos import Cosmos
 
 
