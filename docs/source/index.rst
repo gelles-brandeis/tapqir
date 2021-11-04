@@ -80,7 +80,8 @@ bioRxiv. 2021 Oct.
    :titlesonly:
    :hidden:
 
-   install/index
-   user_guide/index
    tutorials/index
+   install/index
+   info
+   user_guide/index
    commands/index

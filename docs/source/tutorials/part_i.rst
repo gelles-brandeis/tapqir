@@ -64,17 +64,6 @@ description of the parameters.
 .. |ld| replace:: :math:`\lambda`
 .. |b| replace:: :math:`b`
 
-Backend
--------
-
-Tapqir's model is implemented in `Pyro`_, a Python-based probabilistic programming language
-(PPL) (`Bingham et al., 2019`_). Probabilistic programming is a relatively new paradigm in
-which probabilistic models are expressed in a high-level language that allows easy formulation,
-modification, and automated inference.
-
-Pyro relies on the `PyTorch`_ numeric library for vectorized math operations on GPU and automatic
-differentiation. We also use `KeOps`_ library for kernel operations on the GPU without memory overflow.
-
 The Tapqir command line interface is implemented in `Typer`_.
 
 Interface
@@ -188,9 +177,6 @@ the diagram) in order to keep the files associated with the run organized in a s
 .. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536 
 .. _Kinz-Thompson et al., 2021: https://doi.org/10.1146/annurev-biophys-082120-103921
 .. _Bingham et al., 2019: https://jmlr.org/papers/v20/18-403.html
-.. _Pyro: https://pyro.ai/
-.. _PyTorch: https://pytorch.org/
-.. _KeOps: https://www.kernel-operations.io/keops/index.html
 .. _Typer: https://typer.tiangolo.com/
 .. _YAML: https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
