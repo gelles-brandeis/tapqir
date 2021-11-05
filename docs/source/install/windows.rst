@@ -3,9 +3,8 @@ Install on Windows
 
 .. important::
 
-   We strongly recommend creating a virtual environment to encapsulate your
-   installation. Below we use a popular package manager Anaconda to create
-   and manage a virtual environment.
+   The Tapqir ``fit`` command does not currently work in Windows Python because of an apparent incompatibility between Windows Python and the KeOps
+   GPU package.  We recommend using Tapqir on linux or Colabs until this problem can be resolved.
 
 1. `Install Anaconda`_ package manager.
 
