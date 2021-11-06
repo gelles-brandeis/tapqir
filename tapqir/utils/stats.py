@@ -174,7 +174,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         ci_stats["theta_probs"] = model.theta_probs.data.cpu()
         ci_stats["j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
-        ci_stats["z_map"] = model.z_map.data.cpu()
+        ci_stats["z_map"] = model.pspecific_map.data.cpu()
 
     model.params = ci_stats
 
@@ -184,7 +184,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     # classification statistics
     if model.pspecific is not None and model.data.labels is not None:
-        pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
+        pred_labels = model.pspecific_map[model.data.is_ontarget].cpu().numpy().ravel()
         true_labels = model.data.labels["z"].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
