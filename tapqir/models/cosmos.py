@@ -23,8 +23,7 @@ class Cosmos(Model):
 
     1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
-       bioRxiv. 2021 Oct.
-       doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
+       bioRxiv. 2021 Oct. doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
 
     :param int S: Number of distinct molecular states for the binder molecules.
     :param int K: Maximum number of spots that can be present in a single image.
@@ -147,10 +146,10 @@ class Cosmos(Model):
         """
         # global parameters
         gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        self.pi = pyro.sample(
+        pi = pyro.sample(
             "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         ).squeeze()
-        self.lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
+        lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
         proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
         size = torch.stack(
             (
@@ -160,7 +159,6 @@ class Cosmos(Model):
             dim=-1,
         )
 
-        # local parameters
         # spots
         spots = pyro.plate("spots", self.K)
         # aoi sites
@@ -184,7 +182,9 @@ class Cosmos(Model):
             background_std = pyro.sample("background_std", dist.HalfNormal(100))
             with frames as fdx:
                 # fetch data
-                obs, target_locs, is_ontarget = self.data.fetch(ndx[:, None], fdx, self.cdx)
+                obs, target_locs, is_ontarget = self.data.fetch(
+                    ndx[:, None], fdx, self.cdx
+                )
                 # sample background intensity
                 background = pyro.sample(
                     "background",
@@ -198,12 +198,12 @@ class Cosmos(Model):
                 if self._classify:
                     theta = pyro.sample(
                         "theta",
-                        dist.Categorical(self.probs_theta[is_ontarget.long()]),
+                        dist.Categorical(self.probs_theta(pi)[is_ontarget.long()]),
                     )
                 else:
                     theta = pyro.sample(
                         "theta",
-                        dist.Categorical(self.probs_theta[is_ontarget.long()]),
+                        dist.Categorical(self.probs_theta(pi)[is_ontarget.long()]),
                         infer={"enumerate": "parallel"},
                     )
 
@@ -213,7 +213,7 @@ class Cosmos(Model):
                     # spot presence
                     m = pyro.sample(
                         f"m_{kdx}",
-                        dist.Bernoulli(Vindex(self.probs_m)[theta, kdx]),
+                        dist.Bernoulli(Vindex(self.probs_m(lamda))[theta, kdx]),
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
@@ -338,7 +338,6 @@ class Cosmos(Model):
             ),
         )
 
-        # local parameters
         # spots
         spots = pyro.plate("spots", self.K)
         # aoi sites
@@ -617,8 +616,7 @@ class Cosmos(Model):
             max_plate_nesting=2, ignore_jit_warnings=True
         )
 
-    @property
-    def probs_m(self):
+    def probs_m(self, lamda):
         r"""
         Spot presence probability :math:`p(m)`.
 
@@ -637,19 +635,18 @@ class Cosmos(Model):
         """
         result = torch.zeros(1 + self.K * self.S, self.K, dtype=self.dtype)
         kdx = torch.arange(self.K)
-        tr_pois_km1 = _truncated_poisson_probs(self.lamda, self.K - 1, self.dtype)
+        tr_pois_km1 = _truncated_poisson_probs(lamda, self.K - 1, self.dtype)
         km1 = torch.arange(1, self.K)
         result[:, :] = (km1 * tr_pois_km1[km1]).sum() / (self.K - 1)
         # theta == 0
-        tr_pois_k = _truncated_poisson_probs(self.lamda, self.K, self.dtype)
+        tr_pois_k = _truncated_poisson_probs(lamda, self.K, self.dtype)
         k = torch.arange(1, self.K + 1)
         result[0] = (k * tr_pois_k[k]).sum() / self.K
         # theta == k
         result[kdx + 1, kdx] = 1
         return result
 
-    @property
-    def probs_theta(self):
+    def probs_theta(self, pi):
         r"""
         Target-specific spot index probability :math:`p(\theta)`.
 
@@ -661,10 +658,10 @@ class Cosmos(Model):
         # 1 (True) - ontarget
         result = torch.zeros(2, self.K * self.S + 1, dtype=self.dtype)
         result[0, 0] = 1
-        result[1, 0] = self.pi[0]
+        result[1, 0] = pi[0]
         for s in range(self.S):
             for k in range(self.K):
-                result[1, self.K * s + k + 1] = self.pi[s + 1] / self.K
+                result[1, self.K * s + k + 1] = pi[s + 1] / self.K
         return result
 
     @property
