@@ -36,15 +36,15 @@ def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
 
 
 def _truncated_poisson_probs(lamda, K, dtype):
-    """
+    r"""
     Probability of the number of non-specific spots (TruncatedPoisson)
     for cases when :math:`\theta = 0` and :math:`\theta `.
 
     .. math::
-        \\mathbf{TruncPoisson}(\\lambda, K)
-        = 1 - e^{-\\lambda} \\sum_{i=0}^{K-1} \\dfrac{\\lambda^i}{i!} \\mathrm{if } k = K
-        \\mathrm{; }
-        \\dfrac{\\lambda^k e^{-\\lambda}}{k!} \\mathrm{otherwise}
+        \mathbf{TruncPoisson}(\lambda, K)
+        = 1 - e^{-\lambda} \sum_{i=0}^{K-1} \dfrac{\lambda^i}{i!} \mathrm{if } k = K
+        \mathrm{; }
+        \dfrac{\lambda^k e^{-\lambda}}{k!} \mathrm{otherwise}
     """
     result = torch.zeros(K + 1, dtype=dtype)
     kdx = torch.arange(K)
