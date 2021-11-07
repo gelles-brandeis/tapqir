@@ -172,9 +172,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     if model.pspecific is not None:
         ci_stats["m_probs"] = model.m_probs.data.cpu()
         ci_stats["theta_probs"] = model.theta_probs.data.cpu()
-        ci_stats["j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
-        ci_stats["z_map"] = model.pspecific_map.data.cpu()
+        ci_stats["pspecific_map"] = model.pspecific_map.data.cpu()
 
     model.params = ci_stats
 
@@ -234,9 +233,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                 if param in (
                     "m_probs",
                     "theta_probs",
-                    "j_probs",
                     "p(specific)",
-                    "z_map",
+                    "pspecific_map",
                 ):
                     ci_stats[param] = field.numpy()
                     continue
