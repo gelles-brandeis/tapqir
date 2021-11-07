@@ -247,7 +247,9 @@ class Model:
                 self.writer.add_scalars(name, scalars, self.epoch)
 
         if self.pspecific is not None and self.data.labels is not None:
-            pred_labels = self.z_map[self.data.is_ontarget].cpu().numpy().ravel()
+            pred_labels = (
+                self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
+            )
             true_labels = self.data.labels["z"].ravel()
 
             metrics = {}
