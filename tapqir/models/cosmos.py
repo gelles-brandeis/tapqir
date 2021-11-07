@@ -11,7 +11,7 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import _gaussian_spots, _truncated_poisson_probs
+from tapqir.distributions.util import _gaussian_spots, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
@@ -198,12 +198,20 @@ class Cosmos(Model):
                 if self._classify:
                     theta = pyro.sample(
                         "theta",
-                        dist.Categorical(self.probs_theta(pi)[is_ontarget.long()]),
+                        dist.Categorical(
+                            probs_theta(pi, self.S, self.K, self.dtype)[
+                                is_ontarget.long()
+                            ]
+                        ),
                     )
                 else:
                     theta = pyro.sample(
                         "theta",
-                        dist.Categorical(self.probs_theta(pi)[is_ontarget.long()]),
+                        dist.Categorical(
+                            probs_theta(pi, self.S, self.K, self.dtype)[
+                                is_ontarget.long()
+                            ]
+                        ),
                         infer={"enumerate": "parallel"},
                     )
 
@@ -213,7 +221,11 @@ class Cosmos(Model):
                     # spot presence
                     m = pyro.sample(
                         f"m_{kdx}",
-                        dist.Bernoulli(Vindex(self.probs_m(lamda))[theta, kdx]),
+                        dist.Bernoulli(
+                            Vindex(probs_m(lamda, self.S, self.K, self.dtype))[
+                                theta, kdx
+                            ]
+                        ),
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
@@ -615,54 +627,6 @@ class Cosmos(Model):
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True
         )
-
-    def probs_m(self, lamda):
-        r"""
-        Spot presence probability :math:`p(m)`.
-
-        .. math::
-
-            p(m_{\mathsf{spot}(k)}) =
-            \begin{cases}
-                \mathbf{Bernoulli}(1) & \text{$\theta = k$} \\
-                \mathbf{Bernoulli} \left( \sum_{l=1}^K
-                    \dfrac{l \cdot \mathbf{TruncPoisson}(l; \lambda, K)}{K} \right)
-                    & \text{$\theta = 0$} \rule{0pt}{4ex} \\
-                \mathbf{Bernoulli} \left( \sum_{l=1}^{K-1}
-                    \dfrac{l \cdot \mathbf{TruncPoisson}(l; \lambda, K-1)}{K-1} \right)
-                    & \text{otherwise} \rule{0pt}{4ex}
-            \end{cases}
-        """
-        result = torch.zeros(1 + self.K * self.S, self.K, dtype=self.dtype)
-        kdx = torch.arange(self.K)
-        tr_pois_km1 = _truncated_poisson_probs(lamda, self.K - 1, self.dtype)
-        km1 = torch.arange(1, self.K)
-        result[:, :] = (km1 * tr_pois_km1[km1]).sum() / (self.K - 1)
-        # theta == 0
-        tr_pois_k = _truncated_poisson_probs(lamda, self.K, self.dtype)
-        k = torch.arange(1, self.K + 1)
-        result[0] = (k * tr_pois_k[k]).sum() / self.K
-        # theta == k
-        result[kdx + 1, kdx] = 1
-        return result
-
-    def probs_theta(self, pi):
-        r"""
-        Target-specific spot index probability :math:`p(\theta)`.
-
-        .. math::
-
-            p(\theta) = \mathbf{Categorical}\left(1 - \pi, \frac{\pi}{K}, \dots, \frac{\pi}{K}\right)
-        """
-        # 0 (False) - offtarget
-        # 1 (True) - ontarget
-        result = torch.zeros(2, self.K * self.S + 1, dtype=self.dtype)
-        result[0, 0] = 1
-        result[1, 0] = pi[0]
-        for s in range(self.S):
-            for k in range(self.K):
-                result[1, self.K * s + k + 1] = pi[s + 1] / self.K
-        return result
 
     @property
     def theta_probs(self):
