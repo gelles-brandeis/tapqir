@@ -3,6 +3,7 @@
 
 import logging
 import os
+import random
 from collections import deque
 from pathlib import Path
 
@@ -126,6 +127,7 @@ class Model:
         raise NotImplementedError
 
     def init(self, lr=0.005, nbatch_size=5, fbatch_size=1000, jit=False):
+        self.lr = lr
         self.optim_fn = optim.Adam
         self.optim_args = {"lr": lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
@@ -162,20 +164,35 @@ class Model:
         use_crit = False
         if not num_epochs:
             use_crit = True
-            num_epochs = 1000
+            num_epochs = 50000
         for i in nrange(num_epochs):
-            losses = []
-            for ndx in torch.split(torch.randperm(self.data.N), self.nbatch_size):
-                for fdx in torch.split(torch.randperm(self.data.F), self.fbatch_size):
-                    self.n = ndx
-                    self.f = fdx
-                    losses.append(self.svi.step())
-            self.epoch_loss = sum(losses) / len(losses)
-            self.save_checkpoint()
-            if use_crit and self._stop:
-                logger.info("Epoch #{} model converged.".format(self.epoch))
-                break
-            self.epoch += 1
+            try:
+                losses = []
+                for ndx in torch.split(torch.randperm(self.data.N), self.nbatch_size):
+                    for fdx in torch.split(
+                        torch.randperm(self.data.F), self.fbatch_size
+                    ):
+                        self.n = ndx
+                        self.f = fdx
+                        # with torch.autograd.detect_anomaly():
+                        losses.append(self.svi.step())
+                self.epoch_loss = sum(losses) / len(losses)
+                self.save_checkpoint()
+                if use_crit and self._stop:
+                    logger.info(f"Epoch #{self.epoch} model converged.")
+                    break
+                self.epoch += 1
+            except ValueError:
+                # load last checkpoint
+                self.init(
+                    lr=self.lr,
+                    nbatch_size=self.nbatch_size,
+                    fbatch_size=self.fbatch_size,
+                )
+                # change rng seed
+                new_seed = random.randint(0, 100)
+                pyro.set_rng_seed(new_seed)
+                logger.warning(f"Epoch #{self.epoch} new seed: {new_seed}.")
 
     def _max_batch_size(self):
         k = 0
@@ -269,7 +286,7 @@ class Model:
             self.writer.add_scalars("NEGATIVES", neg, self.epoch)
             self.writer.add_scalars("POSITIVES", pos, self.epoch)
 
-        logger.debug("Epoch #{}.".format(self.epoch))
+        logger.debug(f"Epoch #{self.epoch}: Successful.")
 
     def load_checkpoint(self, path=None, param_only=False, warnings=False):
         device = self.device
@@ -285,9 +302,7 @@ class Model:
             self.epoch = checkpoint["epoch"]
             self.optim.set_state(checkpoint["optimizer"])
             logger.info(
-                "Epoch #{}. Loaded model params and optimizer state from {}".format(
-                    self.epoch, path
-                )
+                f"Epoch #{self.epoch}. Loaded model params and optimizer state from {path}"
             )
         if warnings and not checkpoint["convergence_status"]:
             logger.warning(f"Model at {path} has not been fully trained")
