@@ -6,20 +6,14 @@ Models
 
 List of Tapqir models.
 
-cosmos
-^^^^^^
-
-.. autoclass:: tapqir.models.Cosmos
+.. automodule:: tapqir.models.cosmos
    :members:
    :show-inheritance:
 
 Distributions
 -------------
 
-KSMOGN
-^^^^^^
-
-.. autoclass:: tapqir.distributions.KSMOGN
+.. automodule:: tapqir.distributions.ksmogn
    :members:
    :show-inheritance:
 

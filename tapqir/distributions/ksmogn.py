@@ -1,6 +1,11 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
+"""
+KSMOGN
+^^^^^^
+"""
+
 from typing import Union
 
 import torch
