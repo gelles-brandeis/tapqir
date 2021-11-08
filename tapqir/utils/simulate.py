@@ -9,7 +9,27 @@ from pyroapi import handlers, pyro
 from tapqir.utils.dataset import CosmosDataset
 
 
-def simulate(model, N, F, P=14, seed=0, params=dict()):
+def simulate(
+    model: str,
+    N: int,
+    F: int,
+    C: int = 1,
+    P: int = 14,
+    seed: int = 0,
+    params: dict = dict(),
+) -> CosmosDataset:
+    """
+    Simulate a new dataset.
+
+    :param model: Tapqir model.
+    :param N: Number of total AOIs. Half will be on-target and half off-target.
+    :param F: Number of frames.
+    :param C: Number of color channels.
+    :param P: Number of pixels alongs the axis.
+    :param seed: Rng seed.
+    :param params: A dictionary of fixed parameter values.
+    """
+
     pyro.set_rng_seed(seed)
     pyro.clear_param_store()
 
@@ -53,8 +73,9 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
     target_locs = torch.full((N, F, 1, 2), (P - 1) / 2)
     is_ontarget = torch.zeros((N,), dtype=torch.bool)
     is_ontarget[: N // 2] = True
+    # placeholder dataset
     model.data = CosmosDataset(
-        torch.full((N, F, 1, P, P), params["background"] + params["offset"]),
+        torch.full((N, F, C, P, P), params["background"] + params["offset"]),
         target_locs,
         is_ontarget,
         None,
@@ -68,7 +89,7 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         handlers.uncondition(model.model), posterior_samples=samples, num_samples=1
     )
     samples = predictive()
-    data = torch.zeros(N, F, 1, P, P)
+    data = torch.zeros(N, F, C, P, P)
     labels = np.zeros((N // 2, F, 1), dtype=[("aoi", int), ("frame", int), ("z", bool)])
     labels["aoi"] = np.arange(N // 2).reshape(-1, 1, 1)
     labels["frame"] = np.arange(F).reshape(-1, 1)
@@ -80,7 +101,8 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         for f in range(F):
             data[:, f : f + 1, 0] = samples[f"data_{f}"][0].data.floor()
             labels["z"][:, f : f + 1, 0] = samples[f"theta_{f}"][0][: N // 2].cpu() > 0
-    model.data = CosmosDataset(
+
+    return CosmosDataset(
         data.cpu(),
         target_locs.cpu(),
         is_ontarget.cpu(),
@@ -89,5 +111,3 @@ def simulate(model, N, F, P=14, seed=0, params=dict()):
         offset_weights=torch.ones(3) / 3,
         device=model.device,
     )
-
-    return samples

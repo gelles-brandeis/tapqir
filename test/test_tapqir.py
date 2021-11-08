@@ -33,10 +33,10 @@ def dataset_path(tmp_path):
     P = 14
 
     model = Cosmos()
-    simulate(model, N, F, P, params=params)
+    data = simulate(model, N, F, P, params=params)
 
     # save data
-    save(model.data, tmp_path)
+    save(data, tmp_path)
     return tmp_path
 
 
