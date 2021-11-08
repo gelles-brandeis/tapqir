@@ -6,6 +6,10 @@ Models
 
 List of Tapqir models.
 
+.. automodule:: tapqir.models.model
+   :members:
+   :show-inheritance:
+
 .. automodule:: tapqir.models.cosmos
    :members:
    :show-inheritance:

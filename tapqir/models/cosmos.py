@@ -486,6 +486,9 @@ class Cosmos(Model):
                         )
 
     def init_parameters(self):
+        """
+        Initialize variational parameters.
+        """
         device = self.device
         data = self.data
         pyro.param(
@@ -630,6 +633,10 @@ class Cosmos(Model):
         pyro.param("m_probs", lambda: m_probs, constraint=constraints.unit_interval)
 
     def TraceELBO(self, jit=False):
+        """
+        A trace implementation of ELBO-based SVI that supports - exhaustive enumeration over
+        discrete sample sites, and - local parallel sampling over any sample site in the guide.
+        """
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=2, ignore_jit_warnings=True
         )
