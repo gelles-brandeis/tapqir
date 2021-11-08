@@ -28,6 +28,7 @@ def simulate(
     :param P: Number of pixels alongs the axis.
     :param seed: Rng seed.
     :param params: A dictionary of fixed parameter values.
+    :return: A new simulated data set.
     """
 
     pyro.set_rng_seed(seed)
