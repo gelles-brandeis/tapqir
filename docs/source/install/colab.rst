@@ -1,4 +1,4 @@
-Install in Google Colab
+Install on Google Colab
 =======================
 
 Colab notebooks start in a fresh environment and thus require installation for each new
