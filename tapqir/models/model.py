@@ -74,8 +74,8 @@ class Model:
         """
         Change tensor device and dtype.
 
-        :param device: Device, either "gpu" or "cpu".
-        :param dtype: Floating precision, either "double" or "float".
+        :param device: Computation device, either "gpu" or "cpu".
+        :param dtype: Floating point precision, either "double" or "float".
         """
         self.dtype = getattr(torch, dtype)
         self.device = torch.device(device)
