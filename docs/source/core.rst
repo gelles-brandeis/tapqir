@@ -22,3 +22,6 @@ KSMOGN
 .. autoclass:: tapqir.distributions.KSMOGN
    :members:
    :show-inheritance:
+
+.. automodule:: tapqir.distributions.util
+   :members:

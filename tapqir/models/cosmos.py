@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import math
+from typing import Union
 
 import torch
 import torch.distributions.constraints as constraints
@@ -11,7 +12,7 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import _gaussian_spots, probs_m, probs_theta
+from tapqir.distributions.util import gaussian_spots, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
@@ -25,26 +26,26 @@ class Cosmos(Model):
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
        bioRxiv. 2021 Oct. doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
 
-    :param int S: Number of distinct molecular states for the binder molecules.
-    :param int K: Maximum number of spots that can be present in a single image.
-    :param int channels: Number of color channels.
-    :param str device: Computation device (cpu or gpu).
-    :param str dtype: Floating point precision.
-    :param bool use_pykeops: Use pykeops as backend to marginalize out offset.
-    :param bool marginal: Marginalize out :math:`\theta` in the model.
+    :param S: Number of distinct molecular states for the binder molecules.
+    :param K: Maximum number of spots that can be present in a single image.
+    :param channels: Number of color channels.
+    :param device: Computation device (cpu or gpu).
+    :param dtype: Floating point precision.
+    :param use_pykeops: Use pykeops as backend to marginalize out offset.
+    :param marginal: Marginalize out :math:`\theta` in the model.
     """
 
     name = "cosmos"
 
     def __init__(
         self,
-        S=1,
-        K=2,
-        channels=(0,),
-        device="cpu",
-        dtype="double",
-        use_pykeops=True,
-        marginal=False,
+        S: int = 1,
+        K: int = 2,
+        channels: Union[tuple, list] = (0,),
+        device: str = "cpu",
+        dtype: str = "double",
+        use_pykeops: bool = True,
+        marginal: bool = False,
     ):
         super().__init__(S, K, channels, device, dtype)
         assert S == 1, "This is a single-state model!"
@@ -697,7 +698,7 @@ class Cosmos(Model):
             \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
             \text{ for } \theta_{nf} = k`
         """
-        weights = _gaussian_spots(
+        weights = gaussian_spots(
             torch.ones(1),
             self.params["d/width"]["Mean"],
             self.params["d/x"]["Mean"],
