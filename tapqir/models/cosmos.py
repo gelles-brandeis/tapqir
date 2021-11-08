@@ -19,7 +19,7 @@ class Cosmos(Model):
     r"""
     **Single-Color Time-Independent Colocalization Model**
 
-    Reference:
+    **Reference**:
 
     1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.

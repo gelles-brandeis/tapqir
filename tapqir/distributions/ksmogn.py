@@ -11,7 +11,7 @@ from .util import _gaussian_spots
 
 class KSMOGN(TorchDistribution):
     r"""
-    K Gaussian Spots, Marginal Offset, Gamma Noise Image Distribution.
+    K-Spots Marginalized Offset Gamma Noise Image Distribution.
 
     .. math::
         \mu^S_{\mathsf{pixelX}(i), \mathsf{pixelY}(j)} =
@@ -22,14 +22,14 @@ class KSMOGN(TorchDistribution):
         \mu^I = b + \sum_{\mathsf{spot}} \mu^S
 
     .. math::
-        p(D|\mu^I, g) = \sum_\delta \delta_\mathsf{weights}
+        p(D|\mu^I, g) = \sum_\delta p(\delta) p(D|\mu^I, g, \delta) = \sum_\delta \delta_\mathsf{weights}
         \cdot \mathrm{Gamma}(D - \delta_\mathsf{samples} | \mu^I, g)
 
-    Reference:
+    **Reference**:
 
     1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
-       bioRxiv. 2021 Oct. doi: 10.1101/2021.09.30.462536.
+       bioRxiv. 2021 Oct. doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
 
     :param torch.Tensor height: Integrated spot intensity. Should be broadcastable
         to ``(batch_shape, K)``.

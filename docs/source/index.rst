@@ -8,3 +8,4 @@ Tapqir Documentation
    install/index
    info
    commands/index
+   core
