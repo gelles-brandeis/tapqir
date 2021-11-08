@@ -129,7 +129,11 @@ def probs_theta(pi: float, S: int, K: int, dtype: torch.dtype) -> torch.Tensor:
 
     .. math::
 
-        p(\theta) = \mathbf{Categorical}\left(1 - \pi, \frac{\pi}{K}, \dots, \frac{\pi}{K}\right)
+        p(\theta) =
+        \begin{cases}
+            \mathbf{Categorical}\left(1 - \pi, \frac{\pi}{K}, \dots, \frac{\pi}{K}\right) & \textrm{if on-target} \\
+            \mathbf{Categorical}\left(1, 0, \dots, 0\right) & \textrm{if off-target}
+        \end{cases}
 
     :param pi: Average binding probability of target-specific binding.
     :param S: Number of distinct molecular states for the binder molecules.
