@@ -17,7 +17,7 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 
 from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import gaussian_spots, probs_m, probs_theta
+from tapqir.distributions.util import probs_m, probs_theta
 from tapqir.models.model import Model
 
 
@@ -308,7 +308,7 @@ class Cosmos(Model):
                 q(h | m) q(w | m) q(x | m) q(y | m) \right] \right]
             \end{aligned}
 
-        :math:`\theta` marginalized variation distribution:
+        :math:`\theta` marginalized variational distribution:
 
         .. math::
             \begin{aligned}
@@ -682,47 +682,3 @@ class Cosmos(Model):
                 "expose": ["theta_probs", "m_probs"],
             }
         return {"expose_types": ["sample", "param"]}
-
-    def snr(self):
-        r"""
-        Calculate the signal-to-noise ratio.
-
-        Total signal:
-
-            :math:`\mu_{knf} =  \sum_{ij} I_{nfij}
-            \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
-
-        Noise:
-
-            :math:`\sigma^2_{knf} = \sigma^2_{\text{offset}}
-            + \mu_{knf} \text{gain}`
-
-        Signal-to-noise ratio:
-
-            :math:`\text{SNR}_{knf} =
-            \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
-            \text{ for } \theta_{nf} = k`
-        """
-        weights = gaussian_spots(
-            torch.ones(1),
-            self.params["d/width"]["Mean"],
-            self.params["d/x"]["Mean"],
-            self.params["d/y"]["Mean"],
-            self.data.ontarget.xy[:, :, self.cdx, :].to(self.device),
-            self.data.ontarget.P,
-        )
-        signal = (
-            (
-                self.data.ontarget.images[:, :, self.cdx, :, :]
-                - self.params["d/background"]["Mean"][..., None, None]
-                - self.data.offset.mean
-            )
-            * weights
-        ).sum(dim=(-2, -1))
-        noise = (
-            self.data.offset.var
-            + self.params["d/background"]["Mean"] * self.params["gain"]["Mean"]
-        ).sqrt()
-        result = signal / noise
-        mask = self.theta_probs > 0.5
-        return result[mask]
