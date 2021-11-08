@@ -1,17 +1,44 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
+"""
+Distribution utility functions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""
+
 import math
 
 import torch
 
 
-def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
+def gaussian_spots(
+    height: torch.Tensor,
+    width: torch.Tensor,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    target_locs: torch.Tensor,
+    P: int,
+    m: torch.Tensor = None,
+) -> torch.Tensor:
     r"""
     Calculates ideal shape of the 2D-Gaussian spots given spot parameters
     and target positions.
 
-        :math:`\dfrac{h}{2 \pi \cdot w^2} \exp{\left( -\dfrac{(i-x)^2 + (j-y)^2}{2 \cdot w^2} \right)}`
+    .. math::
+        \mu^S_{\mathsf{pixelX}(i), \mathsf{pixelY}(j)} =
+        \dfrac{m \cdot h}{2 \pi w^2}
+        \exp{\left( -\dfrac{(i-x-x^\mathsf{target})^2 + (j-y-y^\mathsf{target})^2}{2 w^2} \right)}
+
+    :param height: Integrated spot intensity. Should be broadcastable to ``batch_shape``.
+    :param width: Spot width. Should be broadcastable to ``batch_shape``.
+    :param x: Spot center on x-axis. Should be broadcastable to ``batch_shape``.
+    :param y: Spot center on y-axis. Should be broadcastable to ``batch_shape``.
+    :param target_locs: Target location. Should have
+        the rightmost size ``2`` correspondnig to locations on
+        x- and y-axes, and be broadcastable to ``batch_shape + (2,)``.
+    :param P: Number of pixels along the axis.
+    :param m: Spot presence indicator. Should be broadcastable to ``batch_shape``.
+    :return: A tensor of a shape ``batch_shape + (P, P)`` representing 2D-Gaussian spots.
     """
     # create meshgrid of PxP pixel positions
     P_range = torch.arange(P)
@@ -35,16 +62,22 @@ def _gaussian_spots(height, width, x, y, target_locs, P, m=None):
     return height[..., None, None] * normalized_gaussian
 
 
-def truncated_poisson_probs(lamda, K, dtype):
+def truncated_poisson_probs(lamda: float, K: int, dtype: torch.dtype) -> torch.Tensor:
     r"""
-    Probability of the number of non-specific spots (TruncatedPoisson)
-    for cases when :math:`\theta = 0` and :math:`\theta `.
+    Probability of the number of non-specific spots.
 
     .. math::
-        \mathbf{TruncPoisson}(\lambda, K)
-        = 1 - e^{-\lambda} \sum_{i=0}^{K-1} \dfrac{\lambda^i}{i!} \mathrm{if } k = K
-        \mathrm{; }
-        \dfrac{\lambda^k e^{-\lambda}}{k!} \mathrm{otherwise}
+
+        \mathbf{TruncatedPoisson}(\lambda, K) =
+        \begin{cases}
+            1 - e^{-\lambda} \sum_{i=0}^{K-1} \dfrac{\lambda^i}{i!} & \textrm{if } k = K \\
+            \dfrac{\lambda^k e^{-\lambda}}{k!} & \mathrm{otherwise}
+        \end{cases}
+
+    :param lamda: Average rate of target-nonspecific binding.
+    :param K: Maximum number of spots that can be present in a single image.
+    :param dtype: return dtype
+    :return: A tensor of a shape ``(K+1,)`` of probabilities.
     """
     result = torch.zeros(K + 1, dtype=dtype)
     kdx = torch.arange(K)
@@ -53,13 +86,13 @@ def truncated_poisson_probs(lamda, K, dtype):
     return result
 
 
-def probs_m(lamda, S, K, dtype):
+def probs_m(lamda: float, S: int, K: int, dtype: torch.dtype) -> torch.Tensor:
     r"""
-    Spot presence probability :math:`p(m)`.
+    Spot presence probability :math:`p(m | \theta, \lambda)`.
 
     .. math::
 
-        p(m_{\mathsf{spot}(k)}) =
+        p(m_{\mathsf{spot}(k)} | \theta, \lambda) =
         \begin{cases}
             \mathbf{Bernoulli}(1) & \text{$\theta = k$} \\
             \mathbf{Bernoulli} \left( \sum_{l=1}^K
@@ -69,6 +102,12 @@ def probs_m(lamda, S, K, dtype):
                 \dfrac{l \cdot \mathbf{TruncPoisson}(l; \lambda, K-1)}{K-1} \right)
                 & \text{otherwise} \rule{0pt}{4ex}
         \end{cases}
+
+    :param lamda: Average rate of target-nonspecific binding.
+    :param S: Number of distinct molecular states for the binder molecules.
+    :param K: Maximum number of spots that can be present in a single image.
+    :param dtype: return dtype
+    :return: A tensor of a shape ``(1 + KS, K)`` of probabilities.
     """
     result = torch.zeros(1 + K * S, K, dtype=dtype)
     kdx = torch.arange(K)
@@ -84,16 +123,21 @@ def probs_m(lamda, S, K, dtype):
     return result
 
 
-def probs_theta(pi, S, K, dtype):
+def probs_theta(pi: float, S: int, K: int, dtype: torch.dtype) -> torch.Tensor:
     r"""
     Target-specific spot index probability :math:`p(\theta)`.
 
     .. math::
 
         p(\theta) = \mathbf{Categorical}\left(1 - \pi, \frac{\pi}{K}, \dots, \frac{\pi}{K}\right)
+
+    :param pi: Average binding probability of target-specific binding.
+    :param S: Number of distinct molecular states for the binder molecules.
+    :param K: Maximum number of spots that can be present in a single image.
+    :param dtype: return dtype
+    :return: A tensor of a shape ``(2, 1 + KS)`` of probabilities for off-target (``0``)
+        and on-target (``1``) AOI.
     """
-    # 0 (False) - offtarget
-    # 1 (True) - ontarget
     result = torch.zeros(2, K * S + 1, dtype=dtype)
     result[0, 0] = 1
     result[1, 0] = pi[0]
