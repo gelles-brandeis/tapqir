@@ -1,5 +1,5 @@
-Part II: Tapqir analysis
-========================
+Part II: Tapqir analysis (Linux)
+================================
 
 In this tutorial we will analyze the data from Rpb1-SNAP\ :sup:`549` binding to DNA\ :sup:`488`
 experiment (`Rosen et al., 2020`_).
