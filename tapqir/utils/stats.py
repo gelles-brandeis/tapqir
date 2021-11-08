@@ -22,20 +22,20 @@ from sklearn.metrics import (
 
 from tapqir.distributions import AffineBeta
 from tapqir.distributions.util import gaussian_spots
-from tapqir.utils.dataset import CosmosDataset
 
 
 def snr(
+    data: torch.Tensor,
     width: torch.Tensor,
     x: torch.Tensor,
     y: torch.Tensor,
     target_locs: torch.Tensor,
     background: torch.Tensor,
-    P: int,
-    data: CosmosDataset,
-    theta_probs: torch.Tensor,
-    cdx: int,
     gain: float,
+    offset_mean: float,
+    offset_var: float,
+    P: int,
+    theta_probs: torch.Tensor,
 ) -> torch.Tensor:
     r"""
     Calculate the signal-to-noise ratio.
@@ -64,14 +64,13 @@ def snr(
         width,
         x,
         y,
-        data.xy[:, :, cdx, :].to(width.device),
-        data.P,
+        target_locs,
+        P,
     )
-    signal = (
-        (data.images[:, :, cdx] - background[..., None, None] - data.offset.mean)
-        * weights
-    ).sum(dim=(-2, -1))
-    noise = (data.offset.var + background * gain).sqrt()
+    signal = ((data - background[..., None, None] - offset_mean) * weights).sum(
+        dim=(-2, -1)
+    )
+    noise = (offset_var + background * gain).sqrt()
     result = signal / noise
     mask = theta_probs > 0.5
     return result[mask]
@@ -232,18 +231,24 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.params = ci_stats
 
     # snr
-    #  if model.pspecific is not None:
-    #      summary.loc["SNR", "Mean"] = snr(
-    #              ci_stats["width"]["Mean"],
-    #              ci_stats["x"]["Mean"],
-    #              ci_stats["y"]["Mean"],
-    #              model.data.xy[:, :, model.cdx].to(model.device),
-    #              ci_stats["background"]["Mean"],
-    #              model.data,
-    #              model.theta_probs,
-    #              model.cdx,
-    #              ci_stats["gain"]["Mean"],
-    #              ).mean().item()
+    if model.pspecific is not None:
+        summary.loc["SNR", "Mean"] = (
+            snr(
+                model.data.images[:, :, model.cdx],
+                ci_stats["width"]["Mean"],
+                ci_stats["x"]["Mean"],
+                ci_stats["y"]["Mean"],
+                model.data.xy[:, :, model.cdx].to(model.device),
+                ci_stats["background"]["Mean"],
+                ci_stats["gain"]["Mean"],
+                model.data.offset.mean,
+                model.data.offset.var,
+                model.data.P,
+                model.theta_probs,
+            )
+            .mean()
+            .item()
+        )
 
     # classification statistics
     if model.pspecific is not None and model.data.labels is not None:
