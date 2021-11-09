@@ -4,26 +4,42 @@ General Information
 About Tapqir
 ------------
 
-Single-molecule fluorescence microscopy is widely used in vitro to study the biochemical and physical mechanisms of the protein and nucleic acid macromolecular “machines” that perform essential biological functions.  The simplest such technique is multi-wavelength colocalization, which is sometimes called CoSMoS (co-localization single-molecule spectroscopy).  In CoSMoS, formation and/or dissociation of molecular complexes is observed by total internal reflection fluorescence (TIRF) or other forms of single-molecule fluorescence microscopy by observing the colocalization of two or more macromolecular components each labeled with a different color of fluorescent dye.  Analysis of the dynamics observed in the microscope is then used to define the quantitative kinetic mechanism of the process being studied.
+Single-molecule fluorescence microscopy is widely used in vitro to study the biochemical and physical mechanisms
+of the protein and nucleic acid macromolecular “machines” that perform essential biological functions.  The simplest
+such technique is multi-wavelength colocalization, which is sometimes called CoSMoS (co-localization single-molecule
+spectroscopy).  In CoSMoS, formation and/or dissociation of molecular complexes is observed by total internal
+reflection fluorescence (TIRF) or other forms of single-molecule fluorescence microscopy by observing the colocalization
+of two or more macromolecular components each labeled with a different color of fluorescent dye.  Analysis of the dynamics
+observed in the microscope is then used to define the quantitative kinetic mechanism of the process being studied.
 
-Reliable analysis of CoSMoS data remains a significant challenge to the effective and more widespread use of the technique. Existing analysis methods are at least partially subjective and require painstaking manual tuning.  Data analysis is usually the slowest and most laborious part of a CoSMoS project.  
+Reliable analysis of CoSMoS data remains a significant challenge to the effective and more widespread use of the
+technique. Existing analysis methods are at least partially subjective and require painstaking manual tuning.
+Data analysis is usually the slowest and most laborious part of a CoSMoS project.  
 
-Tapqir is a computer program for rigorous statistical classification and analysis of image data from CoSMoS experiments.  The program has multiple advantageous features:
+Tapqir is a computer program for rigorous statistical classification and analysis of image data from CoSMoS experiments.
+The program has multiple advantageous features:
 
-•	Tapqir maximizes extraction of useful information by globally fitting experimental images to a causal probabilistic model that explicitly accounts for all important physical and chemical aspects of CoSMoS image formation. The fitting employs Bayesian inference, incorporating appropriate levels of prior knowledge (or lack of knowledge) for all parameters.
+* Tapqir maximizes extraction of useful information by globally fitting experimental images to a causal probabilistic
+  model that explicitly accounts for all important physical and chemical aspects of CoSMoS image formation. The fitting
+  employs Bayesian inference, incorporating appropriate levels of prior knowledge (or lack of knowledge) for all parameters.
 
-•	Existing methods produce a binary spot/no-spot classification that does not convey the uncertainties inherent in interpreting the low signal-to-noise single-molecule images.  Tapqir instead produces spot probability estimates that accurately convey experimental uncertainty at each individual time point.  These probability estimates can then be used to perform more reliable downstream kinetic and thermodynamic analyses. 
+* Existing methods produce a binary spot/no-spot classification that does not convey the uncertainties inherent in
+  interpreting the low signal-to-noise single-molecule images.  Tapqir instead produces spot probability estimates that
+  accurately convey experimental uncertainty at each individual time point.  These probability estimates can then be
+  used to perform more reliable downstream kinetic and thermodynamic analyses. 
 
-•	Tapqir has been thoroughly validated by measuring its performance on simulated image datasets.
+* Tapqir has been thoroughly validated by measuring its performance on simulated image datasets.
 
-•	Tapqir is a fully objective method; we have shown that it works without manual parameter tweaking on both simulated and experiment-derived data sets with a wide range of signal, noise, and non-specific binding characteristics. 
+* Tapqir is a fully objective method; we have shown that it works without manual parameter tweaking on both simulated and
+  experiment-derived data sets with a wide range of signal, noise, and non-specific binding characteristics. 
 
 Citation
 --------
 
-Initial development and validation of Tapqi is described in
+Initial development and validation of Tapqir is described in
 
 |DOI|
+
 Ordabayev YA, Friedman LJ, Gelles J, Theobald DL. *Bayesian machine learning analysis of single-molecule
 fluorescence colocalization images*. bioRxiv. 2021 Oct.
 
