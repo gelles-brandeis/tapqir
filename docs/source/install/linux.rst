@@ -30,7 +30,7 @@ Install on Linux
 .. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
 
 Install linux server tools (optional)
-==========================
+-------------------------------------
 
 Linux machines can be set up to run as servers for batch processing of Tapqir runs. This is optional
 and requires some linux sysadmin skills.  The following are short summary instructions for installing the server 
@@ -84,7 +84,6 @@ Finally, create ``/etc/slurm-llnl/gres.conf`` file by listing all gpu devices::
 
 Remote Desktop Server
 ~~~~~~~~~~~~~~~~~~~~~
-
 
 Install `xrdp <https://wiki.archlinux.org/index.php/Xrdp>`_ package on the Linux server machine.
 `Start/enable <https://wiki.archlinux.org/index.php/Systemd#Using_units>`_ ``xrdp.service`` and ``xrdp-sesman.service``.
