@@ -130,7 +130,7 @@ the intensity distribution histograms for offset and data from different channel
 offset median drift (offset distribution shouldn't change over time):
 
 .. image:: offset-medians.png
-   :width: 300
+   :width: 500
 
 Data analysis
 -------------
