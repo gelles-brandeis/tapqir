@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import tkinter.filedialog as fd
 from collections import defaultdict
 from enum import Enum
 from functools import partial
@@ -121,6 +122,12 @@ def glimpse(
         is_eager=True,
         callback=deactivate_prompts,
     ),
+    filepicker: bool = typer.Option(
+        False,
+        "--filepicker",
+        "-fp",
+        help="Use filepicker to select files.",
+    ),
 ):
     """
     Extract AOIs from raw glimpse images.
@@ -190,6 +197,7 @@ def glimpse(
                 "ontarget-labels",
             ]
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
+            last_folder = None
             for key in keys:
                 if key == "offtarget-aoiinfo":
                     offtarget = typer.confirm(
@@ -209,9 +217,44 @@ def glimpse(
                         if "ontarget-labels" in DEFAULTS["channels"][c]:
                             del DEFAULTS["channels"][c]["ontarget-labels"]
                         continue
-                DEFAULTS["channels"][c][key] = typer.prompt(
-                    desc[key], default=DEFAULTS["channels"][c][key]
-                )
+
+                # picker and options
+                options = {}
+                if key == "glimpse-folder" and filepicker:
+                    picker = fd.askdirectory
+                    options["title"] = desc[key]
+                    options["initialdir"] = DEFAULTS["channels"][c][key]
+                elif (
+                    key
+                    in [
+                        "ontarget-aoiinfo",
+                        "offtarget-aoiinfo",
+                        "driftlist",
+                        "ontarget-labels",
+                    ]
+                    and filepicker
+                ):
+                    picker = fd.askopenfilename
+                    options["title"] = desc[key]
+                    if DEFAULTS["channels"][c][key] is not None:
+                        options["initialdir"] = Path(
+                            DEFAULTS["channels"][c][key]
+                        ).parent
+                        options["initialfile"] = Path(DEFAULTS["channels"][c][key]).name
+                    else:
+                        options["initialdir"] = last_folder
+                else:
+                    picker = typer.prompt
+                    options["text"] = desc[key]
+                    options["default"] = DEFAULTS["channels"][c][key]
+
+                if key != "name" and filepicker:
+                    typer.echo(desc[key] + ": ")
+                DEFAULTS["channels"][c][key] = picker(**options)
+                if key != "name" and filepicker:
+                    typer.echo(DEFAULTS["channels"][c][key])
+                if key == "glimpse-folder":
+                    last_folder = Path(DEFAULTS["channels"][c][key]).parent
 
     DEFAULTS = dict(DEFAULTS)
     for i, channel in enumerate(DEFAULTS["channels"]):
