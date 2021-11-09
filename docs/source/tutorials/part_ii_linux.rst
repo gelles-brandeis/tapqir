@@ -1,11 +1,8 @@
 Part II: Tapqir analysis (Linux)
 ================================
 
-In this tutorial we will analyze the data from Rpb1-SNAP\ :sup:`549` binding to DNA\ :sup:`488`
-experiment (`Rosen et al., 2020`_).
-
-.. image:: cosmos_experiment.png
-   :width: 700
+In this tutorial we will use a linux computer to analyze the Data set A in `Orbadayev et al., 2021`_. The data
+are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `imscroll`_ (`Friedman et al., 2015`_).
 
 Set up the environment
 ----------------------
