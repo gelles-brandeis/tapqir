@@ -1,7 +1,7 @@
 Part II: Tapqir analysis (Linux)
 ================================
 
-In this tutorial we will use a linux computer to analyze the Data set A in `Orbadayev et al., 2021`_. The data
+In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2021`_. The data
 are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `imscroll`_ (`Friedman et al., 2015`_).
 
 Set up the environment
@@ -40,9 +40,9 @@ Preprocessing raw input data
 This data was acquired with `Glimpse`_ and pre-processed with `imscroll`_ program (`Friedman et al., 2015`_).
 Let's download data files using `wget`_ and then unzip files::
 
-  $ wget http://centaur.biochem.brandeis.edu/Rpb1SNAP549_glimpse.zip
-  $ unzip Rpb1SNAP549_glimpse.zip && rm Rpb1SNAP549_glimpse.zip
-  $ ls Rpb1SNAP549_glimpse
+  $ wget https://zenodo.org/record/5659927/files/DatasetA_glimpse.zip
+  $ unzip DatasetA_glimpse.zip && rm DatasetA_glimpse.zip
+  $ ls DatasetA_glimpse
 
   garosen00267  green_DNA_locations.dat  green_driftlist.dat  green_nonDNA_locations.dat
 
@@ -53,13 +53,13 @@ The raw input data are:
 * ``green_nonDNA_locations.dat`` - aoiinfo file designating off-target (nonDNA) locations in the binder channel
 * ``green_driftlist.dat`` - driftlist file recording the stage movement that took place during the experiment
 
-Extract AOIs from raw images using ``tapqir glimpse`` command which will run interactively::
+Extract AOIs from raw images using ``tapqir glimpse --filepicker`` command which will run interactively::
 
-  $ tapqir glimpse
+  $ tapqir glimpse --filepicker
 
   Dataset name: Rpb1SNAP549
-  AOI image size - number of pixels along the axis [14]: 14
-  Number of color channels [1]: 1
+  AOI image size - number of pixels along the axis [14]:
+  Number of color channels [1]:
   Overwrite defaults values? [Y/n]:
   Specify frame range? [y/N]: y
   First frame to include in the analysis: 1
@@ -68,16 +68,27 @@ Extract AOIs from raw images using ``tapqir glimpse`` command which will run int
   INPUTS FOR CHANNEL #0
 
   Channel name: SNAP549
-  Path to the header/glimpse folder: Rpb1SNAP549_glimpse/garosen00267
-  Path to the on-target AOI locations file: Rpb1SNAP549_glimpse/green_DNA_locations.dat
+  Path to the header/glimpse folder:
+  /tmp/tutorial/DatasetA_glimpse/garosen00267
+  Path to the on-target AOI locations file:
+  /tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat
   Add off-target AOI locations? [y/N]: y
-  Path to the off-target control AOI locations file: Rpb1SNAP549_glimpse/green_nonDNA_locations.dat
-  Path to the driftlist file: Rpb1SNAP549_glimpse/green_driftlist.dat
-  Add on-target labels? [y/N]:
+  Path to the off-target control AOI locations file:
+  /tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat
+  Path to the driftlist file:
+  /tmp/tutorial/DatasetA_glimpse/green_driftlist.dat
   INFO - Processing glimpse files ...
   100%|███████████████████████████████████| 790/790 [00:07<00:00, 109.28it/s]
   INFO - Dataset: N=857 AOIs, F=790 frames, C=1 channels, P=14 pixels, P=14 pixels
   INFO - Data is saved in /tmp/tutorial/data.tpqr
+
+``--filepicker`` flag tells the program to use a file dialog for file/folder selection:
+
+.. image:: glimpse_folder.png
+   :width: 300
+
+.. image:: DNA_locations.png
+   :width: 300
 
 .. note::
 
@@ -96,9 +107,8 @@ off-target control locations, the camera offset empirical distirbution samples a
     data.tpqr            offset-distribution.png  ontarget-channel0.png
     offset-channel0.png  offtarget-channel0.png   Rpb1SNAP549_glimpse
 
-Additionally the program has saved field of view (FOV) images displaying locations of on-target and off-target AOIs in the first frame,
-location from the dark corner of the image used to create the offset empirical distribution, and the offset empirical distribution histogram.
-Make sure that AOIs are *inside* of the FOV and offset is *outside* of the FOV.
+Additionally the program has saved field of view (FOV) images displaying locations of on-target and off-target AOIs in
+the first frame (make sure that AOIs are *inside* of the FOV):
 
 .. image:: ontarget-channel0.png
    :width: 700
@@ -106,11 +116,21 @@ Make sure that AOIs are *inside* of the FOV and offset is *outside* of the FOV.
 .. image:: offtarget-channel0.png
    :width: 700
 
+location from the dark corner of the image used to create the offset empirical distribution (make sure that offset region
+is *outside* of the FOV):
+
 .. image:: offset-channel0.png
    :width: 700
 
+the intensity distribution histograms for offset and data from different channels:
+
 .. image:: offset-distribution.png
    :width: 300
+
+offset median drift (offset distribution shouldn't change over time):
+
+.. image:: offset-medians.png
+   :width: 500
 
 Data analysis
 -------------
