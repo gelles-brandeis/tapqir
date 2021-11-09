@@ -1,12 +1,6 @@
 Install on Linux
 ================
 
-.. important::
-
-   We strongly recommend creating a virtual environment to encapsulate your
-   installation. Below we use a popular package manager Anaconda to create
-   and manage a virtual environment.
-
 1. `Install Anaconda`_ package manager.
 
 2. Create a new environment and give it a name (e.g., ``tapqir-env``)::
@@ -29,18 +23,18 @@ Install on Linux
     Cuda compilation tools, release 11.5, V11.5.50
     Build cuda_11.5.r11.5/compiler.30411180_0
 
-5. To install ``tapqir``, in the terminal run::
+5. Install ``tapqir``::
 
     $ pip install git+https://github.com/gelles-brandeis/tapqir.git
 
 .. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
 
+Install linux server tools (optional)
+-------------------------------------
 
-Set up a Slurm server (optional)
---------------------------------
-
-Linux machines can be set up to run as servers. Following is a short instruction
-for Arch Linux.
+Linux machines can be set up to run as servers for batch processing of Tapqir runs. This is optional
+and requires some linux sysadmin skills.  The following are short summary instructions for installing the server 
+tools on Arch Linux.
 
 ssh server
 ~~~~~~~~~~
@@ -96,6 +90,5 @@ Install `xrdp <https://wiki.archlinux.org/index.php/Xrdp>`_ package on the Linux
 
 .. note::
 
-    Connect from the University network or use VPN client.
     Use remote desktop program (`Remmina <https://wiki.archlinux.org/index.php/Remmina>`_ on Linux) to connect to the computer.
     At the login screen select xvnc display session.
