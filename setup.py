@@ -22,7 +22,7 @@ EXTRAS_REQUIRE = [
 ]
 # tests
 TEST_REQUIRE = [
-    "black",
+    "black[jupyter]",
     "flake8",
     "isort",
     "pytest",
@@ -33,9 +33,10 @@ TEST_REQUIRE = [
 DOCS_REQUIRE = [
     "IPython",
     "nbsphinx>=0.8.5",
-    "sphinx",
     "pydata_sphinx_theme",
-    "sphinx-argparse",
+    "sphinx",
+    "sphinx-autodoc-typehints",
+    "sphinx-click",
     "sphinx-gallery",
     "sphinx-panels",
 ]
@@ -54,18 +55,19 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "colorama",
-        "configparser",
-        "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
-        # "funsor==0.4.0",
+        "funsor==0.4.1",
         "future",
         "matplotlib",
         "pandas",
-        "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
+        "pykeops",
+        "pyro-ppl==1.7.0",
         "pyqtgraph",
         "PySide2",
+        "pyyaml",
         "scikit-learn",
         "scipy",
         "tensorboard",
+        "typer",
         "qtrangeslider",
     ],
     extras_require={
@@ -85,6 +87,6 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.main:main"],
+        "console_scripts": ["tapqir=tapqir.main:app"],
     },
 )

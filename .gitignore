@@ -10,4 +10,4 @@ tapqir.egg-info/
 
 # sphinx documentation
 docs/build/
-docs/source/examples/*ipynb
+docs/source/tutorials/*ipynb
