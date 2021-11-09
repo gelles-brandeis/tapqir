@@ -181,6 +181,7 @@ def read_glimpse(path, **kwargs):
     channels = kwargs.pop("channels")
 
     offsets = defaultdict(int)
+    offset_medians = []
     # iterate over channels
     data = defaultdict(list)
     target_xy = defaultdict(list)
@@ -259,6 +260,7 @@ def read_glimpse(path, **kwargs):
         for f, frame in enumerate(tqdm(glimpse.cumdrift.index)):
             img = glimpse[frame]
 
+            offset_medians.append(np.median(img[10:40, 10:40]))
             values, counts = np.unique(img[10:40, 10:40], return_counts=True)
             for value, count in zip(values, counts):
                 offsets[value] += count
@@ -339,8 +341,8 @@ def read_glimpse(path, **kwargs):
     )
     save(dataset, path)
 
-    plt.figure(figsize=(3, 3))
     # plot offset distribution
+    plt.figure(figsize=(3, 3))
     plt.bar(offset_samples, offset_weights, alpha=0.5, label="Offset")
     # plot data distribution for each channel
     for c in range(C):
@@ -356,6 +358,16 @@ def read_glimpse(path, **kwargs):
     plt.legend()
     plt.tight_layout()
     plt.savefig(path / "offset-distribution.png", dpi=300)
+
+    plt.figure(figsize=(5, 3))
+    plt.plot(offset_medians, label="Offset Median")
+    plt.title("Offset drift", fontsize=12)
+    plt.ylabel("Intensity", fontsize=12)
+    plt.xlabel("Frames", fontsize=12)
+    plt.ylim(offset_samples.min(), offset_samples.max())
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path / "offset-medians.png", dpi=300)
 
     logger.info(
         f"Dataset: N={dataset.N} AOIs, "

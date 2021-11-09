@@ -128,6 +128,12 @@ def glimpse(
         "-fp",
         help="Use filepicker to select files.",
     ),
+    labels: bool = typer.Option(
+        False,
+        "--labels",
+        "-l",
+        help="Add on-target binding labels.",
+    ),
 ):
     """
     Extract AOIs from raw glimpse images.
@@ -156,7 +162,6 @@ def glimpse(
     desc["ontarget-aoiinfo"] = "Path to the on-target AOI locations file"
     desc["offtarget-aoiinfo"] = "Path to the off-target control AOI locations file"
     desc["ontarget-labels"] = "On-target AOI binding labels"
-    desc["offtarget-labels"] = "Off-target AOI binding labels"
 
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
@@ -194,8 +199,12 @@ def glimpse(
                 "ontarget-aoiinfo",
                 "offtarget-aoiinfo",
                 "driftlist",
-                "ontarget-labels",
             ]
+            if labels:
+                keys += ["ontarget-labels"]
+            else:
+                if "ontarget-labels" in DEFAULTS["channels"][c]:
+                    del DEFAULTS["channels"][c]["ontarget-labels"]
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
             last_folder = None
             for key in keys:
@@ -208,17 +217,8 @@ def glimpse(
                         if "offtarget-aoiinfo" in DEFAULTS["channels"][c]:
                             del DEFAULTS["channels"][c]["offtarget-aoiinfo"]
                         continue
-                elif key == "ontarget-labels":
-                    labels = typer.confirm(
-                        "Add on-target labels?",
-                        default=("ontarget-labels" in DEFAULTS["channels"][c]),
-                    )
-                    if not labels:
-                        if "ontarget-labels" in DEFAULTS["channels"][c]:
-                            del DEFAULTS["channels"][c]["ontarget-labels"]
-                        continue
 
-                # picker and options
+                # picker (prompt or file dialog) and its options
                 options = {}
                 if key == "glimpse-folder" and filepicker:
                     picker = fd.askdirectory
@@ -248,12 +248,12 @@ def glimpse(
                     options["text"] = desc[key]
                     options["default"] = DEFAULTS["channels"][c][key]
 
+                # input
                 if key != "name" and filepicker:
                     typer.echo(desc[key] + ": ")
                 DEFAULTS["channels"][c][key] = picker(**options)
                 if key != "name" and filepicker:
                     typer.echo(DEFAULTS["channels"][c][key])
-                if key == "glimpse-folder":
                     last_folder = Path(DEFAULTS["channels"][c][key]).parent
 
     DEFAULTS = dict(DEFAULTS)
