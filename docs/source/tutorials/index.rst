@@ -10,20 +10,10 @@ for running on a linux system, and those labeled "colab" are Jupyter notebooks t
 on Google Colab.  See the General Information section for information about the requirements for running
 the software in each environment.
 
-Tutorials
----------
-
-.. nbgallery::
-   :caption: Tutorials
+.. toctree::
+   :titlesonly:
 
    part_i
-   linux_part_i
-
-Colab Tutorials
----------------
-
-.. nbgallery::
-   :caption: Colab Tutorials
-
-   tutorial_part_i
-   tutorial_part_ii
+   part_ii_linux
+   part_ii_colab
+   part_iii_colab

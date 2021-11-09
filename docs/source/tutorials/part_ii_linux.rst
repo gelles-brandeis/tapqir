@@ -1,7 +1,8 @@
-Part II: Tapqir analysis (linux)
-========================
+Part II: Tapqir analysis (Linux)
+================================
 
-In this tutorial we will use a linux computer to analyze the data from Data set A in Orbadayev et al. 2021. The data are taken from `Rosen et al., 2020`_ and have already been preprocesssed using imscroll (Friedman and Gelles).
+In this tutorial we will use a linux computer to analyze the Data set A in `Orbadayev et al., 2021`_. The data
+are taken from `Rosen et al., 2020`_ and have already been preprocesssed using imscroll (Friedman and Gelles).
 
 Set up the environment
 ----------------------
@@ -24,13 +25,11 @@ To start the analysis create an empty folder (here named ``tutorial``) and initi
   $ cd tutorial
   $ tapqir init
 
-  Tapqir is a Bayesian program for single-molecule data analysis.
+  Initialized Tapqir in the working directory.
   ---------------------------------------------------------------
   - Checkout the documentation: <https://tapqir.readthedocs.io/>
   - Get help on our forum: <https://github.com/gelles-brandeis/tapqir/discussions>
-  - Star us on GitHub: <https://github.com/gelles-brandeis/tapqir>
 
-  Initialized Tapqir in the working directory.
 
 ``tapqir init`` command has created a ``.tapqir`` sub-folder that will store internal files
 such as ``config.yml`` configuration file, ``loginfo`` logging file, and model checkpoints.

@@ -1,25 +1,26 @@
-Part I: Intro
-=============
+Part I: Intro (Generic)
+=======================
 
 Models
 ------
 
-Tapqir's most basic model, ``cosmos``, was developed for colocalization detection in a
-relatively simple binder-target single-molecule experiment. ``cosmos`` model is
-*time-independent* and *single-color*. Please checkout our preprint (`Ordabayev et al., 2021`_)
-for a comprehensive description of the ``cosmos`` model. Tapqir can be extended readily
-to more complex models. For example, we expect Tapqir to naturally extend to multi-state,
-multi-color, and kinetic analysis.
+Tapqir is a modular program that uses a chosen probabilistic model to interpret experimental data.
+There currently exists only a single model, ``cosmos``, developed for analysis of simple CoSMoS
+experiments. The ``cosmos`` model is for *time-independent* analysis of *single-channel* (i.e., one-binder)
+data sets. Our preprint (`Ordabayev et al., 2021`_) contains a comprehensive description of the
+``cosmos`` model. In the future, we plan to add addional models to Tapqir, for example to integrate
+hidden-Markov kinetic analysis or to handle global analysis with multiple wavelength channels.
 
-``cosmos`` is a *Bayesian* model, i.e. each model parameter has an associated probability
+Tapqir uses *Bayesian* models; this means that each model parameter has an associated probability
 distribution (uncertainty). For those who are interested, `Kinz-Thompson et al., 2021`_ is
 a nice read about Bayesian inference in the context of single-molecule data analysis.
 
 As a consequence of Bayesian inference, Tapqir computes for each frame of each AOI the *probability*
 :math:`p(\mathsf{specific})`, that a target-specific spot is present.
 
-``cosmos`` is a physics-informed model, i.e. model parameters have a physical interpretation.
-For *N* AOIs, *F* frames, and *K* spots model parameters are:
+``cosmos`` is a physics-informed model, i.e. model parameters have a physical meaning.
+For *N* AOIs per frame, *F* frames, and a maximum of *K* spots in each AOI in each frame, 
+Tapqir estimates the values of the ``cosmos`` parameters:
 
 +------------------------+-----------+-------------------------------------+
 | Parameter              | Shape     | Description                         |
@@ -49,12 +50,13 @@ For *N* AOIs, *F* frames, and *K* spots model parameters are:
 | ``background`` - |b|   | (N, F)    | background intensity                |
 +------------------------+-----------+-------------------------------------+
 | ``p(specific)`` - |ps| | (N, F)    | probability of there being          |
-|                        |           | a target-specific spot in the image |
+|                        |           | a target-specific spot in the AOI   |
 +------------------------+-----------+-------------------------------------+
 
-where shape provides dimensionality information about parameters, e.g., (1,) shape means
-a global parameter and ``height`` with (K, N, F) shape means that *each* spot for *each*
-AOI for *each* frame has an intensity parameter.
+where "shape" is the dimensionality of the parameters, e.g., (1,) shape means a scalar
+parameter and (K, N, F) shape means that *each* spot in *each* AOI in *each* frame
+has a separate value of the parameter. `Ordabayev et al., 2021`_ has a more detailed
+description of the parameters.
 
 .. |ps| replace:: :math:`p(\mathsf{specific})`
 .. |theta| replace:: :math:`\theta`
@@ -62,22 +64,13 @@ AOI for *each* frame has an intensity parameter.
 .. |ld| replace:: :math:`\lambda`
 .. |b| replace:: :math:`b`
 
-Backend
--------
-
-Tapqir's model is implemented in `Pyro`_, a Python-based probabilistic programming language
-(PPL) (`Bingham et al., 2019`_). Probabilistic programming is a relatively new paradigm in
-which probabilistic models are expressed in a high-level language that allows easy formulation,
-modification, and automated inference.
-
-Pyro relies on the `PyTorch`_ numeric library for vectorized math operations on GPU and automatic
-differentiation. We also use `KeOps`_ library for kernel operations on the GPU without memory overflow.
+The Tapqir command line interface is implemented in `Typer`_.
 
 Interface
 ---------
 
-Tapqir is a command-line application and needs to be run in the terminal (``$`` signifies a terminal prompt).
-Its command line interface is implemented in `Typer`_. The usage is ``tapqir COMMAND [OPTIONS]``. For example::
+Tapqir is a command-line application that runs in the terminal (``$`` signifies a terminal prompt in
+the information below). The usage is ``tapqir COMMAND [OPTIONS]``. For example::
 
     $ tapqir fit --model cosmos --cuda
 
@@ -93,7 +86,7 @@ Some options have a one-letter version as well. For example, both ``--help`` and
 ``tapqir --help`` will display an overall help and ``tapqir COMMAND --help`` will display
 a command-specific help that will show which options are available for that specific command.
 
-*Commands* are one of the:
+Commands have the following meanings:
 
 +------------------------+-----------------------------------+
 | Command                | Short description                 |
@@ -111,13 +104,13 @@ a command-specific help that will show which options are available for that spec
 | | ``$ tapqir log``     | Show logging info                 |
 +------------------------+-----------------------------------+
 
-Command *options* do not depend on their order. For command options that are not provided ``tapqir``
-will interactively ask for the missing value::
+Command *options* do not depend on their order. For command options that require specifying a value
+that are not provided ``tapqir`` will interactively ask for the missing value::
 
     Tapqir model [cosmos]: cosmos
 
 At the prompt, enter a new value by typing and then hit ENTER. To use a default value shown in ``[...]``
-brackets press ENTER. For yes/no prompts type ``y`` for yes and ``n`` for no and then hit ENTER.
+brackets, just press ENTER. For yes/no prompts type ``y`` for yes and ``n`` for no and then hit ENTER.
 The default for yes/no prompt is shown in capital::
 
     Run computations on GPU? [Y/n]: y
@@ -155,23 +148,28 @@ For a quick reference, some commonly used Linux commands:
 7. ``mv`` - Move or rename files. Usage is ``mv <from> <to>``.
 8. Use double ``[TAB]`` for command or filename completion.
 
-Raw input data
---------------
+Input data
+----------
 
 Tapqir analyzes a small area of interest (AOI) around each target or off-target location. AOIs (usually ``14x14`` pixels)
-are extracted from raw input data. Currently Tapqir supports raw input images in `Glimpse`_ format and pre-processed
-with the `imscroll`_ program:
+are extracted from raw input data. Currently Tapqir supports raw input images in `Glimpse`_ format and pre-processing
+information files from the `imscroll`_ program:
 
-* image data in glimpse format and header file
+* image data folder in glimpse format (contains glimpse.header file)
 * aoiinfo file designating the locations of target molecules (on-target AOIs) in the binder channel
 * (optional) aoiinfo file designating the off-target control locations (off-target AOIs) in the binder channel
 * driftlist file recording the stage movement that took place during the experiment
 
-We plan to extend the support to other data formats as well. Please start a `new issue`_ if you have a file format
-that is not supported yet.
+We plan to extend the support to other data formats. Please start a `new issue`_ if you would like to work with us 
+to extend support to file formats used in your processing pipeline.
 
 Workflow
 --------
+
+The following diagram shows the steps in a Tapqir data processing run (using the ``cosmos`` model), the Tapqir command
+used to run each step, and the input files used and output files produced (color highlights) in each step. All the
+Tapqir commands for a single processing run should be run in the same default working directory (``new_folder`` in
+the diagram) in order to keep the files associated with the run organized in a single location.
 
 .. image:: ../Tapqir_workflow.png
    :alt: Tapqir workflow
@@ -179,9 +177,6 @@ Workflow
 .. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536 
 .. _Kinz-Thompson et al., 2021: https://doi.org/10.1146/annurev-biophys-082120-103921
 .. _Bingham et al., 2019: https://jmlr.org/papers/v20/18-403.html
-.. _Pyro: https://pyro.ai/
-.. _PyTorch: https://pytorch.org/
-.. _KeOps: https://www.kernel-operations.io/keops/index.html
 .. _Typer: https://typer.tiangolo.com/
 .. _YAML: https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse

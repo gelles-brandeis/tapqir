@@ -21,6 +21,59 @@ from sklearn.metrics import (
 )
 
 from tapqir.distributions import AffineBeta
+from tapqir.distributions.util import gaussian_spots
+
+
+def snr(
+    data: torch.Tensor,
+    width: torch.Tensor,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    target_locs: torch.Tensor,
+    background: torch.Tensor,
+    gain: float,
+    offset_mean: float,
+    offset_var: float,
+    P: int,
+    theta_probs: torch.Tensor,
+) -> torch.Tensor:
+    r"""
+    Calculate the signal-to-noise ratio.
+
+    Total signal:
+
+    .. math::
+        \mu_{knf} =  \sum_{ij} I_{nfij}
+        \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
+
+    Noise:
+
+    .. math::
+        \sigma^2_{knf} = \sigma^2_{\text{offset}}
+        + \mu_{knf} \text{gain}`
+
+    Signal-to-noise ratio:
+
+    .. math::
+        \text{SNR}_{knf} =
+        \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
+        \text{ for } \theta_{nf} = k`
+    """
+    weights = gaussian_spots(
+        torch.ones(1),
+        width,
+        x,
+        y,
+        target_locs,
+        P,
+    )
+    signal = ((data - background[..., None, None] - offset_mean) * weights).sum(
+        dim=(-2, -1)
+    )
+    noise = (offset_var + background * gain).sqrt()
+    result = signal / noise
+    mask = theta_probs > 0.5
+    return result[mask]
 
 
 def save_stats(model, path, CI=0.95, save_matlab=False):
@@ -172,19 +225,34 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     if model.pspecific is not None:
         ci_stats["m_probs"] = model.m_probs.data.cpu()
         ci_stats["theta_probs"] = model.theta_probs.data.cpu()
-        ci_stats["j_probs"] = model.j_probs.data.cpu()
         ci_stats["p(specific)"] = model.pspecific.data.cpu()
-        ci_stats["z_map"] = model.z_map.data.cpu()
+        ci_stats["pspecific_map"] = model.pspecific_map.data.cpu()
 
     model.params = ci_stats
 
     # snr
-    #  if model.pspecific is not None:
-    #      summary.loc["SNR", "Mean"] = model.snr().mean().item()
+    if model.pspecific is not None:
+        summary.loc["SNR", "Mean"] = (
+            snr(
+                model.data.images[:, :, model.cdx],
+                ci_stats["width"]["Mean"],
+                ci_stats["x"]["Mean"],
+                ci_stats["y"]["Mean"],
+                model.data.xy[:, :, model.cdx].to(model.device),
+                ci_stats["background"]["Mean"],
+                ci_stats["gain"]["Mean"],
+                model.data.offset.mean,
+                model.data.offset.var,
+                model.data.P,
+                model.theta_probs,
+            )
+            .mean()
+            .item()
+        )
 
     # classification statistics
     if model.pspecific is not None and model.data.labels is not None:
-        pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
+        pred_labels = model.pspecific_map[model.data.is_ontarget].cpu().numpy().ravel()
         true_labels = model.data.labels["z"].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -234,9 +302,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                 if param in (
                     "m_probs",
                     "theta_probs",
-                    "j_probs",
                     "p(specific)",
-                    "z_map",
+                    "pspecific_map",
                 ):
                     ci_stats[param] = field.numpy()
                     continue

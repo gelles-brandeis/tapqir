@@ -3,8 +3,10 @@
 
 import logging
 import os
+import random
 from collections import deque
 from pathlib import Path
+from typing import Any, Union
 
 import numpy as np
 import pandas as pd
@@ -16,7 +18,6 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from torch.distributions.utils import lazy_property
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
@@ -35,11 +36,26 @@ class Model:
 
     * :meth:`model`
     * :meth:`guide`
+    * :meth:`init_parameters`
+    * :meth:`TraceELBO`
+
+    :param S: Number of distinct molecular states for the binder molecules.
+    :param K: Maximum number of spots that can be present in a single image.
+    :param channels: Number of color channels.
+    :param device: Computation device (cpu or gpu).
+    :param dtype: Floating point precision.
     """
 
-    def __init__(self, S=1, K=2, channels=(0,), device="cpu", dtype="double"):
-        self._S = S
-        self._K = K
+    def __init__(
+        self,
+        S: int = 1,
+        K: int = 2,
+        channels: Union[tuple, list] = (0,),
+        device: str = "cpu",
+        dtype: str = "double",
+    ):
+        self.S = S
+        self.K = K
         self.channels = channels
         self.nbatch_size = None
         self.fbatch_size = None
@@ -54,7 +70,13 @@ class Model:
         # set device & dtype
         self.to(device, dtype)
 
-    def to(self, device, dtype="double"):
+    def to(self, device: str, dtype: str = "double") -> None:
+        """
+        Change tensor device and dtype.
+
+        :param device: Computation device, either "gpu" or "cpu".
+        :param dtype: Floating point precision, either "double" or "float".
+        """
         self.dtype = getattr(torch, dtype)
         self.device = torch.device(device)
         if device == "cuda" and dtype == "double":
@@ -76,21 +98,13 @@ class Model:
         logger.info("Device - {}".format(self.device))
         logger.info("Floating precision - {}".format(self.dtype))
 
-    @lazy_property
-    def S(self):
-        r"""
-        Number of distinct molecular states for the binder molecules.
+    def load(self, path: Union[str, Path], data_only: bool = True) -> None:
         """
-        return self._S
+        Load data and optionally parameters from a specified path
 
-    @lazy_property
-    def K(self):
-        r"""
-        Maximum number of spots that can be present in a single image.
+        :param path: Path to Tapqir analysis folder.
+        :param data_only: Load only data or both data and parameters.
         """
-        return self._K
-
-    def load(self, path, data_only=True):
         # set path
         self.path = Path(path)
         self.run_path = self.path / ".tapqir"
@@ -107,12 +121,6 @@ class Model:
                 self.path / f"{self.full_name}-summary.csv", index_col=0
             )
 
-    def TraceELBO(self, jit):
-        """
-        A trace implementation of ELBO-based SVI.
-        """
-        raise NotImplementedError
-
     def model(self):
         """
         Generative Model
@@ -121,11 +129,38 @@ class Model:
 
     def guide(self):
         """
-        Variational Model
+        Variational Distribution
         """
         raise NotImplementedError
 
-    def init(self, lr=0.005, nbatch_size=5, fbatch_size=1000, jit=False):
+    def TraceELBO(self, jit):
+        """
+        A trace implementation of ELBO-based SVI.
+        """
+        raise NotImplementedError
+
+    def init_parameters(self):
+        """
+        Initialize variational parameters.
+        """
+        raise NotImplementedError
+
+    def init(
+        self,
+        lr: float = 0.005,
+        nbatch_size: int = 5,
+        fbatch_size: int = 1000,
+        jit: bool = False,
+    ) -> None:
+        """
+        Initialize SVI object.
+
+        :param lr: Learning rate.
+        :param nbatch_size: AOI batch size.
+        :param fbatch_size: Frame batch size.
+        :param jit: Use JIT compiler.
+        """
+        self.lr = lr
         self.optim_fn = optim.Adam
         self.optim_args = {"lr": lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
@@ -153,7 +188,13 @@ class Model:
         logger.info("AOI batch size - {}".format(self.nbatch_size))
         logger.info("Frame batch size - {}".format(self.fbatch_size))
 
-    def run(self, num_epochs=0, nrange=trange):
+    def run(self, num_epochs: int = 0, nrange: Any = trange):
+        """
+        Run inference procedure.
+
+        :param num_epochs: Number of epochs.
+        :param nrange: Progress bar.
+        """
         slurm = os.environ.get("SLURM_JOB_ID")
         if slurm is not None:
             nrange = range
@@ -162,20 +203,35 @@ class Model:
         use_crit = False
         if not num_epochs:
             use_crit = True
-            num_epochs = 1000
+            num_epochs = 50000
         for i in nrange(num_epochs):
-            losses = []
-            for ndx in torch.split(torch.randperm(self.data.N), self.nbatch_size):
-                for fdx in torch.split(torch.randperm(self.data.F), self.fbatch_size):
-                    self.n = ndx
-                    self.f = fdx
-                    losses.append(self.svi.step())
-            self.epoch_loss = sum(losses) / len(losses)
-            self.save_checkpoint()
-            if use_crit and self._stop:
-                logger.info("Epoch #{} model converged.".format(self.epoch))
-                break
-            self.epoch += 1
+            try:
+                losses = []
+                for ndx in torch.split(torch.randperm(self.data.N), self.nbatch_size):
+                    for fdx in torch.split(
+                        torch.randperm(self.data.F), self.fbatch_size
+                    ):
+                        self.n = ndx
+                        self.f = fdx
+                        # with torch.autograd.detect_anomaly():
+                        losses.append(self.svi.step())
+                self.epoch_loss = sum(losses) / len(losses)
+                self.save_checkpoint()
+                if use_crit and self._stop:
+                    logger.info(f"Epoch #{self.epoch} model converged.")
+                    break
+                self.epoch += 1
+            except ValueError:
+                # load last checkpoint
+                self.init(
+                    lr=self.lr,
+                    nbatch_size=self.nbatch_size,
+                    fbatch_size=self.fbatch_size,
+                )
+                # change rng seed
+                new_seed = random.randint(0, 100)
+                pyro.set_rng_seed(new_seed)
+                logger.warning(f"Epoch #{self.epoch} new seed: {new_seed}.")
 
     def _max_batch_size(self):
         k = 0
@@ -247,7 +303,9 @@ class Model:
                 self.writer.add_scalars(name, scalars, self.epoch)
 
         if self.pspecific is not None and self.data.labels is not None:
-            pred_labels = self.z_map[self.data.is_ontarget].cpu().numpy().ravel()
+            pred_labels = (
+                self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
+            )
             true_labels = self.data.labels["z"].ravel()
 
             metrics = {}
@@ -267,9 +325,21 @@ class Model:
             self.writer.add_scalars("NEGATIVES", neg, self.epoch)
             self.writer.add_scalars("POSITIVES", pos, self.epoch)
 
-        logger.debug("Epoch #{}.".format(self.epoch))
+        logger.debug(f"Epoch #{self.epoch}: Successful.")
 
-    def load_checkpoint(self, path=None, param_only=False, warnings=False):
+    def load_checkpoint(
+        self,
+        path: Union[str, Path] = None,
+        param_only: bool = False,
+        warnings: bool = False,
+    ):
+        """
+        Load checkpoint.
+
+        :param path: Path to model checkpoint.
+        :param param_only: Load only parameters.
+        :param warnings: Give warnings if loaded model has not been fully trained.
+        """
         device = self.device
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
@@ -283,14 +353,18 @@ class Model:
             self.epoch = checkpoint["epoch"]
             self.optim.set_state(checkpoint["optimizer"])
             logger.info(
-                "Epoch #{}. Loaded model params and optimizer state from {}".format(
-                    self.epoch, path
-                )
+                f"Epoch #{self.epoch}. Loaded model params and optimizer state from {path}"
             )
         if warnings and not checkpoint["convergence_status"]:
             logger.warning(f"Model at {path} has not been fully trained")
 
-    def compute_stats(self, CI=0.95, save_matlab=False):
+    def compute_stats(self, CI: float = 0.95, save_matlab: bool = False):
+        """
+        Compute credible regions (CI) and other stats.
+
+        :param CI: credible region.
+        :param save_matlab: Save output in Matlab format as well.
+        """
         save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
         if self.path is not None:
             logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")

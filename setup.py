@@ -33,8 +33,9 @@ TEST_REQUIRE = [
 DOCS_REQUIRE = [
     "IPython",
     "nbsphinx>=0.8.5",
-    "sphinx",
     "pydata_sphinx_theme",
+    "sphinx",
+    "sphinx-autodoc-typehints",
     "sphinx-click",
     "sphinx-gallery",
     "sphinx-panels",
