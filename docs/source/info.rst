@@ -53,7 +53,6 @@ This project is licensed under the `Apache License 2.0 <https://www.apache.org/l
 By submitting a pull request to this project, you agree to license your contribution under the Apache
 License 2.0 to this project.
 
-
 Backend
 -------
 
@@ -65,11 +64,6 @@ modification, and automated inference.
 Pyro relies on the `PyTorch`_ numeric library for vectorized math operations on GPU and
 automatic differentiation. We also use `KeOps`_ library for kernel operations on the GPU
 without memory overflow.
-
-
-
-
-
 
 .. _Bingham et al., 2019: https://jmlr.org/papers/v20/18-403.html
 .. _Pyro: https://pyro.ai/
