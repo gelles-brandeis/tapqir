@@ -15,8 +15,8 @@ Set up the environment
 
    $ conda activate tapqir-env
 
-Create & initialize Tapqir analysis folder
-------------------------------------------
+Initialize folder
+-----------------
 
 To start the analysis create an empty folder (here named ``tutorial``) and initialize it by running
 ``tapqir init`` inside the new folder::
@@ -34,17 +34,14 @@ To start the analysis create an empty folder (here named ``tutorial``) and initi
 ``tapqir init`` command has created a ``.tapqir`` sub-folder that will store internal files
 such as ``config.yml`` configuration file, ``loginfo`` logging file, and model checkpoints.
 
-Preprocessing raw input data
-----------------------------
+Download input data
+-------------------
 
 This data was acquired with `Glimpse`_ and pre-processed with `imscroll`_ program (`Friedman et al., 2015`_).
 Let's download data files using `wget`_ and then unzip files::
 
   $ wget https://zenodo.org/record/5659927/files/DatasetA_glimpse.zip
   $ unzip DatasetA_glimpse.zip && rm DatasetA_glimpse.zip
-  $ ls DatasetA_glimpse
-
-  garosen00267  green_DNA_locations.dat  green_driftlist.dat  green_nonDNA_locations.dat
 
 The raw input data are:
 
@@ -53,7 +50,11 @@ The raw input data are:
 * ``green_nonDNA_locations.dat`` - aoiinfo file designating off-target (nonDNA) locations in the binder channel
 * ``green_driftlist.dat`` - driftlist file recording the stage movement that took place during the experiment
 
-Extract AOIs from raw images using ``tapqir glimpse --filepicker`` command which will run interactively::
+Extract AOIs
+------------
+
+Extract AOIs from raw images using ``tapqir glimpse --filepicker`` command (``--filepicker`` flag tells
+the program to use a file dialog for file/folder selection) which will run interactively::
 
   $ tapqir glimpse --filepicker
 
@@ -65,39 +66,53 @@ Extract AOIs from raw images using ``tapqir glimpse --filepicker`` command which
   First frame to include in the analysis: 1
   Last frame to include in the analysis: 790
 
-  INPUTS FOR CHANNEL #0
+Above we specified a dataset name (``Rpb1SNAP549``), size of AOI images (we recommend to use ``14`` pixels),
+first and last frames included in the analysis (``1`` and ``790``), and the number of color channels (``1``).
+If starting and ending frames are not specified then the full range of frames from the driftlist file will be analyzed.
 
-  Channel name: SNAP549
-  Path to the header/glimpse folder:
-  /tmp/tutorial/DatasetA_glimpse/garosen00267
-  Path to the on-target AOI locations file:
-  /tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat
-  Add off-target AOI locations? [y/N]: y
-  Path to the off-target control AOI locations file:
-  /tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat
-  Path to the driftlist file:
-  /tmp/tutorial/DatasetA_glimpse/green_driftlist.dat
-  INFO - Processing glimpse files ...
-  100%|███████████████████████████████████| 790/790 [00:07<00:00, 109.28it/s]
-  INFO - Dataset: N=857 AOIs, F=790 frames, C=1 channels, P=14 pixels, P=14 pixels
-  INFO - Data is saved in /tmp/tutorial/data.tpqr
-
-``--filepicker`` flag tells the program to use a file dialog for file/folder selection:
-
-.. image:: glimpse_folder.png
-   :width: 300
-
-.. image:: DNA_locations.png
-   :width: 300
+Next, the program asks the locations of input files for each color channel (only one color channel in this example):
 
 .. note::
 
    In Python indexing starts with 0. We stick to this convention and index AOIs, frames, color channels, and
    pixels starting with 0.
 
-Apart from files above mentioned we also specified a dataset name (``Rpb1SNAP549``), size of AOI images (we recommend to
-use ``14`` pixels), first and last frames included in the analysis (``1`` and ``790``), and the number of color channels (``1``).
-If starting and ending frames are not specified then the full range of frames from the driftlist file will be analyzed.
+.. code-block::
+
+  INPUTS FOR CHANNEL #0
+
+  Channel name: SNAP549
+  Path to the header/glimpse folder:
+  /tmp/tutorial/DatasetA_glimpse/garosen00267
+
+.. image:: glimpse_folder.png
+   :width: 400
+
+.. code-block::
+
+  Path to the on-target AOI locations file:
+  /tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat
+
+.. image:: DNA_locations.png
+   :width: 400
+
+.. code-block::
+
+  Add off-target AOI locations? [y/N]: y
+  Path to the off-target control AOI locations file:
+  /tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat
+  Path to the driftlist file:
+  /tmp/tutorial/DatasetA_glimpse/green_driftlist.dat
+
+Above we tell the program to include off-target AOI locations in the analysis and specify the file location using
+the file dialog. Last, we specify the location of the driftlist file.
+
+.. code-block::
+
+  INFO - Processing glimpse files ...
+  100%|███████████████████████████████████| 790/790 [00:07<00:00, 109.28it/s]
+  INFO - Dataset: N=857 AOIs, F=790 frames, C=1 channels, P=14 pixels, P=14 pixels
+  INFO - Data is saved in /tmp/tutorial/data.tpqr
 
 The program has outputted ``data.tpqr`` file containing extracted AOIs, target and
 off-target control locations, the camera offset empirical distirbution samples and weights::
@@ -105,10 +120,12 @@ off-target control locations, the camera offset empirical distirbution samples a
     $ ls
 
     data.tpqr            offset-distribution.png  ontarget-channel0.png
-    offset-channel0.png  offtarget-channel0.png   Rpb1SNAP549_glimpse
+    offset-channel0.png  offtarget-channel0.png   DatasetA_glimpse
 
-Additionally the program has saved field of view (FOV) images displaying locations of on-target and off-target AOIs in
-the first frame (make sure that AOIs are *inside* of the FOV):
+Additionally the program has saved
+
+* field of view (FOV) images (``ontarget-channel0.png`` and ``offtarget-channel0.png``)
+  displaying locations of on-target and off-target AOIs in the first frame (make sure that AOIs are *inside* of the FOV):
 
 .. image:: ontarget-channel0.png
    :width: 700
@@ -116,26 +133,26 @@ the first frame (make sure that AOIs are *inside* of the FOV):
 .. image:: offtarget-channel0.png
    :width: 700
 
-location from the dark corner of the image used to create the offset empirical distribution (make sure that offset region
-is *outside* of the FOV):
+* Location from the dark corner of the image (``off-channel0.png``) used to create the offset empirical distribution
+  (make sure that offset region is *outside* of the FOV):
 
 .. image:: offset-channel0.png
    :width: 700
 
-the intensity distribution histograms for offset and data from different channels:
+* The intensity distribution histograms for offset and data from different channels (``offset-distribution.png``):
 
 .. image:: offset-distribution.png
    :width: 300
 
-offset median drift (offset distribution shouldn't change over time):
+* Offset median drift (offset distribution shouldn't change over time) (``offset-medians.png``):
 
 .. image:: offset-medians.png
    :width: 500
 
-Data analysis
--------------
+Fit the data
+------------
 
-Now the data is ready for analysis. We will first fit the data to the time-independent ``cosmos`` model (`Ordabayev et al., 2021`).
+Now the data is ready for analysis. We will first fit the data to the time-independent ``cosmos`` model (`Ordabayev et al., 2021`_).
 
 .. note::
    We use variational inference to fit the model. For a better convergence we marginalize out :math:`\theta` parameter

@@ -4,8 +4,8 @@ Tapqir Documentation
 .. toctree::
    :maxdepth: 2
 
+   info
    tutorials/index
    install/index
-   info
    commands/index
    core
