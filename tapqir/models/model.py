@@ -265,40 +265,37 @@ class Model:
             self.run_path / f"{self.full_name}-model.tpqr",
         )
 
-        if writer is not None:
-            # save global paramters for tensorboard
-            writer.add_scalar("-ELBO", self.iter_loss, self.iter)
-            for name, val in pyro.get_param_store().items():
-                if val.dim() == 0:
-                    writer.add_scalar(name, val.item(), self.iter)
-                elif val.dim() == 1 and len(val) <= self.S + 1:
-                    scalars = {str(i): v.item() for i, v in enumerate(val)}
-                    writer.add_scalars(name, scalars, self.iter)
+        # save global paramters for tensorboard
+        writer.add_scalar("-ELBO", self.iter_loss, self.iter)
+        for name, val in pyro.get_param_store().items():
+            if val.dim() == 0:
+                writer.add_scalar(name, val.item(), self.iter)
+            elif val.dim() == 1 and len(val) <= self.S + 1:
+                scalars = {str(i): v.item() for i, v in enumerate(val)}
+                writer.add_scalars(name, scalars, self.iter)
 
-            if self.pspecific is not None and self.data.labels is not None:
-                pred_labels = (
-                    self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
-                )
-                true_labels = self.data.labels["z"].ravel()
+        if self.pspecific is not None and self.data.labels is not None:
+            pred_labels = (
+                self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
+            )
+            true_labels = self.data.labels["z"].ravel()
 
-                metrics = {}
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
-                metrics["Recall"] = recall_score(
-                    true_labels, pred_labels, zero_division=0
-                )
-                metrics["Precision"] = precision_score(
-                    true_labels, pred_labels, zero_division=0
-                )
+            metrics = {}
+            with np.errstate(divide="ignore", invalid="ignore"):
+                metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
+            metrics["Recall"] = recall_score(true_labels, pred_labels, zero_division=0)
+            metrics["Precision"] = precision_score(
+                true_labels, pred_labels, zero_division=0
+            )
 
-                neg, pos = {}, {}
-                neg["TN"], neg["FP"], pos["FN"], pos["TP"] = confusion_matrix(
-                    true_labels, pred_labels, labels=(0, 1)
-                ).ravel()
+            neg, pos = {}, {}
+            neg["TN"], neg["FP"], pos["FN"], pos["TP"] = confusion_matrix(
+                true_labels, pred_labels, labels=(0, 1)
+            ).ravel()
 
-                writer.add_scalars("ACCURACY", metrics, self.iter)
-                writer.add_scalars("NEGATIVES", neg, self.iter)
-                writer.add_scalars("POSITIVES", pos, self.iter)
+            writer.add_scalars("ACCURACY", metrics, self.iter)
+            writer.add_scalars("NEGATIVES", neg, self.iter)
+            writer.add_scalars("POSITIVES", pos, self.iter)
 
         logger.debug(f"Iteration #{self.iter}: Successful.")
 
