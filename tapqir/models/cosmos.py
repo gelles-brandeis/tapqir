@@ -151,15 +151,13 @@ class Cosmos(Model):
             \end{aligned}
         """
         # global parameters
-        gain = pyro.sample("gain", dist.HalfNormal(50)).squeeze()
-        pi = pyro.sample(
-            "pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
-        ).squeeze()
-        lamda = pyro.sample("lamda", dist.Exponential(1)).squeeze()
-        proximity = pyro.sample("proximity", dist.Exponential(1)).squeeze()
+        gain = pyro.sample("gain", dist.HalfNormal(50))
+        pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
+        lamda = pyro.sample("lamda", dist.Exponential(1))
+        proximity = pyro.sample("proximity", dist.Exponential(1))
         size = torch.stack(
             (
-                torch.tensor(2.0),
+                torch.full_like(proximity, 2.0),
                 (((self.data.P + 1) / (2 * proximity)) ** 2 - 1),
             ),
             dim=-1,
@@ -205,8 +203,8 @@ class Cosmos(Model):
                     theta = pyro.sample(
                         "theta",
                         dist.Categorical(
-                            probs_theta(pi, self.S, self.K, self.dtype)[
-                                is_ontarget.long()
+                            Vindex(probs_theta(pi, self.S, self.K))[
+                                ..., is_ontarget.long(), :
                             ]
                         ),
                     )
@@ -214,8 +212,8 @@ class Cosmos(Model):
                     theta = pyro.sample(
                         "theta",
                         dist.Categorical(
-                            probs_theta(pi, self.S, self.K, self.dtype)[
-                                is_ontarget.long()
+                            Vindex(probs_theta(pi, self.S, self.K))[
+                                ..., is_ontarget.long(), :
                             ]
                         ),
                         infer={"enumerate": "parallel"},
@@ -228,9 +226,7 @@ class Cosmos(Model):
                     m = pyro.sample(
                         f"m_{kdx}",
                         dist.Bernoulli(
-                            Vindex(probs_m(lamda, self.S, self.K, self.dtype))[
-                                theta, kdx
-                            ]
+                            Vindex(probs_m(lamda, self.S, self.K))[..., theta, kdx]
                         ),
                     )
                     with handlers.mask(mask=m > 0):
@@ -252,7 +248,7 @@ class Cosmos(Model):
                             f"x_{kdx}",
                             AffineBeta(
                                 0,
-                                size[specific],
+                                Vindex(size)[..., specific],
                                 -(self.data.P + 1) / 2,
                                 (self.data.P + 1) / 2,
                             ),
@@ -261,7 +257,7 @@ class Cosmos(Model):
                             f"y_{kdx}",
                             AffineBeta(
                                 0,
-                                size[specific],
+                                Vindex(size)[..., specific],
                                 -(self.data.P + 1) / 2,
                                 (self.data.P + 1) / 2,
                             ),
