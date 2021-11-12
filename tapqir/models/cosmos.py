@@ -409,7 +409,7 @@ class Cosmos(Model):
                     # sample spot presence m
                     if self._classify:
                         m_probs = Vindex(pyro.param("m_probs"))[
-                            theta, kdx, ndx[:, None], fdx
+                            theta, kdx, ndx[:, None], fdx, 1
                         ].to(self.device)
                     else:
                         m_probs = torch.einsum(
@@ -419,6 +419,7 @@ class Cosmos(Model):
                                 kdx,
                                 ndx[:, None],
                                 fdx,
+                                1,
                             ].to(self.device),
                             Vindex(pyro.param("theta_probs"))[ndx[:, None], fdx, :].to(
                                 self.device
@@ -619,18 +620,17 @@ class Cosmos(Model):
             lambda: theta_probs,
             constraint=constraints.simplex,
         )
-        m_probs = (
-            torch.ones(
-                1 + self.K * self.S,
-                self.K,
-                data.N,
-                data.F,
-                device=device,
-            )
-            / 2
+        m_probs = torch.ones(
+            1 + self.K * self.S,
+            self.K,
+            data.N,
+            data.F,
+            2,
+            device=device,
         )
-        m_probs[torch.arange(self.K) + 1, torch.arange(self.K)] = 1
-        pyro.param("m_probs", lambda: m_probs, constraint=constraints.unit_interval)
+        m_probs[1, 0, :, :, 0] = 0
+        m_probs[2, 1, :, :, 0] = 0
+        pyro.param("m_probs", lambda: m_probs, constraint=constraints.simplex)
 
     def TraceELBO(self, jit=False):
         """
@@ -655,7 +655,7 @@ class Cosmos(Model):
         """
         return torch.einsum(
             "sknf,nfs->knf",
-            pyro.param("m_probs").data,
+            pyro.param("m_probs").data[..., 1],
             pyro.param("theta_probs").data,
         )
 
