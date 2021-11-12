@@ -62,7 +62,7 @@ def gaussian_spots(
     return height[..., None, None] * normalized_gaussian
 
 
-def truncated_poisson_probs(lamda: float, K: int, dtype: torch.dtype) -> torch.Tensor:
+def truncated_poisson_probs(lamda: torch.Tensor, K: int) -> torch.Tensor:
     r"""
     Probability of the number of non-specific spots.
 
@@ -76,17 +76,20 @@ def truncated_poisson_probs(lamda: float, K: int, dtype: torch.dtype) -> torch.T
 
     :param lamda: Average rate of target-nonspecific binding.
     :param K: Maximum number of spots that can be present in a single image.
-    :param dtype: return dtype
-    :return: A tensor of a shape ``(K+1,)`` of probabilities.
+    :return: A tensor of a shape ``lamda.shape + (K+1,)`` of probabilities.
     """
-    result = torch.zeros(K + 1, dtype=dtype)
+    shape = lamda.shape + (K + 1,)
+    dtype = lamda.dtype
+    result = torch.zeros(shape, dtype=dtype)
     kdx = torch.arange(K)
-    result[:-1] = torch.exp(kdx.xlogy(lamda) - lamda - (kdx + 1).lgamma())
-    result[-1] = 1 - result[:-1].sum()
+    result[..., :-1] = torch.exp(
+        kdx.xlogy(lamda.unsqueeze(-1)) - lamda.unsqueeze(-1) - (kdx + 1).lgamma()
+    )
+    result[..., -1] = 1 - result[..., :-1].sum(-1)
     return result
 
 
-def probs_m(lamda: float, S: int, K: int, dtype: torch.dtype) -> torch.Tensor:
+def probs_m(lamda: torch.Tensor, S: int, K: int) -> torch.Tensor:
     r"""
     Spot presence probability :math:`p(m | \theta, \lambda)`.
 
@@ -106,24 +109,27 @@ def probs_m(lamda: float, S: int, K: int, dtype: torch.dtype) -> torch.Tensor:
     :param lamda: Average rate of target-nonspecific binding.
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param dtype: return dtype
-    :return: A tensor of a shape ``(1 + KS, K)`` of probabilities.
+    :return: A tensor of a shape ``lamda.shape + (1 + KS, K)`` of probabilities.
     """
-    result = torch.zeros(1 + K * S, K, dtype=dtype)
+    shape = lamda.shape + (1 + K * S, K)
+    dtype = lamda.dtype
+    result = torch.zeros(shape, dtype=dtype)
     kdx = torch.arange(K)
-    tr_pois_km1 = truncated_poisson_probs(lamda, K - 1, dtype)
+    tr_pois_km1 = truncated_poisson_probs(lamda, K - 1)
     km1 = torch.arange(1, K)
-    result[:, :] = (km1 * tr_pois_km1[km1]).sum() / (K - 1)
+    result[..., :, :] = (km1 * tr_pois_km1[..., km1]).sum(-1).unsqueeze(-1).unsqueeze(
+        -1
+    ) / (K - 1)
     # theta == 0
-    tr_pois_k = truncated_poisson_probs(lamda, K, dtype)
+    tr_pois_k = truncated_poisson_probs(lamda, K)
     k = torch.arange(1, K + 1)
-    result[0] = (k * tr_pois_k[k]).sum() / K
+    result[..., 0, :] = (k * tr_pois_k[..., k]).sum(-1).unsqueeze(-1) / K
     # theta == k
-    result[kdx + 1, kdx] = 1
+    result[..., kdx + 1, kdx] = 1
     return result
 
 
-def probs_theta(pi: float, S: int, K: int, dtype: torch.dtype) -> torch.Tensor:
+def probs_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
     r"""
     Target-specific spot index probability :math:`p(\theta)`.
 
@@ -138,14 +144,15 @@ def probs_theta(pi: float, S: int, K: int, dtype: torch.dtype) -> torch.Tensor:
     :param pi: Average binding probability of target-specific binding.
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param dtype: return dtype
-    :return: A tensor of a shape ``(2, 1 + KS)`` of probabilities for off-target (``0``)
+    :return: A tensor of a shape ``pi.shape[:-1] + (2, 1 + KS)`` of probabilities for off-target (``0``)
         and on-target (``1``) AOI.
     """
-    result = torch.zeros(2, K * S + 1, dtype=dtype)
-    result[0, 0] = 1
-    result[1, 0] = pi[0]
+    shape = pi.shape[:-1] + (2, 1 + K * S)
+    dtype = pi.dtype
+    result = torch.zeros(shape, dtype=dtype)
+    result[..., 0, 0] = 1
+    result[..., 1, 0] = pi[..., 0]
     for s in range(S):
         for k in range(K):
-            result[1, K * s + k + 1] = pi[s + 1] / K
+            result[..., 1, K * s + k + 1] = pi[..., s + 1] / K
     return result

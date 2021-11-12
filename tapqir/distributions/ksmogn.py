@@ -83,8 +83,8 @@ class KSMOGN(TorchDistribution):
         gaussians = gaussian_spots(height, width, x, y, target_locs.unsqueeze(-2), P, m)
         image = background[..., None, None] + gaussians.sum(-3)
 
-        self.concentration = image / gain
-        self.rate = 1 / gain
+        self.concentration = image / gain[..., None, None]
+        self.rate = 1 / gain[..., None, None]
         self.offset_samples = offset_samples
         self.offset_logits = offset_logits
         self.P = P
@@ -114,12 +114,12 @@ class KSMOGN(TorchDistribution):
 
     def log_prob(self, value):
         if self.use_pykeops:
-            formula = "wj+Log(Step(xi-gj-IntCst(1)))+(ai-IntCst(1))*Log(IfElse(xi-gj-IntCst(1),xi-gj,xi))-b*(xi-gj)"
+            formula = "wj+Log(Step(xi-gj-IntCst(1)))+(ai-IntCst(1))*Log(IfElse(xi-gj-IntCst(1),xi-gj,xi))-bi*(xi-gj)"
             variables = [
                 "wj = Vj(1)",
                 "gj = Vj(1)",
                 "ai = Vi(1)",
-                "b = Pm(1)",
+                "bi = Vi(1)",
                 "xi = Vi(1)",
             ]
             dtype = self.concentration.dtype
@@ -130,13 +130,15 @@ class KSMOGN(TorchDistribution):
                 axis=1,
                 dtype=str(dtype).split(".")[1],
             )
-            concentration, value = torch.broadcast_tensors(self.concentration, value)
+            concentration, value, rate = torch.broadcast_tensors(
+                self.concentration, value, self.rate
+            )
             shape = value.shape
             result = my_routine(
                 self.offset_logits.reshape(-1, 1),
                 self.offset_samples.reshape(-1, 1).to(dtype),
                 concentration.reshape(-1, 1),
-                self.rate.reshape(1),
+                rate.reshape(-1, 1).contiguous(),
                 value.reshape(-1, 1).to(dtype),
                 backend=self.device_pykeops,
             )
