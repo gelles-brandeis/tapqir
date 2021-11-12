@@ -73,7 +73,7 @@ def init():
     # CONFIG_FILE.touch(exist_ok=True)
     with open(CONFIG_FILE, "w") as cfg_file:
         DEFAULTS["P"] = 14
-        DEFAULTS["nbatch-size"] = 10
+        DEFAULTS["nbatch-size"] = 5
         DEFAULTS["fbatch-size"] = 512
         DEFAULTS["learning-rate"] = 0.005
         DEFAULTS["num-channels"] = 1
@@ -313,12 +313,12 @@ def fit(
         help="Learning rate",
         prompt="Learning rate",
     ),
-    num_epochs: int = typer.Option(
+    num_iter: int = typer.Option(
         0,
-        "--num-epochs",
-        "-e",
-        help="Number of epochs",
-        prompt="Number of epochs",
+        "--num-iter",
+        "-it",
+        help="Number of iterations",
+        prompt="Number of iterations",
     ),
     k_max: int = typer.Option(
         2, "--k-max", "-k", help="Maximum number of spots per image"
@@ -396,7 +396,7 @@ def fit(
         model.load(cd)
 
         model.init(learning_rate, nbatch_size, fbatch_size)
-        model.run(num_epochs)
+        model.run(num_iter)
 
 
 @app.command()

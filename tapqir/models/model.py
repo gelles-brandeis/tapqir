@@ -2,11 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import os
 import random
 from collections import deque
 from pathlib import Path
-from typing import Any, Union
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -65,8 +64,8 @@ class Model:
         self.data_path = None
         self.path = None
         self.run_path = None
-        logger.info("Tapqir version - {}".format(tapqir_version))
-        logger.info("Model - {}".format(self.name))
+        logger.debug("Tapqir version - {}".format(tapqir_version))
+        logger.debug("Model - {}".format(self.name))
         # set device & dtype
         self.to(device, dtype)
 
@@ -95,8 +94,8 @@ class Model:
                 samples=self.data.offset.samples.to(self.device),
                 weights=self.data.offset.weights.to(self.device),
             )
-        logger.info("Device - {}".format(self.device))
-        logger.info("Floating precision - {}".format(self.dtype))
+        logger.debug("Device - {}".format(self.device))
+        logger.debug("Floating precision - {}".format(self.dtype))
 
     def load(self, path: Union[str, Path], data_only: bool = True) -> None:
         """
@@ -108,7 +107,6 @@ class Model:
         # set path
         self.path = Path(path)
         self.run_path = self.path / ".tapqir"
-        self.writer = SummaryWriter(log_dir=self.run_path / "logs" / self.full_name)
 
         # load data
         self.data = load(self.path, self.device)
@@ -149,7 +147,7 @@ class Model:
         self,
         lr: float = 0.005,
         nbatch_size: int = 5,
-        fbatch_size: int = 1000,
+        fbatch_size: int = 512,
         jit: bool = False,
     ) -> None:
         """
@@ -169,108 +167,82 @@ class Model:
             self.load_checkpoint()
         except (FileNotFoundError, TypeError):
             pyro.clear_param_store()
-            self.epoch = 0
+            self.iter = 0
+            self.converged = False
             self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
             self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
-        # find max possible batch_size
-        if nbatch_size == 0:
-            nbatch_size = self._max_batch_size()
-            logger.info("Optimal batch size determined - {}".format(nbatch_size))
         self.nbatch_size = nbatch_size
         self.fbatch_size = fbatch_size
 
-        logger.info("Optimizer - {}".format(self.optim_fn.__name__))
-        logger.info("Learning rate - {}".format(lr))
-        logger.info("AOI batch size - {}".format(self.nbatch_size))
-        logger.info("Frame batch size - {}".format(self.fbatch_size))
+        logger.debug("Optimizer - {}".format(self.optim_fn.__name__))
+        logger.debug("Learning rate - {}".format(self.lr))
+        logger.debug("AOI batch size - {}".format(self.nbatch_size))
+        logger.debug("Frame batch size - {}".format(self.fbatch_size))
 
-    def run(self, num_epochs: int = 0, nrange: Any = trange):
+    def run(self, num_iter: int = 0) -> int:
         """
-        Run inference procedure.
+        Run inference procedure for a specified number of iterations.
+        If num_iter equals zero then run till model converges.
 
-        :param num_epochs: Number of epochs.
-        :param nrange: Progress bar.
+        :param num_iter: Number of iterations.
+        :return: Exit code.
         """
-        slurm = os.environ.get("SLURM_JOB_ID")
-        if slurm is not None:
-            nrange = range
-        # pyro.enable_validation()
-        self._stop = False
         use_crit = False
-        if not num_epochs:
+        if not num_iter:
             use_crit = True
-            num_epochs = 50000
-        for i in nrange(num_epochs):
-            try:
-                losses = []
-                for ndx in torch.split(torch.randperm(self.data.N), self.nbatch_size):
-                    for fdx in torch.split(
-                        torch.randperm(self.data.F), self.fbatch_size
-                    ):
-                        self.n = ndx
-                        self.f = fdx
-                        # with torch.autograd.detect_anomaly():
-                        losses.append(self.svi.step())
-                self.epoch_loss = sum(losses) / len(losses)
-                self.save_checkpoint()
-                if use_crit and self._stop:
-                    logger.info(f"Epoch #{self.epoch} model converged.")
-                    break
-                self.epoch += 1
-            except ValueError:
-                # load last checkpoint
-                self.init(
-                    lr=self.lr,
-                    nbatch_size=self.nbatch_size,
-                    fbatch_size=self.fbatch_size,
-                )
-                # change rng seed
-                new_seed = random.randint(0, 100)
-                pyro.set_rng_seed(new_seed)
-                logger.warning(f"Epoch #{self.epoch} new seed: {new_seed}.")
+            num_iter = 100000
+        with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
+            for i in trange(num_iter):
+                try:
+                    self.iter_loss = self.svi.step()
+                    # save a checkpoint every 500 iterations
+                    if not self.iter % 500:
+                        self.save_checkpoint(writer)
+                        if use_crit and self.converged:
+                            logger.debug(f"Iteration #{self.iter} model converged.")
+                            return 0
+                    self.iter += 1
+                except ValueError:
+                    # load last checkpoint
+                    self.init(
+                        lr=self.lr,
+                        nbatch_size=self.nbatch_size,
+                        fbatch_size=self.fbatch_size,
+                    )
+                    # change rng seed
+                    new_seed = random.randint(0, 100)
+                    pyro.set_rng_seed(new_seed)
+                    logger.warning(
+                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                    )
+        return 1
 
-    def _max_batch_size(self):
-        k = 0
-        batch_size = 0
-        while batch_size + 2 ** k < self.data.ontarget.N:
-            try:
-                torch.cuda.empty_cache()
-                self.batch_size = batch_size + 2 ** k
-                self.run(1, nrange=range)
-            except RuntimeError as error:
-                assert error.args[0].startswith("CUDA")
-                if k == 0:
-                    break
-                else:
-                    batch_size += 2 ** (k - 1)
-                    k = 0
-            else:
-                k += 1
-        else:
-            batch_size += 2 ** (k - 1)
+    def save_checkpoint(self, writer: SummaryWriter = None):
+        """
+        Save checkpoint.
 
-        return max(1, batch_size // 4)
-
-    def save_checkpoint(self):
+        :param writer: SummaryWriter object.
+        """
         # save only if no NaN values
         for k, v in pyro.get_param_store().items():
             if torch.isnan(v).any() or torch.isinf(v).any():
                 raise ValueError(
-                    "Epoch #{}. Detected NaN values in {}".format(self.epoch, k)
+                    "Iteration #{}. Detected NaN values in {}".format(self.iter, k)
                 )
 
         # update convergence criteria parameters
         for name in self.conv_params:
             if name == "-ELBO":
-                self._rolling["-ELBO"].append(self.epoch_loss)
+                self._rolling["-ELBO"].append(self.iter_loss)
             else:
                 self._rolling[name].append(pyro.param(name).item())
 
         # check convergence status
+        self.converged = False
         if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
             crit = all(
                 torch.tensor(self._rolling[p]).std()
@@ -279,53 +251,56 @@ class Model:
                 for p in self.conv_params
             )
             if crit:
-                self._stop = True
+                self.converged = False
 
         # save the model state
         torch.save(
             {
-                "epoch": self.epoch,
+                "iter": self.iter,
                 "params": pyro.get_param_store().get_state(),
                 "optimizer": self.optim.get_state(),
                 "rolling": self._rolling,
-                "convergence_status": self._stop,
+                "convergence_status": self.converged,
             },
             self.run_path / f"{self.full_name}-model.tpqr",
         )
 
-        # save global paramters for tensorboard
-        self.writer.add_scalar("-ELBO", self.epoch_loss, self.epoch)
-        for name, val in pyro.get_param_store().items():
-            if val.dim() == 0:
-                self.writer.add_scalar(name, val.item(), self.epoch)
-            elif val.dim() == 1 and len(val) <= self.S + 1:
-                scalars = {str(i): v.item() for i, v in enumerate(val)}
-                self.writer.add_scalars(name, scalars, self.epoch)
+        if writer is not None:
+            # save global paramters for tensorboard
+            writer.add_scalar("-ELBO", self.iter_loss, self.iter)
+            for name, val in pyro.get_param_store().items():
+                if val.dim() == 0:
+                    writer.add_scalar(name, val.item(), self.iter)
+                elif val.dim() == 1 and len(val) <= self.S + 1:
+                    scalars = {str(i): v.item() for i, v in enumerate(val)}
+                    writer.add_scalars(name, scalars, self.iter)
 
-        if self.pspecific is not None and self.data.labels is not None:
-            pred_labels = (
-                self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
-            )
-            true_labels = self.data.labels["z"].ravel()
+            if self.pspecific is not None and self.data.labels is not None:
+                pred_labels = (
+                    self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
+                )
+                true_labels = self.data.labels["z"].ravel()
 
-            metrics = {}
-            with np.errstate(divide="ignore", invalid="ignore"):
-                metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
-            metrics["Recall"] = recall_score(true_labels, pred_labels, zero_division=0)
-            metrics["Precision"] = precision_score(
-                true_labels, pred_labels, zero_division=0
-            )
+                metrics = {}
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    metrics["MCC"] = matthews_corrcoef(true_labels, pred_labels)
+                metrics["Recall"] = recall_score(
+                    true_labels, pred_labels, zero_division=0
+                )
+                metrics["Precision"] = precision_score(
+                    true_labels, pred_labels, zero_division=0
+                )
 
-            neg, pos = {}, {}
-            neg["TN"], neg["FP"], pos["FN"], pos["TP"] = confusion_matrix(
-                true_labels, pred_labels, labels=(0, 1)
-            ).ravel()
+                neg, pos = {}, {}
+                neg["TN"], neg["FP"], pos["FN"], pos["TP"] = confusion_matrix(
+                    true_labels, pred_labels, labels=(0, 1)
+                ).ravel()
 
-            self.writer.add_scalars("ACCURACY", metrics, self.epoch)
-            self.writer.add_scalars("NEGATIVES", neg, self.epoch)
-            self.writer.add_scalars("POSITIVES", pos, self.epoch)
+                writer.add_scalars("ACCURACY", metrics, self.iter)
+                writer.add_scalars("NEGATIVES", neg, self.iter)
+                writer.add_scalars("POSITIVES", pos, self.iter)
 
-        logger.debug(f"Epoch #{self.epoch}: Successful.")
+        logger.debug(f"Iteration #{self.iter}: Successful.")
 
     def load_checkpoint(
         self,
@@ -348,12 +323,12 @@ class Model:
         )
         pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
-            self._stop = checkpoint["convergence_status"]
+            self.converged = checkpoint["convergence_status"]
             self._rolling = checkpoint["rolling"]
-            self.epoch = checkpoint["epoch"]
+            self.iter = checkpoint["iter"]
             self.optim.set_state(checkpoint["optimizer"])
             logger.info(
-                f"Epoch #{self.epoch}. Loaded model params and optimizer state from {path}"
+                f"Iteration #{self.iter}. Loaded a model checkpoint from {path}"
             )
         if warnings and not checkpoint["convergence_status"]:
             logger.warning(f"Model at {path} has not been fully trained")

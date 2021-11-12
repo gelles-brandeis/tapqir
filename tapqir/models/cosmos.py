@@ -170,6 +170,7 @@ class Cosmos(Model):
             "aois",
             self.data.N,
             subsample=self.n,
+            subsample_size=self.nbatch_size,
             dim=-2,
         )
         # time frames
@@ -177,6 +178,7 @@ class Cosmos(Model):
             "frames",
             self.data.F,
             subsample=self.f,
+            subsample_size=self.fbatch_size,
             dim=-1,
         )
 
@@ -359,6 +361,7 @@ class Cosmos(Model):
             "aois",
             self.data.N,
             subsample=self.n,
+            subsample_size=self.nbatch_size,
             dim=-2,
         )
         # time frames
@@ -366,6 +369,7 @@ class Cosmos(Model):
             "frames",
             self.data.F,
             subsample=self.f,
+            subsample_size=self.fbatch_size,
             dim=-1,
         )
 
