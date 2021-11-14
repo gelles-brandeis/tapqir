@@ -199,8 +199,8 @@ class Model:
             for i in trange(num_iter):
                 try:
                     self.iter_loss = self.svi.step()
-                    # save a checkpoint every 500 iterations
-                    if not self.iter % 500:
+                    # save a checkpoint every 200 iterations
+                    if not self.iter % 200:
                         self.save_checkpoint(writer)
                         if use_crit and self.converged:
                             logger.debug(f"Iteration #{self.iter} model converged.")
@@ -274,7 +274,7 @@ class Model:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 writer.add_scalars(name, scalars, self.iter)
 
-        if self.pspecific is not None and self.data.labels is not None:
+        if False and self.data.labels is not None:
             pred_labels = (
                 self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
             )
