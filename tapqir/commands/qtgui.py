@@ -30,7 +30,7 @@ from PySide2.QtWidgets import (
 )
 from qtrangeslider import QRangeSlider
 
-from tapqir.distributions.kspotgammanoise import _gaussian_spots
+from tapqir.distributions.util import gaussian_spots
 
 mpl.use("Qt5Agg")
 mpl.rc("text", usetex=True)
@@ -278,7 +278,7 @@ class MainWindow(QMainWindow):
             self.Model.data.offset.mean
             + self.Model.params["background"]["Mean"][n, frames, None, None]
         )
-        gaussian = _gaussian_spots(
+        gaussian = gaussian_spots(
             self.Model.params["height"]["Mean"][:, n, frames],
             #  self.Model.params["d/height"]["Mean"][:, n, frames].masked_fill(
             #      self.Model.params["d/m_probs"][:, n, frames] < 0.5, 0.0

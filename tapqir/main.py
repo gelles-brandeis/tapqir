@@ -278,13 +278,6 @@ def fit(
         help="Color-channel numbers to analyze",
         prompt="Channel numbers (space separated if multiple)",
     ),
-    marginal: bool = typer.Option(
-        partial(_get_default, "marginal"),
-        "--marginal/--full",
-        help="Use the marginalized or the full model",
-        prompt="Use the marginalized model?",
-        show_default=False,
-    ),
     cuda: bool = typer.Option(
         partial(_get_default, "cuda"),
         "--cuda/--cpu",
@@ -323,6 +316,12 @@ def fit(
     k_max: int = typer.Option(
         2, "--k-max", "-k", help="Maximum number of spots per image"
     ),
+    matlab: bool = typer.Option(
+        False,
+        "--matlab",
+        help="Save parameters in matlab format",
+        prompt="Save parameters in matlab format?",
+    ),
     funsor: bool = typer.Option(
         False, "--funsor/--pyro", help="Use funsor or pyro backend"
     ),
@@ -359,6 +358,7 @@ def fit(
     from pyroapi import pyro_backend
 
     from tapqir.models import models
+    from tapqir.utils.stats import save_stats
 
     settings = {}
     settings["S"] = 1
@@ -367,10 +367,8 @@ def fit(
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
     settings["use_pykeops"] = pykeops
-    settings["marginal"] = marginal
 
     if overwrite:
-        DEFAULTS["marginal"] = marginal
         DEFAULTS["cuda"] = cuda
         DEFAULTS["nbatch-size"] = nbatch_size
         DEFAULTS["fbatch-size"] = fbatch_size
@@ -396,7 +394,15 @@ def fit(
         model.load(cd)
 
         model.init(learning_rate, nbatch_size, fbatch_size)
-        model.run(num_iter)
+        typer.echo("Fitting the data ...")
+        exit_code = model.run(num_iter)
+        if exit_code == 0:
+            typer.echo("Fitting the data: Done")
+            typer.echo("Computing stats ...")
+            save_stats(model, cd, save_matlab=matlab)
+            typer.echo("Computing stats: Done")
+        elif exit_code == 1:
+            typer.echo("The model hasn't converged!")
 
 
 @app.command()
