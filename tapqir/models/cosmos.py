@@ -37,7 +37,6 @@ class Cosmos(Model):
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
-    :param marginal: Marginalize out :math:`\theta` in the model.
     """
 
     name = "cosmos"
