@@ -61,6 +61,9 @@ class HMM(Cosmos):
         self._global_params = ["gain", "proximity", "lamda", "trans"]
 
     def model(self):
+        """
+        **Generative Model**
+        """
         # global parameters
         gain = pyro.sample("gain", dist.HalfNormal(50))
         init = pyro.sample(
@@ -204,6 +207,9 @@ class HMM(Cosmos):
                 theta_prev = theta_curr
 
     def guide(self):
+        """
+        **Variational Distribution**
+        """
         # global parameters
         pyro.sample(
             "gain",
@@ -511,7 +517,7 @@ class HMM(Cosmos):
         )
 
     @staticmethod
-    def _sequential_logmatmulexp(logits):
+    def _sequential_logmatmulexp(logits: torch.Tensor) -> torch.Tensor:
         """
         For a tensor ``x`` whose time dimension is -3, computes::
             x[..., 0, :, :] @ x[..., 1, :, :] @ ... @ x[..., T-1, :, :]
@@ -561,7 +567,7 @@ class HMM(Cosmos):
         return alphas
 
     @staticmethod
-    def _contraction_identity(logits):
+    def _contraction_identity(logits: torch.Tensor) -> torch.Tensor:
         batch_shape = logits.shape[:-2]
         state_dim = logits.size(-1)
         result = torch.eye(state_dim).log()
@@ -570,21 +576,21 @@ class HMM(Cosmos):
         return result
 
     @property
-    def theta_trans_marginal(self):
+    def theta_trans_marginal(self) -> torch.Tensor:
         result = self._sequential_logmatmulexp(pyro.param("theta_trans").data.log())
         return result[..., 0, :].exp()
 
     @property
-    def theta_probs(self):
+    def theta_probs(self) -> torch.Tensor:
         r"""
-        Probability of an on-target spot :math:`p(z_{knf})`.
+        Posterior target-specific spot probability :math:`q(\theta = k)`.
         """
         return self.theta_trans_marginal.data[..., 1:].permute(2, 0, 1)
 
     @property
-    def m_probs(self):
+    def m_probs(self) -> torch.Tensor:
         r"""
-        Probability of a spot :math:`p(m_{knf})`.
+        Posterior spot presence probability :math:`q(m)`.
         """
         return torch.einsum(
             "sknf,nfs->knf",

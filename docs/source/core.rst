@@ -14,6 +14,10 @@ List of Tapqir models.
    :members:
    :show-inheritance:
 
+.. automodule:: tapqir.models.hmm
+   :members:
+   :show-inheritance:
+
 Distributions
 -------------
 

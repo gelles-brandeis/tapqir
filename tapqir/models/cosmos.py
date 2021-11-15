@@ -278,18 +278,6 @@ class Cosmos(Model):
         r"""
         **Variational Distribution**
 
-        Full variational distribution:
-
-        .. math::
-            \begin{aligned}
-                q(\phi) =~&q(g) q(\sigma^{xy}) q(\pi) q(\lambda) \cdot \\
-                &\prod_{\mathsf{AOI}} \left[ q(\mu^b) q(\sigma^b) \prod_{\mathsf{frame}}
-                \left[ q(b) q(\theta) \prod_{\mathsf{spot}} q(m | \theta)
-                q(h | m) q(w | m) q(x | m) q(y | m) \right] \right]
-            \end{aligned}
-
-        :math:`\theta` marginalized variational distribution:
-
         .. math::
             \begin{aligned}
                 q(\phi \setminus \theta) =~&q(g) q(\sigma^{xy}) q(\pi) q(\lambda) \cdot \\
@@ -593,28 +581,28 @@ class Cosmos(Model):
     @property
     def m_probs(self) -> torch.Tensor:
         r"""
-        Posterior spot presence probability :math:`\sum_\theta q(\theta) q(m|\theta)`.
+        Posterior spot presence probability :math:`q(m)`.
         """
         return pyro.param("m_probs").data
 
     @property
-    def pspecific(self):
+    def pspecific(self) -> torch.Tensor:
         r"""
         Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
         """
         return self.theta_probs.sum(-3)
 
     @property
-    def pspecific_map(self):
+    def pspecific_map(self) -> torch.Tensor:
         return self.pspecific > 0.5
 
     @lazy_property
-    def theta_to_z(self):
+    def theta_to_z(self) -> torch.Tensor:
         result = torch.zeros(self.K * self.S + 1, self.K, dtype=torch.long)
         for s in range(self.S):
             result[1 + s * self.K : 1 + (s + 1) * self.K] = torch.eye(self.K) * (s + 1)
         return result
 
     @lazy_property
-    def specific(self):
+    def specific(self) -> torch.Tensor:
         return torch.clamp(self.theta_to_z, min=0, max=1)

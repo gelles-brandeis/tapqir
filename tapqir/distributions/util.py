@@ -160,15 +160,7 @@ def probs_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
 
 def init_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
     r"""
-    Target-specific spot index probability :math:`p(\theta)`.
-
-    .. math::
-
-        p(\theta) =
-        \begin{cases}
-            \mathbf{Categorical}\left(1 - \pi, \frac{\pi}{K}, \dots, \frac{\pi}{K}\right) & \textrm{if on-target} \\
-            \mathbf{Categorical}\left(1, 0, \dots, 0\right) & \textrm{if off-target}
-        \end{cases}
+    Initial index probability :math:`p(\theta_0)`.
 
     :param pi: Initial probabilities.
     :param S: Number of distinct molecular states for the binder molecules.
@@ -189,20 +181,12 @@ def init_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
 
 def trans_theta(A: torch.Tensor, S: int, K: int) -> torch.Tensor:
     r"""
-    Target-specific spot index probability :math:`p(\theta)`.
-
-    .. math::
-
-        p(\theta) =
-        \begin{cases}
-            \mathbf{Categorical}\left(1 - \pi, \frac{\pi}{K}, \dots, \frac{\pi}{K}\right) & \textrm{if on-target} \\
-            \mathbf{Categorical}\left(1, 0, \dots, 0\right) & \textrm{if off-target}
-        \end{cases}
+    Transition probability matrix :math:`p(\theta_t | \theta_{t-1})`.
 
     :param A: Transition probabilities.
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :return: A tensor of a shape ``A.shape[:-1] + (2, 1 + KS)`` of probabilities for off-target (``0``)
+    :return: A tensor of a shape ``A.shape[:-2] + (2, 1 + KS, 1 + KS)`` of probabilities for off-target (``0``)
         and on-target (``1``) AOI.
     """
     shape = A.shape[:-2] + (2, 1 + K * S, 1 + K * S)
