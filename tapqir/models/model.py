@@ -251,7 +251,7 @@ class Model:
                 for p in self.conv_params
             )
             if crit:
-                self.converged = False
+                self.converged = True
 
         # save the model state
         torch.save(

@@ -264,10 +264,12 @@ def glimpse(
         with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
             yaml.dump(DEFAULTS, cfg_file, sort_keys=False)
 
+    typer.echo("Extracting AOIs ...")
     read_glimpse(
         path=cd,
         **DEFAULTS,
     )
+    typer.echo("Extracting AOIs: Done")
 
 
 @app.command()

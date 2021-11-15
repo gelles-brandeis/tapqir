@@ -156,3 +156,48 @@ def probs_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
         for k in range(K):
             result[..., 1, K * s + k + 1] = pi[..., s + 1] / K
     return result
+
+
+def init_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
+    r"""
+    Initial index probability :math:`p(\theta_0)`.
+
+    :param pi: Initial probabilities.
+    :param S: Number of distinct molecular states for the binder molecules.
+    :param K: Maximum number of spots that can be present in a single image.
+    :return: A tensor of a shape ``pi.shape[:-1] + (2, 1 + KS)`` of probabilities for off-target (``0``)
+        and on-target (``1``) AOI.
+    """
+    shape = pi.shape[:-1] + (2, 1 + K * S)
+    dtype = pi.dtype
+    result = torch.zeros(shape, dtype=dtype)
+    result[..., 0, 0] = 1
+    result[..., 1, 0] = pi[..., 0]
+    for s in range(S):
+        for k in range(K):
+            result[..., 1, K * s + k + 1] = pi[..., s + 1] / K
+    return result
+
+
+def trans_theta(A: torch.Tensor, S: int, K: int) -> torch.Tensor:
+    r"""
+    Transition probability matrix :math:`p(\theta_t | \theta_{t-1})`.
+
+    :param A: Transition probabilities.
+    :param S: Number of distinct molecular states for the binder molecules.
+    :param K: Maximum number of spots that can be present in a single image.
+    :return: A tensor of a shape ``A.shape[:-2] + (2, 1 + KS, 1 + KS)`` of probabilities for off-target (``0``)
+        and on-target (``1``) AOI.
+    """
+    shape = A.shape[:-2] + (2, 1 + K * S, 1 + K * S)
+    dtype = A.dtype
+    result = torch.zeros(shape, dtype=dtype)
+    result[..., :, 0] = 1
+    for i in range(1 + K * S):
+        # FIXME
+        j = (i + 1) // K
+        result[..., 1, i, 0] = A[..., j, 0]
+        for s in range(S):
+            for k in range(K):
+                result[..., 1, i, K * s + k + 1] = A[..., j, s + 1] / K
+    return result
