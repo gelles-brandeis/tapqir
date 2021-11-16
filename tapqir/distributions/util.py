@@ -151,7 +151,7 @@ def expand_offtarget(probs: torch.Tensor) -> torch.Tensor:
 
 
 @lru_cache
-def probs_theta(K: int, device) -> torch.Tensor:
+def probs_theta(K: int, device: torch.device) -> torch.Tensor:
     r"""
     Prior probability for target-specific spot index :math:`p(\theta | z)`.
 
