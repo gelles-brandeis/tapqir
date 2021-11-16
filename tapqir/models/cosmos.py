@@ -15,9 +15,10 @@ from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
+from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import probs_m, probs_theta
+from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
@@ -80,6 +81,8 @@ class Cosmos(Model):
         +-----------------+-----------+-------------------------------------+
         | |bg| - |b|      | (N, F)    | background intensity                |
         +-----------------+-----------+-------------------------------------+
+        | |z| - :math:`z` | (N, F)    | target-specific spot presence       |
+        +-----------------+-----------+-------------------------------------+
         | |t| - |theta|   | (N, F)    | target-specific spot index          |
         +-----------------+-----------+-------------------------------------+
         | |m| - :math:`m` | (K, N, F) | spot presence indicator             |
@@ -107,6 +110,7 @@ class Cosmos(Model):
         .. |w| replace:: ``width``
         .. |D| replace:: ``data``
         .. |m| replace:: ``m``
+        .. |z| replace:: ``z``
         .. |t| replace:: ``theta``
         .. |x| replace:: ``x``
         .. |y| replace:: ``y``
@@ -120,7 +124,7 @@ class Cosmos(Model):
             \begin{aligned}
                 p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
                 \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
-                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) p(\theta | \pi)
+                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) p(z | \pi) p(\theta | z)
                 \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
                 &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
                 p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
@@ -128,14 +132,14 @@ class Cosmos(Model):
                 p(D | \mu^I, g, \delta) \right] \right]
             \end{aligned}
 
-        :math:`\theta` marginalized joint distribution:
+        :math:`z` and :math:`\theta` marginalized joint distribution:
 
         .. math::
 
             \begin{aligned}
-                \sum_{\theta} p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
-                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b)
-                \prod_{\mathsf{frame}} \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) \sum_{\theta} p(\theta | \pi)
+                \sum_{z, \theta} p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
+                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
+                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) \sum_{z} p(z | \pi) \sum_{\theta} p(\theta | z)
                 \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
                 &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
                 p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
@@ -144,8 +148,9 @@ class Cosmos(Model):
             \end{aligned}
         """
         # global parameters
-        gain = pyro.sample("gain", dist.HalfNormal(50))
+        gain = pyro.sample("gain", dist.HalfNormal(torch.tensor([50.0])))
         pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
+        pi = expand_offtarget(pi)
         lamda = pyro.sample("lamda", dist.Exponential(1))
         proximity = pyro.sample("proximity", dist.Exponential(1))
         size = torch.stack(
@@ -192,26 +197,28 @@ class Cosmos(Model):
                     ),
                 )
 
-                # sample hidden model state (1+K*S,)
+                # sample hidden model state (1+S,)
+                z = pyro.sample(
+                    "z",
+                    dist.Categorical(Vindex(pi)[..., :, is_ontarget.long()]),
+                    infer={"enumerate": "parallel"},
+                )
                 theta = pyro.sample(
                     "theta",
                     dist.Categorical(
-                        Vindex(probs_theta(pi, self.S, self.K))[
-                            ..., is_ontarget.long(), :
-                        ]
+                        Vindex(probs_theta(self.K, self.device))[torch.clamp(z, min=0, max=1)]
                     ),
                     infer={"enumerate": "parallel"},
                 )
+                onehot_theta = one_hot(theta, num_classes=1 + self.K)
 
                 ms, heights, widths, xs, ys = [], [], [], [], []
                 for kdx in spots:
-                    specific = Vindex(self.specific)[theta, kdx]
+                    specific = onehot_theta[..., 1 + kdx]
                     # spot presence
                     m = pyro.sample(
                         f"m_{kdx}",
-                        dist.Bernoulli(
-                            Vindex(probs_m(lamda, self.S, self.K))[..., theta, kdx]
-                        ),
+                        dist.Bernoulli(Vindex(probs_m(lamda, self.K))[..., theta, kdx]),
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
@@ -280,7 +287,7 @@ class Cosmos(Model):
 
         .. math::
             \begin{aligned}
-                q(\phi \setminus \theta) =~&q(g) q(\sigma^{xy}) q(\pi) q(\lambda) \cdot \\
+                q(\phi \setminus \{z, \theta\}) =~&q(g) q(\sigma^{xy}) q(\pi) q(\lambda) \cdot \\
                 &\prod_{\mathsf{AOI}} \left[ q(\mu^b) q(\sigma^b) \prod_{\mathsf{frame}}
                 \left[ \vphantom{\prod_{F}} q(b) \prod_{\mathsf{spot}}
                 q(m) q(h | m) q(w | m) q(x | m) q(y | m) \right] \right]
@@ -538,11 +545,12 @@ class Cosmos(Model):
         )
 
     @lazy_property
-    def theta_probs(self) -> torch.Tensor:
+    def compute_probs(self) -> torch.Tensor:
         r"""
         Posterior target-specific spot probability :math:`q(\theta = k)`.
         """
-        probs = torch.zeros(self.K, self.data.N, self.data.F)
+        z_probs = torch.zeros(self.data.N, self.data.F)
+        theta_probs = torch.zeros(self.K, self.data.N, self.data.F)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
@@ -561,22 +569,42 @@ class Cosmos(Model):
                     ).get_trace()
                 model_tr.compute_log_prob()
                 guide_tr.compute_log_prob()
+                # 0 - theta
+                # 1 - z
+                # 2 - m_1
+                # 3 - m_0
+                # p(z, theta, phi)
                 logp = 0
-                for name in ["theta", "m_0", "m_1", "x_0", "x_1", "y_0", "y_1"]:
+                for name in ["z", "theta", "m_0", "m_1", "x_0", "x_1", "y_0", "y_1"]:
                     logp = logp + model_tr.nodes[name]["unscaled_log_prob"]
-                logp = logp - logp.logsumexp(0)
+                # p(z, theta | phi) = p(z, theta, phi) - p(z, theta, phi).sum(z, theta)
+                logp = logp - logp.logsumexp((0, 1))
                 expectation = (
                     guide_tr.nodes["m_0"]["unscaled_log_prob"]
                     + guide_tr.nodes["m_1"]["unscaled_log_prob"]
                     + logp
                 )
-                result = expectation.logsumexp((1, 2))
-                probs[:, ndx[:, None], fdx] = result[1:].exp().mean(-3)
+                result = expectation.logsumexp((2, 3))
+                z_logits = result.logsumexp(0)
+                z_probs[ndx[:, None], fdx] = z_logits[1].exp().mean(-3)
+                theta_logits = result.logsumexp(1)
+                theta_probs[:, ndx[:, None], fdx] = theta_logits[1:].exp().mean(-3)
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size
         self.fbatch_size = fbatch_size
-        return probs
+        return z_probs, theta_probs
+
+    @property
+    def z_probs(self) -> torch.Tensor:
+        r"""
+        Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
+        """
+        return self.compute_probs[0]
+
+    @property
+    def theta_probs(self) -> torch.Tensor:
+        return self.compute_probs[1]
 
     @property
     def m_probs(self) -> torch.Tensor:
@@ -590,19 +618,8 @@ class Cosmos(Model):
         r"""
         Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
         """
-        return self.theta_probs.sum(-3)
+        return self.z_probs
 
     @property
     def pspecific_map(self) -> torch.Tensor:
         return self.pspecific > 0.5
-
-    @lazy_property
-    def theta_to_z(self) -> torch.Tensor:
-        result = torch.zeros(self.K * self.S + 1, self.K, dtype=torch.long)
-        for s in range(self.S):
-            result[1 + s * self.K : 1 + (s + 1) * self.K] = torch.eye(self.K) * (s + 1)
-        return result
-
-    @lazy_property
-    def specific(self) -> torch.Tensor:
-        return torch.clamp(self.theta_to_z, min=0, max=1)

@@ -15,9 +15,10 @@ from pyro.distributions.hmm import _logmatmulexp
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
+from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import init_theta, probs_m, trans_theta
+from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.cosmos import Cosmos
 
 
@@ -69,12 +70,14 @@ class HMM(Cosmos):
         init = pyro.sample(
             "init", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         )
+        init = expand_offtarget(init)
         trans = pyro.sample(
             "trans",
             dist.Dirichlet(torch.ones(self.S + 1, self.S + 1) / (self.S + 1)).to_event(
                 1
             ),
         )
+        trans = expand_offtarget(trans)
         lamda = pyro.sample("lamda", dist.Exponential(1))
         proximity = pyro.sample("proximity", dist.Exponential(1))
         size = torch.stack(
@@ -107,7 +110,7 @@ class HMM(Cosmos):
             # background mean and std
             background_mean = pyro.sample("background_mean", dist.HalfNormal(1000))
             background_std = pyro.sample("background_std", dist.HalfNormal(100))
-            theta_prev = None
+            z_prev = None
             for fdx in frames:
                 if self.vectorized:
                     fsx, fdx = fdx
@@ -124,25 +127,32 @@ class HMM(Cosmos):
                     ),
                 )
 
-                # sample hidden model state (1+K*S,)
-                theta_probs = (
-                    Vindex(init_theta(init, self.S, self.K))[..., is_ontarget.long(), :]
+                # sample hidden model state (1+S,)
+                z_probs = (
+                    Vindex(init)[..., :, is_ontarget.long()]
                     if isinstance(fdx, int) and fdx < 1
-                    else Vindex(trans_theta(trans, self.S, self.K))[
-                        ..., is_ontarget.long(), theta_prev, :
-                    ]
+                    else Vindex(trans)[..., z_prev, :, is_ontarget.long()]
                 )
-                theta_curr = pyro.sample(f"theta_{fsx}", dist.Categorical(theta_probs))
+                z_curr = pyro.sample(f"z_{fsx}", dist.Categorical(z_probs))
+
+                theta = pyro.sample(
+                    f"theta_{fdx}",
+                    dist.Categorical(
+                        Vindex(probs_theta(self.K, self.device))[
+                            torch.clamp(z_curr, min=0, max=1)
+                        ]
+                    ),
+                    infer={"enumerate": "parallel"},
+                )
+                onehot_theta = one_hot(theta, num_classes=1 + self.K)
 
                 ms, heights, widths, xs, ys = [], [], [], [], []
                 for kdx in spots:
-                    specific = Vindex(self.specific)[theta_curr, kdx]
+                    specific = onehot_theta[..., 1 + kdx]
                     # spot presence
                     m = pyro.sample(
                         f"m_{kdx}_{fsx}",
-                        dist.Bernoulli(
-                            Vindex(probs_m(lamda, self.S, self.K))[..., theta_curr, kdx]
-                        ),
+                        dist.Bernoulli(Vindex(probs_m(lamda, self.K))[..., theta, kdx]),
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
@@ -204,7 +214,7 @@ class HMM(Cosmos):
                     ),
                     obs=obs,
                 )
-                theta_prev = theta_curr
+                z_prev = z_curr
 
     def guide(self):
         """
@@ -271,7 +281,7 @@ class HMM(Cosmos):
                 "background_std",
                 dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0]),
             )
-            theta_prev = None
+            z_prev = None
             for fdx in frames:
                 if self.vectorized:
                     fsx, fdx = fdx
@@ -288,20 +298,20 @@ class HMM(Cosmos):
                 )
 
                 # sample hidden model state (3,1,1,1)
-                theta_probs = (
-                    Vindex(pyro.param("theta_trans"))[ndx, fdx, 0]
+                z_probs = (
+                    Vindex(pyro.param("z_trans"))[ndx, fdx, 0]
                     if isinstance(fdx, int) and fdx < 1
-                    else Vindex(pyro.param("theta_trans"))[ndx, fdx, theta_prev]
+                    else Vindex(pyro.param("z_trans"))[ndx, fdx, z_prev]
                 )
-                theta_curr = pyro.sample(
-                    f"theta_{fsx}",
-                    dist.Categorical(theta_probs),
+                z_curr = pyro.sample(
+                    f"z_{fsx}",
+                    dist.Categorical(z_probs),
                     infer={"enumerate": "parallel"},
                 )
 
                 for kdx in spots:
                     # spot presence
-                    m_probs = Vindex(pyro.param("m_probs"))[theta_curr, kdx, ndx, fdx]
+                    m_probs = Vindex(pyro.param("m_probs"))[z_curr, kdx, ndx, fdx]
                     m = pyro.sample(
                         f"m_{kdx}_{fsx}",
                         dist.Categorical(m_probs),
@@ -345,7 +355,7 @@ class HMM(Cosmos):
                             ),
                         )
 
-                theta_prev = theta_curr
+                z_prev = z_curr
 
     def init_parameters(self):
         """
@@ -485,22 +495,21 @@ class HMM(Cosmos):
         # classification
         # FIX HERE
         pyro.param(
-            "theta_trans",
+            "z_trans",
             lambda: torch.ones(
                 data.N,
                 data.F,
-                1 + self.K * self.S,
-                1 + self.K * self.S,
+                1 + self.S,
+                1 + self.S,
                 device=device,
             ),
             constraint=constraints.simplex,
         )
         m_probs = torch.full(
-            (1 + self.K * self.S, self.K, self.data.N, self.data.F),
+            (1 + self.S, self.K, self.data.N, self.data.F),
             0.5,
             device=device,
         )
-        m_probs[torch.arange(self.K) + 1, torch.arange(self.K)] = 1
         pyro.param("m_probs", lambda: m_probs, constraint=constraints.unit_interval)
 
     def TraceELBO(self, jit=False):
@@ -576,16 +585,12 @@ class HMM(Cosmos):
         return result
 
     @property
-    def theta_trans_marginal(self) -> torch.Tensor:
-        result = self._sequential_logmatmulexp(pyro.param("theta_trans").data.log())
-        return result[..., 0, :].exp()
-
-    @property
-    def theta_probs(self) -> torch.Tensor:
+    def pspecific(self) -> torch.Tensor:
         r"""
-        Posterior target-specific spot probability :math:`q(\theta = k)`.
+        Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
         """
-        return self.theta_trans_marginal.data[..., 1:].permute(2, 0, 1)
+        result = self._sequential_logmatmulexp(pyro.param("z_trans").data.log())
+        return result[..., 0, 1].exp()
 
     @property
     def m_probs(self) -> torch.Tensor:
@@ -593,7 +598,7 @@ class HMM(Cosmos):
         Posterior spot presence probability :math:`q(m)`.
         """
         return torch.einsum(
-            "sknf,nfs->knf",
-            pyro.param("m_probs").data[..., 1],
-            self.theta_trans_marginal,
+            "knf,nf->knf",
+            pyro.param("m_probs").data[1],
+            self.pspecific,
         )

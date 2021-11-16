@@ -7,6 +7,7 @@ Distribution utility functions
 """
 
 import math
+from functools import lru_cache
 
 import torch
 
@@ -89,9 +90,9 @@ def truncated_poisson_probs(lamda: torch.Tensor, K: int) -> torch.Tensor:
     return result
 
 
-def probs_m(lamda: torch.Tensor, S: int, K: int) -> torch.Tensor:
+def probs_m(lamda: torch.Tensor, K: int) -> torch.Tensor:
     r"""
-    Spot presence probability :math:`p(m | \theta, \lambda)`.
+    Prior spot presence probability :math:`p(m | \theta, \lambda)`.
 
     .. math::
 
@@ -107,11 +108,10 @@ def probs_m(lamda: torch.Tensor, S: int, K: int) -> torch.Tensor:
         \end{cases}
 
     :param lamda: Average rate of target-nonspecific binding.
-    :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :return: A tensor of a shape ``lamda.shape + (1 + KS, K)`` of probabilities.
+    :return: A tensor of a shape ``lamda.shape + (1 + K, K)`` of probabilities.
     """
-    shape = lamda.shape + (1 + K * S, K)
+    shape = lamda.shape + (1 + K, K)
     dtype = lamda.dtype
     result = torch.zeros(shape, dtype=dtype)
     kdx = torch.arange(K)
@@ -129,75 +129,44 @@ def probs_m(lamda: torch.Tensor, S: int, K: int) -> torch.Tensor:
     return result
 
 
-def probs_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
+def expand_offtarget(probs: torch.Tensor) -> torch.Tensor:
     r"""
-    Target-specific spot index probability :math:`p(\theta)`.
+    Expand state probability ``probs`` (e.g., :math:`\pi` or :math:`A`) to off-target AOIs.
 
     .. math::
 
-        p(\theta) =
+        p(\mathsf{state}) =
         \begin{cases}
-            \mathbf{Categorical}\left(1 - \pi, \frac{\pi}{K}, \dots, \frac{\pi}{K}\right) & \textrm{if on-target} \\
-            \mathbf{Categorical}\left(1, 0, \dots, 0\right) & \textrm{if off-target}
+            \mathbf{Categorical}\left( \mathsf{probs} \right) & \textrm{if on-target} \\
+            \mathbf{Categorical}\left( \left[ 1, 0, \dots, 0 \right] \right) & \textrm{if off-target}
         \end{cases}
 
-    :param pi: Average binding probability of target-specific binding.
-    :param S: Number of distinct molecular states for the binder molecules.
-    :param K: Maximum number of spots that can be present in a single image.
-    :return: A tensor of a shape ``pi.shape[:-1] + (2, 1 + KS)`` of probabilities for off-target (``0``)
+    :param probs: Probability of target-specific states.
+    :return: A tensor of a shape ``(2,) + probs.shape`` of probabilities for off-target (``0``)
         and on-target (``1``) AOI.
     """
-    shape = pi.shape[:-1] + (2, 1 + K * S)
-    dtype = pi.dtype
-    result = torch.zeros(shape, dtype=dtype)
-    result[..., 0, 0] = 1
-    result[..., 1, 0] = pi[..., 0]
-    for s in range(S):
-        for k in range(K):
-            result[..., 1, K * s + k + 1] = pi[..., s + 1] / K
-    return result
+    offtarget_probs = torch.zeros_like(probs)
+    offtarget_probs[..., 0] = 1
+    return torch.stack([offtarget_probs, probs], dim=-1)
 
 
-def init_theta(pi: torch.Tensor, S: int, K: int) -> torch.Tensor:
+@lru_cache
+def probs_theta(K: int, device) -> torch.Tensor:
     r"""
-    Initial index probability :math:`p(\theta_0)`.
+    Prior probability for target-specific spot index :math:`p(\theta | z)`.
 
-    :param pi: Initial probabilities.
-    :param S: Number of distinct molecular states for the binder molecules.
+    .. math::
+        p(\theta | z) =
+        \begin{cases}
+            \mathbf{Categorical}\left( \begin{bmatrix} 0 & 1/K & \dots & 1/K \end{bmatrix} \right) & z > 0 \\
+            \mathbf{Categorical}\left( \begin{bmatrix} 1 & 0 & \dots & 0 \end{bmatrix} \right) & z = 0
+        \end{cases}
+
     :param K: Maximum number of spots that can be present in a single image.
-    :return: A tensor of a shape ``pi.shape[:-1] + (2, 1 + KS)`` of probabilities for off-target (``0``)
-        and on-target (``1``) AOI.
+    :return: A tensor of a shape ``(2, 1 + K)`` of :math:`\theta` probabilities for spot-absent (``0``)
+        and spot-present (``1``) cases.
     """
-    shape = pi.shape[:-1] + (2, 1 + K * S)
-    dtype = pi.dtype
-    result = torch.zeros(shape, dtype=dtype)
-    result[..., 0, 0] = 1
-    result[..., 1, 0] = pi[..., 0]
-    for s in range(S):
-        for k in range(K):
-            result[..., 1, K * s + k + 1] = pi[..., s + 1] / K
-    return result
-
-
-def trans_theta(A: torch.Tensor, S: int, K: int) -> torch.Tensor:
-    r"""
-    Transition probability matrix :math:`p(\theta_t | \theta_{t-1})`.
-
-    :param A: Transition probabilities.
-    :param S: Number of distinct molecular states for the binder molecules.
-    :param K: Maximum number of spots that can be present in a single image.
-    :return: A tensor of a shape ``A.shape[:-2] + (2, 1 + KS, 1 + KS)`` of probabilities for off-target (``0``)
-        and on-target (``1``) AOI.
-    """
-    shape = A.shape[:-2] + (2, 1 + K * S, 1 + K * S)
-    dtype = A.dtype
-    result = torch.zeros(shape, dtype=dtype)
-    result[..., :, 0] = 1
-    for i in range(1 + K * S):
-        # FIXME
-        j = (i + 1) // K
-        result[..., 1, i, 0] = A[..., j, 0]
-        for s in range(S):
-            for k in range(K):
-                result[..., 1, i, K * s + k + 1] = A[..., j, s + 1] / K
+    result = torch.zeros(2, 1 + K, device=device)
+    result[0, 0] = 1
+    result[1, 1:] = 1 / K
     return result
