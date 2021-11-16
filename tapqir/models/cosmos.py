@@ -206,7 +206,9 @@ class Cosmos(Model):
                 theta = pyro.sample(
                     "theta",
                     dist.Categorical(
-                        Vindex(probs_theta(self.K, self.device))[torch.clamp(z, min=0, max=1)]
+                        Vindex(probs_theta(self.K, self.device))[
+                            torch.clamp(z, min=0, max=1)
+                        ]
                     ),
                     infer={"enumerate": "parallel"},
                 )
