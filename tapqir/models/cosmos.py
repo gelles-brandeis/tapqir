@@ -148,7 +148,7 @@ class Cosmos(Model):
             \end{aligned}
         """
         # global parameters
-        gain = pyro.sample("gain", dist.HalfNormal(torch.tensor([50.0])))
+        gain = pyro.sample("gain", dist.HalfNormal(50))
         pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
         pi = expand_offtarget(pi)
         lamda = pyro.sample("lamda", dist.Exponential(1))
@@ -548,9 +548,6 @@ class Cosmos(Model):
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        r"""
-        Posterior target-specific spot probability :math:`q(\theta = k)`.
-        """
         z_probs = torch.zeros(self.data.N, self.data.F)
         theta_probs = torch.zeros(self.K, self.data.N, self.data.F)
         nbatch_size = self.nbatch_size
@@ -600,18 +597,21 @@ class Cosmos(Model):
     @property
     def z_probs(self) -> torch.Tensor:
         r"""
-        Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
+        Probability of there being a target-specific spot :math:`p(z=1)`
         """
         return self.compute_probs[0]
 
     @property
     def theta_probs(self) -> torch.Tensor:
+        r"""
+        Posterior target-specific spot probability :math:`q(\theta = k)`.
+        """
         return self.compute_probs[1]
 
     @property
     def m_probs(self) -> torch.Tensor:
         r"""
-        Posterior spot presence probability :math:`q(m)`.
+        Posterior spot presence probability :math:`q(m=1)`.
         """
         return pyro.param("m_probs").data
 
@@ -623,5 +623,5 @@ class Cosmos(Model):
         return self.z_probs
 
     @property
-    def pspecific_map(self) -> torch.Tensor:
-        return self.pspecific > 0.5
+    def z_map(self) -> torch.Tensor:
+        return self.z_probs > 0.5

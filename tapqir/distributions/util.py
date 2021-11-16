@@ -142,7 +142,7 @@ def expand_offtarget(probs: torch.Tensor) -> torch.Tensor:
         \end{cases}
 
     :param probs: Probability of target-specific states.
-    :return: A tensor of a shape ``(2,) + probs.shape`` of probabilities for off-target (``0``)
+    :return: A tensor of a shape ``probs.shape + (2,)`` of probabilities for off-target (``0``)
         and on-target (``1``) AOI.
     """
     offtarget_probs = torch.zeros_like(probs)

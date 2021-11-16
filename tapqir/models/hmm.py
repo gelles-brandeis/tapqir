@@ -493,7 +493,6 @@ class HMM(Cosmos):
         )
 
         # classification
-        # FIX HERE
         pyro.param(
             "z_trans",
             lambda: torch.ones(
@@ -505,12 +504,15 @@ class HMM(Cosmos):
             ),
             constraint=constraints.simplex,
         )
-        m_probs = torch.full(
-            (1 + self.S, self.K, self.data.N, self.data.F),
-            0.5,
-            device=device,
+        pyro.param(
+            "m_probs",
+            lambda: torch.full(
+                (1 + self.S, self.K, self.data.N, self.data.F),
+                0.5,
+                device=device,
+            ),
+            constraint=constraints.unit_interval,
         )
-        pyro.param("m_probs", lambda: m_probs, constraint=constraints.unit_interval)
 
     def TraceELBO(self, jit=False):
         """
@@ -585,17 +587,24 @@ class HMM(Cosmos):
         return result
 
     @property
-    def pspecific(self) -> torch.Tensor:
+    def z_probs(self) -> torch.Tensor:
         r"""
-        Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
+        Probability of there being a target-specific spot :math:`p(z=1)`
         """
         result = self._sequential_logmatmulexp(pyro.param("z_trans").data.log())
         return result[..., 0, 1].exp()
 
     @property
+    def pspecific(self) -> torch.Tensor:
+        r"""
+        Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
+        """
+        return self.z_probs
+
+    @property
     def m_probs(self) -> torch.Tensor:
         r"""
-        Posterior spot presence probability :math:`q(m)`.
+        Posterior spot presence probability :math:`q(m=1)`.
         """
         return torch.einsum(
             "knf,nf->knf",
