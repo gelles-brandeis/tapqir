@@ -143,7 +143,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     num_samples = 1000
     for param in local_params:
         LL, UL, Mean = [], [], []
-        for ndx in torch.split(torch.arange(model.data.N), model.nbatch_size):
+        for ndx in torch.split(torch.arange(model.data.Nt), model.nbatch_size):
             ndx = ndx[:, None]
             kdx = torch.arange(model.K)[:, None, None]
             ll, ul, mean = [], [], []

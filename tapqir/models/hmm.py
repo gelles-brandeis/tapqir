@@ -93,7 +93,7 @@ class HMM(Cosmos):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -259,7 +259,7 @@ class HMM(Cosmos):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -421,7 +421,7 @@ class HMM(Cosmos):
         pyro.param(
             "background_mean_loc",
             lambda: torch.full(
-                (data.N, 1),
+                (data.Nt, 1),
                 data.median - self.data.offset.mean,
                 device=device,
             ),
@@ -429,14 +429,14 @@ class HMM(Cosmos):
         )
         pyro.param(
             "background_std_loc",
-            lambda: torch.ones(data.N, 1, device=device),
+            lambda: torch.ones(data.Nt, 1, device=device),
             constraint=constraints.positive,
         )
 
         pyro.param(
             "b_loc",
             lambda: torch.full(
-                (data.N, data.F),
+                (data.Nt, data.F),
                 data.median - self.data.offset.mean,
                 device=device,
             ),
@@ -444,22 +444,22 @@ class HMM(Cosmos):
         )
         pyro.param(
             "b_beta",
-            lambda: torch.ones(data.N, data.F, device=device),
+            lambda: torch.ones(data.Nt, data.F, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_loc",
-            lambda: torch.full((self.K, data.N, data.F), 2000, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 2000, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_beta",
-            lambda: torch.full((self.K, data.N, data.F), 0.001, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 0.001, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "w_mean",
-            lambda: torch.full((self.K, data.N, data.F), 1.5, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 1.5, device=device),
             constraint=constraints.interval(
                 0.75 + torch.finfo(self.dtype).eps,
                 2.25 - torch.finfo(self.dtype).eps,
@@ -467,12 +467,12 @@ class HMM(Cosmos):
         )
         pyro.param(
             "w_size",
-            lambda: torch.full((self.K, data.N, data.F), 100, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             "x_mean",
-            lambda: torch.zeros(self.K, data.N, data.F, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -480,7 +480,7 @@ class HMM(Cosmos):
         )
         pyro.param(
             "y_mean",
-            lambda: torch.zeros(self.K, data.N, data.F, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -488,7 +488,7 @@ class HMM(Cosmos):
         )
         pyro.param(
             "size",
-            lambda: torch.full((self.K, data.N, data.F), 200, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
 
@@ -496,7 +496,7 @@ class HMM(Cosmos):
         pyro.param(
             "z_trans",
             lambda: torch.ones(
-                data.N,
+                data.Nt,
                 data.F,
                 1 + self.S,
                 1 + self.S,
@@ -507,7 +507,7 @@ class HMM(Cosmos):
         pyro.param(
             "m_probs",
             lambda: torch.full(
-                (1 + self.S, self.K, self.data.N, self.data.F),
+                (1 + self.S, self.K, self.data.Nt, self.data.F),
                 0.5,
                 device=device,
             ),

@@ -56,32 +56,64 @@ class CosmosDataset:
         self.offset = OffsetData(offset_samples.to(device), offset_weights.to(device))
         self.name = name
 
-    @property
-    def N(self):
-        return self.images.shape[0]
+    @lazy_property
+    def N(self) -> int:
+        """
+        Number of on-target AOIs.
+        """
+        return self.is_ontarget.sum().item()
+
+    @lazy_property
+    def Nc(self) -> int:
+        """
+        Number of off-target AOIs.
+        """
+        return (~self.is_ontarget).sum().item()
+
+    @lazy_property
+    def Nt(self) -> int:
+        """
+        Total number of AOIs.
+        """
+        return self.N + self.Nc
 
     @property
-    def F(self):
+    def F(self) -> int:
+        """
+        Number of frames.
+        """
         return self.images.shape[1]
 
     @property
-    def C(self):
+    def C(self) -> int:
+        """
+        Number of color-channels.
+        """
         return self.images.shape[2]
 
     @property
-    def P(self):
+    def P(self) -> int:
+        """
+        Number of pixels.
+        """
         return self.images.shape[3]
 
     @property
-    def x(self):
+    def x(self) -> torch.Tensor:
+        """
+        Target location on the x-axis.
+        """
         return self.xy[..., 0]
 
     @property
-    def y(self):
+    def y(self) -> torch.Tensor:
+        """
+        Target location on the y-axis.
+        """
         return self.xy[..., 1]
 
     @lazy_property
-    def median(self):
+    def median(self) -> int:
         return torch.median(self.images).item()
 
     def fetch(self, ndx, fdx, cdx):
@@ -92,11 +124,11 @@ class CosmosDataset:
         )
 
     @lazy_property
-    def vmin(self):
+    def vmin(self) -> int:
         return quantile(self.images.flatten().float(), 0.05).item()
 
     @lazy_property
-    def vmax(self):
+    def vmax(self) -> int:
         return quantile(self.images.flatten().float(), 0.99).item()
 
     def __repr__(self):

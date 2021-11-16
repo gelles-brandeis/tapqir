@@ -166,7 +166,7 @@ class Cosmos(Model):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -326,7 +326,7 @@ class Cosmos(Model):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -460,7 +460,7 @@ class Cosmos(Model):
         pyro.param(
             "background_mean_loc",
             lambda: torch.full(
-                (data.N, 1),
+                (data.Nt, 1),
                 data.median - self.data.offset.mean,
                 device=device,
             ),
@@ -468,14 +468,14 @@ class Cosmos(Model):
         )
         pyro.param(
             "background_std_loc",
-            lambda: torch.ones(data.N, 1, device=device),
+            lambda: torch.ones(data.Nt, 1, device=device),
             constraint=constraints.positive,
         )
 
         pyro.param(
             "b_loc",
             lambda: torch.full(
-                (data.N, data.F),
+                (data.Nt, data.F),
                 data.median - self.data.offset.mean,
                 device=device,
             ),
@@ -483,22 +483,22 @@ class Cosmos(Model):
         )
         pyro.param(
             "b_beta",
-            lambda: torch.ones(data.N, data.F, device=device),
+            lambda: torch.ones(data.Nt, data.F, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_loc",
-            lambda: torch.full((self.K, data.N, data.F), 2000, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 2000, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_beta",
-            lambda: torch.full((self.K, data.N, data.F), 0.001, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 0.001, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "w_mean",
-            lambda: torch.full((self.K, data.N, data.F), 1.5, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 1.5, device=device),
             constraint=constraints.interval(
                 0.75 + torch.finfo(self.dtype).eps,
                 2.25 - torch.finfo(self.dtype).eps,
@@ -506,12 +506,12 @@ class Cosmos(Model):
         )
         pyro.param(
             "w_size",
-            lambda: torch.full((self.K, data.N, data.F), 100, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             "x_mean",
-            lambda: torch.zeros(self.K, data.N, data.F, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -519,7 +519,7 @@ class Cosmos(Model):
         )
         pyro.param(
             "y_mean",
-            lambda: torch.zeros(self.K, data.N, data.F, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -527,13 +527,13 @@ class Cosmos(Model):
         )
         pyro.param(
             "size",
-            lambda: torch.full((self.K, data.N, data.F), 200, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
 
         pyro.param(
             "m_probs",
-            lambda: torch.full((self.K, data.N, data.F), 0.5, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
             constraint=constraints.unit_interval,
         )
 
@@ -548,8 +548,8 @@ class Cosmos(Model):
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        z_probs = torch.zeros(self.data.N, self.data.F)
-        theta_probs = torch.zeros(self.K, self.data.N, self.data.F)
+        z_probs = torch.zeros(self.data.Nt, self.data.F)
+        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
