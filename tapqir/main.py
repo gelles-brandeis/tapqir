@@ -157,10 +157,10 @@ def glimpse(
     desc["frame-start"] = "First frame to include in the analysis"
     desc["frame-end"] = "Last frame to include in the analysis"
     desc["name"] = "Channel name"
-    desc["glimpse-folder"] = "Path to the header/glimpse folder"
-    desc["driftlist"] = "Path to the driftlist file"
-    desc["ontarget-aoiinfo"] = "Path to the on-target AOI locations file"
-    desc["offtarget-aoiinfo"] = "Path to the off-target control AOI locations file"
+    desc["glimpse-folder"] = "Header/glimpse folder"
+    desc["driftlist"] = "Driftlist file"
+    desc["ontarget-aoiinfo"] = "On-target AOI locations file"
+    desc["offtarget-aoiinfo"] = "Off-target control AOI locations file"
     desc["ontarget-labels"] = "On-target AOI binding labels"
 
     DEFAULTS["dataset"] = dataset
