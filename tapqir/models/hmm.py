@@ -93,7 +93,7 @@ class HMM(Cosmos):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -259,7 +259,7 @@ class HMM(Cosmos):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -507,7 +507,7 @@ class HMM(Cosmos):
         pyro.param(
             "m_probs",
             lambda: torch.full(
-                (1 + self.S, self.K, self.data.N, self.data.F),
+                (1 + self.S, self.K, self.data.Nt, self.data.F),
                 0.5,
                 device=device,
             ),

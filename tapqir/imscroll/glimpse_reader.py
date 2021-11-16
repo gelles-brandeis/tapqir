@@ -32,10 +32,9 @@ class GlimpseDataset:
     :param frame-start: First frame to include in the analysis (optional).
     :param frame-end: Last frame to include in the analysis (optional).
     :param ontarget-labels: Path to the on-target label intervals file.
-    :param offtarget-labels: Path to the off-target label intervals file.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, c=0, **kwargs):
         dtypes = ["ontarget"]
         if "offtarget-aoiinfo" in kwargs:
             dtypes.append("offtarget")
@@ -140,9 +139,10 @@ class GlimpseDataset:
         self.cumdrift = drift_df
         self.labels = labels
         self.name = kwargs["name"]
+        self.c = c
 
-    def __len__(self):
-        return self.N
+    def __len__(self) -> int:
+        return self.F
 
     def __getitem__(self, key):
         # read the entire frame image
@@ -164,11 +164,75 @@ class GlimpseDataset:
             )
         return img + 2 ** 15
 
+    @property
+    def N(self) -> int:
+        return len(self.aoiinfo["ontarget"])
+
+    @property
+    def Nc(self) -> int:
+        if "offtarget" in self.dtypes:
+            return len(self.aoiinfo["offtarget"])
+        return 0
+
+    @property
+    def F(self) -> int:
+        return len(self.cumdrift)
+
     def __repr__(self):
-        return rf"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
+        return rf"{self.__class__.__name__}(N={self.N}, Nc={self.Nc}, F={self.F})"
 
     def __str__(self):
-        return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
+        return f"{self.__class__.__name__}(N={self.N}, Nc={self.Nc}, F={self.F})"
+
+    def plot(self, dtype: str, P: int, path: Path, save: bool):
+        """
+        Plot AOIs in the field of view.
+
+        :param dtype: Data type (``ontarget``, ``offtarget``, ``offset``).
+        :param P: AOI size.
+        :param path: Path where to save plots.
+        :param save: Save plots.
+        """
+        colors = {}
+        colors["ontarget"] = "#AA3377"
+        colors["offtarget"] = "#CCBB44"
+        fig = plt.figure(figsize=(10, 10 * self.height / self.width))
+        ax = fig.add_subplot(1, 1, 1)
+        fov = self[self.cumdrift.index[0]]
+        vmin = np.percentile(fov, 1)
+        vmax = np.percentile(fov, 99)
+        ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
+        if dtype in ["ontarget", "offtarget"]:
+            for aoi in self.aoiinfo[dtype].index:
+                # areas of interest
+                y_pos = round(self.aoiinfo[dtype].at[aoi, "y"] - 0.5 * (P - 1)) - 0.5
+                x_pos = round(self.aoiinfo[dtype].at[aoi, "x"] - 0.5 * (P - 1)) - 0.5
+                ax.add_patch(
+                    Rectangle(
+                        (x_pos, y_pos),
+                        P,
+                        P,
+                        edgecolor=colors[dtype],
+                        lw=1,
+                        facecolor="none",
+                    )
+                )
+        elif dtype == "offset":
+            ax.add_patch(
+                Rectangle(
+                    (10, 10),
+                    P,
+                    P,
+                    edgecolor="#CCBB44",
+                    lw=1,
+                    facecolor="none",
+                )
+            )
+        ax.set_title(f"{dtype} locations for channel {self.c}", fontsize=16)
+        ax.set_xlabel("x", fontsize=16)
+        ax.set_ylabel("y", fontsize=16)
+        if save:
+            plt.savefig(path / f"{dtype}-channel{self.c}.png", dpi=300)
 
 
 def read_glimpse(path, **kwargs):
@@ -186,7 +250,7 @@ def read_glimpse(path, **kwargs):
     data = defaultdict(list)
     target_xy = defaultdict(list)
     for c in range(C):
-        glimpse = GlimpseDataset(**kwargs, **channels[c])
+        glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
 
         raw_target_xy = {}
         colors = {}
@@ -207,56 +271,12 @@ def read_glimpse(path, **kwargs):
                 )
             )
 
-            # plot AOIs in raw FOV images
-            fig = plt.figure(figsize=(10, 10 * glimpse.height / glimpse.width))
-            ax = fig.add_subplot(1, 1, 1)
-            fov = glimpse[glimpse.cumdrift.index[0]]
-            vmin = np.percentile(fov, 1)
-            vmax = np.percentile(fov, 99)
-            ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
-            for aoi in glimpse.aoiinfo[dtype].index:
-                # areas of interest
-                y_pos = round(glimpse.aoiinfo[dtype].at[aoi, "y"] - 0.5 * (P - 1)) - 0.5
-                x_pos = round(glimpse.aoiinfo[dtype].at[aoi, "x"] - 0.5 * (P - 1)) - 0.5
-                ax.add_patch(
-                    Rectangle(
-                        (x_pos, y_pos),
-                        P,
-                        P,
-                        edgecolor=colors[dtype],
-                        lw=1,
-                        facecolor="none",
-                    )
-                )
-            ax.set_title(f"{dtype} AOI locations for channel {c}", fontsize=16)
-            ax.set_xlabel("x", fontsize=16)
-            ax.set_ylabel("y", fontsize=16)
-            plt.savefig(path / f"{dtype}-channel{c}.png", dpi=300)
+            glimpse.plot(dtype, P, path=path, save=True)
 
         # plot offset in raw FOV images
-        fig = plt.figure(figsize=(10, 10 * glimpse.height / glimpse.width))
-        ax = fig.add_subplot(1, 1, 1)
-        fov = glimpse[glimpse.cumdrift.index[0]]
-        vmin = np.percentile(fov, 1)
-        vmax = np.percentile(fov, 99)
-        ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
-        ax.add_patch(
-            Rectangle(
-                (10, 10),
-                30,
-                30,
-                edgecolor="#CCBB44",
-                lw=1,
-                facecolor="none",
-            )
-        )
-        ax.set_title(f"offset location for channel {c}", fontsize=16)
-        ax.set_xlabel("x", fontsize=16)
-        ax.set_ylabel("y", fontsize=16)
-        plt.savefig(path / f"offset-channel{c}.png", dpi=300)
+        glimpse.plot("offset", 30, path=path, save=True)
 
         # loop through each frame
-        logger.info("Processing glimpse files ...")
         for f, frame in enumerate(tqdm(glimpse.cumdrift.index)):
             img = glimpse[frame]
 
@@ -370,10 +390,11 @@ def read_glimpse(path, **kwargs):
     plt.savefig(path / "offset-medians.png", dpi=300)
 
     logger.info(
-        f"Dataset: N={dataset.N} AOIs, "
+        f"Dataset: N={dataset.N} on-target AOIs, "
+        f"Nc={dataset.Nc} off-target AOIs, "
         f"F={dataset.F} frames, "
         f"C={dataset.C} channels, "
-        f"P={dataset.P} pixels, "
-        f"P={dataset.P} pixels"
+        f"Px={dataset.P} pixels, "
+        f"Py={dataset.P} pixels"
     )
     logger.info(f"Data is saved in {Path(path) / 'data.tpqr'}")

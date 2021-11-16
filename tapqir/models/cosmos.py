@@ -166,7 +166,7 @@ class Cosmos(Model):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -326,7 +326,7 @@ class Cosmos(Model):
         # aoi sites
         aois = pyro.plate(
             "aois",
-            self.data.N,
+            self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
             dim=-2,
@@ -548,8 +548,8 @@ class Cosmos(Model):
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        z_probs = torch.zeros(self.data.N, self.data.F)
-        theta_probs = torch.zeros(self.K, self.data.N, self.data.F)
+        z_probs = torch.zeros(self.data.Nt, self.data.F)
+        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
