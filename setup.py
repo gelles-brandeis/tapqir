@@ -54,6 +54,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
+        "cmake>=3.18",
         "colorama",
         "funsor==0.4.1",
         "future",
