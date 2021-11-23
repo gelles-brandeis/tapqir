@@ -140,6 +140,16 @@ class GlimpseDataset:
         self.labels = labels
         self.name = kwargs["name"]
         self.c = c
+        #  if self.name == "Ch0":
+        #      self.aoiinfo["ontarget"] = self.aoiinfo["ontarget"].sample(
+        #          n=200, axis=0, random_state=2
+        #      )
+        #      self.aoiinfo["offtarget"] = self.aoiinfo["offtarget"].sample(
+        #          n=200, axis=0, random_state=2
+        #      )
+        #      # self.aoiinfo["ontarget"] = self.aoiinfo["ontarget"].drop(313, axis=0)
+        #      mask = self.aoiinfo["ontarget"].index.values - 1
+        #      self.labels["ontarget"] = self.labels["ontarget"][mask]
 
     def __len__(self) -> int:
         return self.F
@@ -249,6 +259,7 @@ def read_glimpse(path, **kwargs):
     # iterate over channels
     data = defaultdict(list)
     target_xy = defaultdict(list)
+    labels = defaultdict(list)
     for c in range(C):
         glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
 
@@ -270,6 +281,7 @@ def read_glimpse(path, **kwargs):
                     dtype="int",
                 )
             )
+            labels[dtype].append(glimpse.labels[dtype])
 
             glimpse.plot(dtype, P, path=path, save=True)
 
@@ -306,10 +318,11 @@ def read_glimpse(path, **kwargs):
 
     min_data = np.inf
     for dtype in data.keys():
-        # concatenate channels
+        # concatenate color channels
         data[dtype] = np.stack(data[dtype], -3)
         target_xy[dtype] = np.stack(target_xy[dtype], -2)
         min_data = min(min_data, data[dtype].min())
+        labels[dtype] = np.stack(labels[dtype], -1)
         # convert data to torch tensor
         data[dtype] = torch.tensor(data[dtype])
         target_xy[dtype] = torch.tensor(target_xy[dtype])
@@ -349,12 +362,13 @@ def read_glimpse(path, **kwargs):
     )
     data = torch.cat(tuple(data[dtype] for dtype in glimpse.dtypes), 0)
     target_xy = torch.cat(tuple(target_xy[dtype] for dtype in glimpse.dtypes), 0)
+    labels = np.concatenate(tuple(labels[dtype] for dtype in glimpse.dtypes), 0)
 
     dataset = CosmosDataset(
         data,
         target_xy,
         is_ontarget,
-        glimpse.labels["ontarget"],
+        labels,
         offset_samples,
         offset_weights,
         name=name,

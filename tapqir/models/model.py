@@ -64,8 +64,6 @@ class Model:
         self.data_path = None
         self.path = None
         self.run_path = None
-        logger.debug("Tapqir version - {}".format(tapqir_version))
-        logger.debug("Model - {}".format(self.name))
         # set device & dtype
         self.to(device, dtype)
 
@@ -94,8 +92,6 @@ class Model:
                 samples=self.data.offset.samples.to(self.device),
                 weights=self.data.offset.weights.to(self.device),
             )
-        logger.debug("Device - {}".format(self.device))
-        logger.debug("Floating precision - {}".format(self.dtype))
 
     def load(self, path: Union[str, Path], data_only: bool = True) -> None:
         """
@@ -110,7 +106,7 @@ class Model:
 
         # load data
         self.data = load(self.path, self.device)
-        logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
+        logger.debug(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results
         if not data_only:
@@ -175,13 +171,8 @@ class Model:
         self.elbo = self.TraceELBO(jit)
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
-        self.nbatch_size = nbatch_size
-        self.fbatch_size = fbatch_size
-
-        logger.debug("Optimizer - {}".format(self.optim_fn.__name__))
-        logger.debug("Learning rate - {}".format(self.lr))
-        logger.debug("AOI batch size - {}".format(self.nbatch_size))
-        logger.debug("Frame batch size - {}".format(self.fbatch_size))
+        self.nbatch_size = min(nbatch_size, self.data.Nt)
+        self.fbatch_size = min(fbatch_size, self.data.F)
 
     def run(self, num_iter: int = 0) -> int:
         """
@@ -195,6 +186,16 @@ class Model:
         if not num_iter:
             use_crit = True
             num_iter = 100000
+
+        logger.debug("Tapqir version - {}".format(tapqir_version))
+        logger.debug("Model - {}".format(self.name))
+        logger.debug("Device - {}".format(self.device))
+        logger.debug("Floating precision - {}".format(self.dtype))
+        logger.debug("Optimizer - {}".format(self.optim_fn.__name__))
+        logger.debug("Learning rate - {}".format(self.lr))
+        logger.debug("AOI batch size - {}".format(self.nbatch_size))
+        logger.debug("Frame batch size - {}".format(self.fbatch_size))
+
         with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
             for i in trange(num_iter):
                 try:
