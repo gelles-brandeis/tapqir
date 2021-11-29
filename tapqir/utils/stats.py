@@ -23,6 +23,8 @@ from sklearn.metrics import (
 from tapqir.distributions import AffineBeta
 from tapqir.distributions.util import gaussian_spots
 
+pyro.enable_validation(False)
+
 
 def snr(
     data: torch.Tensor,
@@ -60,7 +62,7 @@ def snr(
         \text{ for } \theta_{nf} = k`
     """
     weights = gaussian_spots(
-        torch.ones(1),
+        torch.ones(1, device=torch.device("cpu")),
         width,
         x,
         y,
@@ -222,38 +224,36 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
-    if model.pspecific is not None:
-        ci_stats["m_probs"] = model.m_probs.data.cpu()
-        ci_stats["theta_probs"] = model.theta_probs.data.cpu()
-        ci_stats["p(specific)"] = model.pspecific.data.cpu()
-        ci_stats["z_map"] = model.z_map.data.cpu()
+    ci_stats["m_probs"] = model.m_probs.data.cpu()
+    ci_stats["theta_probs"] = model.theta_probs.data.cpu()
+    ci_stats["z_probs"] = model.z_probs.data.cpu()
+    ci_stats["z_map"] = model.z_map.data.cpu()
 
     model.params = ci_stats
 
     # snr
-    if model.pspecific is not None:
-        summary.loc["SNR", "Mean"] = (
-            snr(
-                model.data.images[:, :, model.cdx],
-                ci_stats["width"]["Mean"],
-                ci_stats["x"]["Mean"],
-                ci_stats["y"]["Mean"],
-                model.data.xy[:, :, model.cdx].to(model.device),
-                ci_stats["background"]["Mean"],
-                ci_stats["gain"]["Mean"],
-                model.data.offset.mean,
-                model.data.offset.var,
-                model.data.P,
-                model.theta_probs,
-            )
-            .mean()
-            .item()
+    summary.loc["SNR", "Mean"] = (
+        snr(
+            model.data.images[:, :, model.cdx],
+            ci_stats["width"]["Mean"],
+            ci_stats["x"]["Mean"],
+            ci_stats["y"]["Mean"],
+            model.data.xy[:, :, model.cdx],
+            ci_stats["background"]["Mean"],
+            ci_stats["gain"]["Mean"],
+            model.data.offset.mean,
+            model.data.offset.var,
+            model.data.P,
+            model.theta_probs,
         )
+        .mean()
+        .item()
+    )
 
     # classification statistics
     if model.data.labels is not None:
         pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
-        true_labels = model.data.labels["z"].ravel()
+        true_labels = model.data.labels["z"][: model.data.N, :, model.cdx].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             summary.loc["MCC", "Mean"] = matthews_corrcoef(true_labels, pred_labels)
@@ -271,10 +271,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc["TP", "Mean"],
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
-        mask = torch.from_numpy(model.data.labels["z"])
-        samples = torch.masked_select(
-            model.pspecific[model.data.is_ontarget].cpu(), mask
-        )
+        mask = torch.from_numpy(model.data.labels["z"][: model.data.N, :, model.cdx])
+        samples = torch.masked_select(model.z_probs[model.data.is_ontarget].cpu(), mask)
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)
             summary.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()
@@ -289,11 +287,6 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        # check convergence status
-        #  data.loc["trained", "Mean"] = False
-        #  for line in open(model.run_path / ".tapqir" / "log"):
-        #      if "model converged" in line:
-        #          data.loc["trained", "Mean"] = True
         torch.save(ci_stats, path / f"{model.full_name}-params.tpqr")
         if save_matlab:
             from scipy.io import savemat
@@ -302,7 +295,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                 if param in (
                     "m_probs",
                     "theta_probs",
-                    "p(specific)",
+                    "z_probs",
                     "z_map",
                 ):
                     ci_stats[param] = field.numpy()

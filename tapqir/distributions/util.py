@@ -42,7 +42,8 @@ def gaussian_spots(
     :return: A tensor of a shape ``batch_shape + (P, P)`` representing 2D-Gaussian spots.
     """
     # create meshgrid of PxP pixel positions
-    P_range = torch.arange(P)
+    device = height.device
+    P_range = torch.arange(P, device=device)
     i_pixel, j_pixel = torch.meshgrid(P_range, P_range, indexing="xy")
     ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
 

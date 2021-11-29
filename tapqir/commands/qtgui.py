@@ -165,13 +165,13 @@ class MainWindow(QMainWindow):
         self.aoiDecrLarge.clicked.connect(partial(self.updateParams, -10))
 
         self.aoiNumber = QLineEdit("0")
-        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.N - 1))
+        self.aoiNumber.setValidator(QIntValidator(0, self.Model.data.Nt - 1))
         self.aoiNumber.setMaximumWidth(50)
         self.aoiNumber.setAlignment(Qt.AlignRight)
         self.aoiNumber.returnPressed.connect(partial(self.updateParams, 0))
 
         self.aoiLabel = QLabel("AOI")
-        self.aoiMax = QLabel(f"/{self.Model.data.N}")
+        self.aoiMax = QLabel(f"/{self.Model.data.Nt}")
         self.hspacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.frame1Label = QLabel("FrameMin")
@@ -300,7 +300,7 @@ class MainWindow(QMainWindow):
             # if self.Model._classifier:
             self.prob[(f - f1) % 100].setOpts(
                 height=(
-                    self.Model.params["p(specific)"][int(self.aoiNumber.text()), f]
+                    self.Model.params["z_probs"][int(self.aoiNumber.text()), f]
                     * self.Model.data.P,
                 )
             )
@@ -344,7 +344,7 @@ class MainWindow(QMainWindow):
         config_axis(self.ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
         (self.item["pspecific"],) = self.ax["pspecific"].plot(
             torch.arange(0, self.Model.data.F),
-            self.Model.params["p(specific)"][0],
+            self.Model.params["z_probs"][0],
             "o-",
             ms=3,
             lw=1,
@@ -401,14 +401,14 @@ class MainWindow(QMainWindow):
         )
 
     def updateParams(self, inc):
-        self.n = (int(self.aoiNumber.text()) + inc) % self.Model.data.N
+        self.n = (int(self.aoiNumber.text()) + inc) % self.Model.data.Nt
         self.aoiNumber.setText(str(self.n))
 
         for p in self.params:
             if p == "z":
-                if "p(specific)" in self.Model.params:
+                if "z_probs" in self.Model.params:
                     self.item["pspecific"].set_ydata(
-                        self.Model.params["p(specific)"][self.n]
+                        self.Model.params["z_probs"][self.n]
                     )
             elif p == "background":
                 self.item[f"{p}_fill"].remove()

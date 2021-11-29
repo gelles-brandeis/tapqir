@@ -159,9 +159,10 @@ def glimpse(
     desc["name"] = "Channel name"
     desc["glimpse-folder"] = "Header/glimpse folder"
     desc["driftlist"] = "Driftlist file"
-    desc["ontarget-aoiinfo"] = "On-target AOI locations file"
-    desc["offtarget-aoiinfo"] = "Off-target control AOI locations file"
+    desc["ontarget-aoiinfo"] = "Target molecule locations file"
+    desc["offtarget-aoiinfo"] = "Off-target control locations file"
     desc["ontarget-labels"] = "On-target AOI binding labels"
+    desc["offtarget-labels"] = "Off-target AOI binding labels"
 
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
@@ -201,10 +202,12 @@ def glimpse(
                 "driftlist",
             ]
             if labels:
-                keys += ["ontarget-labels"]
+                keys += ["ontarget-labels", "offtarget-labels"]
             else:
                 if "ontarget-labels" in DEFAULTS["channels"][c]:
                     del DEFAULTS["channels"][c]["ontarget-labels"]
+                elif "offtarget-labels" in DEFAULTS["channels"][c]:
+                    del DEFAULTS["channels"][c]["offtarget-labels"]
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
             last_folder = None
             for key in keys:
@@ -231,6 +234,7 @@ def glimpse(
                         "offtarget-aoiinfo",
                         "driftlist",
                         "ontarget-labels",
+                        "offtarget-labels",
                     ]
                     and filepicker
                 ):
@@ -486,7 +490,9 @@ def stats(
         model.nbatch_size = nbatch_size
         model.fbatch_size = fbatch_size
 
+        typer.echo("Computing stats ...")
         save_stats(model, cd, save_matlab=matlab)
+        typer.echo("Computing stats: Done")
 
 
 @app.command()
