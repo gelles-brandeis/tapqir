@@ -226,7 +226,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
     ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
-    ci_stats["p(specific)"] = model.pspecific.data.cpu()
+    ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()
 
     model.params = ci_stats
@@ -272,9 +272,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
         mask = torch.from_numpy(model.data.labels["z"][: model.data.N, :, model.cdx])
-        samples = torch.masked_select(
-            model.pspecific[model.data.is_ontarget].cpu(), mask
-        )
+        samples = torch.masked_select(model.z_probs[model.data.is_ontarget].cpu(), mask)
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)
             summary.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()
@@ -289,11 +287,6 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        # check convergence status
-        #  data.loc["trained", "Mean"] = False
-        #  for line in open(model.run_path / ".tapqir" / "log"):
-        #      if "model converged" in line:
-        #          data.loc["trained", "Mean"] = True
         torch.save(ci_stats, path / f"{model.full_name}-params.tpqr")
         if save_matlab:
             from scipy.io import savemat
@@ -302,7 +295,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                 if param in (
                     "m_probs",
                     "theta_probs",
-                    "p(specific)",
+                    "z_probs",
                     "z_map",
                 ):
                     ci_stats[param] = field.numpy()

@@ -140,16 +140,6 @@ class GlimpseDataset:
         self.labels = labels
         self.name = kwargs["name"]
         self.c = c
-        #  if self.name == "Ch0":
-        #      self.aoiinfo["ontarget"] = self.aoiinfo["ontarget"].sample(
-        #          n=200, axis=0, random_state=2
-        #      )
-        #      self.aoiinfo["offtarget"] = self.aoiinfo["offtarget"].sample(
-        #          n=200, axis=0, random_state=2
-        #      )
-        #      # self.aoiinfo["ontarget"] = self.aoiinfo["ontarget"].drop(313, axis=0)
-        #      mask = self.aoiinfo["ontarget"].index.values - 1
-        #      self.labels["ontarget"] = self.labels["ontarget"][mask]
 
     def __len__(self) -> int:
         return self.F
