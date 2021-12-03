@@ -18,8 +18,8 @@ Set up the environment
 Initialize folder
 -----------------
 
-To start the analysis create an empty folder (here named ``tutorial``) and initialize it by running
-``tapqir init`` inside the new folder::
+To start the analysis create an empty folder (here named ``tutorial``), change directory to the newly created folder,
+and initialize it by running ``tapqir init`` inside the new folder::
 
   $ mkdir tutorial
   $ cd tutorial
@@ -66,23 +66,29 @@ the program to use a file dialog for file/folder selection) which will run inter
   First frame to include in the analysis: 1
   Last frame to include in the analysis: 790
 
-Above we specified a dataset name (``Rpb1SNAP549``), size of AOI images (we recommend to use ``14`` pixels),
-first and last frames included in the analysis (``1`` and ``790``), and the number of color channels (``1``).
-If starting and ending frames are not specified then the full range of frames from the driftlist file will be analyzed.
+Above we specified
+
+* A dataset name (``Rpb1SNAP549``)
+* Size of AOI images (we recommend to use ``14`` pixels)
+* First and last frames included in the analysis (``1`` and ``790``). If starting and ending frames are not specified
+  then the full range of frames from the driftlist file will be analyzed.
+* The number of color channels (``1``).
 
 Next, the program asks the locations of input files for each color channel (only one color channel in this example):
 
 .. note::
 
-   In Python indexing starts with 0. We stick to this convention and index AOIs, frames, color channels, and
-   pixels starting with 0.
+   **About indexing**. In Python indexing starts with 0. We stick to this convention and index AOIs, frames, color channels,
+   and pixels starting with 0. Note, however, that in the ``tapqir glimpse`` command above for frame numbers we used
+   ``1`` and ``790`` which are according to Matlab indexing convention (in Matlab indexing starts with ``1``) since
+   driftlist file was produced using the Matlab script.
 
 .. code-block::
 
   INPUTS FOR CHANNEL #0
 
   Channel name: SNAP549
-  Path to the header/glimpse folder:
+  Header/glimpse folder:
   /tmp/tutorial/DatasetA_glimpse/garosen00267
 
 .. image:: glimpse_folder.png
@@ -90,7 +96,7 @@ Next, the program asks the locations of input files for each color channel (only
 
 .. code-block::
 
-  Path to the on-target AOI locations file:
+  Target molecule locations file:
   /tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat
 
 .. image:: DNA_locations.png
@@ -99,33 +105,38 @@ Next, the program asks the locations of input files for each color channel (only
 .. code-block::
 
   Add off-target AOI locations? [y/N]: y
-  Path to the off-target control AOI locations file:
+  Off-target control locations file:
   /tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat
-  Path to the driftlist file:
+  Driftlist file:
   /tmp/tutorial/DatasetA_glimpse/green_driftlist.dat
 
-Above we tell the program to include off-target AOI locations in the analysis and specify the file location using
-the file dialog. Last, we specify the location of the driftlist file.
+Above
+
+* we tell the program to include off-target AOI locations in the analysis and specify the file location using
+  the file dialog.
+* Last, we specify the location of the driftlist file.
 
 .. code-block::
 
-  INFO - Processing glimpse files ...
+  Extracting AOIs ...
   100%|███████████████████████████████████| 790/790 [00:07<00:00, 109.28it/s]
-  INFO - Dataset: N=857 AOIs, F=790 frames, C=1 channels, P=14 pixels, P=14 pixels
+  INFO - Dataset: N=331 on-target AOIs, Nc=526 off-target AOIs, F=790 frames, C=1 channels, Px=14 pixels, Py=14 pixels
   INFO - Data is saved in /tmp/tutorial/data.tpqr
+  Extracting AOIs: Done
 
-The program has outputted ``data.tpqr`` file containing extracted AOIs, target and
-off-target control locations, the camera offset empirical distirbution samples and weights::
+Great! The program has outputted ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
+control locations), the camera offset empirical distirbution sample values and their weights::
 
     $ ls
 
-    data.tpqr            offset-distribution.png  ontarget-channel0.png
-    offset-channel0.png  offtarget-channel0.png   DatasetA_glimpse
+    DatasetA_glimpse     offset-distribution.png  ontarget-channel0.png
+    data.tpqr            offset-medians.png
+    offset-channel0.png  offtarget-channel0.png
 
-Additionally the program has saved
+Additionally, the program has saved
 
-* field of view (FOV) images (``ontarget-channel0.png`` and ``offtarget-channel0.png``)
-  displaying locations of on-target and off-target AOIs in the first frame (make sure that AOIs are *inside* of the FOV):
+* Image files (``ontarget-channel0.png`` and ``offtarget-channel0.png``) displaying locations of on-target and off-target
+  AOIs in the first frame (make sure that AOIs are *inside* the FOV):
 
 .. image:: ontarget-channel0.png
    :width: 700
@@ -133,8 +144,8 @@ Additionally the program has saved
 .. image:: offtarget-channel0.png
    :width: 700
 
-* Location from the dark corner of the image (``off-channel0.png``) used to create the offset empirical distribution
-  (make sure that offset region is *outside* of the FOV):
+* Location from the dark corner of the image (``offset-channel0.png``) used to create the offset empirical distribution
+  (make sure that offset region is *outside* the FOV):
 
 .. image:: offset-channel0.png
    :width: 700
@@ -144,7 +155,7 @@ Additionally the program has saved
 .. image:: offset-distribution.png
    :width: 300
 
-* Offset median drift (offset distribution shouldn't change over time) (``offset-medians.png``):
+* Offset median change (offset distribution shouldn't drift over time) (``offset-medians.png``):
 
 .. image:: offset-medians.png
    :width: 500
@@ -152,101 +163,63 @@ Additionally the program has saved
 Fit the data
 ------------
 
-Now the data is ready for analysis. We will first fit the data to the time-independent ``cosmos`` model (`Ordabayev et al., 2021`_).
-
-.. note::
-   We use variational inference to fit the model. For a better convergence we marginalize out :math:`\theta` parameter
-   in the model ("marginalization" is a term in Bayesian inference meaning integrating out the variable). This is what
-   we call the marginal (``--marginal``) model. However, to calculate :math:`p(\mathsf{specific})` we need the probability values
-   of :math:`\theta` parameter. Therefore, at the second step we fit the "full" model where :math:`\theta` is not marginalized
-   out. At this step we also "freeze" all other parameters since they already have converged to a good value. In short,
-   we first need to fit the "marginal" model and then the "full" model.
-
-First, fit the data to the ``cosmos`` model with :math:`\theta` marginalized out (``--marginal``)::
+Now the data is ready for analysis. We will fit the data to the time-independent ``cosmos`` model (`Ordabayev et al., 2021`_)::
 
     $ tapqir fit
 
     Tapqir model (cosmos) [cosmos]:
     Channel numbers (space separated if multiple) [0]:
-    Use the marginalized model? [y/n]: y
     Run computations on GPU? [y/n]: y
     AOI batch size [10]:
     Frame batch size [512]:
     Learning rate [0.005]:
-    Number of epochs [0]:
+    Number of iterations [0]:
+    Save parameters in matlab format? [y/N]: y
     Overwrite defaults values? [Y/n]:
-    INFO - Tapqir version - 0+untagged.779.gd3fba72.dirty
-    INFO - Model - cosmos
-    INFO - Device - cuda
-    INFO - Floating precision - torch.float64
-    INFO - Loaded data from /tmp/tutorial/data.tpqr
-    INFO - Optimizer - Adam
-    INFO - Learning rate - 0.005
-    INFO - AOI batch size - 5
-    INFO - Frame batch size - 512
-      0%|                                             | 0/1000 [00:00<?, ?it/s]
+    Fitting the data ...
+    100%|████████████████████████████████████| 100/100 [00:38<00:00,  2.62it/s]
+    Fitting the data: Done
+    Computing stats ...
+    Computing stats: Done
 
 Options that we selected:
 
 * Model - the default single-color time-independent model (``cosmos``).
-
 * Color channel number - first chanel (``0``) (there is only one color channel in this data)
-
-* Marginalized model - yes (``y``).
-
 * Run computations on GPU: yes (``y``).
-
 * AOI batch size - use default (``10``).
-
 * Frame batch size - use default (``512``).
-
 * Learning rate - use default (``0.005``).
-
-* Number of epochs - use default (``0``)
+* Number of iterations - use default (``0``)
 
 .. note::
    **About batch size**. In theory, batch size should impact *training time* and *memory consumption*,
    but not the *performance*. It can be optimized for a particular GPU hardware by
    trying different batch size values and comparing training time/memory usage
    (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values). In particular,
-   if there is a memory overflow you can decrease either AOI batch size (e.g., to ``5``)
-   or frame batch size (e.g., to ``128`` or ``256``).
+   if there is a memory overflow you can decrease either frame batch size (e.g., to ``128`` or ``256``)
+   or AOI batch size (e.g., to ``5``).
 
 .. note::
-   **About epoch**. Sweep through the entire data set is called an *epoch*. Fitting the data
-   requires many epochs (about 500-1000) until parameters converge. Setting the number of epochs to 0 will run
-   the program till Tapqir's custom convergence criteria is satisfied. We recommend to set it
-   to 0 (default) and then run for additional number of epochs as required. Convergence of global
+   **About number of iterations**. Fitting the data requires many iterations (about 50,000-100,000) until parameters
+   converge. Setting the number of iterations to 0 will run the program till Tapqir's custom convergence criteria is satisfied.
+   We recommend to set it to 0 (default) and then run for additional number of iterations if required. Convergence of global
    parameters can be visually checked using tensorboard_.
 
-The program will save a checkpoint every epoch (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
-Starting the program again will resume from the last saved checkpoint. The program can be stopped using ``Ctrl+C``.
+The program will save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
+Starting the program again will resume from the last saved checkpoint. The program can be stopped using ``Ctrl-C``.
 At every checkpoint the values of global variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``,
 ``pi_mean``, ``lamda_loc``) are also recorded for visualization by tensorboard_. Plateaued plots signify convergence.
 
-After the marginalized model has converged run the full ``cosmos`` model (usually
-100-150 epochs is enough)::
+After fitting is finished the program computes 95% credible intervals of model parameters and saves them in
+``cosmos-channel0-params.tqpr``, ``cosmos-channel0-params.mat`` (Matlab format), and ``cosmos-channel0-summary.csv`` files.
 
-    $ tapqir fit
+To visualize analysis results run::
 
-    Use the marginalized model? [Y/n]: n
-    Run computations on GPU? [Y/n]:
-    AOI batch size [10]:
-    Frame batch size [512]:
-    Learning rate [0.005]:
-    Number of epochs [0]: 100
-    Overwrite defaults values? [Y/n]:
-    INFO - Tapqir version - 0+untagged.779.gd3fba72.dirty
-    INFO - Model - cosmos
-    INFO - Device - cuda
-    INFO - Floating precision - torch.float64
-    INFO - Loaded data from /tmp/tutorial/data.tpqr
-    INFO - Epoch #391. Loaded model params and optimizer state from /tmp/tutorial/.tapqir
-    INFO - Optimizer - Adam
-    INFO - Learning rate - 0.005
-    INFO - AOI batch size - 10
-    INFO - Frame batch size - 512
-     40%|██████████████                     | 40/100 [49:32<1:14:12, 74.21s/it]
+    $ tapqir show
+
+which will open GUI displaying parameter values from ``cosmos-channel0-params.tpqr`` file (mean and 95% CI). Clicking on the
+``Images`` button will show original images along with the best fit estimates.
 
 .. tip::
 
@@ -265,39 +238,6 @@ Fitting progress can be inspected while fitting is taking place or afterwards us
 
     $ tensorboard --logdir=.
 
-Posterior distributions
-^^^^^^^^^^^^^^^^^^^^^^^
-
-To compute 95% credible intervals of model parameters run::
-
-    $ tapqir stats
-
-    Tapqir model (cosmos) [cosmos]:
-    Channel numbers (space separated if multiple) [0]:
-    Run computations on GPU? [Y/n]:
-    AOI batch size [10]:
-    Frame batch size [512]:
-    Save parameters in matlab format? [y/N]: y
-    INFO - Tapqir version - 0+untagged.779.gd3fba72.dirty
-    INFO - Model - cosmos
-    INFO - Device - cuda
-    INFO - Floating precision - torch.float64
-    INFO - Loaded data from /tmp/tutorial/data.tpqr
-
-Options:
-
-* Save parameters in matlab format - yes (``y``)
-
-Parameters with their mean value, 95% CI (credible interval) lower limit and upper limit
-are saved in ``cosmos-channel0-params.tqpr``, ``cosmos-channel0-params.mat``, and ``cosmos-channel0-summary.csv`` files.
-
-To visualize analysis results run::
-
-    $ tapqir show
-
-which will open GUI displaying parameter values (mean and 95% CI). Clicking on the ``Images`` button
-will show original images along with the best fit estimates.
-
 Viewing logging info
 --------------------
 
@@ -306,7 +246,7 @@ Tapqir logs console output to a ``.tapqir/loginfo`` text file. It can be viewed 
     $ tapqir log
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
-.. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536 
+.. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536
 .. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki

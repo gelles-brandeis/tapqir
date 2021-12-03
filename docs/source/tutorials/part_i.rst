@@ -20,49 +20,63 @@ As a consequence of Bayesian inference, Tapqir computes for each frame of each A
 
 ``cosmos`` is a physics-informed model, i.e. model parameters have a physical meaning.
 For *N* AOIs per frame, *F* frames, and a maximum of *K* spots in each AOI in each frame, 
-Tapqir estimates the values of the ``cosmos`` parameters:
+Tapqir estimates the values of the ``cosmos`` model parameters:
 
-+------------------------+-----------+-------------------------------------+
-| Parameter              | Shape     | Description                         |
-+========================+===========+=====================================+
-| ``gain`` - :math:`g`   | (1,)      | camera gain                         |
-+------------------------+-----------+-------------------------------------+
-| ``proximity`` - |prox| | (1,)      | proximity                           |
-+------------------------+-----------+-------------------------------------+
-| ``lamda`` - |ld|       | (1,)      | average rate of target-nonspecific  |
-|                        |           | binding                             |
-+------------------------+-----------+-------------------------------------+
-| ``pi`` - :math:`\pi`   | (1,)      | average binding probability of      |
-|                        |           | target-specific binding             |
-+------------------------+-----------+-------------------------------------+
-| ``theta`` - |theta|    | (N, F)    | target-specific spot index          |
-+------------------------+-----------+-------------------------------------+
-| ``m`` - :math:`m`      | (K, N, F) | spot presence indicator             |
-+------------------------+-----------+-------------------------------------+
-| ``height`` - :math:`h` | (K, N, F) | spot intensity                      |
-+------------------------+-----------+-------------------------------------+
-| ``width`` - :math:`w`  | (K, N, F) | spot width                          |
-+------------------------+-----------+-------------------------------------+
-| ``x`` - :math:`x`      | (K, N, F) | spot position on x-axis             |
-+------------------------+-----------+-------------------------------------+
-| ``y`` - :math:`y`      | (K, N, F) | spot position on y-axis             |
-+------------------------+-----------+-------------------------------------+
-| ``background`` - |b|   | (N, F)    | background intensity                |
-+------------------------+-----------+-------------------------------------+
-| ``p(specific)`` - |ps| | (N, F)    | probability of there being          |
-|                        |           | a target-specific spot in the AOI   |
-+------------------------+-----------+-------------------------------------+
-
-where "shape" is the dimensionality of the parameters, e.g., (1,) shape means a scalar
-parameter and (K, N, F) shape means that *each* spot in *each* AOI in *each* frame
-has a separate value of the parameter. `Ordabayev et al., 2021`_ has a more detailed
-description of the parameters.
++-----------------+-----------+-------------------------------------+
+| Parameter       | Shape     | Description                         |
++=================+===========+=====================================+
+| |g| - :math:`g` | (1,)      | camera gain                         |
++-----------------+-----------+-------------------------------------+
+| |sigma| - |prox|| (1,)      | proximity                           |
++-----------------+-----------+-------------------------------------+
+| ``lamda`` - |ld|| (1,)      | average rate of target-nonspecific  |
+|                 |           | binding                             |
++-----------------+-----------+-------------------------------------+
+| ``pi`` - |pi|   | (1,)      | average binding probability of      |
+|                 |           | target-specific binding             |
++-----------------+-----------+-------------------------------------+
+| |bg| - |b|      | (N, F)    | background intensity                |
++-----------------+-----------+-------------------------------------+
+| |z| - :math:`z` | (N, F)    | target-specific spot presence       |
++-----------------+-----------+-------------------------------------+
+| |t| - |theta|   | (N, F)    | target-specific spot index          |
++-----------------+-----------+-------------------------------------+
+| |m| - :math:`m` | (K, N, F) | spot presence indicator             |
++-----------------+-----------+-------------------------------------+
+| |h| - :math:`h` | (K, N, F) | spot intensity                      |
++-----------------+-----------+-------------------------------------+
+| |w| - :math:`w` | (K, N, F) | spot width                          |
++-----------------+-----------+-------------------------------------+
+| |x| - :math:`x` | (K, N, F) | spot position on x-axis             |
++-----------------+-----------+-------------------------------------+
+| |y| - :math:`y` | (K, N, F) | spot position on y-axis             |
++-----------------+-----------+-------------------------------------+
+| |D| - :math:`D` | |shape|   | observed images                     |
++-----------------+-----------+-------------------------------------+
 
 .. |ps| replace:: :math:`p(\mathsf{specific})`
 .. |theta| replace:: :math:`\theta`
 .. |prox| replace:: :math:`\sigma^{xy}`
 .. |ld| replace:: :math:`\lambda`
 .. |b| replace:: :math:`b`
+.. |shape| replace:: (N, F, P, P)
+.. |sigma| replace:: ``proximity``
+.. |bg| replace:: ``background``
+.. |h| replace:: ``height``
+.. |w| replace:: ``width``
+.. |D| replace:: ``data``
+.. |m| replace:: ``m``
+.. |z| replace:: ``z``
+.. |t| replace:: ``theta``
+.. |x| replace:: ``x``
+.. |y| replace:: ``y``
+.. |pi| replace:: :math:`\pi`
+.. |g| replace:: ``gain``
+
+where "shape" is the dimensionality of the parameters, e.g., (1,) shape means a scalar
+parameter and (K, N, F) shape means that *each* spot in *each* AOI in *each* frame
+has a separate value of the parameter. `Ordabayev et al., 2021`_ has a more detailed
+description of the parameters.
 
 The Tapqir command line interface is implemented in `Typer`_.
 
@@ -81,7 +95,7 @@ where
 * ``--model cosmos`` is a command *option (flag)* where ``--model`` is the option name and ``cosmos`` is the option value.
 * ``--cuda`` is a Yes or No command *option (flag)* where its value is True/Yes if provided and False/No if not provided.
 
-Some options have a one-letter version as well. For example, both ``--help`` and ``-h`` will display help.
+Some options have a short version (with one dash) as well. For example, both ``--help`` and ``-h`` will display help.
 
 ``tapqir --help`` will display an overall help and ``tapqir COMMAND --help`` will display
 a command-specific help that will show which options are available for that specific command.
