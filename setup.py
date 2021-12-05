@@ -71,6 +71,7 @@ setuptools.setup(
         "qtrangeslider",
     ],
     extras_require={
+        "colab": ["cmake>=3.18"],
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
         "docs": DOCS_REQUIRE,
