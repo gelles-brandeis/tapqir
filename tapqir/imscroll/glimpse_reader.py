@@ -312,7 +312,10 @@ def read_glimpse(path, **kwargs):
         data[dtype] = np.stack(data[dtype], -3)
         target_xy[dtype] = np.stack(target_xy[dtype], -2)
         min_data = min(min_data, data[dtype].min())
-        labels[dtype] = np.stack(labels[dtype], -1)
+        if any(label is None for label in labels[dtype]):
+            labels[dtype] = None
+        else:
+            labels[dtype] = np.stack(labels[dtype], -1)
         # convert data to torch tensor
         data[dtype] = torch.tensor(data[dtype])
         target_xy[dtype] = torch.tensor(target_xy[dtype])
@@ -352,7 +355,15 @@ def read_glimpse(path, **kwargs):
     )
     data = torch.cat(tuple(data[dtype] for dtype in glimpse.dtypes), 0)
     target_xy = torch.cat(tuple(target_xy[dtype] for dtype in glimpse.dtypes), 0)
-    labels = np.concatenate(tuple(labels[dtype] for dtype in glimpse.dtypes), 0)
+    if all(labels[dtype] is None for dtype in glimpse.dtypes):
+        labels = None
+    else:
+        labels = np.concatenate(
+            tuple(
+                labels[dtype] for dtype in glimpse.dtypes if labels[dtype] is not None
+            ),
+            0,
+        )
 
     dataset = CosmosDataset(
         data,
