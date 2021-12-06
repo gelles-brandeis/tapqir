@@ -136,10 +136,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         # calculate Keq
         if param == "pi":
             ci_stats["Keq"] = {}
-            ci_stats["Keq"]["LL"], ci_stats["Keq"]["UL"] = hpdi(
-                samples[:, 1] / (1 - samples[:, 1]), CI, dim=0
-            )
-            ci_stats["Keq"]["Mean"] = (samples[:, 1] / (1 - samples[:, 1])).mean()
+            LL, UL = hpdi(samples[:, 1] / (1 - samples[:, 1]), CI, dim=0)
+            ci_stats["Keq"]["LL"] = LL.cpu()
+            ci_stats["Keq"]["UL"] = UL.cpu()
+            ci_stats["Keq"]["Mean"] = (samples[:, 1] / (1 - samples[:, 1])).mean().cpu()
 
     # this does not need to be very accurate
     num_samples = 1000
