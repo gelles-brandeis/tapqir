@@ -1,18 +1,62 @@
 Install on Linux
 ================
 
-1. `Install Anaconda`_ package manager.
+We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
-2. Create a new environment and give it a name (e.g., ``tapqir-env``)::
+1. Install Nvidia drivers.
+
+   **Ubuntu 20.04**
+
+   To get information about your graphic card and available drivers run::
+
+    $ ubuntu-drivers device
+
+   Install recommended driver::
+
+    $ sudo apt install nvidia-driver-470
+
+   **Arch Linux**
+
+   Install the nvidia package::
+
+    $ sudo pacman -S nvidia
+
+2. Install cmake and git.
+
+   **Ubuntu 20.04**
+
+   In the terminal run::
+
+    $ sudo apt install cmake
+    $ sudo apt install git
+
+   **Arch Linux**
+
+   In the terminal run::
+
+    $ sudo pacman -S cmake
+    $ sudo pacman -S git
+
+3. `Install Anaconda`_ package manager.
+
+   Download installer from `<https://www.anaconda.com/products/individual>`_ (if anaconda nucleus sign-up page pops up
+   you can ignore it).
+
+   Run the following command to install Anaconda (change the name of the installer file appropriately if it
+   is a newer version)::
+
+    $ bash ~/Downloads/Anaconda3-2020.02-Linux-x86_64.sh
+
+4. Create a new environment and give it a name (e.g., ``tapqir-env``)::
 
     $ conda create --name tapqir-env python=3.8
 
-3. Activate the environement (you should see the environment name
+5. Activate the environement (you should see the environment name
    (i.e., ``tapqir-env``) in the command prompt)::
 
     $ conda activate tapqir-env
 
-4. Install CUDA and ensure that it is version 11.5 or later::
+6. Install CUDA and ensure that it is version 11.5 or later::
 
     $ conda install cuda -c nvidia
     $ nvcc --version
@@ -23,7 +67,7 @@ Install on Linux
     Cuda compilation tools, release 11.5, V11.5.50
     Build cuda_11.5.r11.5/compiler.30411180_0
 
-5. Install ``tapqir``::
+7. Install ``tapqir``::
 
     $ pip install git+https://github.com/gelles-brandeis/tapqir.git
 
