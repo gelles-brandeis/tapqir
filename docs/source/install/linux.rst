@@ -10,8 +10,13 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
    To get information about your graphic card and available drivers run::
 
     $ ubuntu-drivers device
+    
+    // From the output
+    vendor   : NVIDIA Corporation
+    model    : TU102 [GeForce RTX 2080 Ti]
+    driver   : nvidia-driver-470 - distro non-free recommended
 
-   Install recommended driver::
+   Install recommended ``nvidia-driver-470``::
 
     $ sudo apt install nvidia-driver-470
 
@@ -21,7 +26,7 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
     $ sudo pacman -S nvidia
 
-2. Install cmake and git.
+2. Install cmake, git and libxcb-xinerama0 (on Ubuntu).
 
    **Ubuntu 20.04**
 
@@ -29,6 +34,7 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
     $ sudo apt install cmake
     $ sudo apt install git
+    $ sudo apt-get install libxcb-xinerama0
 
    **Arch Linux**
 
