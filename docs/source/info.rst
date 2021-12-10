@@ -53,6 +53,14 @@ This project is licensed under the `Apache License 2.0 <https://www.apache.org/l
 By submitting a pull request to this project, you agree to license your contribution under the Apache
 License 2.0 to this project.
 
+Open soucre community
+---------------------
+We are committed to working with users from other labs whoe want to incorporate taquir into their image processing popelines.  We would like help from outside users to
+
+-- test tapqir with other microscope or camera  (e.g., sCMOS) technologies 
+-- make tapqir work with other data file formats and preprocessing piplines
+-- export Tapqir results to different post-processing software
+
 Backend
 -------
 
