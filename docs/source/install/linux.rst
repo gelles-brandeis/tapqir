@@ -26,13 +26,12 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
     $ sudo pacman -S nvidia
 
-2. Install cmake, git and libxcb-xinerama0 (on Ubuntu).
+2. Install git and libxcb-xinerama0 (on Ubuntu).
 
    **Ubuntu 20.04**
 
    In the terminal run::
 
-    $ sudo apt install cmake
     $ sudo apt install git
     $ sudo apt-get install libxcb-xinerama0
 
@@ -40,7 +39,6 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
    In the terminal run::
 
-    $ sudo pacman -S cmake
     $ sudo pacman -S git
 
 3. `Install Anaconda`_ package manager.
