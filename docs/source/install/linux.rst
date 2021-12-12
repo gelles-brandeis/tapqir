@@ -3,24 +3,26 @@ Install on Linux
 
 We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
-1. Install Nvidia drivers.
+1. Install Nvidia drivers if not already installed.
 
-   **Ubuntu 20.04**
-
+   *On Ubuntu 20.04*
+   
+   Tip: on Ubuntu select the text to copy it and then press the middle mouse button (scrolling wheel) to paste the copied text.
+   
    To get information about your graphic card and available drivers run::
 
-    $ ubuntu-drivers device
+    $ ubuntu-drivers devices
     
     // From the output
     vendor   : NVIDIA Corporation
     model    : TU102 [GeForce RTX 2080 Ti]
     driver   : nvidia-driver-470 - distro non-free recommended
 
-   Install recommended ``nvidia-driver-470``::
+   Install the recommended nvidia driver (in this case ``nvidia-driver-470``)::
 
     $ sudo apt install nvidia-driver-470
 
-   **Arch Linux**
+   *On Arch Linux*
 
    Install the nvidia package::
 
@@ -28,28 +30,38 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
 2. Install git and libxcb-xinerama0 (on Ubuntu).
 
-   **Ubuntu 20.04**
+   *On Ubuntu 20.04*
 
    In the terminal run::
 
     $ sudo apt install git
-    $ sudo apt-get install libxcb-xinerama0
+    $ sudo apt install libxcb-xinerama0
 
-   **Arch Linux**
+   *On Arch Linux*
 
    In the terminal run::
 
     $ sudo pacman -S git
 
-3. `Install Anaconda`_ package manager.
+3. Install Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
+   Here is the summary of required installation steps:
 
-   Download installer from `<https://www.anaconda.com/products/individual>`_ (if anaconda nucleus sign-up page pops up
-   you can ignore it).
+   * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).
 
-   Run the following command to install Anaconda (change the name of the installer file appropriately if it
+   * Run the following command to install Anaconda (change the name of the installer file appropriately if it
    is a newer version)::
 
-    $ bash ~/Downloads/Anaconda3-2020.02-Linux-x86_64.sh
+      $ bash ~/Downloads/Anaconda3-2021.11-Linux-x86_64.sh
+    
+   * Press Enter at the “In order to continue the installation process, please review the license agreement.” prompt.
+   
+   * Scroll to the bottom of the license terms and enter “Yes” to agree.
+   
+   * Press Enter to accept the default install location.
+   
+   * Type "yes" at “Do you wish the installer to initialize Anaconda3 by running conda init?” prompt.
+   
+   * After installation is complete close the terminal and open it again. Now you should see ``(base)`` environment indicated in the terminal.
 
 4. Create a new environment and give it a name (e.g., ``tapqir-env``)::
 
@@ -74,8 +86,6 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 7. Install ``tapqir``::
 
     $ pip install git+https://github.com/gelles-brandeis/tapqir.git
-
-.. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
 
 Install linux server tools (optional)
 -------------------------------------
