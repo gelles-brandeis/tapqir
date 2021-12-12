@@ -14,12 +14,6 @@ Tapqir is a Python program that can be installed via ``pip`` package manager.
 .. toctree::
    :maxdepth: 1
 
-   windows
    linux
    colab
-
-Advanced options
-----------------
-
-- On Linux machines you can :doc:`set up a Slurm server <linux>` to be able to
-  submit and queue Tapqir jobs.
+   windows
