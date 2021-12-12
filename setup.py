@@ -61,7 +61,7 @@ setuptools.setup(
         "matplotlib",
         "pandas",
         "pykeops==1.5",
-        "pyro-ppl==1.7.0",
+        "pyro-ppl>=1.7.0",
         "pyqtgraph",
         "PySide2",
         "pyyaml>=6.0",
@@ -72,7 +72,6 @@ setuptools.setup(
         "qtrangeslider",
     ],
     extras_require={
-        "colab": ["cmake>=3.18"],
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
         "docs": DOCS_REQUIRE,
