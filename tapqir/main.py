@@ -35,7 +35,6 @@ def format_link(link):
 # available models
 class Model(str, Enum):
     cosmos = "cosmos"
-    crosstalk = "crosstalk"
 
 
 def get_default(key):
