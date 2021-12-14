@@ -2,12 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import tkinter.filedialog as fd
 from collections import defaultdict
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import colorama
 import typer
@@ -38,7 +37,15 @@ class Model(str, Enum):
     cosmos = "cosmos"
 
 
-def _get_default(key):
+def get_default(key):
+    if key in [
+        "name",
+        "glimpse-folder",
+        "ontarget-aoiinfo",
+        "offtarget-aoiinfo",
+        "driftlist",
+    ]:
+        return [c.get(key, None) for c in DEFAULTS["channels"]]
     return DEFAULTS[key]
 
 
@@ -92,22 +99,35 @@ def init():
 @app.command()
 def glimpse(
     dataset: str = typer.Option(
-        partial(_get_default, "dataset"), help="Dataset name", prompt="Dataset name"
+        partial(get_default, "dataset"), help="Dataset name", prompt="Dataset name"
     ),
     P: int = typer.Option(
-        partial(_get_default, "P"),
+        partial(get_default, "P"),
         "--aoi-size",
         "-P",
         help="AOI image size - number of pixels along the axis",
         prompt="AOI image size - number of pixels along the axis",
     ),
     num_channels: int = typer.Option(
-        partial(_get_default, "num-channels"),
+        partial(get_default, "num-channels"),
         "--num-channels",
         "-C",
         help="Number of color channels",
         prompt="Number of color channels",
     ),
+    name: Optional[List[str]] = typer.Option(partial(get_default, "name")),
+    glimpse_folder: Optional[List[str]] = typer.Option(
+        partial(get_default, "glimpse-folder")
+    ),
+    ontarget_aoiinfo: Optional[List[str]] = typer.Option(
+        partial(get_default, "ontarget-aoiinfo")
+    ),
+    offtarget_aoiinfo: Optional[List[str]] = typer.Option(
+        partial(get_default, "offtarget-aoiinfo")
+    ),
+    driftlist: Optional[List[str]] = typer.Option(partial(get_default, "driftlist")),
+    frame_start: Optional[int] = typer.Option(partial(get_default, "frame-start")),
+    frame_end: Optional[int] = typer.Option(partial(get_default, "frame-end")),
     overwrite: bool = typer.Option(
         True,
         "--overwrite",
@@ -121,12 +141,6 @@ def glimpse(
         help="Disable interactive prompt.",
         is_eager=True,
         callback=deactivate_prompts,
-    ),
-    filepicker: bool = typer.Option(
-        False,
-        "--filepicker",
-        "-fp",
-        help="Use filepicker to select files.",
     ),
     labels: bool = typer.Option(
         False,
@@ -167,6 +181,8 @@ def glimpse(
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
     DEFAULTS["num-channels"] = num_channels
+    DEFAULTS["frame-start"] = frame_start
+    DEFAULTS["frame-end"] = frame_end
 
     if not no_input:
         frame_range = typer.confirm(
@@ -180,20 +196,27 @@ def glimpse(
                 desc["frame-end"], default=DEFAULTS["frame-end"], type=int
             )
         else:
-            if "frame-start" in DEFAULTS:
-                del DEFAULTS["frame-start"]
-            if "frame-end" in DEFAULTS:
-                del DEFAULTS["frame-end"]
+            DEFAULTS["frame-start"] = None
+            DEFAULTS["frame-end"] = None
 
         if "channels" not in DEFAULTS:
             DEFAULTS["channels"] = []
         for c in range(num_channels):
             if len(DEFAULTS["channels"]) < c + 1:
-                DEFAULTS["channels"].append(defaultdict(lambda: None))
-            else:
-                DEFAULTS["channels"][c] = defaultdict(
-                    lambda: None, DEFAULTS["channels"][c]
-                )
+                DEFAULTS["channels"].append({})
+            DEFAULTS["channels"][c]["name"] = name[c] if c < len(name) else None
+            DEFAULTS["channels"][c]["glimpse-folder"] = (
+                glimpse_folder[c] if c < len(glimpse_folder) else None
+            )
+            DEFAULTS["channels"][c]["ontarget-aoiinfo"] = (
+                ontarget_aoiinfo[c] if c < len(ontarget_aoiinfo) else None
+            )
+            DEFAULTS["channels"][c]["offtarget-aoiinfo"] = (
+                offtarget_aoiinfo[c] if c < len(offtarget_aoiinfo) else None
+            )
+            DEFAULTS["channels"][c]["driftlist"] = (
+                driftlist[c] if c < len(driftlist) else None
+            )
             keys = [
                 "name",
                 "glimpse-folder",
@@ -209,60 +232,23 @@ def glimpse(
                 elif "offtarget-labels" in DEFAULTS["channels"][c]:
                     del DEFAULTS["channels"][c]["offtarget-labels"]
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
-            last_folder = None
             for key in keys:
                 if key == "offtarget-aoiinfo":
                     offtarget = typer.confirm(
                         "Add off-target AOI locations?",
-                        default=("offtarget-aoiinfo" in DEFAULTS["channels"][c]),
+                        default=(
+                            DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None
+                        ),
                     )
                     if not offtarget:
-                        if "offtarget-aoiinfo" in DEFAULTS["channels"][c]:
-                            del DEFAULTS["channels"][c]["offtarget-aoiinfo"]
+                        DEFAULTS["channels"][c]["offtarget-aoiinfo"] = None
                         continue
 
-                # picker (prompt or file dialog) and its options
-                options = {}
-                if key == "glimpse-folder" and filepicker:
-                    picker = fd.askdirectory
-                    options["title"] = desc[key]
-                    options["initialdir"] = DEFAULTS["channels"][c][key]
-                elif (
-                    key
-                    in [
-                        "ontarget-aoiinfo",
-                        "offtarget-aoiinfo",
-                        "driftlist",
-                        "ontarget-labels",
-                        "offtarget-labels",
-                    ]
-                    and filepicker
-                ):
-                    picker = fd.askopenfilename
-                    options["title"] = desc[key]
-                    if DEFAULTS["channels"][c][key] is not None:
-                        options["initialdir"] = Path(
-                            DEFAULTS["channels"][c][key]
-                        ).parent
-                        options["initialfile"] = Path(DEFAULTS["channels"][c][key]).name
-                    else:
-                        options["initialdir"] = last_folder
-                else:
-                    picker = typer.prompt
-                    options["text"] = desc[key]
-                    options["default"] = DEFAULTS["channels"][c][key]
-
-                # input
-                if key != "name" and filepicker:
-                    typer.echo(desc[key] + ": ")
-                DEFAULTS["channels"][c][key] = picker(**options)
-                if key != "name" and filepicker:
-                    typer.echo(DEFAULTS["channels"][c][key])
-                    last_folder = Path(DEFAULTS["channels"][c][key]).parent
+                DEFAULTS["channels"][c][key] = typer.prompt(
+                    desc[key], default=DEFAULTS["channels"][c][key]
+                )
 
     DEFAULTS = dict(DEFAULTS)
-    for i, channel in enumerate(DEFAULTS["channels"]):
-        DEFAULTS["channels"][i] = dict(channel)
 
     if overwrite:
         with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
@@ -285,28 +271,28 @@ def fit(
         prompt="Channel numbers (space separated if multiple)",
     ),
     cuda: bool = typer.Option(
-        partial(_get_default, "cuda"),
+        partial(get_default, "cuda"),
         "--cuda/--cpu",
         help="Run computations on GPU or CPU",
         prompt="Run computations on GPU?",
         show_default=False,
     ),
     nbatch_size: int = typer.Option(
-        partial(_get_default, "nbatch-size"),
+        partial(get_default, "nbatch-size"),
         "--nbatch-size",
         "-n",
         help="AOI batch size",
         prompt="AOI batch size",
     ),
     fbatch_size: int = typer.Option(
-        partial(_get_default, "fbatch-size"),
+        partial(get_default, "fbatch-size"),
         "--fbatch-size",
         "-f",
         help="Frame batch size",
         prompt="Frame batch size",
     ),
     learning_rate: float = typer.Option(
-        partial(_get_default, "learning-rate"),
+        partial(get_default, "learning-rate"),
         "--learning-rate",
         "-lr",
         help="Learning rate",
@@ -420,21 +406,21 @@ def stats(
         prompt="Channel numbers (space separated if multiple)",
     ),
     cuda: bool = typer.Option(
-        partial(_get_default, "cuda"),
+        partial(get_default, "cuda"),
         "--cuda/--cpu",
         help="Run computations on GPU or CPU",
         prompt="Run computations on GPU?",
         show_default=False,
     ),
     nbatch_size: int = typer.Option(
-        partial(_get_default, "nbatch-size"),
+        partial(get_default, "nbatch-size"),
         "--nbatch-size",
         "-n",
         help="AOI batch size",
         prompt="AOI batch size",
     ),
     fbatch_size: int = typer.Option(
-        partial(_get_default, "fbatch-size"),
+        partial(get_default, "fbatch-size"),
         "--fbatch-size",
         "-f",
         help="Frame batch size",
