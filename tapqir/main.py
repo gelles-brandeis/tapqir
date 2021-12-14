@@ -237,7 +237,9 @@ def glimpse(
                 if key == "offtarget-aoiinfo":
                     offtarget = typer.confirm(
                         "Add off-target AOI locations?",
-                        default=(DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None),
+                        default=(
+                            DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None
+                        ),
                     )
                     if not offtarget:
                         DEFAULTS["channels"][c]["offtarget-aoiinfo"] = None
