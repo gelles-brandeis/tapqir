@@ -96,12 +96,12 @@ class MainWindow(QMainWindow):
         formLayout.addRow("AOI image size:", aoiSize)
         self.aoiSize = aoiSize
         # Number of channels
-        channelNumber = QSpinBox()
-        channelNumber.setValue(1)
-        channelNumber.setMinimum(1)
-        channelNumber.setMaximum(4)
-        channelNumber.valueChanged.connect(self.channelUI)
-        formLayout.addRow("Number of color channels:", channelNumber)
+        numChannels = QSpinBox()
+        numChannels.setValue(1)
+        numChannels.setMinimum(1)
+        numChannels.setMaximum(4)
+        numChannels.valueChanged.connect(self.channelUI)
+        formLayout.addRow("Number of color channels:", numChannels)
         # Specify frame range?
         specifyFrame = QCheckBox()
         specifyFrame.setChecked(False)
@@ -114,21 +114,39 @@ class MainWindow(QMainWindow):
         # Last frame
         lastFrame = QSpinBox()
         lastFrame.setValue(2)
+        lastFrame.setMaximum(50000)
         lastFrame.setEnabled(False)
         formLayout.addRow("Last frame:", lastFrame)
         specifyFrame.toggled.connect(partial(self.toggleWidgets, (firstFrame, lastFrame)))
         # channel tabs
         channelTabs = QTabWidget()
         self.channelTabs = channelTabs
-        self.channelUI(channelNumber.value())
+        self.name, self.header, self.ontarget, self.offtarget, self.driftlist = {}, {}, {}, {}, {}
+        self.channelUI(numChannels.value())
         # extract AOIs
         extractAOIs = QPushButton("tapqir glimpse")
-        extractAOIs.clicked.connect(self.glimpseCmd)
+        extractAOIs.clicked.connect(partial(
+            glimpse,
+            dataset=datasetName.text(),
+            P=aoiSize.value(),
+            num_channels=numChannels.value(),
+            name=[Edit.text() for Edit in self.name.values()],
+            glimpse_folder=[Edit.text() for Edit in self.header.values()],
+            ontarget_aoiinfo=[Edit.text() for Edit in self.ontarget.values()],
+            offtarget_aoiinfo=[Edit.text() for Edit in self.offtarget.values()],
+            driftlist=[Edit.text() for Edit in self.driftlist.values()],
+            frame_start=firstFrame.value(),
+            frame_end=lastFrame.value(),
+            no_input=True,
+
+        ))
         # Layout
         layout.addLayout(formLayout)
         layout.addWidget(channelTabs)
+        layout.addWidget(extractAOIs)
         layout.addStretch(0)
         glimpseTab.setLayout(layout)
+        breakpoint()
         return glimpseTab
 
     def channelUI(self, C):
@@ -141,11 +159,11 @@ class MainWindow(QMainWindow):
                 vbox = QVBoxLayout()
                 formLayout = QFormLayout()
                 # channel name
-                nameEdit = QLineEdit()
+                self.name[i] = nameEdit = QLineEdit()
                 formLayout.addRow("Channel name:", nameEdit)
                 # header/glimpse
                 headerLayout = QHBoxLayout()
-                headerEdit = QLineEdit()
+                self.header[i] = headerEdit = QLineEdit()
                 headerBrowse = QPushButton("Browse")
                 headerBrowse.clicked.connect(partial(self.getFolder, headerEdit))
                 headerLayout.addWidget(headerEdit)
@@ -153,7 +171,7 @@ class MainWindow(QMainWindow):
                 formLayout.addRow("Header/glimpse folder:", headerLayout)
                 # on-target aoiinfo
                 ontargetLayout = QHBoxLayout()
-                ontargetEdit = QLineEdit()
+                self.ontarget[i] = ontargetEdit = QLineEdit()
                 ontargetBrowse = QPushButton("Browse")
                 ontargetBrowse.clicked.connect(partial(self.getFile, ontargetEdit))
                 ontargetLayout.addWidget(ontargetEdit)
@@ -165,7 +183,7 @@ class MainWindow(QMainWindow):
                 formLayout.addRow("Add off-target AOI locations?", addOfftarget)
                 # off-target aoiinfo
                 offtargetLayout = QHBoxLayout()
-                offtargetEdit = QLineEdit()
+                self.offtarget[i] = offtargetEdit = QLineEdit()
                 offtargetBrowse = QPushButton("Browse")
                 offtargetBrowse.clicked.connect(partial(self.getFile, offtargetEdit))
                 offtargetLayout.addWidget(offtargetEdit)
@@ -174,7 +192,7 @@ class MainWindow(QMainWindow):
                 addOfftarget.toggled.connect(partial(self.toggleWidgets, (offtargetEdit, offtargetBrowse)))
                 # driftlist
                 driftlistLayout = QHBoxLayout()
-                driftlistEdit = QLineEdit()
+                self.driftlist[i] = driftlistEdit = QLineEdit()
                 driftlistBrowse = QPushButton("Browse")
                 driftlistBrowse.clicked.connect(partial(self.getFile, driftlistEdit))
                 driftlistLayout.addWidget(driftlistEdit)
@@ -186,6 +204,11 @@ class MainWindow(QMainWindow):
                 widget.setLayout(vbox)
                 self.channelTabs.addTab(widget, f"Channel #{i}")
             else:
+                del self.name[i]
+                del self.header[i]
+                del self.ontarget[i]
+                del self.offtarget[i]
+                del self.driftlist[i]
                 self.channelTabs.removeTab(C)
 
     def fitUI(self):

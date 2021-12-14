@@ -165,6 +165,7 @@ def glimpse(
 
     global DEFAULTS
     cd = DEFAULTS.pop("cd")
+    breakpoint()
 
     # inputs descriptions
     desc = {}
@@ -566,6 +567,7 @@ def main(
     global DEFAULTS
     # set working directory
     DEFAULTS["cd"] = cd
+    breakpoint()
 
     # create logger
     logger = logging.getLogger("tapqir")
