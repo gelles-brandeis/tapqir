@@ -36,7 +36,7 @@ class GlimpseDataset:
 
     def __init__(self, c=0, **kwargs):
         dtypes = ["ontarget"]
-        if "offtarget-aoiinfo" in kwargs:
+        if kwargs["offtarget-aoiinfo"] is not None:
             dtypes.append("offtarget")
 
         # convert header into dict format
@@ -91,7 +91,7 @@ class GlimpseDataset:
             .values
         )
 
-        if ("frame-start" in kwargs) and ("frame-end" in kwargs):
+        if (kwargs["frame-start"] is not None) and (kwargs["frame-end"] is not None):
             f1 = int(kwargs["frame-start"])
             f2 = int(kwargs["frame-end"])
             drift_df = drift_df.loc[f1:f2]
