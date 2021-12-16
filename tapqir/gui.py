@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -34,9 +35,10 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    QScrollArea,
 )
 
-from tapqir.main import DEFAULTS, glimpse, init, main
+from tapqir.main import DEFAULTS, glimpse, init, main, fit
 
 
 class MainWindow(QMainWindow):
@@ -48,13 +50,21 @@ class MainWindow(QMainWindow):
     def initUI(self):
         pg.setConfigOption("background", "w")
         pg.setConfigOption("foreground", "k")
-        self.tabs = QTabWidget()
+        tabs = QTabWidget()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        # widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.cdUI())
+        layout.addWidget(tabs)
+        # widget.setLayout(layout)
+        scroll.setLayout(layout)
 
-        self.tabs.addTab(self.cdUI(), "Working Directory")
-        self.tabs.addTab(self.glimpseUI(), "Extract AOIs")
-        self.tabs.addTab(self.fitUI(), "Fit the data")
+        # tabs.addTab(self.cdUI(), "Working Directory")
+        tabs.addTab(self.glimpseUI(), "Extract AOIs")
+        tabs.addTab(self.fitUI(), "Fit the data")
 
-        self.setCentralWidget(self.tabs)
+        self.setCentralWidget(scroll)
 
         self.resize(1200, 1000)
         self.setWindowTitle("Tapqir")
@@ -66,20 +76,60 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         # cd input
         cdLayout = QHBoxLayout()
-        cdEdit = QLineEdit()
+        self.cdEdit = QLineEdit()
         cdBrowse = QPushButton("Browse")
-        cdBrowse.clicked.connect(partial(self.getFolder, cdEdit))
-        cdLayout.addWidget(cdEdit)
+        cdBrowse.clicked.connect(partial(self.getFolder, self.cdEdit))
+        cdLayout.addWidget(self.cdEdit)
         cdLayout.addWidget(cdBrowse)
         # cd button
         cdChange = QPushButton("Set working directory")
-        cdChange.clicked.connect(partial(main, Path(cdEdit.text())))
+        cdChange.clicked.connect(self.cdCmd)
         # layout
         layout.addLayout(cdLayout)
         layout.addWidget(cdChange)
         layout.addStretch(0)
         cdTab.setLayout(layout)
         return cdTab
+
+    def cdCmd(self):
+        main(cd=Path(self.cdEdit.text()))
+        # glimpse config
+        if "dataset" in DEFAULTS:
+            self.datasetName.setText(DEFAULTS["dataset"])
+        if "P" in DEFAULTS:
+            self.aoiSize.setValue(DEFAULTS["P"])
+        if "num-channels" in DEFAULTS:
+            self.numChannels.setValue(DEFAULTS["num-channels"])
+        if "frame-start" in DEFAULTS:
+            self.firstFrame.setValue(DEFAULTS["frame-start"])
+        if "frame-end" in DEFAULTS:
+            self.lastFrame.setValue(DEFAULTS["frame-end"])
+        if "channels" not in DEFAULTS:
+            DEFAULTS["channels"] = []
+        for c in range(self.numChannels.value()):
+            if len(DEFAULTS["channels"]) < c + 1:
+                DEFAULTS["channels"].append({})
+            if "name" in DEFAULTS["channels"][c]:
+                self.name[c].setText(DEFAULTS["channels"][c]["name"])
+            if "glimpse-folder" in DEFAULTS["channels"][c]:
+                self.header[c].setText(DEFAULTS["channels"][c]["glimpse-folder"])
+            if "ontarget-aoiinfo" in DEFAULTS["channels"][c]:
+                self.ontarget[c].setText(DEFAULTS["channels"][c]["ontarget-aoiinfo"])
+            if "offtarget-aoiinfo" in DEFAULTS["channels"][c]:
+                self.offtarget[c].setText(DEFAULTS["channels"][c]["offtarget-aoiinfo"])
+            if "driftlist" in DEFAULTS["channels"][c]:
+                self.driftlist[c].setText(DEFAULTS["channels"][c]["driftlist"])
+        # fit config
+        self.channelNumber.clear()
+        self.channelNumber.addItems([str(c) for c in range(self.numChannels.value())])
+        if DEFAULTS["cuda"] is not None:
+            self.useGpu.setChecked(DEFAULTS["cuda"])
+        if DEFAULTS["nbatch-size"] is not None:
+            self.aoiBatch.setText(str(DEFAULTS["nbatch-size"]))
+        if DEFAULTS["fbatch-size"] is not None:
+            self.frameBatch.setText(str(DEFAULTS["fbatch-size"]))
+        if DEFAULTS["learning-rate"] is not None:
+            self.learningRate.setText(str(DEFAULTS["learning-rate"]))
 
     def glimpseUI(self):
         glimpseTab = QWidget()
@@ -88,6 +138,7 @@ class MainWindow(QMainWindow):
         # Dataset name
         datasetName = QLineEdit()
         formLayout.addRow("Dataset name:", datasetName)
+        self.datasetName = datasetName
         # AOI image size
         aoiSize = QSpinBox()
         aoiSize.setValue(14)
@@ -102,6 +153,7 @@ class MainWindow(QMainWindow):
         numChannels.setMaximum(4)
         numChannels.valueChanged.connect(self.channelUI)
         formLayout.addRow("Number of color channels:", numChannels)
+        self.numChannels = numChannels
         # Specify frame range?
         specifyFrame = QCheckBox()
         specifyFrame.setChecked(False)
@@ -111,43 +163,58 @@ class MainWindow(QMainWindow):
         firstFrame.setValue(1)
         firstFrame.setEnabled(False)
         formLayout.addRow("First frame:", firstFrame)
+        self.firstFrame = firstFrame
         # Last frame
         lastFrame = QSpinBox()
         lastFrame.setValue(2)
         lastFrame.setMaximum(50000)
         lastFrame.setEnabled(False)
         formLayout.addRow("Last frame:", lastFrame)
-        specifyFrame.toggled.connect(partial(self.toggleWidgets, (firstFrame, lastFrame)))
+        self.lastFrame = lastFrame
+        specifyFrame.toggled.connect(
+            partial(self.toggleWidgets, (firstFrame, lastFrame))
+        )
         # channel tabs
         channelTabs = QTabWidget()
         self.channelTabs = channelTabs
-        self.name, self.header, self.ontarget, self.offtarget, self.driftlist = {}, {}, {}, {}, {}
+        self.name, self.header, self.ontarget, self.offtarget, self.driftlist = (
+            {},
+            {},
+            {},
+            {},
+            {},
+        )
         self.channelUI(numChannels.value())
+        # progress bar
+        progressBar = QProgressBar()
+        self.progressBar = progressBar
         # extract AOIs
         extractAOIs = QPushButton("tapqir glimpse")
-        extractAOIs.clicked.connect(partial(
-            glimpse,
-            dataset=datasetName.text(),
-            P=aoiSize.value(),
-            num_channels=numChannels.value(),
+        extractAOIs.clicked.connect(self.glimpseCmd)
+        # Layout
+        layout.addLayout(formLayout)
+        layout.addWidget(channelTabs)
+        layout.addWidget(progressBar)
+        layout.addWidget(extractAOIs)
+        layout.addStretch(0)
+        glimpseTab.setLayout(layout)
+        return glimpseTab
+
+    def glimpseCmd(self):
+        glimpse(
+            dataset=self.datasetName.text(),
+            P=self.aoiSize.value(),
+            num_channels=self.numChannels.value(),
             name=[Edit.text() for Edit in self.name.values()],
             glimpse_folder=[Edit.text() for Edit in self.header.values()],
             ontarget_aoiinfo=[Edit.text() for Edit in self.ontarget.values()],
             offtarget_aoiinfo=[Edit.text() for Edit in self.offtarget.values()],
             driftlist=[Edit.text() for Edit in self.driftlist.values()],
-            frame_start=firstFrame.value(),
-            frame_end=lastFrame.value(),
+            frame_start=self.firstFrame.value(),
+            frame_end=self.lastFrame.value(),
             no_input=True,
-
-        ))
-        # Layout
-        layout.addLayout(formLayout)
-        layout.addWidget(channelTabs)
-        layout.addWidget(extractAOIs)
-        layout.addStretch(0)
-        glimpseTab.setLayout(layout)
-        breakpoint()
-        return glimpseTab
+            progress_bar=self.progressBar,
+        )
 
     def channelUI(self, C):
         currentC = self.channelTabs.count()
@@ -189,7 +256,9 @@ class MainWindow(QMainWindow):
                 offtargetLayout.addWidget(offtargetEdit)
                 offtargetLayout.addWidget(offtargetBrowse)
                 formLayout.addRow("Off-target control locations file:", offtargetLayout)
-                addOfftarget.toggled.connect(partial(self.toggleWidgets, (offtargetEdit, offtargetBrowse)))
+                addOfftarget.toggled.connect(
+                    partial(self.toggleWidgets, (offtargetEdit, offtargetBrowse))
+                )
                 # driftlist
                 driftlistLayout = QHBoxLayout()
                 self.driftlist[i] = driftlistEdit = QLineEdit()
@@ -217,35 +286,66 @@ class MainWindow(QMainWindow):
         formLayout = QFormLayout()
         # model
         modelComboBox = QComboBox()
+        modelComboBox.addItem("cosmos")
         formLayout.addRow("Tapqir model:", modelComboBox)
+        self.modelComboBox = modelComboBox
         # channel numbers
-        channelEdit = QLineEdit()
-        formLayout.addRow("Channel numbers:", channelEdit)
+        channelNumber = QComboBox()
+        formLayout.addRow("Channel numbers:", channelNumber)
+        self.channelNumber = channelNumber
         # device
         useGpu = QCheckBox()
         useGpu.setChecked(False)
         formLayout.addRow("Run computations on GPU?", useGpu)
+        self.useGpu = useGpu
         # AOI batch size
-        aoiBatch = QLineEdit("10")
+        aoiBatch = QLineEdit()
         formLayout.addRow("AOI batch size:", aoiBatch)
+        self.aoiBatch = aoiBatch
         # Frame batch size
-        frameBatch = QLineEdit("512")
+        frameBatch = QLineEdit()
         formLayout.addRow("Frame batch size:", frameBatch)
+        self.frameBatch = frameBatch
         # Learning rate
-        learningRate = QLineEdit("0.005")
+        learningRate = QLineEdit()
         formLayout.addRow("Learning rate:", learningRate)
+        self.learningRate = learningRate
         # Number of iterations
         iterationNumber = QLineEdit("0")
         formLayout.addRow("Number of iterations:", iterationNumber)
+        self.iterationNumber = iterationNumber
         # Save parameters in matlab format?
         saveMatlab = QCheckBox()
         saveMatlab.setChecked(False)
         formLayout.addRow("Save parameters in matlab format?", saveMatlab)
+        self.saveMatlab = saveMatlab
+        # progress bar
+        fitBar = QProgressBar()
+        self.fitBar = fitBar
+        # fit the data
+        fitData = QPushButton("Fit the data")
+        fitData.clicked.connect(self.fitCmd)
         # layout
         layout.addLayout(formLayout)
+        layout.addWidget(fitBar)
+        layout.addWidget(fitData)
         layout.addStretch(0)
         fitTab.setLayout(layout)
         return fitTab
+
+    def fitCmd(self):
+        fit(
+            model=self.modelComboBox.currentText(),
+            channels=[int(self.channelNumber.currentText())],
+            cuda=self.useGpu.isChecked(),
+            nbatch_size=int(self.aoiBatch.text()),
+            fbatch_size=int(self.frameBatch.text()),
+            learning_rate=float(self.learningRate.text()),
+            num_iter=int(self.iterationNumber.text()),
+            matlab=self.saveMatlab.isChecked(),
+            no_input=True,
+            progress_bar=self.progressBar,
+        )
 
     def getFolder(self, widget):
         dlg = QFileDialog()
@@ -274,13 +374,6 @@ class MainWindow(QMainWindow):
         else:
             for widget in widgets:
                 widget.setEnabled(False)
-
-    def glimpseCmd(self):
-        global DEFAULTS
-        DEFAULTS["dataset"] = dataset
-        DEFAULTS["P"] = P
-        DEFAULTS["num-channels"] = num_channels
-        glimpse(no_input=True)
 
 
 if __name__ == "__main__":

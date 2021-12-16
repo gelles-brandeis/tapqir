@@ -174,7 +174,7 @@ class Model:
         self.nbatch_size = min(nbatch_size, self.data.Nt)
         self.fbatch_size = min(fbatch_size, self.data.F)
 
-    def run(self, num_iter: int = 0) -> int:
+    def run(self, num_iter: int = 0, progress_bar=None) -> int:
         """
         Run inference procedure for a specified number of iterations.
         If num_iter equals zero then run till model converges.
@@ -186,6 +186,10 @@ class Model:
         if not num_iter:
             use_crit = True
             num_iter = 100000
+
+        if progress_bar is not None:
+            progress_bar.setMinimum(1)
+            progress_bar.setMaximum(num_iter)
 
         logger.debug("Tapqir version - {}".format(tapqir_version))
         logger.debug("Model - {}".format(self.name))
@@ -207,6 +211,8 @@ class Model:
                             logger.debug(f"Iteration #{self.iter} model converged.")
                             return 0
                     self.iter += 1
+                    if progress_bar is not None:
+                        progress_bar.setValue(self.iter + 1)
                 except ValueError:
                     # load last checkpoint
                     self.init(

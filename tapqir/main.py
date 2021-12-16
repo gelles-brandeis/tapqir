@@ -6,7 +6,7 @@ from collections import defaultdict
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import colorama
 import typer
@@ -148,6 +148,7 @@ def glimpse(
         "-l",
         help="Add on-target binding labels.",
     ),
+    progress_bar: Optional[int] = typer.Option(None),
 ):
     """
     Extract AOIs from raw glimpse images.
@@ -165,7 +166,6 @@ def glimpse(
 
     global DEFAULTS
     cd = DEFAULTS.pop("cd")
-    breakpoint()
 
     # inputs descriptions
     desc = {}
@@ -179,12 +179,33 @@ def glimpse(
     desc["ontarget-labels"] = "On-target AOI binding labels"
     desc["offtarget-labels"] = "Off-target AOI binding labels"
 
+    # fill in default values
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
     DEFAULTS["num-channels"] = num_channels
     DEFAULTS["frame-start"] = frame_start
     DEFAULTS["frame-end"] = frame_end
 
+    if "channels" not in DEFAULTS:
+        DEFAULTS["channels"] = []
+    for c in range(num_channels):
+        if len(DEFAULTS["channels"]) < c + 1:
+            DEFAULTS["channels"].append({})
+        DEFAULTS["channels"][c]["name"] = name[c] if c < len(name) else None
+        DEFAULTS["channels"][c]["glimpse-folder"] = (
+            glimpse_folder[c] if c < len(glimpse_folder) else None
+        )
+        DEFAULTS["channels"][c]["ontarget-aoiinfo"] = (
+            ontarget_aoiinfo[c] if c < len(ontarget_aoiinfo) else None
+        )
+        DEFAULTS["channels"][c]["offtarget-aoiinfo"] = (
+            offtarget_aoiinfo[c] if c < len(offtarget_aoiinfo) else None
+        )
+        DEFAULTS["channels"][c]["driftlist"] = (
+            driftlist[c] if c < len(driftlist) else None
+        )
+
+    # interactive input
     if not no_input:
         frame_range = typer.confirm(
             "Specify frame range?", default=("frame-start" in DEFAULTS)
@@ -200,24 +221,7 @@ def glimpse(
             DEFAULTS["frame-start"] = None
             DEFAULTS["frame-end"] = None
 
-        if "channels" not in DEFAULTS:
-            DEFAULTS["channels"] = []
         for c in range(num_channels):
-            if len(DEFAULTS["channels"]) < c + 1:
-                DEFAULTS["channels"].append({})
-            DEFAULTS["channels"][c]["name"] = name[c] if c < len(name) else None
-            DEFAULTS["channels"][c]["glimpse-folder"] = (
-                glimpse_folder[c] if c < len(glimpse_folder) else None
-            )
-            DEFAULTS["channels"][c]["ontarget-aoiinfo"] = (
-                ontarget_aoiinfo[c] if c < len(ontarget_aoiinfo) else None
-            )
-            DEFAULTS["channels"][c]["offtarget-aoiinfo"] = (
-                offtarget_aoiinfo[c] if c < len(offtarget_aoiinfo) else None
-            )
-            DEFAULTS["channels"][c]["driftlist"] = (
-                driftlist[c] if c < len(driftlist) else None
-            )
             keys = [
                 "name",
                 "glimpse-folder",
@@ -258,6 +262,7 @@ def glimpse(
     typer.echo("Extracting AOIs ...")
     read_glimpse(
         path=cd,
+        progress_bar=progress_bar,
         **DEFAULTS,
     )
     typer.echo("Extracting AOIs: Done")
@@ -266,8 +271,8 @@ def glimpse(
 @app.command()
 def fit(
     model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
-    channels: str = typer.Option(
-        "0",
+    channels: List[int] = typer.Option(
+        [0],
         help="Color-channel numbers to analyze",
         prompt="Channel numbers (space separated if multiple)",
     ),
@@ -337,6 +342,7 @@ def fit(
         is_eager=True,
         callback=deactivate_prompts,
     ),
+    progress_bar: Optional[int] = typer.Option(None),
 ):
     """
     Fit the data to the selected model.
@@ -356,7 +362,7 @@ def fit(
     settings = {}
     settings["S"] = 1
     settings["K"] = k_max
-    settings["channels"] = [int(c) for c in channels.split()]
+    settings["channels"] = channels
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
     settings["use_pykeops"] = pykeops
@@ -388,7 +394,7 @@ def fit(
 
         model.init(learning_rate, nbatch_size, fbatch_size)
         typer.echo("Fitting the data ...")
-        exit_code = model.run(num_iter)
+        exit_code = model.run(num_iter, progress_bar=progress_bar)
         if exit_code == 0:
             typer.echo("Fitting the data: Done")
             typer.echo("Computing stats ...")
@@ -567,7 +573,6 @@ def main(
     global DEFAULTS
     # set working directory
     DEFAULTS["cd"] = cd
-    breakpoint()
 
     # create logger
     logger = logging.getLogger("tapqir")

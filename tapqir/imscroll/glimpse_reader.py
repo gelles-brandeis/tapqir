@@ -235,7 +235,7 @@ class GlimpseDataset:
             plt.savefig(path / f"{dtype}-channel{self.c}.png", dpi=300)
 
 
-def read_glimpse(path, **kwargs):
+def read_glimpse(path, progress_bar, **kwargs):
     """
     Preprocess glimpse files.
     """
@@ -278,6 +278,10 @@ def read_glimpse(path, **kwargs):
         # plot offset in raw FOV images
         glimpse.plot("offset", 30, path=path, save=True)
 
+        if progress_bar is not None:
+            progress_bar.setMinimum(1)
+            progress_bar.setMaximum(F)
+
         # loop through each frame
         for f, frame in enumerate(tqdm(glimpse.cumdrift.index)):
             img = glimpse[frame]
@@ -300,6 +304,8 @@ def read_glimpse(path, **kwargs):
                     target_xy[dtype][c][n, f, 1] = (
                         raw_target_xy[dtype][n, f, 1] - shifty
                     )
+            if progress_bar is not None:
+                progress_bar.setValue(f + 1)
 
         # assert that target positions are within central pixel
         for dtype in glimpse.dtypes:
