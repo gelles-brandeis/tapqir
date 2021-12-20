@@ -368,12 +368,8 @@ class MainWindow(QMainWindow):
         return fname
 
     def toggleWidgets(self, widgets, checked):
-        if checked:
-            for widget in widgets:
-                widget.setEnabled(True)
-        else:
-            for widget in widgets:
-                widget.setEnabled(False)
+        for widget in widgets:
+            widget.setEnabled(checked)
 
 
 if __name__ == "__main__":
