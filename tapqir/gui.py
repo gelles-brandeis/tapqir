@@ -35,10 +35,9 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
-    QScrollArea,
 )
 
-from tapqir.main import DEFAULTS, glimpse, init, main, fit
+from tapqir.main import DEFAULTS, fit, glimpse, main
 
 
 class MainWindow(QMainWindow):

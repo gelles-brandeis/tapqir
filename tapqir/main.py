@@ -6,7 +6,7 @@ from collections import defaultdict
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import colorama
 import typer
@@ -55,45 +55,6 @@ def deactivate_prompts(ctx, param, value):
             if isinstance(p, typer.core.TyperOption) and p.prompt is not None:
                 p.prompt = None
     return value
-
-
-@app.command()
-def init():
-    """
-    Initialize Tapqir in the working directory.
-
-    Initializing a Tapqir workspace creates a ``.tapqir`` sub-directory for storing ``config.yml``
-    file, ``loginfo`` file, and files that are created by commands such as ``tapqir fit``.
-    """
-    global DEFAULTS
-    cd = DEFAULTS.pop("cd")
-
-    TAPQIR_PATH = cd / ".tapqir"
-
-    if TAPQIR_PATH.is_dir():
-        typer.echo(".tapqir already exists.")
-        raise typer.Exit()
-
-    # initialize directory
-    TAPQIR_PATH.mkdir()
-    CONFIG_FILE = TAPQIR_PATH / "config.yml"
-    # CONFIG_FILE.touch(exist_ok=True)
-    with open(CONFIG_FILE, "w") as cfg_file:
-        DEFAULTS["P"] = 14
-        DEFAULTS["nbatch-size"] = 10
-        DEFAULTS["fbatch-size"] = 512
-        DEFAULTS["learning-rate"] = 0.005
-        DEFAULTS["num-channels"] = 1
-        yaml.dump(dict(DEFAULTS), cfg_file, sort_keys=False)
-
-    typer.echo(
-        (
-            "Initialized Tapqir in the working directory.\n"
-            "{yellow}---------------------------------------------------------------{nc}\n"
-            f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
-            f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
-        ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
-    )
 
 
 @app.command()
@@ -165,7 +126,7 @@ def glimpse(
     from tapqir.imscroll import read_glimpse
 
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     # inputs descriptions
     desc = {}
@@ -352,7 +313,7 @@ def fit(
     * cosmos: single-color time-independent co-localization model.\n
     """
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     from pyroapi import pyro_backend
 
@@ -456,7 +417,7 @@ def stats(
     from tapqir.utils.stats import save_stats
 
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     dtype = "double"
     device = "cuda" if cuda else "cpu"
@@ -516,7 +477,7 @@ def show(
     from tapqir.models import models
 
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     backend = "funsor" if funsor else "pyro"
     channels = [int(c) for c in channels.split()]
@@ -541,7 +502,7 @@ def log():
     import pydoc
 
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     log_file = cd / ".tapqir" / "loginfo"
     with open(log_file, "r") as f:
@@ -568,11 +529,44 @@ def main(
 ):
     """
     Bayesian analysis of co-localization single-molecule microscopy image data.
+
+    Initialize Tapqir in the working directory.
+
+    Initializing a Tapqir workspace creates a ``.tapqir`` sub-directory for storing ``config.yml``
+    file, ``loginfo`` file, and files that are created by commands such as ``tapqir fit``.
     """
 
     global DEFAULTS
     # set working directory
     DEFAULTS["cd"] = cd
+
+    TAPQIR_PATH = cd / ".tapqir"
+
+    if not TAPQIR_PATH.is_dir():
+        # initialize directory
+        TAPQIR_PATH.mkdir()
+        CONFIG_FILE = TAPQIR_PATH / "config.yml"
+        with open(CONFIG_FILE, "w") as cfg_file:
+            DEFAULTS["P"] = 14
+            DEFAULTS["nbatch-size"] = 10
+            DEFAULTS["fbatch-size"] = 512
+            DEFAULTS["learning-rate"] = 0.005
+            DEFAULTS["num-channels"] = 1
+            yaml.dump(dict(DEFAULTS), cfg_file, sort_keys=False)
+
+        typer.echo(
+            (
+                "Initialized Tapqir in the working directory.\n"
+                "{yellow}---------------------------------------------------------------{nc}\n"
+                f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
+                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
+            ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
+        )
+
+    # read defaults from config file
+    with open(cd / ".tapqir" / "config.yml", "r") as cfg_file:
+        cfg_defaults = yaml.safe_load(cfg_file) or {}
+        DEFAULTS.update(cfg_defaults)
 
     # create logger
     logger = logging.getLogger("tapqir")
@@ -586,21 +580,14 @@ def main(
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    if (cd / ".tapqir").is_dir():
-        fh = logging.FileHandler(cd / ".tapqir" / "loginfo")
-        fh.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            fmt="%(asctime)s - %(levelname)s - %(message)s",
-            datefmt="%m/%d/%Y %I:%M %p",
-        )
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-
-    # read defaults from config file
-    if (cd / ".tapqir" / "config.yml").is_file():
-        with open(cd / ".tapqir" / "config.yml", "r") as cfg_file:
-            cfg_defaults = yaml.safe_load(cfg_file) or {}
-            DEFAULTS.update(cfg_defaults)
+    fh = logging.FileHandler(cd / ".tapqir" / "loginfo")
+    fh.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        fmt="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%m/%d/%Y %I:%M %p",
+    )
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
 
 
 # click object is required to generate docs with sphinx-click
