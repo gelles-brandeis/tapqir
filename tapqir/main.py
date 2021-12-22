@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import colorama
+import ipywidgets as widgets
 import typer
 import yaml
 
@@ -55,6 +56,33 @@ def deactivate_prompts(ctx, param, value):
             if isinstance(p, typer.core.TyperOption) and p.prompt is not None:
                 p.prompt = None
     return value
+
+
+class OutputWidgetHandler(logging.Handler):
+    """Custom logging handler sending logs to an output widget"""
+
+    def __init__(self, *args, **kwargs):
+        super(OutputWidgetHandler, self).__init__(*args, **kwargs)
+        layout = {"width": "100%", "height": "160px", "border": "1px solid black"}
+        self.out = widgets.Output(layout=layout)
+
+    def emit(self, record):
+        """Overload of logging.Handler method"""
+        formatted_record = self.format(record)
+        new_output = {
+            "name": "stdout",
+            "output_type": "stream",
+            "text": formatted_record + "\n",
+        }
+        self.out.outputs = (new_output,) + self.out.outputs
+
+    def show_logs(self):
+        """Show the logs"""
+        display(self.out)
+
+    def clear_logs(self):
+        """Clear the current logs"""
+        self.out.clear_output()
 
 
 @app.command()
@@ -596,6 +624,14 @@ def main(
     )
     fh.setFormatter(formatter)
     logger.addHandler(fh)
+
+    jh = OutputWidgetHandler()
+    jh.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        fmt="%(levelname)s - %(message)s",
+    )
+    jh.setFormatter(formatter)
+    logger.addHandler(jh)
 
 
 # click object is required to generate docs with sphinx-click
