@@ -218,7 +218,11 @@ def glimpse(
 
     if overwrite:
         with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
-            yaml.dump(DEFAULTS, cfg_file, sort_keys=False)
+            yaml.dump(
+                {key: value for key, value in DEFAULTS.items() if key != "cd"},
+                cfg_file,
+                sort_keys=False,
+            )
 
     typer.echo("Extracting AOIs ...")
     read_glimpse(
@@ -334,7 +338,11 @@ def fit(
         DEFAULTS["fbatch-size"] = fbatch_size
         DEFAULTS["learning-rate"] = learning_rate
         with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
-            yaml.dump(dict(DEFAULTS), cfg_file, sort_keys=False)
+            yaml.dump(
+                {key: value for key, value in DEFAULTS.items() if key != "cd"},
+                cfg_file,
+                sort_keys=False,
+            )
 
     backend = "funsor" if funsor else "pyro"
     if backend == "pyro":
