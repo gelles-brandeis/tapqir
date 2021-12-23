@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import sys
+from collections.abc import Iterable
 from functools import partial
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from pyqtgraph import HistogramLUTItem
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QApplication,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -36,88 +38,126 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from tqdm import tqdm
 
 from tapqir.main import DEFAULTS, fit, glimpse, main
 
 
+def qt_progress(iterable: Iterable, progress_bar: QProgressBar):
+    """
+    Iterate over iterable and update progress bar.
+    """
+    progress_bar.setMinimum(1)
+    progress_bar.setMaximum(len(iterable))
+    for i in iterable:
+        progress_bar.setValue(i + 1)
+        yield i
+
+
+class QStream:
+    """
+    Redirect stdout to QPlainTextEdit.
+    """
+
+    def __init__(self, edit):
+        self.edit = edit
+
+    def write(self, text):
+        self.edit.insertPlainText(text)
+
+    def flush(self):
+        pass
+
+
 class MainWindow(QMainWindow):
+    """
+    Graphical user interface for Tapqir.
+    """
+
     def __init__(self):
         super().__init__()
 
+        self.default_dir = Path("/tmp/tutorial")
         self.initUI()
 
     def initUI(self):
-        pg.setConfigOption("background", "w")
-        pg.setConfigOption("foreground", "k")
-        tabs = QTabWidget()
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        # widget = QWidget()
+        widget = QWidget()
         layout = QVBoxLayout()
-        layout.addWidget(self.cdUI())
-        layout.addWidget(tabs)
-        # widget.setLayout(layout)
-        scroll.setLayout(layout)
-
-        # tabs.addTab(self.cdUI(), "Working Directory")
-        tabs.addTab(self.glimpseUI(), "Extract AOIs")
-        tabs.addTab(self.fitUI(), "Fit the data")
-
-        self.setCentralWidget(scroll)
+        # working directory
+        cdLayout = self.cdUI()
+        # commands tabs
+        commandTabs = QTabWidget()
+        commandTabs.addTab(self.glimpseUI(), "Extract AOIs")
+        commandTabs.addTab(self.fitUI(), "Fit the data")
+        commandTabs.addTab(self.tensorboardUI(), "Tensorboard")
+        # log output
+        logOutput = QPlainTextEdit()
+        sys.stdout = QStream(logOutput)
+        # layout
+        layout.addLayout(cdLayout)
+        layout.addWidget(commandTabs)
+        layout.addWidget(logOutput)
+        layout.addStretch(0)
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
 
         self.resize(1200, 1000)
         self.setWindowTitle("Tapqir")
-        self.default_dir = Path(".")
         self.show()
 
     def cdUI(self):
-        cdTab = QWidget()
         layout = QVBoxLayout()
         # cd input
+        formLayout = QFormLayout()
         cdLayout = QHBoxLayout()
-        self.cdEdit = QLineEdit()
+        cdEdit = QLineEdit()
         cdBrowse = QPushButton("Browse")
-        cdBrowse.clicked.connect(partial(self.getFolder, self.cdEdit))
-        cdLayout.addWidget(self.cdEdit)
+        cdBrowse.clicked.connect(partial(self.getFolder, cdEdit))
+        cdLayout.addWidget(cdEdit)
         cdLayout.addWidget(cdBrowse)
+        formLayout.addRow("Working directory:", cdLayout)
         # cd button
         cdChange = QPushButton("Set working directory")
-        cdChange.clicked.connect(self.cdCmd)
         # layout
-        layout.addLayout(cdLayout)
+        layout.addLayout(formLayout)
         layout.addWidget(cdChange)
         layout.addStretch(0)
-        cdTab.setLayout(layout)
-        return cdTab
+        # callbacks
+        cdChange.clicked.connect(partial(self.cdCmd, cdEdit=cdEdit))
+        return layout
 
-    def cdCmd(self):
-        main(cd=Path(self.cdEdit.text()))
+    def cdCmd(self, cdEdit):
+        main(cd=Path(cdEdit.text()))
         # glimpse config
-        if "dataset" in DEFAULTS:
+        if DEFAULTS["dataset"] is not None:
             self.datasetName.setText(DEFAULTS["dataset"])
         if "P" in DEFAULTS:
             self.aoiSize.setValue(DEFAULTS["P"])
-        if "num-channels" in DEFAULTS:
+        if DEFAULTS["num-channels"] is not None:
             self.numChannels.setValue(DEFAULTS["num-channels"])
-        if "frame-start" in DEFAULTS:
+        if DEFAULTS["frame-range"] is not None:
+            self.specifyFrame.setChecked(DEFAULTS["frame-range"])
+        if DEFAULTS["frame-start"] is not None:
             self.firstFrame.setValue(DEFAULTS["frame-start"])
-        if "frame-end" in DEFAULTS:
+        if DEFAULTS["frame-end"] is not None:
             self.lastFrame.setValue(DEFAULTS["frame-end"])
-        if "channels" not in DEFAULTS:
+        if DEFAULTS["channels"] is None:
             DEFAULTS["channels"] = []
+        flags = [self.name, self.header, self.ontarget, self.offtarget, self.driftlist]
+        keys = [
+            "name",
+            "glimpse-folder",
+            "ontarget-aoiinfo",
+            "offtarget-aoiinfo",
+            "driftlist",
+        ]
         for c in range(self.numChannels.value()):
             if len(DEFAULTS["channels"]) < c + 1:
                 DEFAULTS["channels"].append({})
-            if "name" in DEFAULTS["channels"][c]:
-                self.name[c].setText(DEFAULTS["channels"][c]["name"])
-            if "glimpse-folder" in DEFAULTS["channels"][c]:
-                self.header[c].setText(DEFAULTS["channels"][c]["glimpse-folder"])
-            if "ontarget-aoiinfo" in DEFAULTS["channels"][c]:
-                self.ontarget[c].setText(DEFAULTS["channels"][c]["ontarget-aoiinfo"])
-            if "offtarget-aoiinfo" in DEFAULTS["channels"][c]:
-                self.offtarget[c].setText(DEFAULTS["channels"][c]["offtarget-aoiinfo"])
-            if "driftlist" in DEFAULTS["channels"][c]:
-                self.driftlist[c].setText(DEFAULTS["channels"][c]["driftlist"])
+            for flag, key in zip(flags, keys):
+                if key in DEFAULTS["channels"][c]:
+                    flag[c].setText(DEFAULTS["channels"][c][key])
         # fit config
         self.channelNumber.clear()
         self.channelNumber.addItems([str(c) for c in range(self.numChannels.value())])
@@ -157,6 +197,7 @@ class MainWindow(QMainWindow):
         specifyFrame = QCheckBox()
         specifyFrame.setChecked(False)
         formLayout.addRow("Specify frame range?:", specifyFrame)
+        self.specifyFrame = specifyFrame
         # First frame
         firstFrame = QSpinBox()
         firstFrame.setValue(1)
@@ -166,7 +207,7 @@ class MainWindow(QMainWindow):
         # Last frame
         lastFrame = QSpinBox()
         lastFrame.setValue(2)
-        lastFrame.setMaximum(50000)
+        lastFrame.setMaximum(99999)
         lastFrame.setEnabled(False)
         formLayout.addRow("Last frame:", lastFrame)
         self.lastFrame = lastFrame
@@ -186,9 +227,9 @@ class MainWindow(QMainWindow):
         self.channelUI(numChannels.value())
         # progress bar
         progressBar = QProgressBar()
-        self.progressBar = progressBar
+        self.glimpseProgress = progressBar
         # extract AOIs
-        extractAOIs = QPushButton("tapqir glimpse")
+        extractAOIs = QPushButton("Extract AOIs")
         extractAOIs.clicked.connect(self.glimpseCmd)
         # Layout
         layout.addLayout(formLayout)
@@ -207,12 +248,15 @@ class MainWindow(QMainWindow):
             name=[Edit.text() for Edit in self.name.values()],
             glimpse_folder=[Edit.text() for Edit in self.header.values()],
             ontarget_aoiinfo=[Edit.text() for Edit in self.ontarget.values()],
+            use_offtarget=self.useOfftarget.isChecked(),
             offtarget_aoiinfo=[Edit.text() for Edit in self.offtarget.values()],
             driftlist=[Edit.text() for Edit in self.driftlist.values()],
+            frame_range=self.specifyFrame.isChecked(),
             frame_start=self.firstFrame.value(),
             frame_end=self.lastFrame.value(),
             no_input=True,
-            progress_bar=self.progressBar,
+            progress_bar=partial(qt_progress, progress_bar=self.glimpseProgress),
+            labels=False,
         )
 
     def channelUI(self, C):
@@ -244,9 +288,10 @@ class MainWindow(QMainWindow):
                 ontargetLayout.addWidget(ontargetBrowse)
                 formLayout.addRow("Target molecule locations file:", ontargetLayout)
                 # Add off-target AOI locations?
-                addOfftarget = QCheckBox()
-                addOfftarget.setChecked(True)
-                formLayout.addRow("Add off-target AOI locations?", addOfftarget)
+                useOfftarget = QCheckBox()
+                useOfftarget.setChecked(True)
+                formLayout.addRow("Use off-target AOI locations?", useOfftarget)
+                self.useOfftarget = useOfftarget
                 # off-target aoiinfo
                 offtargetLayout = QHBoxLayout()
                 self.offtarget[i] = offtargetEdit = QLineEdit()
@@ -255,7 +300,7 @@ class MainWindow(QMainWindow):
                 offtargetLayout.addWidget(offtargetEdit)
                 offtargetLayout.addWidget(offtargetBrowse)
                 formLayout.addRow("Off-target control locations file:", offtargetLayout)
-                addOfftarget.toggled.connect(
+                useOfftarget.toggled.connect(
                     partial(self.toggleWidgets, (offtargetEdit, offtargetBrowse))
                 )
                 # driftlist
@@ -319,14 +364,15 @@ class MainWindow(QMainWindow):
         formLayout.addRow("Save parameters in matlab format?", saveMatlab)
         self.saveMatlab = saveMatlab
         # progress bar
-        fitBar = QProgressBar()
-        self.fitBar = fitBar
+        fitProgress = QProgressBar()
+        self.fitProgress = fitProgress
+        self.fitProgress = fitProgress
         # fit the data
         fitData = QPushButton("Fit the data")
         fitData.clicked.connect(self.fitCmd)
         # layout
         layout.addLayout(formLayout)
-        layout.addWidget(fitBar)
+        layout.addWidget(fitProgress)
         layout.addWidget(fitData)
         layout.addStretch(0)
         fitTab.setLayout(layout)
@@ -341,10 +387,18 @@ class MainWindow(QMainWindow):
             fbatch_size=int(self.frameBatch.text()),
             learning_rate=float(self.learningRate.text()),
             num_iter=int(self.iterationNumber.text()),
+            k_max=2,
             matlab=self.saveMatlab.isChecked(),
+            funsor=False,
+            pykeops=True,
             no_input=True,
-            progress_bar=self.progressBar,
+            progress_bar=partial(qt_progress, progress_bar=self.fitProgress),
         )
+
+    def tensorboardUI(self):
+        browser = QWebEngineView()
+        browser.setUrl(QUrl("http://google.com"))
+        return browser
 
     def getFolder(self, widget):
         dlg = QFileDialog()

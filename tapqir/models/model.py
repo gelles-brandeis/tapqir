@@ -3,6 +3,7 @@
 
 import logging
 import random
+import sys
 from collections import deque
 from pathlib import Path
 from typing import Union
@@ -18,7 +19,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import trange
+from tqdm import tqdm
 
 from tapqir import __version__ as tapqir_version
 from tapqir.utils.dataset import load
@@ -174,7 +175,7 @@ class Model:
         self.nbatch_size = min(nbatch_size, self.data.Nt)
         self.fbatch_size = min(fbatch_size, self.data.F)
 
-    def run(self, num_iter: int = 0, progress_bar=None) -> int:
+    def run(self, num_iter: int = 0, progress_bar=tqdm) -> int:
         """
         Run inference procedure for a specified number of iterations.
         If num_iter equals zero then run till model converges.
@@ -187,10 +188,6 @@ class Model:
             use_crit = True
             num_iter = 100000
 
-        if progress_bar is not None:
-            progress_bar.setMinimum(1)
-            progress_bar.setMaximum(num_iter)
-
         logger.debug("Tapqir version - {}".format(tapqir_version))
         logger.debug("Model - {}".format(self.name))
         logger.debug("Device - {}".format(self.device))
@@ -201,7 +198,7 @@ class Model:
         logger.debug("Frame batch size - {}".format(self.fbatch_size))
 
         with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
-            for i in trange(num_iter):
+            for i in progress_bar(range(num_iter)):
                 #  try:
                 self.iter_loss = self.svi.step()
                 # save a checkpoint every 200 iterations
@@ -211,8 +208,6 @@ class Model:
                         logger.debug(f"Iteration #{self.iter} model converged.")
                         return 0
                 self.iter += 1
-                if progress_bar is not None:
-                    progress_bar.setValue(self.iter + 1)
                 #  except ValueError:
                 #      # load last checkpoint
                 #      self.init(

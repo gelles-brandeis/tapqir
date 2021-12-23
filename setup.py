@@ -58,6 +58,7 @@ setuptools.setup(
         "colorama",
         "funsor==0.4.1",
         "future",
+        "ipywidgets",
         "matplotlib",
         "pandas",
         "pykeops==1.5",

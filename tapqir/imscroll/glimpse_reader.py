@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import sys
 from collections import OrderedDict, defaultdict
 from pathlib import Path
 
@@ -36,7 +37,7 @@ class GlimpseDataset:
 
     def __init__(self, c=0, **kwargs):
         dtypes = ["ontarget"]
-        if kwargs["offtarget-aoiinfo"] is not None:
+        if kwargs["use-offtarget"]:
             dtypes.append("offtarget")
 
         # convert header into dict format
@@ -91,14 +92,14 @@ class GlimpseDataset:
             .values
         )
 
-        if (kwargs["frame-start"] is not None) and (kwargs["frame-end"] is not None):
+        if kwargs["frame-range"]:
             f1 = int(kwargs["frame-start"])
             f2 = int(kwargs["frame-end"])
             drift_df = drift_df.loc[f1:f2]
 
         labels = defaultdict(lambda: None)
         for dtype in dtypes:
-            if f"{dtype}-labels" in kwargs:
+            if kwargs["labels"] and kwargs[f"{dtype}-labels"] is not None:
                 labels_mat = loadmat(kwargs[f"{dtype}-labels"])
                 labels[dtype] = np.zeros(
                     (len(aoi_df[dtype]), len(drift_df)),
@@ -278,12 +279,9 @@ def read_glimpse(path, progress_bar, **kwargs):
         # plot offset in raw FOV images
         glimpse.plot("offset", 30, path=path, save=True)
 
-        if progress_bar is not None:
-            progress_bar.setMinimum(1)
-            progress_bar.setMaximum(F)
-
         # loop through each frame
-        for f, frame in enumerate(tqdm(glimpse.cumdrift.index)):
+        # for f, frame in enumerate(tqdm(glimpse.cumdrift.index, file=sys.stdout)):
+        for f, frame in enumerate(progress_bar(glimpse.cumdrift.index)):
             img = glimpse[frame]
 
             offset_medians.append(np.median(img[10:40, 10:40]))
@@ -304,8 +302,6 @@ def read_glimpse(path, progress_bar, **kwargs):
                     target_xy[dtype][c][n, f, 1] = (
                         raw_target_xy[dtype][n, f, 1] - shifty
                     )
-            if progress_bar is not None:
-                progress_bar.setValue(f + 1)
 
         # assert that target positions are within central pixel
         for dtype in glimpse.dtypes:
