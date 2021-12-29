@@ -278,7 +278,6 @@ def read_glimpse(path, progress_bar, **kwargs):
         glimpse.plot("offset", 30, path=path, save=True)
 
         # loop through each frame
-        # for f, frame in enumerate(tqdm(glimpse.cumdrift.index, file=sys.stdout)):
         for f, frame in enumerate(progress_bar(glimpse.cumdrift.index)):
             img = glimpse[frame]
 
