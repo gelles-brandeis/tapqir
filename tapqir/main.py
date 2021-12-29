@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import sys
 from collections import defaultdict
 from enum import Enum
 from functools import partial
@@ -9,8 +10,10 @@ from pathlib import Path
 from typing import List, Optional
 
 import colorama
+import torch
 import typer
 import yaml
+from tqdm import tqdm
 
 from tapqir import __version__
 
@@ -18,6 +21,7 @@ app = typer.Typer()
 
 # option DEFAULTS
 DEFAULTS = defaultdict(lambda: None)
+DEFAULTS["channels"] = []
 
 
 def version_callback(value: bool):
@@ -50,50 +54,15 @@ def get_default(key):
 
 
 def deactivate_prompts(ctx, param, value):
-    if value:
+    if param.name == "no_input" and value:
         for p in ctx.command.params:
             if isinstance(p, typer.core.TyperOption) and p.prompt is not None:
                 p.prompt = None
+    elif param.name == "frame_range" and not value:
+        for p in ctx.command.params:
+            if p.name in ("frame_start", "frame_end"):
+                p.prompt = None
     return value
-
-
-@app.command()
-def init():
-    """
-    Initialize Tapqir in the working directory.
-
-    Initializing a Tapqir workspace creates a ``.tapqir`` sub-directory for storing ``config.yml``
-    file, ``loginfo`` file, and files that are created by commands such as ``tapqir fit``.
-    """
-    global DEFAULTS
-    cd = DEFAULTS.pop("cd")
-
-    TAPQIR_PATH = cd / ".tapqir"
-
-    if TAPQIR_PATH.is_dir():
-        typer.echo(".tapqir already exists.")
-        raise typer.Exit()
-
-    # initialize directory
-    TAPQIR_PATH.mkdir()
-    CONFIG_FILE = TAPQIR_PATH / "config.yml"
-    # CONFIG_FILE.touch(exist_ok=True)
-    with open(CONFIG_FILE, "w") as cfg_file:
-        DEFAULTS["P"] = 14
-        DEFAULTS["nbatch-size"] = 10
-        DEFAULTS["fbatch-size"] = 512
-        DEFAULTS["learning-rate"] = 0.005
-        DEFAULTS["num-channels"] = 1
-        yaml.dump(dict(DEFAULTS), cfg_file, sort_keys=False)
-
-    typer.echo(
-        (
-            "Initialized Tapqir in the working directory.\n"
-            "{yellow}---------------------------------------------------------------{nc}\n"
-            f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
-            f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
-        ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
-    )
 
 
 @app.command()
@@ -108,12 +77,33 @@ def glimpse(
         help="AOI image size - number of pixels along the axis",
         prompt="AOI image size - number of pixels along the axis",
     ),
+    frame_range: bool = typer.Option(
+        partial(get_default, "frame-range"),
+        help="Specify frame range.",
+        prompt="Specify frame range?",
+        callback=deactivate_prompts,
+    ),
+    frame_start: Optional[int] = typer.Option(
+        partial(get_default, "frame-start"),
+        help="First frame.",
+        prompt="First frame",
+    ),
+    frame_end: Optional[int] = typer.Option(
+        partial(get_default, "frame-end"),
+        help="Last frame.",
+        prompt="Last frame",
+    ),
     num_channels: int = typer.Option(
         partial(get_default, "num-channels"),
         "--num-channels",
         "-C",
         help="Number of color channels",
         prompt="Number of color channels",
+    ),
+    use_offtarget: bool = typer.Option(
+        partial(get_default, "use-offtarget"),
+        help="Use off-target AOI locations.",
+        prompt="Use off-target AOI locations?",
     ),
     name: Optional[List[str]] = typer.Option(partial(get_default, "name")),
     glimpse_folder: Optional[List[str]] = typer.Option(
@@ -126,8 +116,6 @@ def glimpse(
         partial(get_default, "offtarget-aoiinfo")
     ),
     driftlist: Optional[List[str]] = typer.Option(partial(get_default, "driftlist")),
-    frame_start: Optional[int] = typer.Option(partial(get_default, "frame-start")),
-    frame_end: Optional[int] = typer.Option(partial(get_default, "frame-end")),
     overwrite: bool = typer.Option(
         True,
         "--overwrite",
@@ -148,6 +136,7 @@ def glimpse(
         "-l",
         help="Add on-target binding labels.",
     ),
+    progress_bar=None,
 ):
     """
     Extract AOIs from raw glimpse images.
@@ -163,13 +152,26 @@ def glimpse(
 
     from tapqir.imscroll import read_glimpse
 
+    torch.set_default_tensor_type(torch.FloatTensor)
+
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
+
+    if progress_bar is None:
+        progress_bar = tqdm
+
+    # fill in default values
+    DEFAULTS["dataset"] = dataset
+    DEFAULTS["P"] = P
+    DEFAULTS["num-channels"] = num_channels
+    DEFAULTS["frame-range"] = frame_range
+    DEFAULTS["frame-start"] = frame_start
+    DEFAULTS["frame-end"] = frame_end
+    DEFAULTS["use-offtarget"] = use_offtarget
+    DEFAULTS["labels"] = labels
 
     # inputs descriptions
     desc = {}
-    desc["frame-start"] = "First frame to include in the analysis"
-    desc["frame-end"] = "Last frame to include in the analysis"
     desc["name"] = "Channel name"
     desc["glimpse-folder"] = "Header/glimpse folder"
     desc["driftlist"] = "Driftlist file"
@@ -178,71 +180,30 @@ def glimpse(
     desc["ontarget-labels"] = "On-target AOI binding labels"
     desc["offtarget-labels"] = "Off-target AOI binding labels"
 
-    DEFAULTS["dataset"] = dataset
-    DEFAULTS["P"] = P
-    DEFAULTS["num-channels"] = num_channels
-    DEFAULTS["frame-start"] = frame_start
-    DEFAULTS["frame-end"] = frame_end
+    keys = [
+        "name",
+        "glimpse-folder",
+        "ontarget-aoiinfo",
+        "offtarget-aoiinfo",
+        "driftlist",
+    ]
+    flags = [name, glimpse_folder, ontarget_aoiinfo, offtarget_aoiinfo, driftlist]
 
+    for c in range(num_channels):
+        if len(DEFAULTS["channels"]) < c + 1:
+            DEFAULTS["channels"].append({})
+        for flag, key in zip(flags, keys):
+            DEFAULTS["channels"][c][key] = flag[c] if c < len(flag) else None
+
+    # interactive input
     if not no_input:
-        frame_range = typer.confirm(
-            "Specify frame range?", default=("frame-start" in DEFAULTS)
-        )
-        if frame_range:
-            DEFAULTS["frame-start"] = typer.prompt(
-                desc["frame-start"], default=DEFAULTS["frame-start"], type=int
-            )
-            DEFAULTS["frame-end"] = typer.prompt(
-                desc["frame-end"], default=DEFAULTS["frame-end"], type=int
-            )
-        else:
-            DEFAULTS["frame-start"] = None
-            DEFAULTS["frame-end"] = None
-
-        if "channels" not in DEFAULTS:
-            DEFAULTS["channels"] = []
         for c in range(num_channels):
-            if len(DEFAULTS["channels"]) < c + 1:
-                DEFAULTS["channels"].append({})
-            DEFAULTS["channels"][c]["name"] = name[c] if c < len(name) else None
-            DEFAULTS["channels"][c]["glimpse-folder"] = (
-                glimpse_folder[c] if c < len(glimpse_folder) else None
-            )
-            DEFAULTS["channels"][c]["ontarget-aoiinfo"] = (
-                ontarget_aoiinfo[c] if c < len(ontarget_aoiinfo) else None
-            )
-            DEFAULTS["channels"][c]["offtarget-aoiinfo"] = (
-                offtarget_aoiinfo[c] if c < len(offtarget_aoiinfo) else None
-            )
-            DEFAULTS["channels"][c]["driftlist"] = (
-                driftlist[c] if c < len(driftlist) else None
-            )
-            keys = [
-                "name",
-                "glimpse-folder",
-                "ontarget-aoiinfo",
-                "offtarget-aoiinfo",
-                "driftlist",
-            ]
             if labels:
                 keys += ["ontarget-labels", "offtarget-labels"]
-            else:
-                if "ontarget-labels" in DEFAULTS["channels"][c]:
-                    del DEFAULTS["channels"][c]["ontarget-labels"]
-                elif "offtarget-labels" in DEFAULTS["channels"][c]:
-                    del DEFAULTS["channels"][c]["offtarget-labels"]
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
             for key in keys:
-                if key == "offtarget-aoiinfo":
-                    offtarget = typer.confirm(
-                        "Add off-target AOI locations?",
-                        default=(
-                            DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None
-                        ),
-                    )
-                    if not offtarget:
-                        DEFAULTS["channels"][c]["offtarget-aoiinfo"] = None
-                        continue
+                if key == "offtarget-aoiinfo" and not use_offtarget:
+                    continue
 
                 DEFAULTS["channels"][c][key] = typer.prompt(
                     desc[key], default=DEFAULTS["channels"][c][key]
@@ -252,11 +213,16 @@ def glimpse(
 
     if overwrite:
         with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
-            yaml.dump(DEFAULTS, cfg_file, sort_keys=False)
+            yaml.dump(
+                {key: value for key, value in DEFAULTS.items() if key != "cd"},
+                cfg_file,
+                sort_keys=False,
+            )
 
     typer.echo("Extracting AOIs ...")
     read_glimpse(
         path=cd,
+        progress_bar=progress_bar,
         **DEFAULTS,
     )
     typer.echo("Extracting AOIs: Done")
@@ -265,8 +231,8 @@ def glimpse(
 @app.command()
 def fit(
     model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
-    channels: str = typer.Option(
-        "0",
+    channels: List[int] = typer.Option(
+        [0],
         help="Color-channel numbers to analyze",
         prompt="Channel numbers (space separated if multiple)",
     ),
@@ -336,6 +302,7 @@ def fit(
         is_eager=True,
         callback=deactivate_prompts,
     ),
+    progress_bar=None,
 ):
     """
     Fit the data to the selected model.
@@ -345,7 +312,10 @@ def fit(
     * cosmos: single-color time-independent co-localization model.\n
     """
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
+
+    if progress_bar is None:
+        progress_bar = tqdm
 
     from pyroapi import pyro_backend
 
@@ -355,7 +325,7 @@ def fit(
     settings = {}
     settings["S"] = 1
     settings["K"] = k_max
-    settings["channels"] = [int(c) for c in channels.split()]
+    settings["channels"] = channels
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
     settings["use_pykeops"] = pykeops
@@ -366,7 +336,11 @@ def fit(
         DEFAULTS["fbatch-size"] = fbatch_size
         DEFAULTS["learning-rate"] = learning_rate
         with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
-            yaml.dump(dict(DEFAULTS), cfg_file, sort_keys=False)
+            yaml.dump(
+                {key: value for key, value in DEFAULTS.items() if key != "cd"},
+                cfg_file,
+                sort_keys=False,
+            )
 
     backend = "funsor" if funsor else "pyro"
     if backend == "pyro":
@@ -387,14 +361,14 @@ def fit(
 
         model.init(learning_rate, nbatch_size, fbatch_size)
         typer.echo("Fitting the data ...")
-        exit_code = model.run(num_iter)
+        exit_code = model.run(num_iter, progress_bar=progress_bar)
         if exit_code == 0:
             typer.echo("Fitting the data: Done")
-            typer.echo("Computing stats ...")
-            save_stats(model, cd, save_matlab=matlab)
-            typer.echo("Computing stats: Done")
         elif exit_code == 1:
             typer.echo("The model hasn't converged!")
+        typer.echo("Computing stats ...")
+        save_stats(model, cd, save_matlab=matlab)
+        typer.echo("Computing stats: Done")
 
 
 @app.command()
@@ -449,7 +423,7 @@ def stats(
     from tapqir.utils.stats import save_stats
 
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     dtype = "double"
     device = "cuda" if cuda else "cpu"
@@ -503,13 +477,13 @@ def show(
     import sys
 
     from pyroapi import pyro_backend
-    from PySide2.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
 
     from tapqir.commands.qtgui import MainWindow
     from tapqir.models import models
 
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     backend = "funsor" if funsor else "pyro"
     channels = [int(c) for c in channels.split()]
@@ -534,7 +508,7 @@ def log():
     import pydoc
 
     global DEFAULTS
-    cd = DEFAULTS.pop("cd")
+    cd = DEFAULTS["cd"]
 
     log_file = cd / ".tapqir" / "loginfo"
     with open(log_file, "r") as f:
@@ -561,17 +535,55 @@ def main(
 ):
     """
     Bayesian analysis of co-localization single-molecule microscopy image data.
+
+    Initialize Tapqir in the working directory. Initializing a Tapqir workspace creates
+    a ``.tapqir`` sub-directory for storing ``config.yml`` file, ``loginfo`` file,
+    and files that are created by commands such as ``tapqir fit``.
     """
 
     global DEFAULTS
     # set working directory
     DEFAULTS["cd"] = cd
 
+    TAPQIR_PATH = cd / ".tapqir"
+
+    if not TAPQIR_PATH.is_dir():
+        # initialize directory
+        TAPQIR_PATH.mkdir()
+    CONFIG_PATH = TAPQIR_PATH / "config.yml"
+    if not CONFIG_PATH.is_file():
+        with open(CONFIG_PATH, "w") as cfg_file:
+            DEFAULTS["P"] = 14
+            DEFAULTS["nbatch-size"] = 10
+            DEFAULTS["fbatch-size"] = 512
+            DEFAULTS["learning-rate"] = 0.005
+            DEFAULTS["num-channels"] = 1
+            yaml.dump(
+                {key: value for key, value in DEFAULTS.items() if key != "cd"},
+                cfg_file,
+                sort_keys=False,
+            )
+
+        typer.echo(
+            (
+                f"Initialized Tapqir at {TAPQIR_PATH}.\n"
+                "{yellow}---------------------------------------------------------------{nc}\n"
+                f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
+                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
+            ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
+        )
+
+    # read defaults from config file
+    with open(CONFIG_PATH, "r") as cfg_file:
+        cfg_defaults = yaml.safe_load(cfg_file) or {}
+        DEFAULTS.update(cfg_defaults)
+        typer.echo(f"Configuration options are read from {CONFIG_PATH}.")
+
     # create logger
     logger = logging.getLogger("tapqir")
 
     logger.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
+    ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
     formatter = logging.Formatter(
         fmt="%(levelname)s - %(message)s",
@@ -579,21 +591,14 @@ def main(
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    if (cd / ".tapqir").is_dir():
-        fh = logging.FileHandler(cd / ".tapqir" / "loginfo")
-        fh.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            fmt="%(asctime)s - %(levelname)s - %(message)s",
-            datefmt="%m/%d/%Y %I:%M %p",
-        )
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-
-    # read defaults from config file
-    if (cd / ".tapqir" / "config.yml").is_file():
-        with open(cd / ".tapqir" / "config.yml", "r") as cfg_file:
-            cfg_defaults = yaml.safe_load(cfg_file) or {}
-            DEFAULTS.update(cfg_defaults)
+    fh = logging.FileHandler(cd / ".tapqir" / "loginfo")
+    fh.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        fmt="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%m/%d/%Y %I:%M %p",
+    )
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
 
 
 # click object is required to generate docs with sphinx-click
