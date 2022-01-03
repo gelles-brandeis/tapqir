@@ -3,15 +3,15 @@
 
 import logging
 import sys
-import torch
 from collections import defaultdict
 from enum import Enum
 from functools import partial
 from pathlib import Path
 from typing import List, Optional
+import matplotlib.pyplot as plt
 
 import colorama
-import ipywidgets as widgets
+import torch
 import typer
 import yaml
 from tqdm import tqdm
@@ -66,33 +66,6 @@ def deactivate_prompts(ctx, param, value):
     return value
 
 
-class OutputWidgetHandler(logging.Handler):
-    """Custom logging handler sending logs to an output widget"""
-
-    def __init__(self, *args, **kwargs):
-        super(OutputWidgetHandler, self).__init__(*args, **kwargs)
-        layout = {"width": "100%", "height": "160px", "border": "1px solid black"}
-        self.out = widgets.Output(layout=layout)
-
-    def emit(self, record):
-        """Overload of logging.Handler method"""
-        formatted_record = self.format(record)
-        new_output = {
-            "name": "stdout",
-            "output_type": "stream",
-            "text": formatted_record + "\n",
-        }
-        self.out.outputs = (new_output,) + self.out.outputs
-
-    def show_logs(self):
-        """Show the logs"""
-        display(self.out)
-
-    def clear_logs(self):
-        """Clear the current logs"""
-        self.out.clear_output()
-
-
 @app.command()
 def glimpse(
     dataset: str = typer.Option(
@@ -128,6 +101,11 @@ def glimpse(
         help="Number of color channels",
         prompt="Number of color channels",
     ),
+    use_offtarget: bool = typer.Option(
+        partial(get_default, "use-offtarget"),
+        help="Use off-target AOI locations.",
+        prompt="Use off-target AOI locations?",
+    ),
     name: Optional[List[str]] = typer.Option(partial(get_default, "name")),
     glimpse_folder: Optional[List[str]] = typer.Option(
         partial(get_default, "glimpse-folder")
@@ -135,7 +113,6 @@ def glimpse(
     ontarget_aoiinfo: Optional[List[str]] = typer.Option(
         partial(get_default, "ontarget-aoiinfo")
     ),
-    use_offtarget: bool = typer.Option(partial(get_default, "use-offtarget")),
     offtarget_aoiinfo: Optional[List[str]] = typer.Option(
         partial(get_default, "offtarget-aoiinfo")
     ),
@@ -226,14 +203,8 @@ def glimpse(
                 keys += ["ontarget-labels", "offtarget-labels"]
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
             for key in keys:
-                if key == "offtarget-aoiinfo":
-                    use_offtarget = typer.confirm(
-                        "Use off-target AOI locations?",
-                        default=(DEFAULTS["use-offtarget"]),
-                    )
-                    if not use_offtarget:
-                        DEFAULTS["channels"][c]["offtarget-aoiinfo"] = None
-                        continue
+                if key == "offtarget-aoiinfo" and not use_offtarget:
+                    continue
 
                 DEFAULTS["channels"][c][key] = typer.prompt(
                     desc[key], default=DEFAULTS["channels"][c][key]
@@ -394,11 +365,11 @@ def fit(
         exit_code = model.run(num_iter, progress_bar=progress_bar)
         if exit_code == 0:
             typer.echo("Fitting the data: Done")
-            typer.echo("Computing stats ...")
-            save_stats(model, cd, save_matlab=matlab)
-            typer.echo("Computing stats: Done")
         elif exit_code == 1:
             typer.echo("The model hasn't converged!")
+        typer.echo("Computing stats ...")
+        save_stats(model, cd, save_matlab=matlab)
+        typer.echo("Computing stats: Done")
 
 
 @app.command()
@@ -485,51 +456,132 @@ def stats(
         typer.echo("Computing stats: Done")
 
 
+def config_axis(ax, label, f1, f2, ymin, ymax, xticklabels=False):
+    plt.minorticks_on()
+    ax.tick_params(
+        direction="in",
+        which="minor",
+        length=1,
+        bottom=True,
+        top=True,
+        left=True,
+        right=True,
+    )
+    ax.tick_params(
+        direction="in",
+        which="major",
+        length=2,
+        bottom=True,
+        top=True,
+        left=True,
+        right=True,
+    )
+    ax.set_ylabel(label)
+    ax.set_xlim(f1 - 2, f2 + 1)
+    ax.set_ylim(ymin, ymax)
+    if not xticklabels:
+        ax.set_xticklabels([])
+
+
 @app.command()
 def show(
     model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
-    channels: str = typer.Option(
-        "0",
+    channels: List[int] = typer.Option(
+        [0],
         help="Color-channel numbers to analyze",
         prompt="Channel numbers (space separated if multiple)",
     ),
-    funsor: bool = typer.Option(
-        False, "--funsor/--pyro", help="Use funsor or pyro backend"
-    ),
-    no_input: bool = typer.Option(
-        False,
-        "--no-input",
-        help="Use defaults values.",
-        is_eager=True,
-        callback=deactivate_prompts,
-    ),
+    n: int = typer.Option(0, help="n", prompt="n"),
+    f1: Optional[int] = None,
+    f2: Optional[int] = None,
 ):
-    import sys
-
-    from pyroapi import pyro_backend
-    from PySide2.QtWidgets import QApplication
-
-    from tapqir.commands.qtgui import MainWindow
     from tapqir.models import models
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
-    backend = "funsor" if funsor else "pyro"
-    channels = [int(c) for c in channels.split()]
-    # pyro backend
-    if backend == "pyro":
-        PYRO_BACKEND = "pyro"
-    elif backend == "funsor":
-        PYRO_BACKEND = "contrib.funsor"
-    else:
-        raise ValueError("Only pyro and funsor backends are supported.")
+    model = models[model](1, 2, channels, "cpu", "float")
+    model.load(cd, data_only=False)
+    if f1 is None:
+        f1 = 0
+    if f2 is None:
+        f2 = model.data.F
 
-    with pyro_backend(PYRO_BACKEND):
-        model = models[model](1, 2, channels, "cpu", "float")
-        app = QApplication(sys.argv)
-        MainWindow(model, cd)
-        sys.exit(app.exec_())
+    width, height, dpi = 10, 8, 100
+    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    gs = fig.add_gridspec(
+        nrows=6,
+        ncols=1,
+        top=0.99,
+        bottom=0.05,
+        left=0.07,
+        right=0.98,
+        hspace=0.1,
+    )
+    ax = {}
+    item = {}
+
+    ax["pspecific"] = fig.add_subplot(gs[0])
+    config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
+    (item["pspecific"],) = ax["pspecific"].plot(
+        torch.arange(0, model.data.F),
+        model.params["z_probs"][n],
+        "o-",
+        ms=3,
+        lw=1,
+        color="C2",
+    )
+
+    ax["height"] = fig.add_subplot(gs[1])
+    config_axis(ax["height"], r"$h$", f1, f2, -100, 8000)
+
+    ax["width"] = fig.add_subplot(gs[2])
+    config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
+
+    ax["x"] = fig.add_subplot(gs[3])
+    config_axis(ax["x"], r"$x$", f1, f2, -9, 9)
+
+    ax["y"] = fig.add_subplot(gs[4])
+    config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
+
+    ax["background"] = fig.add_subplot(gs[5])
+    config_axis(ax["background"], r"$b$", f1, f2, 0, 500, True)
+    ax["background"].set_xlabel("Time (frame)")
+
+    for p in ["height", "width", "x", "y"]:
+        for k in range(model.K):
+            (item[f"{p}_{k}_mean"],) = ax[p].plot(
+                torch.arange(0, model.data.F),
+                model.params[p]["Mean"][k, n],
+                "o-",
+                ms=3,
+                lw=1,
+                color=f"C{k}",
+            )
+            item[f"{p}_{k}_fill"] = ax[p].fill_between(
+                torch.arange(0, model.data.F),
+                model.params[p]["LL"][k, n],
+                model.params[p]["UL"][k, n],
+                alpha=0.3,
+                color=f"C{k}",
+            )
+    (item["background_mean"],) = ax["background"].plot(
+        torch.arange(0, model.data.F),
+        model.params["background"]["Mean"][n],
+        "o-",
+        ms=3,
+        lw=1,
+        color="k",
+    )
+    item["background_fill"] = ax["background"].fill_between(
+        torch.arange(0, model.data.F),
+        model.params["background"]["LL"][n],
+        model.params["background"]["UL"][n],
+        alpha=0.3,
+        color="k",
+    )
+    plt.show()
+    return model, fig, item, ax
 
 
 @app.command()
@@ -588,6 +640,7 @@ def main(
             DEFAULTS["fbatch-size"] = 512
             DEFAULTS["learning-rate"] = 0.005
             DEFAULTS["num-channels"] = 1
+            DEFAULTS["cuda"] = "true"
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
                 cfg_file,
@@ -629,14 +682,6 @@ def main(
     )
     fh.setFormatter(formatter)
     logger.addHandler(fh)
-
-    jh = OutputWidgetHandler()
-    jh.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        fmt="%(levelname)s - %(message)s",
-    )
-    jh.setFormatter(formatter)
-    logger.addHandler(jh)
 
 
 # click object is required to generate docs with sphinx-click

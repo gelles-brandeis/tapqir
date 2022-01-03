@@ -3,7 +3,6 @@
 
 import logging
 import random
-import sys
 from collections import deque
 from pathlib import Path
 from typing import Union
@@ -199,28 +198,28 @@ class Model:
 
         with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
             for i in progress_bar(range(num_iter)):
-                #  try:
-                self.iter_loss = self.svi.step()
-                # save a checkpoint every 200 iterations
-                if not self.iter % 200:
-                    self.save_checkpoint(writer)
-                    if use_crit and self.converged:
-                        logger.debug(f"Iteration #{self.iter} model converged.")
-                        return 0
-                self.iter += 1
-                #  except ValueError:
-                #      # load last checkpoint
-                #      self.init(
-                #          lr=self.lr,
-                #          nbatch_size=self.nbatch_size,
-                #          fbatch_size=self.fbatch_size,
-                #      )
-                #      # change rng seed
-                #      new_seed = random.randint(0, 100)
-                #      pyro.set_rng_seed(new_seed)
-                #      logger.warning(
-                #          f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
-                #      )
+                try:
+                    self.iter_loss = self.svi.step()
+                    # save a checkpoint every 200 iterations
+                    if not self.iter % 200:
+                        self.save_checkpoint(writer)
+                        if use_crit and self.converged:
+                            logger.debug(f"Iteration #{self.iter} model converged.")
+                            return 0
+                    self.iter += 1
+                except ValueError:
+                    # load last checkpoint
+                    self.init(
+                        lr=self.lr,
+                        nbatch_size=self.nbatch_size,
+                        fbatch_size=self.fbatch_size,
+                    )
+                    # change rng seed
+                    new_seed = random.randint(0, 100)
+                    pyro.set_rng_seed(new_seed)
+                    logger.warning(
+                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                    )
         return 1
 
     def save_checkpoint(self, writer: SummaryWriter = None):

@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import sys
 from collections import OrderedDict, defaultdict
 from pathlib import Path
 
@@ -12,7 +11,6 @@ import pandas as pd
 import torch
 from matplotlib.patches import Rectangle
 from scipy.io import loadmat
-from tqdm import tqdm
 
 from tapqir.utils.dataset import CosmosDataset, save
 
