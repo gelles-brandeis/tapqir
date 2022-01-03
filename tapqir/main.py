@@ -8,9 +8,9 @@ from enum import Enum
 from functools import partial
 from pathlib import Path
 from typing import List, Optional
-import matplotlib.pyplot as plt
 
 import colorama
+import matplotlib.pyplot as plt
 import torch
 import typer
 import yaml

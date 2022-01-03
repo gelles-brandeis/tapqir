@@ -9,7 +9,6 @@ from functools import partial, singledispatch
 from pathlib import Path
 
 import ipywidgets as widgets
-import nbformat as nbf
 import torch
 from ipyfilechooser import FileChooser
 from traitlets.utils.bunch import Bunch
@@ -467,12 +466,14 @@ def toggleWidgets(b, widgets):
         w.disabled = not checked
 
 
-if __name__ == "__main__":
+def app():
+    import nbformat as nbf
+
     notebook = nbf.v4.new_notebook()
     notebook["cells"] = []
     new_cell = nbf.v4.new_code_cell(
         "%matplotlib widget\n"
-        "from tapqir.v2 import initUI\n"
+        "from tapqir.gui import initUI\n"
         "from tapqir.main import DEFAULTS\n"
         "initUI(DEFAULTS)"
     )

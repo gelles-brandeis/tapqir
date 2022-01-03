@@ -90,6 +90,6 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.main:app"],
+        "console_scripts": ["tapqir=tapqir.main:app", "tapqir-gui=tapqir.gui:app"],
     },
 )
