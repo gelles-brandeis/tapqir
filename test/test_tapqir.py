@@ -48,7 +48,6 @@ def dataset_path(request, tmp_path):
 def test_commands_cpu(dataset_path, qtbot):
 
     commands = [
-        ["--cd", dataset_path, "init"],
         [
             "--cd",
             dataset_path,
@@ -100,7 +99,6 @@ def test_commands_cpu(dataset_path, qtbot):
 @requires_cuda
 def test_commands_cuda(dataset_path):
     commands = [
-        ["--cd", dataset_path, "init"],
         [
             "--cd",
             dataset_path,

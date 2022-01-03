@@ -213,7 +213,7 @@ def glimpse(
     DEFAULTS = dict(DEFAULTS)
 
     if overwrite:
-        with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
+        with open(cd / ".tapqir" / "config.yaml", "w") as cfg_file:
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
                 cfg_file,
@@ -336,7 +336,7 @@ def fit(
         DEFAULTS["nbatch-size"] = nbatch_size
         DEFAULTS["fbatch-size"] = fbatch_size
         DEFAULTS["learning-rate"] = learning_rate
-        with open(cd / ".tapqir" / "config.yml", "w") as cfg_file:
+        with open(cd / ".tapqir" / "config.yaml", "w") as cfg_file:
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
                 cfg_file,
@@ -375,8 +375,8 @@ def fit(
 @app.command()
 def stats(
     model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
-    channels: str = typer.Option(
-        "0",
+    channels: List[int] = typer.Option(
+        [0],
         help="Color-channel numbers to analyze",
         prompt="Channel numbers (space separated if multiple)",
     ),
@@ -429,7 +429,6 @@ def stats(
     dtype = "double"
     device = "cuda" if cuda else "cpu"
     backend = "funsor" if funsor else "pyro"
-    channels = [int(c) for c in channels.split()]
 
     # pyro backend
     if backend == "pyro":
@@ -619,7 +618,7 @@ def main(
     Bayesian analysis of co-localization single-molecule microscopy image data.
 
     Initialize Tapqir in the working directory. Initializing a Tapqir workspace creates
-    a ``.tapqir`` sub-directory for storing ``config.yml`` file, ``loginfo`` file,
+    a ``.tapqir`` sub-directory for storing ``config.yaml`` file, ``loginfo`` file,
     and files that are created by commands such as ``tapqir fit``.
     """
 
@@ -632,7 +631,7 @@ def main(
     if not TAPQIR_PATH.is_dir():
         # initialize directory
         TAPQIR_PATH.mkdir()
-    CONFIG_PATH = TAPQIR_PATH / "config.yml"
+    CONFIG_PATH = TAPQIR_PATH / "config.yaml"
     if not CONFIG_PATH.is_file():
         with open(CONFIG_PATH, "w") as cfg_file:
             DEFAULTS["P"] = 14
