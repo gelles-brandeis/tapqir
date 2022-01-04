@@ -55,7 +55,7 @@ def initUI(DEFAULTS):
     layout = widgets.VBox()
 
     # widgets
-    cd = FileChooser("/tmp/tutorial", title="Working directory")
+    cd = FileChooser(".", title="Working directory")
     cd.show_only_dirs = True
 
     out = widgets.Output(layout={"border": "1px solid black"})
