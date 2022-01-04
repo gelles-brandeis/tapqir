@@ -28,14 +28,13 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
     $ sudo pacman -S nvidia
 
-2. Install git and libxcb-xinerama0 (on Ubuntu).
+2. Install git.
 
    *On Ubuntu 20.04*
 
    In the terminal run::
 
     $ sudo apt install git
-    $ sudo apt install libxcb-xinerama0
 
    *On Arch Linux*
 

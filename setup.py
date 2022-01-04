@@ -65,13 +65,11 @@ setuptools.setup(
         "pandas",
         "pykeops==1.5",
         "pyro-ppl>=1.7.0",
-        "pyqtgraph",
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
         "tensorboard",
         "typer",
-        "qtrangeslider",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,

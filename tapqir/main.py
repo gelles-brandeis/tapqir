@@ -16,6 +16,7 @@ import typer
 import yaml
 from tqdm import tqdm
 
+from tapqir.distributions.util import gaussian_spots
 from tapqir import __version__
 
 app = typer.Typer()
@@ -476,7 +477,7 @@ def config_axis(ax, label, f1, f2, ymin, ymax, xticklabels=False):
         right=True,
     )
     ax.set_ylabel(label)
-    ax.set_xlim(f1 - 2, f2 + 1)
+    ax.set_xlim(f1 - 0.5, f2 - 0.5)
     ax.set_ylim(ymin, ymax)
     if not xticklabels:
         ax.set_xticklabels([])
@@ -505,22 +506,58 @@ def show(
         f1 = 0
     if f2 is None:
         f2 = model.data.F
+    f2 = 15
+    c = model.cdx
 
     width, height, dpi = 10, 8, 100
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
-        nrows=6,
-        ncols=1,
+        nrows=8,
+        ncols=15,
         top=0.99,
         bottom=0.05,
         left=0.07,
         right=0.98,
         hspace=0.1,
+        # height_ratios=[0.75, 0.75, 1, 1, 1, 1, 1, 1],
     )
     ax = {}
     item = {}
 
-    ax["pspecific"] = fig.add_subplot(gs[0])
+    frames = torch.arange(f1, f2)
+    img_ideal = (
+        model.data.offset.mean
+        + model.params["background"]["Mean"][n, frames, None, None]
+    )
+    gaussian = gaussian_spots(
+        model.params["height"]["Mean"][:, n, frames],
+        model.params["width"]["Mean"][:, n, frames],
+        model.params["x"]["Mean"][:, n, frames],
+        model.params["y"]["Mean"][:, n, frames],
+        model.data.xy[n, frames, c],
+        model.data.P,
+    )
+    img_ideal = img_ideal + gaussian.sum(-4)
+    for f in range(15):
+        ax[f"image_{f}"] = fig.add_subplot(gs[0, f])
+        item[f"image_{f}"] = ax[f"image_{f}"].imshow(
+            model.data.images[n, f, c].numpy(),
+            vmin=model.data.vmin - 50,
+            vmax=model.data.vmax + 50,
+            cmap="gray",
+        )
+        ax[f"image_{f}"].set_title(f)
+        ax[f"image_{f}"].axis("off")
+        ax[f"ideal_{f}"] = fig.add_subplot(gs[1, f])
+        item[f"ideal_{f}"] = ax[f"ideal_{f}"].imshow(
+            img_ideal[f].numpy(),
+            vmin=model.data.vmin - 50,
+            vmax=model.data.vmax + 50,
+            cmap="gray",
+        )
+        ax[f"ideal_{f}"].axis("off")
+
+    ax["pspecific"] = fig.add_subplot(gs[2, :])
     config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
     (item["pspecific"],) = ax["pspecific"].plot(
         torch.arange(0, model.data.F),
@@ -531,19 +568,19 @@ def show(
         color="C2",
     )
 
-    ax["height"] = fig.add_subplot(gs[1])
+    ax["height"] = fig.add_subplot(gs[3, :])
     config_axis(ax["height"], r"$h$", f1, f2, -100, 8000)
 
-    ax["width"] = fig.add_subplot(gs[2])
+    ax["width"] = fig.add_subplot(gs[4, :])
     config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
 
-    ax["x"] = fig.add_subplot(gs[3])
+    ax["x"] = fig.add_subplot(gs[5, :])
     config_axis(ax["x"], r"$x$", f1, f2, -9, 9)
 
-    ax["y"] = fig.add_subplot(gs[4])
+    ax["y"] = fig.add_subplot(gs[6, :])
     config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
 
-    ax["background"] = fig.add_subplot(gs[5])
+    ax["background"] = fig.add_subplot(gs[7, :])
     config_axis(ax["background"], r"$b$", f1, f2, 0, 500, True)
     ax["background"].set_xlabel("Time (frame)")
 

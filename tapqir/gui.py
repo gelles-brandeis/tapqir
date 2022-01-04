@@ -11,9 +11,11 @@ from pathlib import Path
 import ipywidgets as widgets
 import torch
 from ipyfilechooser import FileChooser
+from tensorboard import notebook
 from traitlets.utils.bunch import Bunch
 
 from tapqir.main import fit, glimpse, main, show
+from tapqir.distributions.util import gaussian_spots
 
 
 @singledispatch
@@ -53,28 +55,35 @@ def initUI(DEFAULTS):
     layout = widgets.VBox()
 
     # widgets
-    cd = FileChooser("/tmp/test", title="Working directory")
+    cd = FileChooser("/tmp/tutorial", title="Working directory")
     cd.show_only_dirs = True
 
     out = widgets.Output(layout={"border": "1px solid black"})
+    tensorboard = widgets.Output(layout={"border": "1px solid blue"})
 
     tab = widgets.Tab()
-    tab.children = [glimpseUI(out), fitUI(out), showUI()]
+    tab.children = [glimpseUI(out), fitUI(out), showUI(), tensorboard]
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
     tab.set_title(2, "View results")
+    tab.set_title(3, "Tensorboard")
     # layout
     layout.children = [cd, tab, out]
     # callbacks
-    cd.register_callback(partial(cdCmd, DEFAULTS=DEFAULTS, tab=tab))
+    cd.register_callback(
+        partial(cdCmd, DEFAULTS=DEFAULTS, tab=tab, tensorboard=tensorboard)
+    )
     return layout
 
 
-def cdCmd(chooser, DEFAULTS, tab):
+def cdCmd(chooser, DEFAULTS, tab, tensorboard):
     """
     Set working directory and load default parameters (main).
     """
     main(cd=Path((chooser.selected_path)))
+    with tensorboard:
+        notebook.start(f"--logdir  {Path((chooser.selected_path))}")
+        notebook.display(height=1000)
     glimpseTab = tab.children[0]
     for i, flag in enumerate(
         [
@@ -140,23 +149,20 @@ def glimpseUI(out):
     aoiSize = widgets.IntText(
         description="AOI image size",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Specify frame range?
     specifyFrame = widgets.Checkbox(
-        value=False, description="Specify frame range?", disabled=False, indent=False
+        value=False, description="Specify frame range?", indent=False
     )
     # First frame
     firstFrame = widgets.IntText(
         description="First frame",
         style={"description_width": "initial"},
-        disabled=True,
     )
     # Last frame
     lastFrame = widgets.IntText(
         description="Last frame",
         style={"description_width": "initial"},
-        disabled=True,
     )
     # Number of channels
     numChannels = widgets.BoundedIntText(
@@ -165,12 +171,10 @@ def glimpseUI(out):
         step=1,
         description="Number of color channels",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Specify frame range?
     useOfftarget = widgets.Checkbox(
         description="Use off-target AOI locations?",
-        disabled=False,
         indent=False,
     )
     # Channel tabs
@@ -269,45 +273,38 @@ def fitUI(out):
         description="Channel numbers",
         value="0",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Run computations on GPU?
     useGpu = widgets.Checkbox(
         value=True,
         description="Run computations of GPU?",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # AOI batch size
     aoiBatch = widgets.IntText(
         description="AOI batch size",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Frame batch size
     frameBatch = widgets.IntText(
         description="Frame batch size",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Learning rate
     learningRate = widgets.FloatText(
         description="Learning rate",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Number of iterations
     iterationNumber = widgets.IntText(
         description="Number of iterations",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Save parameters in matlab format?
     saveMatlab = widgets.Checkbox(
         value=False,
         description="Save parameters in matlab format?",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # progress bar
     fitBar = widgets.IntProgress()
@@ -366,7 +363,6 @@ def showUI():
         description="Channel numbers",
         value="0",
         style={"description_width": "initial"},
-        disabled=False,
     )
     # Fit the data
     showParams = widgets.Button(description="Load results")
@@ -395,34 +391,66 @@ def showCmd(b, layout, view):
             f2=None,
         )
     controls = layout.children[3]
-    n = widgets.IntText(
+    n = widgets.BoundedIntText(
         value=0,
+        min=0,
+        max=model.data.Nt-1,
         description="AOI",
         style={"description_width": "initial"},
-        disabled=False,
     )
-    f1 = widgets.IntText(
+    f1 = widgets.IntSlider(
         value=0,
-        description="f1",
-        style={"description_width": "initial"},
-        disabled=False,
+        min=0,
+        max=model.data.F-1-15,
+        step=1,
+        description="Frame",
+        continuous_update=True,
+        readout=True,
+        readout_format="d",
     )
-    f2 = widgets.IntText(
-        value=model.data.F - 1,
-        description="f2",
-        style={"description_width": "initial"},
-        disabled=False,
+    zoom = widgets.Checkbox(
+        value=False, description="zoom out", indent=False
     )
-    controls.children = [n, f1, f2]
+    controls.children = [n, f1, zoom]
     n.observe(
-        partial(updateParams, model=model, fig=fig, item=item, ax=ax), names="value"
+        partial(updateParams, f1=f1, model=model, fig=fig, item=item, ax=ax),
+        names="value",
     )
-    f1.observe(partial(updateRange, f2=f2, fig=fig, ax=ax), names="value")
-    f2.observe(partial(updateRange, f1, fig=fig, ax=ax), names="value")
+    f1.observe(
+        partial(updateRange, n=n, model=model, fig=fig, item=item, ax=ax),
+        names="value",
+    )
+    zoom.observe(
+        partial(zoomOut, f1=f1, model=model, fig=fig, ax=ax),
+        names="value",
+    )
 
 
-def updateParams(n, model, fig, item, ax):
+def updateParams(n, f1, model, fig, item, ax):
     n = get_value(n)
+    f1 = get_value(f1)
+    f2 = f1 + 15
+    c = model.cdx
+
+    frames = torch.arange(f1, f2)
+    img_ideal = (
+        model.data.offset.mean
+        + model.params["background"]["Mean"][n, frames, None, None]
+    )
+    gaussian = gaussian_spots(
+        model.params["height"]["Mean"][:, n, frames],
+        model.params["width"]["Mean"][:, n, frames],
+        model.params["x"]["Mean"][:, n, frames],
+        model.params["y"]["Mean"][:, n, frames],
+        model.data.xy[n, frames, c],
+        model.data.P,
+    )
+    img_ideal = img_ideal + gaussian.sum(-4)
+    for i, f in enumerate(range(f1, f2)):
+        ax[f"image_{i}"].set_title(f)
+        item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
+        item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
+
     params = ["z", "height", "width", "x", "y", "background"]
     for p in params:
         if p == "z":
@@ -452,13 +480,49 @@ def updateParams(n, model, fig, item, ax):
     fig.canvas.draw()
 
 
-def updateRange(f1, f2, fig, ax):
+def updateRange(f1, n, model, fig, item, ax):
+    n = get_value(n)
     f1 = get_value(f1)
-    f2 = get_value(f2)
-    for a in ax.values():
-        a.set_xlim(f1 - 1, f2 + 1)
+    f2 = f1 + 15
+    c = model.cdx
+
+    frames = torch.arange(f1, f2)
+    img_ideal = (
+        model.data.offset.mean
+        + model.params["background"]["Mean"][n, frames, None, None]
+    )
+    gaussian = gaussian_spots(
+        model.params["height"]["Mean"][:, n, frames],
+        model.params["width"]["Mean"][:, n, frames],
+        model.params["x"]["Mean"][:, n, frames],
+        model.params["y"]["Mean"][:, n, frames],
+        model.data.xy[n, frames, c],
+        model.data.P,
+    )
+    img_ideal = img_ideal + gaussian.sum(-4)
+    for i, f in enumerate(range(f1, f2)):
+        ax[f"image_{i}"].set_title(f)
+        item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
+        item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
+
+    for key, a in ax.items():
+        if not key.startswith("image") and not key.startswith("ideal"):
+            a.set_xlim(f1 - 0.5, f2 - 0.5)
     fig.canvas.draw()
 
+
+def zoomOut(checked, f1, model, fig, ax):
+    checked = get_value(checked)
+    if checked:
+        f1 = 0
+        f2 = model.data.F
+    else:
+        f1 = get_value(f1)
+        f2 = f1 + 15
+    for key, a in ax.items():
+        if not key.startswith("image") and not key.startswith("ideal"):
+            a.set_xlim(f1 - 0.5, f2 - 0.5)
+    fig.canvas.draw()
 
 def toggleWidgets(b, widgets):
     checked = get_value(b)
