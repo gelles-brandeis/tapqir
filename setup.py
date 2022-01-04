@@ -26,7 +26,6 @@ TEST_REQUIRE = [
     "flake8",
     "isort",
     "pytest",
-    "pytest-qt",
     "pytest-xvfb",
 ]
 # docs
