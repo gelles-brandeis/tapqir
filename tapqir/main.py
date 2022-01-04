@@ -10,12 +10,14 @@ from pathlib import Path
 from typing import List, Optional
 
 import colorama
+import matplotlib.pyplot as plt
 import torch
 import typer
 import yaml
 from tqdm import tqdm
 
 from tapqir import __version__
+from tapqir.distributions.util import gaussian_spots
 
 app = typer.Typer()
 
@@ -454,51 +456,168 @@ def stats(
         typer.echo("Computing stats: Done")
 
 
+def config_axis(ax, label, f1, f2, ymin, ymax, xticklabels=False):
+    plt.minorticks_on()
+    ax.tick_params(
+        direction="in",
+        which="minor",
+        length=1,
+        bottom=True,
+        top=True,
+        left=True,
+        right=True,
+    )
+    ax.tick_params(
+        direction="in",
+        which="major",
+        length=2,
+        bottom=True,
+        top=True,
+        left=True,
+        right=True,
+    )
+    ax.set_ylabel(label)
+    ax.set_xlim(f1 - 0.5, f2 - 0.5)
+    ax.set_ylim(ymin, ymax)
+    if not xticklabels:
+        ax.set_xticklabels([])
+
+
 @app.command()
 def show(
     model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
-    channels: str = typer.Option(
-        "0",
+    channels: List[int] = typer.Option(
+        [0],
         help="Color-channel numbers to analyze",
         prompt="Channel numbers (space separated if multiple)",
     ),
-    funsor: bool = typer.Option(
-        False, "--funsor/--pyro", help="Use funsor or pyro backend"
-    ),
-    no_input: bool = typer.Option(
-        False,
-        "--no-input",
-        help="Use defaults values.",
-        is_eager=True,
-        callback=deactivate_prompts,
-    ),
+    n: int = typer.Option(0, help="n", prompt="n"),
+    f1: Optional[int] = None,
+    f2: Optional[int] = None,
 ):
-    import sys
-
-    from pyroapi import pyro_backend
-    from PySide6.QtWidgets import QApplication
-
-    from tapqir.commands.qtgui import MainWindow
     from tapqir.models import models
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
-    backend = "funsor" if funsor else "pyro"
-    channels = [int(c) for c in channels.split()]
-    # pyro backend
-    if backend == "pyro":
-        PYRO_BACKEND = "pyro"
-    elif backend == "funsor":
-        PYRO_BACKEND = "contrib.funsor"
-    else:
-        raise ValueError("Only pyro and funsor backends are supported.")
+    model = models[model](1, 2, channels, "cpu", "float")
+    model.load(cd, data_only=False)
+    if f1 is None:
+        f1 = 0
+    if f2 is None:
+        f2 = model.data.F
+    f2 = 15
+    c = model.cdx
 
-    with pyro_backend(PYRO_BACKEND):
-        model = models[model](1, 2, channels, "cpu", "float")
-        app = QApplication(sys.argv)
-        MainWindow(model, cd)
-        sys.exit(app.exec_())
+    width, height, dpi = 10, 8, 100
+    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    gs = fig.add_gridspec(
+        nrows=8,
+        ncols=15,
+        top=0.99,
+        bottom=0.05,
+        left=0.07,
+        right=0.98,
+        hspace=0.1,
+        # height_ratios=[0.75, 0.75, 1, 1, 1, 1, 1, 1],
+    )
+    ax = {}
+    item = {}
+
+    frames = torch.arange(f1, f2)
+    img_ideal = (
+        model.data.offset.mean
+        + model.params["background"]["Mean"][n, frames, None, None]
+    )
+    gaussian = gaussian_spots(
+        model.params["height"]["Mean"][:, n, frames],
+        model.params["width"]["Mean"][:, n, frames],
+        model.params["x"]["Mean"][:, n, frames],
+        model.params["y"]["Mean"][:, n, frames],
+        model.data.xy[n, frames, c],
+        model.data.P,
+    )
+    img_ideal = img_ideal + gaussian.sum(-4)
+    for f in range(15):
+        ax[f"image_{f}"] = fig.add_subplot(gs[0, f])
+        item[f"image_{f}"] = ax[f"image_{f}"].imshow(
+            model.data.images[n, f, c].numpy(),
+            vmin=model.data.vmin - 50,
+            vmax=model.data.vmax + 50,
+            cmap="gray",
+        )
+        ax[f"image_{f}"].set_title(f)
+        ax[f"image_{f}"].axis("off")
+        ax[f"ideal_{f}"] = fig.add_subplot(gs[1, f])
+        item[f"ideal_{f}"] = ax[f"ideal_{f}"].imshow(
+            img_ideal[f].numpy(),
+            vmin=model.data.vmin - 50,
+            vmax=model.data.vmax + 50,
+            cmap="gray",
+        )
+        ax[f"ideal_{f}"].axis("off")
+
+    ax["pspecific"] = fig.add_subplot(gs[2, :])
+    config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
+    (item["pspecific"],) = ax["pspecific"].plot(
+        torch.arange(0, model.data.F),
+        model.params["z_probs"][n],
+        "o-",
+        ms=3,
+        lw=1,
+        color="C2",
+    )
+
+    ax["height"] = fig.add_subplot(gs[3, :])
+    config_axis(ax["height"], r"$h$", f1, f2, -100, 8000)
+
+    ax["width"] = fig.add_subplot(gs[4, :])
+    config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
+
+    ax["x"] = fig.add_subplot(gs[5, :])
+    config_axis(ax["x"], r"$x$", f1, f2, -9, 9)
+
+    ax["y"] = fig.add_subplot(gs[6, :])
+    config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
+
+    ax["background"] = fig.add_subplot(gs[7, :])
+    config_axis(ax["background"], r"$b$", f1, f2, 0, 500, True)
+    ax["background"].set_xlabel("Time (frame)")
+
+    for p in ["height", "width", "x", "y"]:
+        for k in range(model.K):
+            (item[f"{p}_{k}_mean"],) = ax[p].plot(
+                torch.arange(0, model.data.F),
+                model.params[p]["Mean"][k, n],
+                "o-",
+                ms=3,
+                lw=1,
+                color=f"C{k}",
+            )
+            item[f"{p}_{k}_fill"] = ax[p].fill_between(
+                torch.arange(0, model.data.F),
+                model.params[p]["LL"][k, n],
+                model.params[p]["UL"][k, n],
+                alpha=0.3,
+                color=f"C{k}",
+            )
+    (item["background_mean"],) = ax["background"].plot(
+        torch.arange(0, model.data.F),
+        model.params["background"]["Mean"][n],
+        "o-",
+        ms=3,
+        lw=1,
+        color="k",
+    )
+    item["background_fill"] = ax["background"].fill_between(
+        torch.arange(0, model.data.F),
+        model.params["background"]["LL"][n],
+        model.params["background"]["UL"][n],
+        alpha=0.3,
+        color="k",
+    )
+    plt.show()
+    return model, fig, item, ax
 
 
 @app.command()
@@ -557,6 +676,7 @@ def main(
             DEFAULTS["fbatch-size"] = 512
             DEFAULTS["learning-rate"] = 0.005
             DEFAULTS["num-channels"] = 1
+            DEFAULTS["cuda"] = "true"
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
                 cfg_file,

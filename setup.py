@@ -26,7 +26,6 @@ TEST_REQUIRE = [
     "flake8",
     "isort",
     "pytest",
-    "pytest-qt",
     "pytest-xvfb",
 ]
 # docs
@@ -58,18 +57,18 @@ setuptools.setup(
         "colorama",
         "funsor==0.4.1",
         "future",
+        "ipyfilechooser",
+        "ipympl",
+        "ipywidgets",
         "matplotlib",
         "pandas",
         "pykeops==1.5",
         "pyro-ppl>=1.7.0",
-        "pyqtgraph",
-        "PySide2",
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
         "tensorboard",
         "typer",
-        "qtrangeslider",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
@@ -88,6 +87,6 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.main:app"],
+        "console_scripts": ["tapqir=tapqir.main:app", "tapqir-gui=tapqir.gui:app"],
     },
 )

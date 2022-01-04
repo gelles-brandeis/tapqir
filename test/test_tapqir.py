@@ -45,7 +45,7 @@ def dataset_path(request, tmp_path):
     return tmp_path
 
 
-def test_commands_cpu(dataset_path, qtbot):
+def test_commands_cpu(dataset_path):
 
     commands = [
         [
@@ -83,17 +83,6 @@ def test_commands_cpu(dataset_path, qtbot):
     for command in commands:
         result = runner.invoke(app, command)
         assert result.exit_code == 0
-
-    #  model = Cosmos()
-    #  window = MainWindow(model, dataset_path)
-    #  qtbot.addWidget(window)
-    #  qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
-    #  qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)
-    #  qtbot.mouseClick(window.aoiIncrLarge, Qt.LeftButton)
-    #  qtbot.mouseClick(window.aoiDecrLarge, Qt.LeftButton)
-    #  qtbot.keyClicks(window.aoiNumber, "1")
-    #  qtbot.mouseClick(window.refresh, Qt.LeftButton)
-    #  qtbot.mouseClick(window.images, Qt.LeftButton)
 
 
 @requires_cuda
