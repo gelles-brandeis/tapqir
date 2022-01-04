@@ -14,8 +14,8 @@ from ipyfilechooser import FileChooser
 from tensorboard import notebook
 from traitlets.utils.bunch import Bunch
 
-from tapqir.main import fit, glimpse, main, show
 from tapqir.distributions.util import gaussian_spots
+from tapqir.main import fit, glimpse, main, show
 
 
 @singledispatch
@@ -394,23 +394,21 @@ def showCmd(b, layout, view):
     n = widgets.BoundedIntText(
         value=0,
         min=0,
-        max=model.data.Nt-1,
+        max=model.data.Nt - 1,
         description="AOI",
         style={"description_width": "initial"},
     )
     f1 = widgets.IntSlider(
         value=0,
         min=0,
-        max=model.data.F-1-15,
+        max=model.data.F - 1 - 15,
         step=1,
         description="Frame",
         continuous_update=True,
         readout=True,
         readout_format="d",
     )
-    zoom = widgets.Checkbox(
-        value=False, description="zoom out", indent=False
-    )
+    zoom = widgets.Checkbox(value=False, description="zoom out", indent=False)
     controls.children = [n, f1, zoom]
     n.observe(
         partial(updateParams, f1=f1, model=model, fig=fig, item=item, ax=ax),
@@ -523,6 +521,7 @@ def zoomOut(checked, f1, model, fig, ax):
         if not key.startswith("image") and not key.startswith("ideal"):
             a.set_xlim(f1 - 0.5, f2 - 0.5)
     fig.canvas.draw()
+
 
 def toggleWidgets(b, widgets):
     checked = get_value(b)

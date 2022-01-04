@@ -16,8 +16,8 @@ import typer
 import yaml
 from tqdm import tqdm
 
-from tapqir.distributions.util import gaussian_spots
 from tapqir import __version__
+from tapqir.distributions.util import gaussian_spots
 
 app = typer.Typer()
 
