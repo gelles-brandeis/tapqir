@@ -212,6 +212,8 @@ def glimpse(
                 )
 
     DEFAULTS = dict(DEFAULTS)
+    for c in range(num_channels):
+        DEFAULTS["channels"][c] = dict(DEFAULTS["channels"][c])
 
     if overwrite:
         with open(cd / ".tapqir" / "config.yaml", "w") as cfg_file:
@@ -676,7 +678,7 @@ def main(
             DEFAULTS["fbatch-size"] = 512
             DEFAULTS["learning-rate"] = 0.005
             DEFAULTS["num-channels"] = 1
-            DEFAULTS["cuda"] = "true"
+            DEFAULTS["cuda"] = True
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
                 cfg_file,
