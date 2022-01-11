@@ -69,6 +69,7 @@ setuptools.setup(
         "scipy",
         "tensorboard",
         "typer",
+        "voila",
     ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
