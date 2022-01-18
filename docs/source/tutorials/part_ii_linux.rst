@@ -63,6 +63,7 @@ Click the ``Select`` button to set the working directory  to ``/tmp/tutorial``:
    :hide-code:
 
    %matplotlib widget
+   %mkdir /tmp/tutorial
    from tapqir.gui import initUI, cdCmd
    from tapqir.main import DEFAULTS
    app = initUI(DEFAULTS)
