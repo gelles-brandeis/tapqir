@@ -87,13 +87,13 @@ def glimpse(
     ),
     frame_start: Optional[int] = typer.Option(
         partial(get_default, "frame-start"),
-        help="First frame.",
-        prompt="First frame",
+        help="Starting frame.",
+        prompt="Starting frame",
     ),
     frame_end: Optional[int] = typer.Option(
         partial(get_default, "frame-end"),
-        help="Last frame.",
-        prompt="Last frame",
+        help="Ending frame.",
+        prompt="Ending frame",
     ),
     num_channels: int = typer.Option(
         partial(get_default, "num-channels"),
@@ -511,7 +511,7 @@ def show(
     f2 = 15
     c = model.cdx
 
-    width, height, dpi = 10, 8, 100
+    width, height, dpi = 6.25, 5, 100
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
         nrows=8,

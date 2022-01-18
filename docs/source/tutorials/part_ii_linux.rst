@@ -21,13 +21,13 @@ To start the analysis create an empty folder (here named ``tutorial``) which wil
 Download input data
 -------------------
 
-This data was acquired with `Glimpse`_ and pre-processed with `imscroll`_ program (`Friedman et al., 2015`_).
+These data were acquired with `Glimpse`_ and pre-processed with the `imscroll`_ program (`Friedman et al., 2015`_).
 Let's download data files using `wget`_ and then unzip files::
 
   $ wget https://zenodo.org/record/5659927/files/DatasetA_glimpse.zip
   $ unzip DatasetA_glimpse.zip && rm DatasetA_glimpse.zip
 
-The raw input data are:
+The raw input data placed in ``/tmp/tutorial/DatasetA_glimpse`` are:
 
 * ``garosen00267`` - folder containing image data in glimpse format and header files
 * ``green_DNA_locations.dat`` - aoiinfo file designating target molecule (DNA) locations in the binder channel
@@ -38,25 +38,42 @@ The raw input data are:
 Start the program
 -----------------
 
-To start the GUI program run::
+To start the program run::
 
   $ tapqir-gui
 
-which will open a web application at `<http://localhost:8866>`_.
+which will open a browser window to display the Tapqir GUI:
 
-.. image:: start-page.png
-   :width: 700
+.. jupyter-execute::
+   :hide-code:
+
+   %matplotlib widget
+   from tapqir.gui import initUI
+   from tapqir.main import DEFAULTS
+   app = initUI(DEFAULTS)
+   display(app)
 
 
 Select working directory
 ------------------------
 
-Set the working directory at ``/tmp/tutorial``:
+Click the ``Select`` button to set the working directory  to ``/tmp/tutorial``:
 
-.. image:: working-directory.png
-   :width: 700
+.. jupyter-execute::
+   :hide-code:
 
-Setting working directory has created a ``.tapqir`` sub-folder that will store internal files
+   %matplotlib widget
+   from tapqir.gui import initUI, cdCmd
+   from tapqir.main import DEFAULTS
+   app = initUI(DEFAULTS)
+   cd = app.children[0]
+   cd._set_form_values(path="/tmp/tutorial", filename="")
+   cd._apply_selection()
+   tab = app.children[1]
+   cdCmd(cd, DEFAULTS, tab)
+   display(app)
+
+Setting working directory creates a ``.tapqir`` sub-folder that will store internal files
 such as ``config.yaml`` configuration file, ``loginfo`` logging file, and model checkpoints.
 
 Extract AOIs
@@ -64,12 +81,12 @@ Extract AOIs
 
 To extract AOIs specify the following options in the ``Extract AOIs`` tab:
 
-* A dataset name:``Rpb1SNAP549`` (an arbitrary name)
-* Size of AOI images: we recommend to use ``14`` pixels
-* First and last frames included in the analysis (``1`` and ``790``). If starting and ending frames are not specified
+* A dataset name: ``Rpb1SNAP549`` (an arbitrary name)
+* Size of AOI images: we recommend using ``14`` pixels
+* Starting and ending frame numbers to be included in the analysis (``1`` and ``790``). If starting and ending frames are not specified
   then the full range of frames from the driftlist file will be analyzed.
-* The number of color channels: ``1``
-* Use off-target AOI locations?: ``True`` (it is recommended to include off-target AOI locations in the analysis)
+* The number of color channels: ``1`` (this data set has only one color channel available)
+* Use off-target AOI locations?: ``True`` (we recommended including off-target AOI locations in the analysis)
 
 And specify the locations of input files for each color channel (only one color channel in this example):
 
@@ -82,16 +99,47 @@ And specify the locations of input files for each color channel (only one color 
 .. note::
 
    **About indexing**. In Python indexing starts with 0. We stick to this convention and index AOIs, frames, color channels,
-   and pixels starting with 0. Note, however, that for frame numbers we used ``1`` and ``790`` which are according to
-   Matlab indexing convention (in Matlab indexing starts with ``1``) since driftlist file was produced using the Matlab script.
+   and pixels starting with 0. Note, however, that for starting and ending frame numbers we used ``1`` and ``790`` which are according to
+   Matlab indexing convention (in Matlab indexing starts with 1) since driftlist file was produced using a Matlab script.
 
-And click ``Extract AOIs`` button:
+Next, click ``Extract AOIs`` button:
 
-.. image:: extract-aois.png
-   :width: 700
+.. jupyter-execute::
+   :hide-code:
 
-Great! The program has outputted ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
-control locations), the camera offset empirical distirbution sample values and their weights::
+   %matplotlib widget
+   import yaml
+   from tapqir.gui import initUI, cdCmd
+   from tapqir.main import DEFAULTS
+   DEFAULTS["dataset"] = "Rpb1SNAP549"
+   DEFAULTS["frame-range"] = True
+   DEFAULTS["frame-start"] = 1
+   DEFAULTS["frame-end"] = 790
+   DEFAULTS["use-offtarget"] = True
+   DEFAULTS["channels"].append({})
+   DEFAULTS["channels"][0]["name"] = "SNAP549"
+   DEFAULTS["channels"][0]["glimpse-folder"] = "/tmp/tutorial/DatasetA_glimpse/garosen00267/"
+   DEFAULTS["channels"][0]["ontarget-aoiinfo"] = "/tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat"
+   DEFAULTS["channels"][0]["offtarget-aoiinfo"] = "/tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat"
+   DEFAULTS["channels"][0]["driftlist"] = "/tmp/tutorial/DatasetA_glimpse/green_driftlist.dat"
+   DEFAULTS = dict(DEFAULTS)
+   DEFAULTS["channels"][0] = dict(DEFAULTS["channels"][0])
+   with open("/tmp/tutorial/.tapqir/config.yaml", "w") as cfg_file:
+       yaml.dump(
+           {key: value for key, value in DEFAULTS.items() if key != "cd"},
+           cfg_file,
+           sort_keys=False,
+       )
+   app = initUI(DEFAULTS)
+   cd = app.children[0]
+   cd._set_form_values(path="/tmp/tutorial", filename="")
+   cd._apply_selection()
+   tab = app.children[1]
+   cdCmd(cd, DEFAULTS, tab)
+   display(app)
+
+Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
+control locations)::
 
     $ ls
 
@@ -102,7 +150,7 @@ control locations), the camera offset empirical distirbution sample values and t
 Additionally, the program has saved
 
 * Image files (``ontarget-channel0.png`` and ``offtarget-channel0.png``) displaying locations of on-target and off-target
-  AOIs in the first frame (make sure that AOIs are *inside* the FOV):
+  AOIs in the first frame. You should inspect these images to make sure that AOIs are *inside* the field of view:
 
 .. image:: ontarget-channel0.png
    :width: 700
@@ -110,18 +158,16 @@ Additionally, the program has saved
 .. image:: offtarget-channel0.png
    :width: 700
 
-* Location from the dark corner of the image (``offset-channel0.png``) used to create the offset empirical distribution
-  (make sure that offset region is *outside* the FOV):
+* You should also look at ``offset-channel0.png`` to check that offset data is taken from a region *outside* the field of view:
 
 .. image:: offset-channel0.png
    :width: 700
 
-* The intensity distribution histograms for offset and data from different channels (``offset-distribution.png``):
+* The other two files show the intensity histograms (``offset-distribution.png``) and the offset median time record
+  (``offset-medians.png``) (offset distribution shouldn't drift over time):
 
 .. image:: offset-distribution.png
    :width: 300
-
-* Offset median change (offset distribution shouldn't drift over time) (``offset-medians.png``):
 
 .. image:: offset-medians.png
    :width: 500
@@ -140,64 +186,89 @@ Now the data is ready for fitting. Options that we will select:
 * Number of iterations - use default (``0``)
 
 .. note::
-   **About batch size**. In theory, batch size should impact *training time* and *memory consumption*,
-   but not the *performance*. It can be optimized for a particular GPU hardware by
+   **About batch size**. Batch sizes should impact *training time* and *memory consumption*. Ideally,
+   it should not affect the final result. Batch sizes can be optimized for a particular GPU hardware by
    trying different batch size values and comparing training time/memory usage
-   (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values). In particular,
-   if there is a memory overflow you can decrease either frame batch size (e.g., to ``128`` or ``256``)
-   or AOI batch size (e.g., to ``5``).
+   (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values).  TODO link to paper
 
-.. note::
-   **About number of iterations**. Fitting the data requires many iterations (about 50,000-100,000) until parameters
-   converge. Setting the number of iterations to 0 will run the program till Tapqir's custom convergence criteria is satisfied.
-   We recommend to set it to 0 (default) and then run for additional number of iterations if required. Convergence of global
-   parameters can be visually checked in the Tensorboard tab.
+Next, press ``Fit the data`` button:
 
-Press ``Fit the data`` button:
+.. jupyter-execute::
+   :hide-code:
 
-.. image:: fit-data.png
-   :width: 700
+   %matplotlib widget
+   import yaml
+   from tapqir.gui import initUI, cdCmd
+   from tapqir.main import DEFAULTS
+   app = initUI(DEFAULTS)
+   cd = app.children[0]
+   cd._set_form_values(path="/tmp/tutorial", filename="")
+   cd._apply_selection()
+   tab = app.children[1]
+   cdCmd(cd, DEFAULTS, tab)
+   tab.selected_index = 1
+   display(app)
 
-The program will save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
-Starting the program again will resume from the last saved checkpoint. The program can be stopped using ``Ctrl-C`` in the terminal.
-At every checkpoint the values of global variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``,
-``pi_mean``, ``lamda_loc``) are also recorded for visualization by tensorboard_. Plateaued plots signify convergence.
+The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
+The program can be stopped at any time by clicking in the terminal window and pressing ``Ctrl-C``. To restart the program again re-run
+``tapqir-gui`` command and the program will resume from the last saved checkpoint.
 
-After fitting is finished the program computes 95% credible intervals of model parameters and saves them in
-``cosmos-channel0-params.tqpr``, ``cosmos-channel0-params.mat`` (in Matlab format if selected), and ``cosmos-channel0-summary.csv`` files.
+After fitting is finished, the program computes 95% credible intervals (CI) of model parameters and saves the parameters and CIs in
+``cosmos-channel0-params.tqpr``, ``cosmos-channel0-params.mat`` (if Matlab format is selected), and ``cosmos-channel0-summary.csv`` files.
+
+If you get an error message saying that there is a memory overflow you can decrease either frame batch size (e.g., to ``128`` or ``256``)
+or AOI batch size (e.g., to ``5``).
 
 Tensorboard
 -----------
 
-Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard program <https://www.tensorflow.org/tensorboard>`_
-displayed in the Tensorboard tab:
+At every checkpoint the values of global variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``,
+``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard gui <https://www.tensorflow.org/tensorboard>`_
+displayed in the ``Tensorboard`` tab, which shows the parameters values as a function of iteration number:
 
 .. image:: tensorboard-tab.png
    :width: 800
 
-Set smoothing to 0 (in left panel) and use refresh button at the top right to refresh plots.
+Set smoothing to 0 (in the left panel) and use refresh button at the top right to refresh plots.
+
+Plateaued plots signify convergence.
+
+.. note::
+   **About number of iterations**. Fitting the data requires many iterations (about 50,000-100,000) until parameters
+   converge. Setting the number of iterations to 0 will run the program till Tapqir's custom convergence criterion is satisfied.
+   We recommend to set it to 0 (default) and then run for additional number of iterations if required.
 
 View results
 ------------
 
 After fitting is done open ``View results`` tab to visualize analysis results. Click on ``Load results`` button which will display parameter values
-from ``cosmos-channel0-params.tpqr`` file:
+from the ``cosmos-channel0-params.tpqr`` file:
 
 .. image:: view-results.png
    :width: 800
 
-In the display panel, top row shows raw images, second row shows best fit images, plots show ``p(specific)`` and parameter values (mean and 95% CI).
-AOI number and frame range can be changed using widgets at the top.
+.. jupyter-execute::
+   :hide-code:
 
-.. tip::
+   %matplotlib widget
+   import yaml
+   from tapqir.gui import initUI, cdCmd, showCmd
+   from tapqir.main import DEFAULTS
+   app = initUI(DEFAULTS)
+   cd = app.children[0]
+   cd._set_form_values(path="/tmp/tutorial", filename="")
+   cd._apply_selection()
+   tab = app.children[1]
+   cdCmd(cd, DEFAULTS, tab)
+   tab.selected_index = 2
+   show = tab.children[2]
+   view = show.children[-1]
+   # showCmd(None, show, view)
+   display(app)
 
-    Use ``CUDA_VISIBLE_DEVICES`` environment variable to change CUDA device::
-
-        $ CUDA_VISIBLE_DEVICES=1 tapqir-gui
-
-    To view available devices run::
-
-        $ nvidia-smi
+In the display panel, the top row shows raw images, the second row shows best fit images, the plots show ``p(specific)`` and parameter values (mean and 95% CI).
+The AOI number can be changed the box widget and the frame range can be changed using the slider widget at the top. To zoom out to entire frame range click on
+the ``zoom out`` checkbox.
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
 .. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536

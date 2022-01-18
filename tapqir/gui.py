@@ -33,6 +33,21 @@ def _(x: widgets.Widget):
     return x.value
 
 
+@singledispatch
+def get_path(x):
+    return x
+
+
+@get_path.register
+def _(x: str):
+    return Path(x)
+
+
+@get_path.register
+def _(x: FileChooser):
+    return Path(x.selected_path)
+
+
 def widget_progress(iterable: Iterable, progress_bar: widgets.IntProgress):
     """
     Iterate over iterable and update progress bar.
@@ -76,14 +91,16 @@ def initUI(DEFAULTS):
     return layout
 
 
-def cdCmd(chooser, DEFAULTS, tab, tensorboard):
+def cdCmd(path, DEFAULTS, tab, tensorboard=None):
     """
     Set working directory and load default parameters (main).
     """
-    main(cd=Path((chooser.selected_path)))
-    with tensorboard:
-        notebook.start(f"--logdir  {Path((chooser.selected_path))}")
-        notebook.display(height=1000)
+    path = get_path(path)
+    main(cd=path)
+    if tensorboard is not None:
+        with tensorboard:
+            notebook.start(f"--logdir  {path}")
+            notebook.display(height=1000)
     glimpseTab = tab.children[0]
     for i, flag in enumerate(
         [
@@ -156,12 +173,12 @@ def glimpseUI(out):
     )
     # First frame
     firstFrame = widgets.IntText(
-        description="First frame",
+        description="Starting frame",
         style={"description_width": "initial"},
     )
     # Last frame
     lastFrame = widgets.IntText(
-        description="Last frame",
+        description="Ending frame",
         style={"description_width": "initial"},
     )
     # Number of channels

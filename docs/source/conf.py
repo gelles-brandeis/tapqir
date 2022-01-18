@@ -39,6 +39,7 @@ release = __version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "jupyter_sphinx",
     "nbsphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.mathjax",
