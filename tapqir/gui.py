@@ -547,18 +547,7 @@ def toggleWidgets(b, widgets):
 
 
 def app():
-    import nbformat as nbf
+    import pkg_resources
 
-    notebook = nbf.v4.new_notebook()
-    notebook["cells"] = []
-    new_cell = nbf.v4.new_code_cell(
-        "%matplotlib widget\n"
-        "from tapqir.gui import initUI\n"
-        "from tapqir.main import DEFAULTS\n"
-        "initUI(DEFAULTS)"
-    )
-    notebook["cells"].append(new_cell)
-    temp_dir = tempfile.mkdtemp()
-    nbpath = os.path.join(temp_dir, "temp_notebook.ipynb")
-    nbf.write(notebook, nbpath)
+    nbpath = pkg_resources.resource_filename("tapqir", "app.ipynb")
     os.system("voila " + nbpath)
