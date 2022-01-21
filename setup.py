@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import sys
 
 import setuptools
 
@@ -40,9 +39,7 @@ DOCS_REQUIRE = [
     "sphinx-gallery",
     "sphinx-panels",
 ]
-IN_COLAB = "google.colab" in sys.modules
-with open("/content/out.txt", "a") as f:
-    f.write(f"{os.environ}")
+IN_COLAB = "COLAB_GPU" in os.environ
 
 setuptools.setup(
     name="tapqir",
