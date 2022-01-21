@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import tempfile
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial, singledispatch
