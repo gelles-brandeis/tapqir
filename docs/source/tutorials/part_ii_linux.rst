@@ -44,35 +44,17 @@ To start the program run::
 
 which will open a browser window to display the Tapqir GUI:
 
-.. jupyter-execute::
-   :hide-code:
-
-   %matplotlib widget
-   from tapqir.gui import initUI
-   from tapqir.main import DEFAULTS
-   app = initUI(DEFAULTS)
-   display(app)
+.. image:: start-page.png
+   :width: 800
 
 
 Select working directory
 ------------------------
 
-Click the ``Select`` button to set the working directory  to ``/tmp/tutorial``:
+Click the ``Select`` button at the top to set the working directory  to ``/tmp/tutorial``:
 
-.. jupyter-execute::
-   :hide-code:
-
-   %matplotlib widget
-   %mkdir /tmp/tutorial
-   from tapqir.gui import initUI, cdCmd
-   from tapqir.main import DEFAULTS
-   app = initUI(DEFAULTS)
-   cd = app.children[0]
-   cd._set_form_values(path="/tmp/tutorial", filename="")
-   cd._apply_selection()
-   tab = app.children[1]
-   cdCmd(cd, DEFAULTS, tab)
-   display(app)
+.. image:: working-directory.png
+   :width: 800
 
 Setting working directory creates a ``.tapqir`` sub-folder that will store internal files
 such as ``config.yaml`` configuration file, ``loginfo`` logging file, and model checkpoints.
@@ -105,39 +87,8 @@ And specify the locations of input files for each color channel (only one color 
 
 Next, click ``Extract AOIs`` button:
 
-.. jupyter-execute::
-   :hide-code:
-
-   %matplotlib widget
-   import yaml
-   from tapqir.gui import initUI, cdCmd
-   from tapqir.main import DEFAULTS
-   DEFAULTS["dataset"] = "Rpb1SNAP549"
-   DEFAULTS["frame-range"] = True
-   DEFAULTS["frame-start"] = 1
-   DEFAULTS["frame-end"] = 790
-   DEFAULTS["use-offtarget"] = True
-   DEFAULTS["channels"].append({})
-   DEFAULTS["channels"][0]["name"] = "SNAP549"
-   DEFAULTS["channels"][0]["glimpse-folder"] = "/tmp/tutorial/DatasetA_glimpse/garosen00267/"
-   DEFAULTS["channels"][0]["ontarget-aoiinfo"] = "/tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat"
-   DEFAULTS["channels"][0]["offtarget-aoiinfo"] = "/tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat"
-   DEFAULTS["channels"][0]["driftlist"] = "/tmp/tutorial/DatasetA_glimpse/green_driftlist.dat"
-   DEFAULTS = dict(DEFAULTS)
-   DEFAULTS["channels"][0] = dict(DEFAULTS["channels"][0])
-   with open("/tmp/tutorial/.tapqir/config.yaml", "w") as cfg_file:
-       yaml.dump(
-           {key: value for key, value in DEFAULTS.items() if key != "cd"},
-           cfg_file,
-           sort_keys=False,
-       )
-   app = initUI(DEFAULTS)
-   cd = app.children[0]
-   cd._set_form_values(path="/tmp/tutorial", filename="")
-   cd._apply_selection()
-   tab = app.children[1]
-   cdCmd(cd, DEFAULTS, tab)
-   display(app)
+.. image:: extract-aois.png
+   :width: 800
 
 Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
 control locations)::
@@ -190,25 +141,12 @@ Now the data is ready for fitting. Options that we will select:
    **About batch size**. Batch sizes should impact *training time* and *memory consumption*. Ideally,
    it should not affect the final result. Batch sizes can be optimized for a particular GPU hardware by
    trying different batch size values and comparing training time/memory usage
-   (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values).  TODO link to paper
+   (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values).
 
 Next, press ``Fit the data`` button:
 
-.. jupyter-execute::
-   :hide-code:
-
-   %matplotlib widget
-   import yaml
-   from tapqir.gui import initUI, cdCmd
-   from tapqir.main import DEFAULTS
-   app = initUI(DEFAULTS)
-   cd = app.children[0]
-   cd._set_form_values(path="/tmp/tutorial", filename="")
-   cd._apply_selection()
-   tab = app.children[1]
-   cdCmd(cd, DEFAULTS, tab)
-   tab.selected_index = 1
-   display(app)
+.. image:: fit-data2.png
+   :width: 800
 
 The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
 The program can be stopped at any time by clicking in the terminal window and pressing ``Ctrl-C``. To restart the program again re-run
@@ -248,27 +186,8 @@ from the ``cosmos-channel0-params.tpqr`` file:
 .. image:: view-results.png
    :width: 800
 
-.. jupyter-execute::
-   :hide-code:
-
-   %matplotlib widget
-   import yaml
-   from tapqir.gui import initUI, cdCmd, showCmd
-   from tapqir.main import DEFAULTS
-   app = initUI(DEFAULTS)
-   cd = app.children[0]
-   cd._set_form_values(path="/tmp/tutorial", filename="")
-   cd._apply_selection()
-   tab = app.children[1]
-   cdCmd(cd, DEFAULTS, tab)
-   tab.selected_index = 2
-   show = tab.children[2]
-   view = show.children[-1]
-   # showCmd(None, show, view)
-   display(app)
-
 In the display panel, the top row shows raw images, the second row shows best fit images, the plots show ``p(specific)`` and parameter values (mean and 95% CI).
-The AOI number can be changed the box widget and the frame range can be changed using the slider widget at the top. To zoom out to entire frame range click on
+The AOI number can be changed using the box widget and the frame range can be changed using the slider widget at the top. To zoom out to entire frame range click on
 the ``zoom out`` checkbox.
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117

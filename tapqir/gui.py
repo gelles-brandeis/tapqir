@@ -67,7 +67,7 @@ def initUI(DEFAULTS):
     - Commands tabs.
     - Output.
     """
-    layout = widgets.VBox()
+    layout = widgets.VBox(layout={"width": "800px", "border": "2px solid blue"})
 
     # widgets
     cd = FileChooser(".", title="Working directory")

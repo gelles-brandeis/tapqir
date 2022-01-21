@@ -516,12 +516,12 @@ def show(
     gs = fig.add_gridspec(
         nrows=8,
         ncols=15,
-        top=0.99,
+        top=0.95,
         bottom=0.05,
-        left=0.07,
+        left=0.1,
         right=0.98,
         hspace=0.1,
-        # height_ratios=[0.75, 0.75, 1, 1, 1, 1, 1, 1],
+        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1],
     )
     ax = {}
     item = {}
