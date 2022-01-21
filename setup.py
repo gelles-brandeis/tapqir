@@ -41,7 +41,8 @@ DOCS_REQUIRE = [
     "sphinx-panels",
 ]
 IN_COLAB = "google.colab" in sys.modules
-print("IN_COLAB", IN_COLAB)
+with open("/tmp/out.txt", "a") as f:
+    f.write("IN_COLAB", IN_COLAB)
 
 setuptools.setup(
     name="tapqir",
@@ -71,7 +72,8 @@ setuptools.setup(
         "scikit-learn",
         "scipy",
         "typer",
-    ],
+    ]
+    + ([] if IN_COLAB else ["tensorboard", "voila"]),
     extras_require={
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
