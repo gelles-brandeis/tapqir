@@ -71,7 +71,7 @@ setuptools.setup(
         "scipy",
         "typer",
     ]
-    + ["voila"]
+    + ["tensorboard", "voila"]
     if not IN_COLAB
     else [],
     extras_require={
