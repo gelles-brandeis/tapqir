@@ -42,7 +42,7 @@ DOCS_REQUIRE = [
 ]
 IN_COLAB = "google.colab" in sys.modules
 with open("/content/out.txt", "a") as f:
-    f.write(f"modules {sys.modules}, platform {sys.platform}")
+    f.write(f"{os.environ}")
 
 setuptools.setup(
     name="tapqir",
