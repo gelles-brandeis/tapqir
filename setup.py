@@ -41,7 +41,7 @@ DOCS_REQUIRE = [
     "sphinx-panels",
 ]
 IN_COLAB = "google.colab" in sys.modules
-with open("out.txt", "a") as f:
+with open("/content/out.txt", "a") as f:
     f.write(f"IN_COLAB {IN_COLAB}")
 
 setuptools.setup(
