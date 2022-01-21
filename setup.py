@@ -70,10 +70,7 @@ setuptools.setup(
         "scikit-learn",
         "scipy",
         "typer",
-    ]
-    + ["tensorboard", "voila"]
-    if not IN_COLAB
-    else [],
+    ],
     extras_require={
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
