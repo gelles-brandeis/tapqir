@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import sys
 
 import setuptools
 
@@ -39,6 +40,7 @@ DOCS_REQUIRE = [
     "sphinx-gallery",
     "sphinx-panels",
 ]
+IN_COLAB = "google.colab" in sys.modules
 
 setuptools.setup(
     name="tapqir",
@@ -69,8 +71,10 @@ setuptools.setup(
         "scipy",
         "tensorboard",
         "typer",
-        "voila",
-    ],
+    ]
+    + ["voila"]
+    if not IN_COLAB
+    else [],
     extras_require={
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
