@@ -39,6 +39,7 @@ DOCS_REQUIRE = [
     "sphinx-gallery",
     "sphinx-panels",
 ]
+IN_COLAB = "COLAB_GPU" in os.environ
 
 setuptools.setup(
     name="tapqir",
@@ -67,10 +68,9 @@ setuptools.setup(
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
-        "tensorboard",
         "typer",
-        "voila",
-    ],
+    ]
+    + ([] if IN_COLAB else ["tensorboard", "voila"]),
     extras_require={
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
