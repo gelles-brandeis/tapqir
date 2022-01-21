@@ -69,7 +69,6 @@ setuptools.setup(
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
-        "tensorboard",
         "typer",
     ]
     + ["voila"]
