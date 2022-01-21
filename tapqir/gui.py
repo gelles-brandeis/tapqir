@@ -66,6 +66,10 @@ def initUI(DEFAULTS):
     - Commands tabs.
     - Output.
     """
+    import sys
+
+    IN_COLAB = "google.colab" in sys.modules
+
     layout = widgets.VBox(layout={"width": "800px", "border": "2px solid blue"})
 
     # widgets
@@ -73,14 +77,17 @@ def initUI(DEFAULTS):
     cd.show_only_dirs = True
 
     out = widgets.Output(layout={"border": "1px solid black"})
-    tensorboard = widgets.Output(layout={"border": "1px solid blue"})
 
     tab = widgets.Tab()
-    tab.children = [glimpseUI(out), fitUI(out), showUI(), tensorboard]
+    tab.children = [glimpseUI(out), fitUI(out)]
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
-    tab.set_title(2, "View results")
-    tab.set_title(3, "Tensorboard")
+    tensorboard = None
+    if not IN_COLAB:
+        tensorboard = widgets.Output(layout={"border": "1px solid blue"})
+        tab.children.extend([showUI(), tensorboard])
+        tab.set_title(2, "View results")
+        tab.set_title(3, "Tensorboard")
     # layout
     layout.children = [cd, tab, out]
     # callbacks
