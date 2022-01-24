@@ -565,7 +565,7 @@ def app():
 
 
 def notebook():
-    from IPython import display
+    from IPython.display import display
 
     from tapqir.main import DEFAULTS
 
