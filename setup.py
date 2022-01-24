@@ -91,7 +91,7 @@ setuptools.setup(
         "console_scripts": [
             "tapqir=tapqir.main:app",
             "tapqir-gui=tapqir.gui:app",
-            "tapqir-colab=tapqir.gui:colab",
+            "tapqir-notebook=tapqir.gui:notebook",
         ],
     },
 )

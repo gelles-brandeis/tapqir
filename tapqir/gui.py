@@ -82,14 +82,12 @@ def initUI(DEFAULTS):
     tab.children = [glimpseUI(out), fitUI(out)]
     if not IN_COLAB:
         tensorboard = widgets.Output(layout={"border": "1px solid blue"})
-        tab.children.extend([showUI(), tensorboard])
+        tab.children = tab.children + (showUI(), tensorboard)
     else:
         tensorboard = None
-        tab.children.extend(
-            [
-                widgets.Text(description="Disabled in Colab"),
-                widgets.Text(description="Disabled in Colab"),
-            ]
+        tab.children = tab.children + (
+            widgets.Text(description="Disabled in Colab"),
+            widgets.Text(description="Disabled in Colab"),
         )
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
@@ -566,7 +564,7 @@ def app():
     os.system("voila " + nbpath)
 
 
-def colab():
+def notebook():
     from tapqir.main import DEFAULTS
 
     initUI(DEFAULTS)
