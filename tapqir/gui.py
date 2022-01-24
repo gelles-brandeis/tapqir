@@ -565,6 +565,8 @@ def app():
 
 
 def notebook():
+    from IPython import display
+
     from tapqir.main import DEFAULTS
 
-    initUI(DEFAULTS)
+    display(initUI(DEFAULTS))
