@@ -80,14 +80,21 @@ def initUI(DEFAULTS):
 
     tab = widgets.Tab()
     tab.children = [glimpseUI(out), fitUI(out)]
-    tab.set_title(0, "Extract AOIs")
-    tab.set_title(1, "Fit the data")
-    tensorboard = None
     if not IN_COLAB:
         tensorboard = widgets.Output(layout={"border": "1px solid blue"})
         tab.children.extend([showUI(), tensorboard])
-        tab.set_title(2, "View results")
-        tab.set_title(3, "Tensorboard")
+    else:
+        tensorboard = None
+        tab.children.extend(
+            [
+                widgets.Text(description="Disabled in Colab"),
+                widgets.Text(description="Disabled in Colab"),
+            ]
+        )
+    tab.set_title(0, "Extract AOIs")
+    tab.set_title(1, "Fit the data")
+    tab.set_title(2, "View results")
+    tab.set_title(3, "Tensorboard")
     # layout
     layout.children = [cd, tab, out]
     # callbacks
@@ -557,3 +564,9 @@ def app():
 
     nbpath = pkg_resources.resource_filename("tapqir", "app.ipynb")
     os.system("voila " + nbpath)
+
+
+def colab():
+    from tapqir.main import DEFAULTS
+
+    initUI(DEFAULTS)
