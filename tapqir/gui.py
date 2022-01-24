@@ -86,8 +86,8 @@ def initUI(DEFAULTS):
     else:
         tensorboard = None
         tab.children = tab.children + (
-            widgets.Text(description="Disabled in Colab"),
-            widgets.Text(description="Disabled in Colab"),
+            widgets.Label(value="Disabled in Colab"),
+            widgets.Label(value="Disabled in Colab"),
         )
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
