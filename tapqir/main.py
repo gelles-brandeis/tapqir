@@ -333,6 +333,15 @@ def fit(
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
     settings["use_pykeops"] = pykeops
+    # priors settings
+    settings["background_mean_std"] = DEFAULTS["background_mean_std"]
+    settings["background_std_std"] = DEFAULTS["background_std_std"]
+    settings["lamda_rate"] = DEFAULTS["lamda_rate"]
+    settings["height_std"] = DEFAULTS["height_std"]
+    settings["width_min"] = DEFAULTS["width_min"]
+    settings["width_max"] = DEFAULTS["width_max"]
+    settings["proximity_rate"] = DEFAULTS["proximity_rate"]
+    settings["gain_std"] = DEFAULTS["gain_std"]
 
     if overwrite:
         DEFAULTS["cuda"] = cuda
@@ -679,6 +688,15 @@ def main(
             DEFAULTS["learning-rate"] = 0.005
             DEFAULTS["num-channels"] = 1
             DEFAULTS["cuda"] = True
+            # priors settings
+            DEFAULTS["background_mean_std"] = 1000
+            DEFAULTS["background_std_std"] = 100
+            DEFAULTS["lamda_rate"] = 1
+            DEFAULTS["height_std"] = 10000
+            DEFAULTS["width_min"] = 0.75
+            DEFAULTS["width_max"] = 2.25
+            DEFAULTS["proximity_rate"] = 1
+            DEFAULTS["gain_std"] = 50
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
                 cfg_file,
