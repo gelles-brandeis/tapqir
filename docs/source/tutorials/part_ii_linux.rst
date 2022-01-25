@@ -190,6 +190,35 @@ In the display panel, the top row shows raw images, the second row shows best fi
 The AOI number can be changed using the box widget and the frame range can be changed using the slider widget at the top. To zoom out to entire frame range click on
 the ``zoom out`` checkbox.
 
+Advanced settings
+-----------------
+
+Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir`` sub-folder of the working directory. It also contains
+additional options that are not available through the GUI.
+
+Offset region
+^^^^^^^^^^^^^
+
+Offset data region (square) can be edited using three variables:
+
+* ``offset_x``: left corner of the square (default is 10 pixels)
+* ``offset_y``: top corner of the square (default is 10 pixels)
+* ``offset_P``: size of the square (default is 30 pixels)
+
+Prior distributions
+^^^^^^^^^^^^^^^^^^^
+
+Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2021`_):
+
+* ``background_mean_std`` (default 1000): standard deviation of the HalfNormal distribution in Eq. 6a
+* ``background_std_std`` (default 100): standard deviation of the HalfNormal distribution in Eq. 6b
+* ``lamda_rate`` (default 1): rate parameter of the Exponential distribution in Eq. 11
+* ``heiht_std`` (default 10,000): standard deviation of the HalfNormal distribution in Eq. 12
+* ``width_min`` (default 0.75): minimum value of Uniform distribution in Eq. 13
+* ``width_max`` (default 2.25): maximum value of Uniform distribution in Eq. 13
+* ``proximity_rate`` (default 1): rate parameter of the Exponential distribution in Eq. 15
+* ``gain_std`` (default 50): standard deviation of the HalfNormal distribution in Eq. 16
+
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
 .. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536
 .. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026

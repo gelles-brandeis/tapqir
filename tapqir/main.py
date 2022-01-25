@@ -682,6 +682,7 @@ def main(
     CONFIG_PATH = TAPQIR_PATH / "config.yaml"
     if not CONFIG_PATH.is_file():
         with open(CONFIG_PATH, "w") as cfg_file:
+            # model settings
             DEFAULTS["P"] = 14
             DEFAULTS["nbatch-size"] = 10
             DEFAULTS["fbatch-size"] = 512
@@ -697,6 +698,11 @@ def main(
             DEFAULTS["width_max"] = 2.25
             DEFAULTS["proximity_rate"] = 1
             DEFAULTS["gain_std"] = 50
+            # offset settings
+            DEFAULTS["offset_x"] = 10
+            DEFAULTS["offset_y"] = 10
+            DEFAULTS["offset_P"] = 30
+            # save config file
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
                 cfg_file,

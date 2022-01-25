@@ -564,7 +564,7 @@ def app():
     os.system("voila " + nbpath)
 
 
-def notebook():
+def run():
     from IPython.display import display
 
     from tapqir.main import DEFAULTS
