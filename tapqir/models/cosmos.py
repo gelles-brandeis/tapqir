@@ -50,6 +50,14 @@ class Cosmos(Model):
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
+        background_mean_std: float = 1000,
+        background_std_std: float = 100,
+        lamda_rate: float = 1,
+        height_std: float = 10000,
+        width_min: float = 0.75,
+        width_max: float = 2.25,
+        proximity_rate: float = 1,
+        gain_std: float = 50,
     ):
         super().__init__(S, K, channels, device, dtype)
         assert S == 1, "This is a single-state model!"
@@ -59,6 +67,15 @@ class Cosmos(Model):
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        # priors settings
+        self.background_mean_std = background_mean_std
+        self.background_std_std = background_std_std
+        self.lamda_rate = lamda_rate
+        self.height_std = height_std
+        self.width_min = width_min
+        self.width_max = width_max
+        self.proximity_rate = proximity_rate
+        self.gain_std = gain_std
 
     def model(self):
         r"""
@@ -148,11 +165,11 @@ class Cosmos(Model):
             \end{aligned}
         """
         # global parameters
-        gain = pyro.sample("gain", dist.HalfNormal(50))
+        gain = pyro.sample("gain", dist.HalfNormal(self.gain_std))
         pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
         pi = expand_offtarget(pi)
-        lamda = pyro.sample("lamda", dist.Exponential(1))
-        proximity = pyro.sample("proximity", dist.Exponential(1))
+        lamda = pyro.sample("lamda", dist.Exponential(self.lamda_rate))
+        proximity = pyro.sample("proximity", dist.Exponential(self.proximity_rate))
         size = torch.stack(
             (
                 torch.full_like(proximity, 2.0),
@@ -183,8 +200,12 @@ class Cosmos(Model):
         with aois as ndx:
             ndx = ndx[:, None]
             # background mean and std
-            background_mean = pyro.sample("background_mean", dist.HalfNormal(1000))
-            background_std = pyro.sample("background_std", dist.HalfNormal(100))
+            background_mean = pyro.sample(
+                "background_mean", dist.HalfNormal(self.background_mean_std)
+            )
+            background_std = pyro.sample(
+                "background_std", dist.HalfNormal(self.background_std_std)
+            )
             with frames as fdx:
                 # fetch data
                 obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
@@ -193,7 +214,7 @@ class Cosmos(Model):
                     "background",
                     dist.Gamma(
                         (background_mean / background_std) ** 2,
-                        background_mean / background_std ** 2,
+                        background_mean / background_std**2,
                     ),
                 )
 
@@ -226,15 +247,15 @@ class Cosmos(Model):
                         # sample spot variables
                         height = pyro.sample(
                             f"height_{kdx}",
-                            dist.HalfNormal(10000),
+                            dist.HalfNormal(self.height_std),
                         )
                         width = pyro.sample(
                             f"width_{kdx}",
                             AffineBeta(
                                 1.5,
                                 2,
-                                0.75,
-                                2.25,
+                                self.width_min,
+                                self.width_max,
                             ),
                         )
                         x = pyro.sample(

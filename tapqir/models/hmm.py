@@ -123,7 +123,7 @@ class HMM(Cosmos):
                     f"background_{fdx}",
                     dist.Gamma(
                         (background_mean / background_std) ** 2,
-                        background_mean / background_std ** 2,
+                        background_mean / background_std**2,
                     ),
                 )
 

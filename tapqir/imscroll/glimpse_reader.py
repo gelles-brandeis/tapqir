@@ -161,7 +161,7 @@ class GlimpseDataset:
             img = np.fromfile(fid, dtype=">i2", count=self.height * self.width).reshape(
                 self.height, self.width
             )
-        return img + 2 ** 15
+        return img + 2**15
 
     @property
     def N(self) -> int:
@@ -242,6 +242,9 @@ def read_glimpse(path, progress_bar, **kwargs):
     C = kwargs.pop("num-channels")
     name = kwargs.pop("dataset")
     channels = kwargs.pop("channels")
+    offset_x = kwargs.pop("offset_x")
+    offset_y = kwargs.pop("offset_y")
+    offset_P = kwargs.pop("offset_P")
 
     offsets = defaultdict(int)
     offset_medians = []
@@ -275,14 +278,17 @@ def read_glimpse(path, progress_bar, **kwargs):
             glimpse.plot(dtype, P, path=path, save=True)
 
         # plot offset in raw FOV images
-        glimpse.plot("offset", 30, path=path, save=True)
+        glimpse.plot("offset", offset_P, path=path, save=True)
 
         # loop through each frame
         for f, frame in enumerate(progress_bar(glimpse.cumdrift.index)):
             img = glimpse[frame]
 
-            offset_medians.append(np.median(img[10:40, 10:40]))
-            values, counts = np.unique(img[10:40, 10:40], return_counts=True)
+            offset_img = img[
+                offset_y : offset_y + offset_P, offset_x : offset_x + offset_P
+            ]
+            offset_medians.append(np.median(offset_img))
+            values, counts = np.unique(offset_img, return_counts=True)
             for value, count in zip(values, counts):
                 offsets[value] += count
             for dtype in glimpse.dtypes:
