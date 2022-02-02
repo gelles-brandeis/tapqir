@@ -1,38 +1,97 @@
 Install on Linux
 ================
 
-First, make sure that `CUDA is installed`_ on the computer.
+We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
-.. important::
+1. Install Nvidia drivers if not already installed.
 
-   We strongly recommend creating a virtual environment to encapsulate your
-   installation. Below we use a popular package manager Anaconda to create
-   and manage a virtual environment.
+   *On Ubuntu 20.04*
+   
+   Tip: on Ubuntu select the text to copy it and then press the middle mouse button (scrolling wheel) to paste the copied text.
+   
+   To get information about your graphic card and available drivers run::
 
-1. `Install Anaconda`_ package manager.
+    $ ubuntu-drivers devices
+    
+    // From the output
+    vendor   : NVIDIA Corporation
+    model    : TU102 [GeForce RTX 2080 Ti]
+    driver   : nvidia-driver-470 - distro non-free recommended
 
-2. Create a new environment and give it a name (e.g., ``tapqir-env``)::
+   Install the recommended nvidia driver (in this case ``nvidia-driver-470``)::
+
+    $ sudo apt install nvidia-driver-470
+
+   *On Arch Linux*
+
+   Install the nvidia package::
+
+    $ sudo pacman -S nvidia
+
+2. Install git.
+
+   *On Ubuntu 20.04*
+
+   In the terminal run::
+
+    $ sudo apt install git
+
+   *On Arch Linux*
+
+   In the terminal run::
+
+    $ sudo pacman -S git
+
+3. Install Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
+   Here is the summary of required installation steps:
+
+   * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).
+
+   * Run the following command to install Anaconda (change the name of the installer file appropriately if it
+   is a newer version)::
+
+      $ bash ~/Downloads/Anaconda3-2021.11-Linux-x86_64.sh
+    
+   * Press Enter at the “In order to continue the installation process, please review the license agreement.” prompt.
+   
+   * Scroll to the bottom of the license terms and enter “Yes” to agree.
+   
+   * Press Enter to accept the default install location.
+   
+   * Type "yes" at “Do you wish the installer to initialize Anaconda3 by running conda init?” prompt.
+   
+   * After installation is complete close the terminal and open it again. Now you should see ``(base)`` environment indicated in the terminal.
+
+4. Create a new environment and give it a name (e.g., ``tapqir-env``)::
 
     $ conda create --name tapqir-env python=3.8
 
-3. Activate the environement (you should see the environment name
+5. Activate the environement (you should see the environment name
    (i.e., ``tapqir-env``) in the command prompt)::
 
     $ conda activate tapqir-env
 
-4. To install ``tapqir``, in the terminal run::
+6. Install CUDA and ensure that it is version 11.5 or later::
+
+    $ conda install cuda -c nvidia
+    $ nvcc --version
+
+    nvcc: NVIDIA (R) Cuda compiler driver
+    Copyright (c) 2005-2021 NVIDIA Corporation
+    Built on Mon_Sep_13_19:13:29_PDT_2021
+    Cuda compilation tools, release 11.5, V11.5.50
+    Build cuda_11.5.r11.5/compiler.30411180_0
+
+7. Install ``tapqir``::
 
     $ pip install git+https://github.com/gelles-brandeis/tapqir.git
 
-.. _CUDA is installed: https://developer.nvidia.com/cuda-downloads
-.. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
+Install linux server tools (optional)
+-------------------------------------
 
-
-Set up a Slurm server (optional)
---------------------------------
-
-Linux machines can be set up to run as servers. Following is a short instruction
-for Arch Linux.
+Linux machines can be set up to run as servers for batch processing of Tapqir runs. This is optional
+and requires some linux sysadmin skills.  The following are short summary instructions for installing the server 
+tools on Arch Linux.
 
 ssh server
 ~~~~~~~~~~
@@ -88,6 +147,5 @@ Install `xrdp <https://wiki.archlinux.org/index.php/Xrdp>`_ package on the Linux
 
 .. note::
 
-    Connect from the University network or use VPN client.
     Use remote desktop program (`Remmina <https://wiki.archlinux.org/index.php/Remmina>`_ on Linux) to connect to the computer.
     At the login screen select xvnc display session.

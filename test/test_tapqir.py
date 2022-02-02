@@ -1,12 +1,12 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
-from subprocess import check_call
-
 import pytest
 import torch
+from typer.testing import CliRunner
 
-from tapqir.models import Cosmos
+from tapqir.main import app
+from tapqir.models import HMM, Cosmos
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
@@ -14,13 +14,19 @@ requires_cuda = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="cuda is not available"
 )
 
+runner = CliRunner()
 
-@pytest.fixture
-def dataset_path(tmp_path):
+
+@pytest.fixture(params=[Cosmos, HMM])
+def dataset_path(request, tmp_path):
     params = {}
+    if request.param == Cosmos:
+        params["pi"] = 0.15
+    elif request.param == HMM:
+        params["kon"] = 0.2
+        params["koff"] = 0.2
     params["width"] = 1.4
     params["gain"] = 7.0
-    params["pi"] = 0.15
     params["lamda"] = 0.15
     params["proximity"] = 0.2
     params["offset"] = 90.0
@@ -28,97 +34,79 @@ def dataset_path(tmp_path):
     params["background"] = 150
     N = 2
     F = 5
+    C = 1
     P = 14
 
-    model = Cosmos()
-    simulate(model, N, F, P, params=params)
+    model = request.param()
+    data = simulate(model, N, F, C, P, params=params)
 
     # save data
-    save(model.data, tmp_path)
+    save(data, tmp_path)
     return tmp_path
 
 
-def test_commands_cpu(dataset_path, qtbot):
+def test_commands_cpu(dataset_path):
 
     commands = [
-        ["tapqir", "--cd", dataset_path, "init"],
         [
-            "tapqir",
             "--cd",
             dataset_path,
             "fit",
+            "--model",
             "cosmos",
-            "--marginal",
-            "-bs",
+            "--learning-rate",
+            "0.005",
+            "--nbatch-size",
             "2",
-            "-it",
-            "100",
+            "--fbatch-size",
+            "5",
+            "--num-iter",
+            "1",
+            "--cpu",
+            "--no-input",
         ],
         [
-            "tapqir",
-            "--cd",
-            dataset_path,
-            "fit",
-            "cosmos",
-            "-bs",
-            "2",
-            "-it",
-            "100",
-        ],
-        [
-            "tapqir",
             "--cd",
             dataset_path,
             "stats",
+            "--model",
             "cosmos",
+            "--nbatch-size",
+            "2",
+            "--fbatch-size",
+            "5",
+            "--cpu",
+            "--no-input",
         ],
     ]
 
     for command in commands:
-        check_call(command)
-
-    #  model = Cosmos()
-    #  window = MainWindow(model, dataset_path)
-    #  qtbot.addWidget(window)
-    #  qtbot.mouseClick(window.aoiIncr, Qt.LeftButton)
-    #  qtbot.mouseClick(window.aoiDecr, Qt.LeftButton)
-    #  qtbot.mouseClick(window.aoiIncrLarge, Qt.LeftButton)
-    #  qtbot.mouseClick(window.aoiDecrLarge, Qt.LeftButton)
-    #  qtbot.keyClicks(window.aoiNumber, "1")
-    #  qtbot.mouseClick(window.refresh, Qt.LeftButton)
-    #  qtbot.mouseClick(window.images, Qt.LeftButton)
+        result = runner.invoke(app, command)
+        assert result.exit_code == 0
 
 
 @requires_cuda
 def test_commands_cuda(dataset_path):
     commands = [
-        ["tapqir", "--cd", dataset_path, "init"],
         [
-            "tapqir",
             "--cd",
             dataset_path,
             "fit",
+            "--model",
             "cosmos",
-            "--marginal",
+            "--learning-rate",
+            "0.005",
             "--cuda",
-            "-bs",
+            "--nbatch-size",
             "2",
-            "-it",
-            "100",
-        ],
-        [
-            "tapqir",
-            "--cd",
-            dataset_path,
-            "fit",
-            "cosmos",
-            "--cuda",
-            "-bs",
-            "2",
-            "-it",
-            "100",
+            "--fbatch-size",
+            "5",
+            "--num-iter",
+            "1",
+            "--no-input",
         ],
     ]
 
     for command in commands:
-        check_call(command)
+        result = runner.invoke(app, command)
+        assert result.exit_code == 0

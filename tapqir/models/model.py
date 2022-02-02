@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import os
+import random
 from collections import deque
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -16,12 +17,10 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from torch.distributions.utils import lazy_property
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import trange
+from tqdm import tqdm
 
 from tapqir import __version__ as tapqir_version
-from tapqir.distributions.kspotgammanoise import _gaussian_spots
 from tapqir.utils.dataset import load
 from tapqir.utils.stats import save_stats
 
@@ -36,24 +35,45 @@ class Model:
 
     * :meth:`model`
     * :meth:`guide`
+    * :meth:`init_parameters`
+    * :meth:`TraceELBO`
+
+    :param S: Number of distinct molecular states for the binder molecules.
+    :param K: Maximum number of spots that can be present in a single image.
+    :param channels: Number of color channels.
+    :param device: Computation device (cpu or gpu).
+    :param dtype: Floating point precision.
     """
 
-    def __init__(self, S=1, K=2, device="cpu", dtype="double"):
-        self._S = S
-        self._K = K
-        self.batch_size = None
+    def __init__(
+        self,
+        S: int = 1,
+        K: int = 2,
+        channels: Union[tuple, list] = (0,),
+        device: str = "cpu",
+        dtype: str = "double",
+    ):
+        self.S = S
+        self.K = K
+        self.channels = channels
+        self.nbatch_size = None
+        self.fbatch_size = None
         # for plotting
         self.n = None
         self.f = None
         self.data_path = None
         self.path = None
         self.run_path = None
-        logger.info("Tapqir version - {}".format(tapqir_version))
-        logger.info("Model - {}".format(self.name))
         # set device & dtype
         self.to(device, dtype)
 
-    def to(self, device, dtype="double"):
+    def to(self, device: str, dtype: str = "double") -> None:
+        """
+        Change tensor device and dtype.
+
+        :param device: Computation device, either "gpu" or "cpu".
+        :param dtype: Floating point precision, either "double" or "float".
+        """
         self.dtype = getattr(torch, dtype)
         self.device = torch.device(device)
         if device == "cuda" and dtype == "double":
@@ -72,47 +92,28 @@ class Model:
                 samples=self.data.offset.samples.to(self.device),
                 weights=self.data.offset.weights.to(self.device),
             )
-        logger.info("Device - {}".format(self.device))
-        logger.info("Floating precision - {}".format(self.dtype))
 
-    @lazy_property
-    def S(self):
-        r"""
-        Number of distinct molecular states for the binder molecules.
+    def load(self, path: Union[str, Path], data_only: bool = True) -> None:
         """
-        return self._S
+        Load data and optionally parameters from a specified path
 
-    @lazy_property
-    def K(self):
-        r"""
-        Maximum number of spots that can be present in a single image.
+        :param path: Path to Tapqir analysis folder.
+        :param data_only: Load only data or both data and parameters.
         """
-        return self._K
-
-    def load(self, path, data_only=True):
         # set path
         self.path = Path(path)
-        self.run_path = (
-            self.path / ".tapqir" / f"{self.name}" / tapqir_version.split("+")[0]
-        )
-        self.writer = SummaryWriter(log_dir=self.run_path / "tb")
+        self.run_path = self.path / ".tapqir"
 
         # load data
         self.data = load(self.path, self.device)
-        logger.info(f"Loaded data from {self.path / 'data.tpqr'}")
+        logger.debug(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results
         if not data_only:
-            self.params = torch.load(self.path / f"{self.name}-params.tpqr")
-            self.statistics = pd.read_csv(self.path / "statistics.csv", index_col=0)
-            logger.info(f"Loaded parameters from {self.name}-params.tpqr")
-            logger.info(f"Loaded model statistics from {self.path / 'statistics.csv'}")
-
-    def TraceELBO(self, jit):
-        """
-        A trace implementation of ELBO-based SVI.
-        """
-        raise NotImplementedError
+            self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
+            self.summary = pd.read_csv(
+                self.path / f"{self.full_name}-summary.csv", index_col=0
+            )
 
     def model(self):
         """
@@ -122,11 +123,38 @@ class Model:
 
     def guide(self):
         """
-        Variational Model
+        Variational Distribution
         """
         raise NotImplementedError
 
-    def init(self, lr=0.005, batch_size=0, jit=False):
+    def TraceELBO(self, jit):
+        """
+        A trace implementation of ELBO-based SVI.
+        """
+        raise NotImplementedError
+
+    def init_parameters(self):
+        """
+        Initialize variational parameters.
+        """
+        raise NotImplementedError
+
+    def init(
+        self,
+        lr: float = 0.005,
+        nbatch_size: int = 5,
+        fbatch_size: int = 512,
+        jit: bool = False,
+    ) -> None:
+        """
+        Initialize SVI object.
+
+        :param lr: Learning rate.
+        :param nbatch_size: AOI batch size.
+        :param fbatch_size: Frame batch size.
+        :param jit: Use JIT compiler.
+        """
+        self.lr = lr
         self.optim_fn = optim.Adam
         self.optim_args = {"lr": lr, "betas": [0.9, 0.999]}
         self.optim = self.optim_fn(self.optim_args)
@@ -136,69 +164,75 @@ class Model:
         except (FileNotFoundError, TypeError):
             pyro.clear_param_store()
             self.iter = 0
+            self.converged = False
             self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
             self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)
         self.svi = infer.SVI(self.model, self.guide, self.optim, loss=self.elbo)
 
-        # find max possible batch_size
-        if batch_size == 0:
-            batch_size = self._max_batch_size()
-            logger.info("Optimal batch size determined - {}".format(batch_size))
-        self.batch_size = batch_size
+        self.nbatch_size = min(nbatch_size, self.data.Nt)
+        self.fbatch_size = min(fbatch_size, self.data.F)
 
-        logger.info("Optimizer - {}".format(self.optim_fn.__name__))
-        logger.info("Learning rate - {}".format(lr))
-        logger.info("Batch size - {}".format(self.batch_size))
+    def run(self, num_iter: int = 0, progress_bar=tqdm) -> int:
+        """
+        Run inference procedure for a specified number of iterations.
+        If num_iter equals zero then run till model converges.
 
-    def run(self, num_iter=0, nrange=trange):
-        slurm = os.environ.get("SLURM_JOB_ID")
-        if slurm is not None:
-            nrange = range
-        # pyro.enable_validation()
-        self._stop = False
+        :param num_iter: Number of iterations.
+        :return: Exit code.
+        """
         use_crit = False
         if not num_iter:
             use_crit = True
             num_iter = 100000
-        for i in nrange(num_iter):
-            self.iter_loss = self.svi.step()
-            if not self.iter % 100:
-                self.save_checkpoint()
-                if use_crit and self._stop:
-                    logger.info("Step #{} model converged.".format(self.iter))
-                    break
-            self.iter += 1
 
-    def _max_batch_size(self):
-        k = 0
-        batch_size = 0
-        while batch_size + 2 ** k < self.data.ontarget.N:
-            try:
-                torch.cuda.empty_cache()
-                self.batch_size = batch_size + 2 ** k
-                self.run(1, nrange=range)
-            except RuntimeError as error:
-                assert error.args[0].startswith("CUDA")
-                if k == 0:
-                    break
-                else:
-                    batch_size += 2 ** (k - 1)
-                    k = 0
-            else:
-                k += 1
-        else:
-            batch_size += 2 ** (k - 1)
+        logger.debug("Tapqir version - {}".format(tapqir_version))
+        logger.debug("Model - {}".format(self.name))
+        logger.debug("Device - {}".format(self.device))
+        logger.debug("Floating precision - {}".format(self.dtype))
+        logger.debug("Optimizer - {}".format(self.optim_fn.__name__))
+        logger.debug("Learning rate - {}".format(self.lr))
+        logger.debug("AOI batch size - {}".format(self.nbatch_size))
+        logger.debug("Frame batch size - {}".format(self.fbatch_size))
 
-        return max(1, batch_size // 4)
+        with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
+            for i in progress_bar(range(num_iter)):
+                try:
+                    self.iter_loss = self.svi.step()
+                    # save a checkpoint every 200 iterations
+                    if not self.iter % 200:
+                        self.save_checkpoint(writer)
+                        if use_crit and self.converged:
+                            logger.debug(f"Iteration #{self.iter} model converged.")
+                            return 0
+                    self.iter += 1
+                except ValueError:
+                    # load last checkpoint
+                    self.init(
+                        lr=self.lr,
+                        nbatch_size=self.nbatch_size,
+                        fbatch_size=self.fbatch_size,
+                    )
+                    # change rng seed
+                    new_seed = random.randint(0, 100)
+                    pyro.set_rng_seed(new_seed)
+                    logger.warning(
+                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                    )
+        return 1
 
-    def save_checkpoint(self):
+    def save_checkpoint(self, writer: SummaryWriter = None):
+        """
+        Save checkpoint.
+
+        :param writer: SummaryWriter object.
+        """
         # save only if no NaN values
         for k, v in pyro.get_param_store().items():
             if torch.isnan(v).any() or torch.isinf(v).any():
                 raise ValueError(
-                    "Step #{}. Detected NaN values in {}".format(self.iter, k)
+                    "Iteration #{}. Detected NaN values in {}".format(self.iter, k)
                 )
 
         # update convergence criteria parameters
@@ -209,6 +243,7 @@ class Model:
                 self._rolling[name].append(pyro.param(name).item())
 
         # check convergence status
+        self.converged = False
         if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
             crit = all(
                 torch.tensor(self._rolling[p]).std()
@@ -217,7 +252,7 @@ class Model:
                 for p in self.conv_params
             )
             if crit:
-                self._stop = True
+                self.converged = True
 
         # save the model state
         torch.save(
@@ -226,23 +261,25 @@ class Model:
                 "params": pyro.get_param_store().get_state(),
                 "optimizer": self.optim.get_state(),
                 "rolling": self._rolling,
-                "convergence_status": self._stop,
+                "convergence_status": self.converged,
             },
-            self.run_path / "model",
+            self.run_path / f"{self.full_name}-model.tpqr",
         )
 
         # save global paramters for tensorboard
-        self.writer.add_scalar("-ELBO", self.iter_loss, self.iter)
+        writer.add_scalar("-ELBO", self.iter_loss, self.iter)
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
-                self.writer.add_scalar(name, val.item(), self.iter)
+                writer.add_scalar(name, val.item(), self.iter)
             elif val.dim() == 1 and len(val) <= self.S + 1:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
-                self.writer.add_scalars(name, scalars, self.iter)
+                writer.add_scalars(name, scalars, self.iter)
 
-        if self.pspecific is not None and self.data.ontarget.labels is not None:
-            pred_labels = self.z_map.cpu().numpy().ravel()
-            true_labels = self.data.ontarget.labels["z"].ravel()
+        if False and self.data.labels is not None:
+            pred_labels = (
+                self.pspecific_map[self.data.is_ontarget].cpu().numpy().ravel()
+            )
+            true_labels = self.data.labels["z"].ravel()
 
             metrics = {}
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -257,78 +294,52 @@ class Model:
                 true_labels, pred_labels, labels=(0, 1)
             ).ravel()
 
-            self.writer.add_scalars("ACCURACY", metrics, self.iter)
-            self.writer.add_scalars("NEGATIVES", neg, self.iter)
-            self.writer.add_scalars("POSITIVES", pos, self.iter)
+            writer.add_scalars("ACCURACY", metrics, self.iter)
+            writer.add_scalars("NEGATIVES", neg, self.iter)
+            writer.add_scalars("POSITIVES", pos, self.iter)
 
-        logger.debug("Step #{}.".format(self.iter))
+        logger.debug(f"Iteration #{self.iter}: Successful.")
 
-    def load_checkpoint(self, path=None, param_only=False, warnings=False):
+    def load_checkpoint(
+        self,
+        path: Union[str, Path] = None,
+        param_only: bool = False,
+        warnings: bool = False,
+    ):
+        """
+        Load checkpoint.
+
+        :param path: Path to model checkpoint.
+        :param param_only: Load only parameters.
+        :param warnings: Give warnings if loaded model has not been fully trained.
+        """
         device = self.device
         path = Path(path) if path else self.run_path
         pyro.clear_param_store()
-        checkpoint = torch.load(path / "model", map_location=device)
+        checkpoint = torch.load(
+            path / f"{self.full_name}-model.tpqr", map_location=device
+        )
         pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
-            self._stop = checkpoint["convergence_status"]
+            self.converged = checkpoint["convergence_status"]
             self._rolling = checkpoint["rolling"]
             self.iter = checkpoint["iter"]
             self.optim.set_state(checkpoint["optimizer"])
             logger.info(
-                "Step #{}. Loaded model params and optimizer state from {}".format(
-                    self.iter, path
-                )
+                f"Iteration #{self.iter}. Loaded a model checkpoint from {path}"
             )
         if warnings and not checkpoint["convergence_status"]:
             logger.warning(f"Model at {path} has not been fully trained")
 
-    def compute_stats(self, CI=0.95, save_matlab=False):
+    def compute_stats(self, CI: float = 0.95, save_matlab: bool = False):
+        """
+        Compute credible regions (CI) and other stats.
+
+        :param CI: credible region.
+        :param save_matlab: Save output in Matlab format as well.
+        """
         save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
         if self.path is not None:
             logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
             if save_matlab:
                 logger.info(f"Parameters were saved in {self.path / 'params.mat'}")
-
-    def snr(self):
-        r"""
-        Calculate the signal-to-noise ratio.
-
-        Total signal:
-
-            :math:`\mu_{knf} =  \sum_{ij} I_{nfij}
-            \mathcal{N}(i, j \mid x_{knf}, y_{knf}, w_{knf})`
-
-        Noise:
-
-            :math:`\sigma^2_{knf} = \sigma^2_{\text{offset}}
-            + \mu_{knf} \text{gain}`
-
-        Signal-to-noise ratio:
-
-            :math:`\text{SNR}_{knf} =
-            \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
-            \text{ for } \theta_{nf} = k`
-        """
-        weights = _gaussian_spots(
-            torch.ones(1),
-            self.params["d/width"]["Mean"],
-            self.params["d/x"]["Mean"],
-            self.params["d/y"]["Mean"],
-            self.data.ontarget.xy.to(self.dtype),
-            self.data.ontarget.P,
-        )
-        signal = (
-            (
-                self.data.ontarget.images
-                - self.params["d/background"]["Mean"][..., None, None]
-                - self.data.offset.mean
-            )
-            * weights
-        ).sum(dim=(-2, -1))
-        noise = (
-            self.data.offset.var
-            + self.params["d/background"]["Mean"] * self.params["gain"]["Mean"]
-        ).sqrt()
-        result = signal / noise
-        mask = self.theta_probs > 0.5
-        return result[mask]

@@ -1,12 +1,8 @@
-Disclaimer
-==========
+.. image:: docs/source/_static/logo.png
 
-This is an alpha version of the program. It may contain bugs and is subject to change.
+*Bayesian analysis of co-localization single-molecule microscopy image data.*
 
-Tapqir
-======
-
-Bayesian analysis of co-localization single-molecule microscopy image data.
+---------
 
 .. |ci| image:: https://github.com/gelles-brandeis/tapqir/workflows/build/badge.svg
   :target: https://github.com/gelles-brandeis/tapqir/actions

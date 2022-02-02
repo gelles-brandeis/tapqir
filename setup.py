@@ -22,23 +22,24 @@ EXTRAS_REQUIRE = [
 ]
 # tests
 TEST_REQUIRE = [
-    "black",
+    "black[jupyter]",
     "flake8",
     "isort",
     "pytest",
-    "pytest-qt",
     "pytest-xvfb",
 ]
 # docs
 DOCS_REQUIRE = [
     "IPython",
     "nbsphinx>=0.8.5",
-    "sphinx",
     "pydata_sphinx_theme",
-    "sphinx-argparse",
+    "sphinx",
+    "sphinx-autodoc-typehints",
+    "sphinx-click",
     "sphinx-gallery",
     "sphinx-panels",
 ]
+IN_COLAB = "COLAB_GPU" in os.environ
 
 setuptools.setup(
     name="tapqir",
@@ -53,21 +54,23 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
+        "cmake>=3.18",
         "colorama",
-        "configparser",
-        "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
-        # "funsor==0.4.0",
+        "funsor==0.4.1",
         "future",
+        "ipyfilechooser",
+        "ipympl",
+        "ipywidgets",
         "matplotlib",
         "pandas",
-        "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
-        "pyqtgraph",
-        "PySide2",
+        "pykeops==1.5",
+        "pyro-ppl>=1.7.0",
+        "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
-        "tensorboard",
-        "qtrangeslider",
-    ],
+        "typer",
+    ]
+    + ([] if IN_COLAB else ["tensorboard", "voila"]),
     extras_require={
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
@@ -85,6 +88,9 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.main:main"],
+        "console_scripts": [
+            "tapqir=tapqir.main:app",
+            "tapqir-gui=tapqir.gui:app",
+        ],
     },
 )

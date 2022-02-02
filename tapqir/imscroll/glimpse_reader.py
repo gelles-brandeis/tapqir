@@ -1,17 +1,16 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
-import configparser
 import logging
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from pyro.ops.stats import quantile
+from matplotlib.patches import Rectangle
 from scipy.io import loadmat
-from tqdm import tqdm
 
 from tapqir.utils.dataset import CosmosDataset, save
 
@@ -22,39 +21,25 @@ logger = logging.getLogger(__name__)
 class GlimpseDataset:
     """
     GlimpseDataset parses header, aoiinfo, driftlist, and intervals (optional)
-    files and creates
+    files.
 
-    1. aoiinfo and cumdrift DataFrames
-    2. __getitem__ method to retrieve glimpse image for a given frame
-    3. labels np.array
-
-    :param path: path to the folder containing options.cfg file.
+    :param name: Channel name.
+    :param glimpse-folder: Path to the header/glimpse folder.
+    :param ontarget-aoiinfo: Path to the on-target AOI locations file.
+    :param offtarget-aoiinfo: Path to the off-target control AOI locations file (optional).
+    :param driftlist: Path to the driftlist file.
+    :param frame-start: First frame to include in the analysis (optional).
+    :param frame-end: Last frame to include in the analysis (optional).
+    :param ontarget-labels: Path to the on-target label intervals file.
     """
 
-    def __init__(self, path):
-        """Read Glimpse files"""
-
-        # read options.cfg file
-        config = configparser.ConfigParser(allow_no_value=True)
-        cfg_file = Path(path) / ".tapqir" / "config"
-        config.read(cfg_file)
-        kwargs = {}
-        kwargs["title"] = config["glimpse"]["title"]
-        kwargs["header_dir"] = config["glimpse"]["dir"]
-        kwargs["ontarget_aoiinfo"] = config["glimpse"]["ontarget_aoiinfo"]
-        kwargs["offtarget_aoiinfo"] = config["glimpse"]["offtarget_aoiinfo"]
-        kwargs["driftlist"] = config["glimpse"]["driftlist"]
-        kwargs["frame_start"] = config["glimpse"].get("frame_start", None)
-        kwargs["frame_end"] = config["glimpse"].get("frame_end", None)
-        kwargs["ontarget_labels"] = config["glimpse"].get("ontarget_labels", None)
-        kwargs["offtarget_labels"] = config["glimpse"].get("offtarget_labels", None)
-
+    def __init__(self, c=0, **kwargs):
         dtypes = ["ontarget"]
-        if kwargs["offtarget_aoiinfo"] is not None:
+        if kwargs["use-offtarget"]:
             dtypes.append("offtarget")
 
         # convert header into dict format
-        mat_header = loadmat(Path(kwargs["header_dir"]) / "header.mat")
+        mat_header = loadmat(Path(kwargs["glimpse-folder"]) / "header.mat")
         header = dict()
         for i, dt in enumerate(mat_header["vid"].dtype.names):
             header[dt] = np.squeeze(mat_header["vid"][0, 0][i])
@@ -72,9 +57,9 @@ class GlimpseDataset:
         aoi_df = {}
         for dtype in dtypes:
             try:
-                aoi_mat[dtype] = loadmat(kwargs[f"{dtype}_aoiinfo"])
+                aoi_mat[dtype] = loadmat(kwargs[f"{dtype}-aoiinfo"])
             except ValueError:
-                aoi_mat[dtype] = np.loadtxt(kwargs[f"{dtype}_aoiinfo"])
+                aoi_mat[dtype] = np.loadtxt(kwargs[f"{dtype}-aoiinfo"])
             try:
                 aoi_df[dtype] = pd.DataFrame(
                     aoi_mat[dtype]["aoiinfo2"],
@@ -105,15 +90,15 @@ class GlimpseDataset:
             .values
         )
 
-        if kwargs["frame_start"] and kwargs["frame_end"]:
-            f1 = int(kwargs["frame_start"])
-            f2 = int(kwargs["frame_end"])
+        if kwargs["frame-range"]:
+            f1 = int(kwargs["frame-start"])
+            f2 = int(kwargs["frame-end"])
             drift_df = drift_df.loc[f1:f2]
 
         labels = defaultdict(lambda: None)
         for dtype in dtypes:
-            if kwargs[f"{dtype}_labels"] is not None:
-                labels_mat = loadmat(kwargs[f"{dtype}_labels"])
+            if kwargs["labels"] and kwargs[f"{dtype}-labels"] is not None:
+                labels_mat = loadmat(kwargs[f"{dtype}-labels"])
                 labels[dtype] = np.zeros(
                     (len(aoi_df[dtype]), len(drift_df)),
                     dtype=[
@@ -152,10 +137,11 @@ class GlimpseDataset:
         self.aoiinfo = aoi_df
         self.cumdrift = drift_df
         self.labels = labels
-        self.title = kwargs["title"]
+        self.name = kwargs["name"]
+        self.c = c
 
-    def __len__(self):
-        return self.N
+    def __len__(self) -> int:
+        return self.F
 
     def __getitem__(self, key):
         # read the entire frame image
@@ -168,101 +154,267 @@ class GlimpseDataset:
             return np.stack(imgs, 0)
         frame = key
         glimpse_number = self.header["filenumber"][frame - 1]
-        glimpse_path = Path(self.config["header_dir"]) / f"{glimpse_number}.glimpse"
+        glimpse_path = Path(self.config["glimpse-folder"]) / f"{glimpse_number}.glimpse"
         offset = self.header["offset"][frame - 1]
         with open(glimpse_path, "rb") as fid:
             fid.seek(offset)
             img = np.fromfile(fid, dtype=">i2", count=self.height * self.width).reshape(
                 self.height, self.width
             )
-        return img + 2 ** 15
+        return img + 2**15
+
+    @property
+    def N(self) -> int:
+        return len(self.aoiinfo["ontarget"])
+
+    @property
+    def Nc(self) -> int:
+        if "offtarget" in self.dtypes:
+            return len(self.aoiinfo["offtarget"])
+        return 0
+
+    @property
+    def F(self) -> int:
+        return len(self.cumdrift)
 
     def __repr__(self):
-        return rf"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
+        return rf"{self.__class__.__name__}(N={self.N}, Nc={self.Nc}, F={self.F})"
 
     def __str__(self):
-        return f"{self.__class__.__name__}(N={self.N}, F={self.F}, D={self.D}, dtype={self.dtype})"
+        return f"{self.__class__.__name__}(N={self.N}, Nc={self.Nc}, F={self.F})"
+
+    def plot(self, dtype: str, P: int, path: Path, save: bool):
+        """
+        Plot AOIs in the field of view.
+
+        :param dtype: Data type (``ontarget``, ``offtarget``, ``offset``).
+        :param P: AOI size.
+        :param path: Path where to save plots.
+        :param save: Save plots.
+        """
+        colors = {}
+        colors["ontarget"] = "#AA3377"
+        colors["offtarget"] = "#CCBB44"
+        fig = plt.figure(figsize=(10, 10 * self.height / self.width))
+        ax = fig.add_subplot(1, 1, 1)
+        fov = self[self.cumdrift.index[0]]
+        vmin = np.percentile(fov, 1)
+        vmax = np.percentile(fov, 99)
+        ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
+        if dtype in ["ontarget", "offtarget"]:
+            for aoi in self.aoiinfo[dtype].index:
+                # areas of interest
+                y_pos = round(self.aoiinfo[dtype].at[aoi, "y"] - 0.5 * (P - 1)) - 0.5
+                x_pos = round(self.aoiinfo[dtype].at[aoi, "x"] - 0.5 * (P - 1)) - 0.5
+                ax.add_patch(
+                    Rectangle(
+                        (x_pos, y_pos),
+                        P,
+                        P,
+                        edgecolor=colors[dtype],
+                        lw=1,
+                        facecolor="none",
+                    )
+                )
+        elif dtype == "offset":
+            ax.add_patch(
+                Rectangle(
+                    (10, 10),
+                    P,
+                    P,
+                    edgecolor="#CCBB44",
+                    lw=1,
+                    facecolor="none",
+                )
+            )
+        ax.set_title(f"{dtype} locations for channel {self.c}", fontsize=16)
+        ax.set_xlabel("x", fontsize=16)
+        ax.set_ylabel("y", fontsize=16)
+        if save:
+            plt.savefig(path / f"{dtype}-channel{self.c}.png", dpi=300)
 
 
-def read_glimpse(path, P=14):
+def read_glimpse(path, progress_bar, **kwargs):
     """
     Preprocess glimpse files.
     """
-    glimpse = GlimpseDataset(path)
+    P = kwargs.pop("P")
+    C = kwargs.pop("num-channels")
+    name = kwargs.pop("dataset")
+    channels = kwargs.pop("channels")
+    offset_x = kwargs.pop("offset_x")
+    offset_y = kwargs.pop("offset_y")
+    offset_P = kwargs.pop("offset_P")
 
-    raw_target_xy = defaultdict(lambda: None)
-    target_xy = defaultdict(lambda: None)
-    data = defaultdict(lambda: None)
-    for dtype in glimpse.dtypes:
-        raw_target_xy[dtype] = (
-            np.expand_dims(glimpse.aoiinfo[dtype][["x", "y"]].values, axis=1)
-            + glimpse.cumdrift[["dx", "dy"]].values
-        )
-        target_xy[dtype] = np.zeros(
-            (len(glimpse.aoiinfo[dtype]), len(glimpse.cumdrift), 2)
-        )
-        data[dtype] = np.zeros(
-            (len(glimpse.aoiinfo[dtype]), len(glimpse.cumdrift), P, P), dtype="int"
-        )
-    offsets = np.zeros((len(glimpse.cumdrift), 4, 30, 30), dtype="int")
-    # loop through each frame
-    logger.info("Processing glimpse files ...")
-    for f, frame in enumerate(tqdm(glimpse.cumdrift.index)):
-        img = glimpse[frame]
+    offsets = defaultdict(int)
+    offset_medians = []
+    # iterate over channels
+    data = defaultdict(list)
+    target_xy = defaultdict(list)
+    labels = defaultdict(list)
+    for c in range(C):
+        glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
 
-        offsets[f, 0, :, :] += img[10:40, 10:40]
-        offsets[f, 1, :, :] += img[10:40, -40:-10]
-        offsets[f, 2, :, :] += img[-40:-10, 10:40]
-        offsets[f, 3, :, :] += img[-40:-10, -40:-10]
+        raw_target_xy = {}
+        colors = {}
+        colors["ontarget"] = "#AA3377"
+        colors["offtarget"] = "#CCBB44"
         for dtype in glimpse.dtypes:
-            # loop through each aoi
-            for n, aoi in enumerate(glimpse.aoiinfo[dtype].index):
-                shiftx = round(raw_target_xy[dtype][n, f, 0] - 0.5 * (P - 1))
-                shifty = round(raw_target_xy[dtype][n, f, 1] - 0.5 * (P - 1))
-                data[dtype][n, f, :, :] += img[shifty : shifty + P, shiftx : shiftx + P]
-                target_xy[dtype][n, f, 0] = raw_target_xy[dtype][n, f, 0] - shiftx
-                target_xy[dtype][n, f, 1] = raw_target_xy[dtype][n, f, 1] - shifty
-    offset = torch.tensor(offsets)
-    for dtype in glimpse.dtypes:
-        assert (target_xy[dtype] > 0.5 * P - 1).all()
-        assert (target_xy[dtype] < 0.5 * P).all()
-        # convert data into torch tensor
+            N = len(glimpse.aoiinfo[dtype])
+            F = len(glimpse.cumdrift)
+            raw_target_xy[dtype] = (
+                np.expand_dims(glimpse.aoiinfo[dtype][["x", "y"]].values, axis=1)
+                + glimpse.cumdrift[["dx", "dy"]].values
+            )
+            target_xy[dtype].append(np.zeros((N, F, 2)))
+            data[dtype].append(
+                np.zeros(
+                    (N, F, P, P),
+                    dtype="int",
+                )
+            )
+            labels[dtype].append(glimpse.labels[dtype])
+
+            glimpse.plot(dtype, P, path=path, save=True)
+
+        # plot offset in raw FOV images
+        glimpse.plot("offset", offset_P, path=path, save=True)
+
+        # loop through each frame
+        for f, frame in enumerate(progress_bar(glimpse.cumdrift.index)):
+            img = glimpse[frame]
+
+            offset_img = img[
+                offset_y : offset_y + offset_P, offset_x : offset_x + offset_P
+            ]
+            offset_medians.append(np.median(offset_img))
+            values, counts = np.unique(offset_img, return_counts=True)
+            for value, count in zip(values, counts):
+                offsets[value] += count
+            for dtype in glimpse.dtypes:
+                # loop through each aoi
+                for n, aoi in enumerate(glimpse.aoiinfo[dtype].index):
+                    shiftx = round(raw_target_xy[dtype][n, f, 0] - 0.5 * (P - 1))
+                    shifty = round(raw_target_xy[dtype][n, f, 1] - 0.5 * (P - 1))
+                    data[dtype][c][n, f, :, :] += img[
+                        shifty : shifty + P, shiftx : shiftx + P
+                    ]
+                    target_xy[dtype][c][n, f, 0] = (
+                        raw_target_xy[dtype][n, f, 0] - shiftx
+                    )
+                    target_xy[dtype][c][n, f, 1] = (
+                        raw_target_xy[dtype][n, f, 1] - shifty
+                    )
+
+        # assert that target positions are within central pixel
+        for dtype in glimpse.dtypes:
+            assert (target_xy[dtype][c] > 0.5 * P - 1).all()
+            assert (target_xy[dtype][c] < 0.5 * P).all()
+
+    min_data = np.inf
+    for dtype in data.keys():
+        # concatenate color channels
+        data[dtype] = np.stack(data[dtype], -3)
+        target_xy[dtype] = np.stack(target_xy[dtype], -2)
+        min_data = min(min_data, data[dtype].min())
+        if any(label is None for label in labels[dtype]):
+            labels[dtype] = None
+        else:
+            labels[dtype] = np.stack(labels[dtype], -1)
+        # convert data to torch tensor
         data[dtype] = torch.tensor(data[dtype])
         target_xy[dtype] = torch.tensor(target_xy[dtype])
 
     # process offset data
-    offset_min = quantile(offset.flatten().float(), 0.005).item()
-    offset_max = quantile(offset.flatten().float(), 0.995).item()
-    clamped_offset = torch.clamp(offset, offset_min, offset_max)
-    offset_samples, offset_weights = torch.unique(
-        clamped_offset, sorted=True, return_counts=True
+    offsets = OrderedDict(sorted(offsets.items()))
+    offset_samples = np.array(list(offsets.keys()))
+    offset_weights = np.array(list(offsets.values()))
+    # if data.min() is smaller than the smallest offset then
+    # add a single point to offset samples with that value - 1
+    if min_data <= offset_samples[0]:
+        offset_samples = np.insert(offset_samples, 0, min_data - 1)
+        offset_weights = np.insert(offset_weights, 0, 1)
+    # normalize weights
+    offset_weights = offset_weights / offset_weights.sum()
+    # remove values from the upper 0.5 percentile
+    high_mask = offset_weights.cumsum() > 0.995
+    high_weights = offset_weights[high_mask].sum()
+    offset_samples = offset_samples[~high_mask]
+    offset_weights = offset_weights[~high_mask]
+    offset_weights[-1] += high_weights
+    # convert data to torch tensor
+    offset_samples = torch.tensor(offset_samples, dtype=torch.int)
+    offset_weights = torch.tensor(offset_weights)
+
+    data = defaultdict(lambda: None, data)
+    target_xy = defaultdict(lambda: None, target_xy)
+    # concatenate ontarget and offtarget
+    is_ontarget = torch.cat(
+        tuple(
+            torch.full(
+                target_xy[dtype].shape[:1], dtype == "ontarget", dtype=torch.bool
+            )
+            for dtype in glimpse.dtypes
+        ),
+        0,
     )
-    offset_weights = offset_weights.float() / offset_weights.sum()
+    data = torch.cat(tuple(data[dtype] for dtype in glimpse.dtypes), 0)
+    target_xy = torch.cat(tuple(target_xy[dtype] for dtype in glimpse.dtypes), 0)
+    if all(labels[dtype] is None for dtype in glimpse.dtypes):
+        labels = None
+    else:
+        labels = np.concatenate(
+            tuple(
+                labels[dtype] for dtype in glimpse.dtypes if labels[dtype] is not None
+            ),
+            0,
+        )
 
     dataset = CosmosDataset(
-        data["ontarget"],
-        target_xy["ontarget"],
-        glimpse.labels["ontarget"],
-        data["offtarget"],
-        target_xy["offtarget"],
-        glimpse.labels["offtarget"],
+        data,
+        target_xy,
+        is_ontarget,
+        labels,
         offset_samples,
         offset_weights,
-        title=glimpse.title,
+        name=name,
     )
     save(dataset, path)
 
-    logger.info(
-        f"On-target data: N={dataset.ontarget.N} AOIs, "
-        f"F={dataset.ontarget.F} frames, "
-        f"P={dataset.ontarget.P} pixels, "
-        f"P={dataset.ontarget.P} pixels"
-    )
-    if dataset.offtarget.images is not None:
-        logger.info(
-            f"Off-target data: N={dataset.offtarget.N} AOIs, "
-            f"F={dataset.offtarget.F} frames, "
-            f"P={dataset.offtarget.P} pixels, "
-            f"P={dataset.offtarget.P} pixels"
+    # plot offset distribution
+    plt.figure(figsize=(3, 3))
+    plt.bar(offset_samples, offset_weights, alpha=0.5, label="Offset")
+    # plot data distribution for each channel
+    for c in range(C):
+        data_samples, data_counts = torch.unique(
+            data[:, :, c], sorted=True, return_counts=True
         )
+        data_weights = data_counts / data_counts.sum()
+        plt.bar(data_samples, data_weights, alpha=0.5, label=f"Channel {c}")
+    plt.title("Empirical Distribution", fontsize=12)
+    plt.ylabel("Density", fontsize=12)
+    plt.xlabel("Intensity", fontsize=12)
+    plt.xlim(offset_samples.min(), dataset.vmax)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path / "offset-distribution.png", dpi=300)
+
+    plt.figure(figsize=(5, 3))
+    plt.plot(offset_medians, label="Offset Median")
+    plt.title("Offset drift", fontsize=12)
+    plt.ylabel("Intensity", fontsize=12)
+    plt.xlabel("Frames", fontsize=12)
+    plt.ylim(offset_samples.min(), offset_samples.max())
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path / "offset-medians.png", dpi=300)
+
+    logger.info(
+        f"Dataset: N={dataset.N} on-target AOIs, "
+        f"Nc={dataset.Nc} off-target AOIs, "
+        f"F={dataset.F} frames, "
+        f"C={dataset.C} channels, "
+        f"Px={dataset.P} pixels, "
+        f"Py={dataset.P} pixels"
+    )
     logger.info(f"Data is saved in {Path(path) / 'data.tpqr'}")

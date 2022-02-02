@@ -1,13 +1,10 @@
 Install on Windows
 ==================
 
-First, make sure that `CUDA is installed`_ on the computer.
-
 .. important::
 
-   We strongly recommend creating a virtual environment to encapsulate your
-   installation. Below we use a popular package manager Anaconda to create
-   and manage a virtual environment.
+   The Tapqir ``fit`` command does not currently work in Windows Python because of an apparent incompatibility between Windows Python and the KeOps
+   GPU package.  We recommend using Tapqir on linux or Colabs until this problem can be resolved.
 
 1. `Install Anaconda`_ package manager.
 
@@ -21,14 +18,24 @@ First, make sure that `CUDA is installed`_ on the computer.
 
     > conda activate tapqir-env
 
-4. Install `git <https://git-scm.com/>`_ (this is needed because we will
+4. Install CUDA and ensure that it is version 11.5 or later::
+
+    > conda install cuda -c nvidia
+    > nvcc --version
+
+    nvcc: NVIDIA (R) Cuda compiler driver
+    Copyright (c) 2005-2021 NVIDIA Corporation
+    Built on Mon_Sep_13_19:13:29_PDT_2021
+    Cuda compilation tools, release 11.5, V11.5.50
+    Build cuda_11.5.r11.5/compiler.30411180_0
+
+5. Install `git <https://git-scm.com/>`_ (this is needed because we will
    install ``tapqir`` from the GitHub repository)::
 
     > conda install -c anaconda git
 
-5. To install ``tapqir``, in the Anaconda Prompt, run::
+6. To install ``tapqir``, in the Anaconda Prompt, run::
 
     > pip install git+https://github.com/gelles-brandeis/tapqir.git -f https://download.pytorch.org/whl/torch_stable.html
 
-.. _CUDA is installed: https://developer.nvidia.com/cuda-downloads
 .. _Install Anaconda: https://docs.anaconda.com/anaconda/install/

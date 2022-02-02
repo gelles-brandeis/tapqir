@@ -1,4 +1,4 @@
-Install in Google Colab
+Install on Google Colab
 =======================
 
 Colab notebooks start in a fresh environment and thus require installation for each new
@@ -18,7 +18,7 @@ start.
 4. Install ``tapqir`` using pip (to avoid clutter in the notebook installation
    output is silenced)::
 
-    !pip install --quiet git+https://github.com/gelles-brandeis/tapqir.git > install.log
+    !pip install git+https://github.com/gelles-brandeis/tapqir.git > install.log
 
 .. _a new notebook: https://colab.research.google.com/?utm_source=scs-index 
-.. _example notebook: https://colab.research.google.com/github/gelles-brandeis/tapqir/blob/latest/notebooks/example_part_i.ipynb
+.. _example notebook: https://colab.research.google.com/github/gelles-brandeis/tapqir/blob/latest/notebooks/part_ii_colab.ipynb
