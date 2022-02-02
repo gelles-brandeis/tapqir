@@ -29,7 +29,7 @@ class OffsetData(namedtuple("OffsetData", ["samples", "weights"])):
 
     @lazy_property
     def var(self):
-        return torch.sum(self.samples ** 2 * self.weights).item() - self.mean ** 2
+        return torch.sum(self.samples**2 * self.weights).item() - self.mean**2
 
 
 class CosmosDataset:

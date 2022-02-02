@@ -214,7 +214,7 @@ class Cosmos(Model):
                     "background",
                     dist.Gamma(
                         (background_mean / background_std) ** 2,
-                        background_mean / background_std ** 2,
+                        background_mean / background_std**2,
                     ),
                 )
 

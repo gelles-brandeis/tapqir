@@ -161,7 +161,7 @@ class GlimpseDataset:
             img = np.fromfile(fid, dtype=">i2", count=self.height * self.width).reshape(
                 self.height, self.width
             )
-        return img + 2 ** 15
+        return img + 2**15
 
     @property
     def N(self) -> int:
