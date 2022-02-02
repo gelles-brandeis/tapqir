@@ -50,7 +50,14 @@ class Cosmos(Model):
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
-        **kwargs,
+        background_mean_std: float = 1000,
+        background_std_std: float = 100,
+        lamda_rate: float = 1,
+        height_std: float = 10000,
+        width_min: float = 0.75,
+        width_max: float = 2.25,
+        proximity_rate: float = 1,
+        gain_std: float = 50,
     ):
         super().__init__(S, K, channels, device, dtype)
         assert S == 1, "This is a single-state model!"
@@ -61,14 +68,14 @@ class Cosmos(Model):
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
         # priors settings
-        self.background_mean_std = kwargs["background_mean_std"]
-        self.background_std_std = kwargs["background_std_std"]
-        self.lamda_rate = kwargs["lamda_rate"]
-        self.height_std = kwargs["height_std"]
-        self.width_min = kwargs["width_min"]
-        self.width_max = kwargs["width_max"]
-        self.proximity_rate = kwargs["proximity_rate"]
-        self.gain_std = kwargs["gain_std"]
+        self.background_mean_std = background_mean_std
+        self.background_std_std = background_std_std
+        self.lamda_rate = lamda_rate
+        self.height_std = height_std
+        self.width_min = width_min
+        self.width_max = width_max
+        self.proximity_rate = proximity_rate
+        self.gain_std = gain_std
 
     def model(self):
         r"""
