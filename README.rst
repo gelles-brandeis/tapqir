@@ -21,11 +21,6 @@
 
 |DOI| |ci| |docs| |black|
 
-Disclaimer
-==========
-
-This is an alpha version of the program. It may contain bugs and is subject to change.
-
 `Preprint <https://doi.org/10.1101/2021.09.30.462536>`_ |
 `Documentation <https://tapqir.readthedocs.io/en/latest/>`_ |
 `Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
