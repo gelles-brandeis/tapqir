@@ -7,7 +7,7 @@
 .. |ci| image:: https://github.com/gelles-brandeis/tapqir/workflows/build/badge.svg
   :target: https://github.com/gelles-brandeis/tapqir/actions
 
-.. |docs| image:: https://readthedocs.org/projects/tapqir/badge/?version=stable
+.. |docs| image:: https://readthedocs.org/projects/tapqir/badge/?version=latest
     :alt: Documentation Status
     :scale: 100%
     :target: https://tapqir.readthedocs.io/
