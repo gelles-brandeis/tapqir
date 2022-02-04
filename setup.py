@@ -42,7 +42,7 @@ DOCS_REQUIRE = [
 IN_COLAB = "COLAB_GPU" in os.environ
 
 setuptools.setup(
-    name="tapqir-bayes",
+    name="tapqir",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     author="Yerdos Ordabayev",
