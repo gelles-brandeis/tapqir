@@ -60,7 +60,7 @@ setuptools.setup(
         "future",
         "ipyfilechooser",
         "ipympl",
-        "ipywidgets",
+        "ipywidgets>=7.6.5",
         "matplotlib",
         "pandas",
         "pykeops==1.5",
