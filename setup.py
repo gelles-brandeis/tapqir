@@ -47,7 +47,7 @@ setuptools.setup(
     cmdclass=versioneer.get_cmdclass(),
     author="Yerdos Ordabayev",
     author_email="ordabayev@brandeis.edu",
-    description="Bayesian analysis of the single-molecule image data",
+    description="Bayesian analysis of co-localization single-molecule microscopy image data",
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://tapqir.readthedocs.io",
