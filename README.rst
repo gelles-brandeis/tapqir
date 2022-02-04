@@ -1,4 +1,6 @@
-.. image:: docs/source/_static/logo.png
+.. image:: https://github.com/gelles-brandeis/tapqir/raw/latest/docs/source/_static/logo.png
+   :target: https://tapqir.readthedocs.io/
+   :alt: Tapqir logo
 
 *Bayesian analysis of co-localization single-molecule microscopy image data.*
 
