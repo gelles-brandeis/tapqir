@@ -49,7 +49,7 @@ setuptools.setup(
     author_email="ordabayev@brandeis.edu",
     description="Bayesian analysis of the single-molecule image data",
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description_content_type="text/x-rst",
     url="https://tapqir.readthedocs.io",
     packages=setuptools.find_packages(),
     include_package_data=True,
