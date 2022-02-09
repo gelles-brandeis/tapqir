@@ -13,6 +13,10 @@
     :alt: Documentation Status
     :scale: 100%
     :target: https://tapqir.readthedocs.io/
+    
+.. |pypi| image:: https://badge.fury.io/py/tapqir.svg
+    :alt: PyPI version
+    :target: https://pypi.org/project/tapqir/
 
 .. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
   :target: https://github.com/ambv/black
@@ -21,7 +25,7 @@
    :target: https://doi.org/10.1101/2021.09.30.462536
    :alt: DOI
 
-|DOI| |ci| |docs| |black|
+|DOI| |ci| |docs| |pypi| |black|
 
 `Preprint <https://doi.org/10.1101/2021.09.30.462536>`_ |
 `Documentation <https://tapqir.readthedocs.io/>`_ |
