@@ -245,6 +245,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     offset_x = kwargs.pop("offset_x")
     offset_y = kwargs.pop("offset_y")
     offset_P = kwargs.pop("offset_P")
+    bin_size = kwargs.pop("bin_size")
 
     offsets = defaultdict(int)
     offset_medians = []
@@ -345,6 +346,22 @@ def read_glimpse(path, progress_bar, **kwargs):
     # convert data to torch tensor
     offset_samples = torch.tensor(offset_samples, dtype=torch.int)
     offset_weights = torch.tensor(offset_weights)
+    # thin offset histogram
+    s = bin_size
+    q, r = divmod(len(offset_samples) - 1, s)
+    offset_n = 1 + q + int(bool(r))
+    new_samples = torch.zeros(offset_n, dtype=torch.int)
+    new_weights = torch.zeros(offset_n)
+    new_samples[0] = offset_samples[0]
+    new_weights[0] = offset_weights[0]
+    new_samples[1 : 1 + q] = offset_samples[1 + s // 2 : 1 + q * s : s]
+    for i in range(s):
+        new_weights[1 : 1 + q] += offset_weights[1 + i : 1 + q * s : s]
+    if r:
+        new_samples[-1] = offset_samples[1 + q * s + r // 2]
+        new_weights[-1] = offset_weights[1 + q * s :].sum()
+    offset_samples = new_samples
+    offset_weights = new_weights
 
     data = defaultdict(lambda: None, data)
     target_xy = defaultdict(lambda: None, target_xy)
