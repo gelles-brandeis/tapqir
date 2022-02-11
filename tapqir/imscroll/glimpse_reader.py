@@ -4,6 +4,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from pathlib import Path
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +17,24 @@ from tapqir.utils.dataset import CosmosDataset, save
 
 # logger
 logger = logging.getLogger(__name__)
+
+
+def bin_hist(
+    samples: torch.Tensor, weights: torch.Tensor, s: int
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    q, r = divmod(len(samples) - 1, s)
+    n = 1 + q + int(bool(r))
+    new_samples = torch.zeros(n, dtype=torch.int)
+    new_weights = torch.zeros(n)
+    new_samples[0] = samples[0]
+    new_weights[0] = weights[0]
+    new_samples[1 : 1 + q] = samples[1 + s // 2 : 1 + q * s : s]
+    for i in range(s):
+        new_weights[1 : 1 + q] += weights[1 + i : 1 + q * s : s]
+    if r:
+        new_samples[-1] = samples[1 + q * s + r // 2]
+        new_weights[-1] = weights[1 + q * s :].sum()
+    return new_samples, new_weights
 
 
 class GlimpseDataset:
@@ -245,6 +264,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     offset_x = kwargs.pop("offset_x")
     offset_y = kwargs.pop("offset_y")
     offset_P = kwargs.pop("offset_P")
+    bin_size = kwargs.pop("bin_size")
 
     offsets = defaultdict(int)
     offset_medians = []
@@ -345,6 +365,8 @@ def read_glimpse(path, progress_bar, **kwargs):
     # convert data to torch tensor
     offset_samples = torch.tensor(offset_samples, dtype=torch.int)
     offset_weights = torch.tensor(offset_weights)
+    # thin offset histogram
+    offset_samples, offset_weights = bin_hist(offset_samples, offset_weights, bin_size)
 
     data = defaultdict(lambda: None, data)
     target_xy = defaultdict(lambda: None, target_xy)

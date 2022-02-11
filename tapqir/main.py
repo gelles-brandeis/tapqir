@@ -702,6 +702,7 @@ def main(
             DEFAULTS["offset_x"] = 10
             DEFAULTS["offset_y"] = 10
             DEFAULTS["offset_P"] = 30
+            DEFAULTS["bin_size"] = 1
             # save config file
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
