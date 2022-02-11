@@ -237,10 +237,21 @@ class Model:
 
         # update convergence criteria parameters
         for name in self.conv_params:
+            #  if name == "-ELBO":
+            #      self._rolling["-ELBO"].append(self.iter_loss)
+            #  else:
+            #      self._rolling[name].append(pyro.param(name).item())
             if name == "-ELBO":
                 self._rolling["-ELBO"].append(self.iter_loss)
             else:
-                self._rolling[name].append(pyro.param(name).item())
+                if name.endswith("_0"):
+                    base_name = name.split("_0")[0]
+                    self._rolling[name].append(pyro.param(base_name)[0].item())
+                elif name.endswith("_1"):
+                    base_name = name.split("_1")[0]
+                    self._rolling[name].append(pyro.param(base_name)[1].item())
+                else:
+                    self._rolling[name].append(pyro.param(name).item())
 
         # check convergence status
         self.converged = False

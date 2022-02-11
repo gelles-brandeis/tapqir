@@ -5,6 +5,7 @@ import funsor
 from funsor.distribution import make_dist
 
 from tapqir.distributions.affine_beta import AffineBeta
+from tapqir.distributions.ksmoctgn import KSMOCTGN
 from tapqir.distributions.ksmogn import KSMOGN
 
 funsor.set_backend("torch")

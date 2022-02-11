@@ -143,6 +143,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     # this does not need to be very accurate
     num_samples = 1000
+    cdim = model.cdx.ndim
     for param in local_params:
         LL, UL, Mean = [], [], []
         for ndx in torch.split(torch.arange(model.data.Nt), model.nbatch_size):
@@ -196,34 +197,36 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                 ul.append(u)
                 mean.append(m)
             else:
-                LL.append(torch.cat(ll, -1))
-                UL.append(torch.cat(ul, -1))
-                Mean.append(torch.cat(mean, -1))
+                # concatenate frames
+                LL.append(torch.cat(ll, -1 - cdim))
+                UL.append(torch.cat(ul, -1 - cdim))
+                Mean.append(torch.cat(mean, -1 - cdim))
         else:
-            ci_stats[param]["LL"] = torch.cat(LL, -2).cpu()
-            ci_stats[param]["UL"] = torch.cat(UL, -2).cpu()
-            ci_stats[param]["Mean"] = torch.cat(Mean, -2).cpu()
+            # concatenate AOIs
+            ci_stats[param]["LL"] = torch.cat(LL, -2 - cdim).cpu()
+            ci_stats[param]["UL"] = torch.cat(UL, -2 - cdim).cpu()
+            ci_stats[param]["Mean"] = torch.cat(Mean, -2 - cdim).cpu()
 
-    for param in global_params:
-        if param == "pi":
-            summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
-            summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
-            summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
-            # Keq
-            summary.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
-            summary.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
-            summary.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
-        elif param == "trans":
-            summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
-            summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
-            summary.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
-            summary.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
-            summary.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
-            summary.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
-        else:
-            summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
-            summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
-            summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+    #  for param in global_params:
+    #      if param == "pi":
+    #          summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
+    #          summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
+    #          summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
+    #          # Keq
+    #          summary.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
+    #          summary.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
+    #          summary.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
+    #      elif param == "trans":
+    #          summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
+    #          summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
+    #          summary.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
+    #          summary.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
+    #          summary.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
+    #          summary.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
+    #      else:
+    #          summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
+    #          summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
+    #          summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
     ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
     ci_stats["z_probs"] = model.z_probs.data.cpu()
@@ -232,23 +235,23 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.params = ci_stats
 
     # snr
-    summary.loc["SNR", "Mean"] = (
-        snr(
-            model.data.images[:, :, model.cdx],
-            ci_stats["width"]["Mean"],
-            ci_stats["x"]["Mean"],
-            ci_stats["y"]["Mean"],
-            model.data.xy[:, :, model.cdx],
-            ci_stats["background"]["Mean"],
-            ci_stats["gain"]["Mean"],
-            model.data.offset.mean,
-            model.data.offset.var,
-            model.data.P,
-            model.theta_probs,
-        )
-        .mean()
-        .item()
-    )
+    #  summary.loc["SNR", "Mean"] = (
+    #      snr(
+    #          model.data.images[:, :, model.cdx],
+    #          ci_stats["width"]["Mean"],
+    #          ci_stats["x"]["Mean"],
+    #          ci_stats["y"]["Mean"],
+    #          model.data.xy[:, :, model.cdx],
+    #          ci_stats["background"]["Mean"],
+    #          ci_stats["gain"]["Mean"],
+    #          model.data.offset.mean,
+    #          model.data.offset.var,
+    #          model.data.P,
+    #          model.theta_probs,
+    #      )
+    #      .mean()
+    #      .item()
+    #  )
 
     # classification statistics
     if model.data.labels is not None:
