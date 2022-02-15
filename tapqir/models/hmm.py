@@ -54,7 +54,15 @@ class HMM(Cosmos):
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
-        vectorized: bool = False,
+        vectorized: bool = True,
+        background_mean_std: float = 1000,
+        background_std_std: float = 100,
+        lamda_rate: float = 1,
+        height_std: float = 10000,
+        width_min: float = 0.75,
+        width_max: float = 2.25,
+        proximity_rate: float = 1,
+        gain_std: float = 50,
     ):
         self.vectorized = vectorized
         super().__init__(S, K, channels, device, dtype, use_pykeops)
@@ -120,7 +128,7 @@ class HMM(Cosmos):
                 obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
                 # sample background intensity
                 background = pyro.sample(
-                    f"background_{fdx}",
+                    f"background_{fsx}",
                     dist.Gamma(
                         (background_mean / background_std) ** 2,
                         background_mean / background_std**2,
@@ -136,7 +144,7 @@ class HMM(Cosmos):
                 z_curr = pyro.sample(f"z_{fsx}", dist.Categorical(z_probs))
 
                 theta = pyro.sample(
-                    f"theta_{fdx}",
+                    f"theta_{fsx}",
                     dist.Categorical(
                         Vindex(probs_theta(self.K, self.device))[
                             torch.clamp(z_curr, min=0, max=1)
@@ -150,9 +158,10 @@ class HMM(Cosmos):
                 for kdx in spots:
                     specific = onehot_theta[..., 1 + kdx]
                     # spot presence
+                    m_probs = Vindex(probs_m(lamda, self.K))[..., theta, kdx]
                     m = pyro.sample(
                         f"m_{kdx}_{fsx}",
-                        dist.Bernoulli(Vindex(probs_m(lamda, self.K))[..., theta, kdx]),
+                        dist.Categorical(torch.stack((1 - m_probs, m_probs), -1)),
                     )
                     with handlers.mask(mask=m > 0):
                         # sample spot variables
@@ -314,7 +323,7 @@ class HMM(Cosmos):
                     m_probs = Vindex(pyro.param("m_probs"))[z_curr, kdx, ndx, fdx]
                     m = pyro.sample(
                         f"m_{kdx}_{fsx}",
-                        dist.Categorical(m_probs),
+                        dist.Categorical(torch.stack((1 - m_probs, m_probs), -1)),
                         infer={"enumerate": "parallel"},
                     )
                     with handlers.mask(mask=m > 0):
