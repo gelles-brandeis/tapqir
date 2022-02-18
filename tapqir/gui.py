@@ -305,7 +305,7 @@ def fitUI(out):
     # Run computations on GPU?
     useGpu = widgets.Checkbox(
         value=True,
-        description="Run computations of GPU?",
+        description="Run computations on GPU?",
         style={"description_width": "initial"},
     )
     # AOI batch size
