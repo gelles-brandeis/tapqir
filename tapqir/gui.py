@@ -3,7 +3,6 @@
 
 import os
 from collections import defaultdict
-from collections.abc import Iterable
 from functools import partial, singledispatch
 from pathlib import Path
 
@@ -11,6 +10,7 @@ import ipywidgets as widgets
 import torch
 from ipyfilechooser import FileChooser
 from tensorboard import notebook
+from tqdm import tqdm_notebook
 from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
@@ -45,17 +45,6 @@ def _(x: str):
 @get_path.register
 def _(x: FileChooser):
     return Path(x.selected_path)
-
-
-def widget_progress(iterable: Iterable, progress_bar: widgets.IntProgress):
-    """
-    Iterate over iterable and update progress bar.
-    """
-    progress_bar.min = 1
-    progress_bar.max = len(iterable)
-    for i in iterable:
-        progress_bar.value = i + 1
-        yield i
 
 
 def initUI(DEFAULTS):
@@ -208,8 +197,6 @@ def glimpseUI(out):
     # Channel tabs
     channelTabs = widgets.Tab()
     channelUI(numChannels.value, channelTabs)
-    # progress bar
-    glimpseBar = widgets.IntProgress()
     # extract AOIs
     extractAOIs = widgets.Button(description="Extract AOIs")
     # Layout
@@ -222,7 +209,6 @@ def glimpseUI(out):
         numChannels,
         useOfftarget,
         channelTabs,
-        glimpseBar,
         extractAOIs,
     ]
     # Callbacks
@@ -236,7 +222,6 @@ def glimpseUI(out):
 
 def glimpseCmd(b, layout, out):
     channelTabs = layout.children[7]
-    glimpseBar = layout.children[8]
     with out:
         glimpse(
             dataset=layout.children[0].value,
@@ -252,7 +237,7 @@ def glimpseCmd(b, layout, out):
             offtarget_aoiinfo=[c.children[3].value for c in channelTabs.children],
             driftlist=[c.children[4].value for c in channelTabs.children],
             no_input=True,
-            progress_bar=partial(widget_progress, progress_bar=glimpseBar),
+            progress_bar=tqdm_notebook,
             labels=False,
         )
 
@@ -305,7 +290,7 @@ def fitUI(out):
     # Run computations on GPU?
     useGpu = widgets.Checkbox(
         value=True,
-        description="Run computations of GPU?",
+        description="Run computations on GPU?",
         style={"description_width": "initial"},
     )
     # AOI batch size
@@ -334,8 +319,6 @@ def fitUI(out):
         description="Save parameters in matlab format?",
         style={"description_width": "initial"},
     )
-    # progress bar
-    fitBar = widgets.IntProgress()
     # Fit the data
     fitData = widgets.Button(description="Fit the data")
     # Layout
@@ -348,7 +331,6 @@ def fitUI(out):
         learningRate,
         iterationNumber,
         saveMatlab,
-        fitBar,
         fitData,
     ]
     # Callbacks
@@ -357,7 +339,6 @@ def fitUI(out):
 
 
 def fitCmd(b, layout, out):
-    fitBar = layout.children[8]
     with out:
         fit(
             model=layout.children[0].value,
@@ -372,7 +353,7 @@ def fitCmd(b, layout, out):
             funsor=False,
             pykeops=True,
             no_input=True,
-            progress_bar=partial(widget_progress, progress_bar=fitBar),
+            progress_bar=tqdm_notebook,
         )
 
 

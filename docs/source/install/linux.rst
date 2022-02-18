@@ -28,19 +28,29 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
     $ sudo pacman -S nvidia
 
-2. Install git.
+2. Install cmake (>=3.18) and g++ (>=7) if not already installed.
+   
+   To check installation versions in the terminal run::
+
+    $ cmake --version
+    $ g++ --version
+
+   To install (if not already installed):
 
    *On Ubuntu 20.04*
 
    In the terminal run::
 
-    $ sudo apt install git
+    $ sudo apt install cmake
+    $ sudo apt install gcc
+    $ sudo apt install g++
 
    *On Arch Linux*
 
    In the terminal run::
 
-    $ sudo pacman -S git
+    $ sudo pacman -S cmake
+    $ sudo pacman -S gcc
 
 3. Install Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
    Here is the summary of required installation steps:
@@ -48,7 +58,7 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
    * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).
 
    * Run the following command to install Anaconda (change the name of the installer file appropriately if it
-   is a newer version)::
+     is a newer version)::
 
       $ bash ~/Downloads/Anaconda3-2021.11-Linux-x86_64.sh
     
@@ -84,7 +94,7 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
 7. Install ``tapqir``::
 
-    $ pip install git+https://github.com/gelles-brandeis/tapqir.git
+    $ pip install tapqir
 
 Install linux server tools (optional)
 -------------------------------------
