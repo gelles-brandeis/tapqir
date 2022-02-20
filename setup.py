@@ -56,7 +56,7 @@ setuptools.setup(
     install_requires=[
         "cmake>=3.18",
         "colorama",
-        "funsor==0.4.1",
+        "funsor @ git+git://github.com/ordabayevy/funsor.git@tapqir",
         "future",
         "ipyfilechooser",
         "ipympl",
@@ -64,7 +64,7 @@ setuptools.setup(
         "matplotlib",
         "pandas",
         "pykeops==1.5",
-        "pyro-ppl>=1.7.0",
+        "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
