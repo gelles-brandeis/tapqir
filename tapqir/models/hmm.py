@@ -28,7 +28,7 @@ class HMM(Cosmos):
     r"""
     **Single-Color Hidden Markov Colocalization Model**
 
-    EXPERIMENTAL This model relies of Funsor backend.
+    EXPERIMENTAL This model relies on Funsor backend.
 
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
@@ -301,7 +301,7 @@ class HMM(Cosmos):
                     ),
                 )
 
-                # sample hidden model state (3,1,1,1)
+                # sample hidden model state
                 z_probs = (
                     Vindex(pyro.param("z_trans"))[ndx, fdx, 0]
                     if isinstance(fdx, int) and fdx < 1
@@ -367,29 +367,7 @@ class HMM(Cosmos):
         """
         device = self.device
         data = self.data
-        pyro.param(
-            "proximity_loc",
-            lambda: torch.tensor(0.5, device=device),
-            constraint=constraints.interval(
-                0,
-                (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "proximity_size",
-            lambda: torch.tensor(100, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            "lamda_loc",
-            lambda: torch.tensor(0.5, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "lamda_beta",
-            lambda: torch.tensor(100, device=device),
-            constraint=constraints.positive,
-        )
+
         pyro.param(
             "init_mean",
             lambda: torch.ones(self.S + 1, device=device),
@@ -409,91 +387,6 @@ class HMM(Cosmos):
             "trans_size",
             lambda: torch.full((self.S + 1, 1), 2, device=device),
             constraint=constraints.positive,
-        )
-
-        pyro.param(
-            "gain_loc",
-            lambda: torch.tensor(5, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "gain_beta",
-            lambda: torch.tensor(100, device=device),
-            constraint=constraints.positive,
-        )
-
-        pyro.param(
-            "background_mean_loc",
-            lambda: torch.full(
-                (data.Nt, 1),
-                data.median - self.data.offset.mean,
-                device=device,
-            ),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "background_std_loc",
-            lambda: torch.ones(data.Nt, 1, device=device),
-            constraint=constraints.positive,
-        )
-
-        pyro.param(
-            "b_loc",
-            lambda: torch.full(
-                (data.Nt, data.F),
-                data.median - self.data.offset.mean,
-                device=device,
-            ),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "b_beta",
-            lambda: torch.ones(data.Nt, data.F, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "h_loc",
-            lambda: torch.full((self.K, data.Nt, data.F), 2000, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "h_beta",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.001, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "w_mean",
-            lambda: torch.full((self.K, data.Nt, data.F), 1.5, device=device),
-            constraint=constraints.interval(
-                0.75 + torch.finfo(self.dtype).eps,
-                2.25 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "w_size",
-            lambda: torch.full((self.K, data.Nt, data.F), 100, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            "x_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "y_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "size",
-            lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
-            constraint=constraints.greater_than(2.0),
         )
 
         # classification
@@ -517,6 +410,8 @@ class HMM(Cosmos):
             ),
             constraint=constraints.unit_interval,
         )
+
+        self._init_parameters()
 
     def TraceELBO(self, jit=False):
         """
@@ -607,20 +502,24 @@ class HMM(Cosmos):
                 ).get_trace()
             model_tr.compute_log_prob()
             guide_tr.compute_log_prob()
-            # p(z, theta, phi)
+
             logp = {}
             result = {}
             for fsx in ("0", f"slice(1, {self.data.F}, None)"):
                 logp[fsx] = 0
+                # collect log_prob terms p(z, theta, phi)
                 for name in ["z", "theta", "m_0", "m_1", "x_0", "x_1", "y_0", "y_1"]:
                     logp[fsx] += model_tr.nodes[f"{name}_{fsx}"]["funsor"]["log_prob"]
                 if fsx == "0":
+                    # substitute MAP values of z into p(z=z_map, theta, phi)
                     z_map = funsor.Tensor(self.z_map[ndx, 0].long(), dtype=2)["aois"]
                     logp[fsx] = logp[fsx](**{f"z_{fsx}": z_map})
+                    # compute log_measure q for given z_map
                     log_measure = guide_tr.nodes[f"m_0_{fsx}"]["funsor"]["log_measure"]
                     +guide_tr.nodes[f"m_1_{fsx}"]["funsor"]["log_measure"]
                     log_measure = log_measure(**{f"z_{fsx}": z_map})
                 else:
+                    # substitute MAP values of z into p(z=z_map, theta, phi)
                     z_map = funsor.Tensor(self.z_map[ndx, 1:].long(), dtype=2)[
                         "aois", "frames"
                     ]
@@ -631,15 +530,17 @@ class HMM(Cosmos):
                     logp[fsx] = logp[fsx](
                         **{f"z_{fsx}": z_map, f"z_{fsx_prev}": z_map_prev}
                     )
+                    # compute log_measure q for given z_map
                     log_measure = guide_tr.nodes[f"m_0_{fsx}"]["funsor"]["log_measure"]
                     +guide_tr.nodes[f"m_1_{fsx}"]["funsor"]["log_measure"]
                     log_measure = log_measure(
                         **{f"z_{fsx}": z_map, f"z_{fsx_prev}": z_map_prev}
                     )
+                # compute p(z_map, theta | phi) = p(z_map, theta, phi) - p(z_map, phi)
                 logp[fsx] = logp[fsx] - logp[fsx].reduce(
                     funsor.ops.logaddexp, f"theta_{fsx}"
                 )
-                # average over m
+                # average over m in p * q
                 result[fsx] = (logp[fsx] + log_measure).reduce(
                     funsor.ops.logaddexp, frozenset({f"m_0_{fsx}", f"m_1_{fsx}"})
                 )
@@ -664,7 +565,7 @@ class HMM(Cosmos):
     @property
     def theta_probs(self) -> torch.Tensor:
         r"""
-        Posterior target-specific spot probability :math:`q(\theta = k)`.
+        Posterior target-specific spot probability :math:`q(\theta = k, z=z_\mathsf{MAP})`.
         """
         return self.compute_probs
 
@@ -678,7 +579,7 @@ class HMM(Cosmos):
     @property
     def m_probs(self) -> torch.Tensor:
         r"""
-        Posterior spot presence probability :math:`q(m=1 | z_\mathsf{MAP})`.
+        Posterior spot presence probability :math:`q(m=1, z=z_\mathsf{MAP})`.
         """
         return Vindex(torch.permute(pyro.param("m_probs").data, (1, 2, 3, 0)))[
             ..., self.z_map.long()
