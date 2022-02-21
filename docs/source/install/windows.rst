@@ -34,7 +34,7 @@ Install on Windows 11
 
    * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).
 
-   * Navigate to the directory containing the installer.  If you downloaded it using a Windows web browser, this will be in /mnt/c/Users/<your Windows username>/Downloads.
+   * Navigate to the directory containing the installer.  If you downloaded it using a Windows web browser, this will be in ``/mnt/c/Users/<your Windows username>/Downloads``.
    
    * Run the following command to install Anaconda (change the name of the installer file appropriately if it
      is a newer version)::
@@ -77,11 +77,11 @@ Install on Windows 11
 
 Now you can run Tapqir in the WSL window in the same way you would on a linux computer.
 
-Tapqir on WSL Usage tips:
+**Tapqir on WSL Usage tips**:
 
-When working with Tapqir in WSL, it is most convenient to work in subdirectories of the linux directory /home/<your linux username>, which is the same as the Windows directory \\\\wsl.localhost\\Ubuntu\\home\\<your linux username>.
+When working with Tapqir in WSL, it is most convenient to work in subdirectories of the linux directory /home/<your linux username>, which is the same as the Windows directory ``\\\\wsl.localhost\\Ubuntu\\home\\<your linux username>``.
 
-When running tapqir-gui, browser windows will not open automatically.  Look for a message like
+When running tapqir-gui, browser windows will not open automatically.  Look for a message like::
 
      [Voila] Voilà is running at: http://localhost:8866/
      
@@ -91,5 +91,5 @@ If there are two GPUs on your computer, use::
 
      CUDA_VISIBLE_DEVICES=1 tapqir-gui
      
-to run Taqir on the second GPU.
+to run Tapqir on the second GPU.
 
