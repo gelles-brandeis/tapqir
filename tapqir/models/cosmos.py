@@ -433,6 +433,32 @@ class Cosmos(Model):
         """
         device = self.device
         data = self.data
+
+        pyro.param(
+            "pi_mean",
+            lambda: torch.ones(self.S + 1, device=device),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "pi_size",
+            lambda: torch.tensor(2, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "m_probs",
+            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
+            constraint=constraints.unit_interval,
+        )
+
+        self._init_parameters()
+
+    def _init_parameters(self):
+        """
+        Parameters shared between different models.
+        """
+        device = self.device
+        data = self.data
+
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5, device=device),
@@ -456,17 +482,6 @@ class Cosmos(Model):
             lambda: torch.tensor(100, device=device),
             constraint=constraints.positive,
         )
-        pyro.param(
-            "pi_mean",
-            lambda: torch.ones(self.S + 1, device=device),
-            constraint=constraints.simplex,
-        )
-        pyro.param(
-            "pi_size",
-            lambda: torch.tensor(2, device=device),
-            constraint=constraints.positive,
-        )
-
         pyro.param(
             "gain_loc",
             lambda: torch.tensor(5, device=device),
@@ -550,12 +565,6 @@ class Cosmos(Model):
             "size",
             lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
             constraint=constraints.greater_than(2.0),
-        )
-
-        pyro.param(
-            "m_probs",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
-            constraint=constraints.unit_interval,
         )
 
     def TraceELBO(self, jit=False):
