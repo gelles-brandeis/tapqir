@@ -6,7 +6,9 @@ crosstalk
 ^^^^^^^^^
 """
 
+import itertools
 import math
+from functools import reduce
 from typing import Union
 
 import torch
@@ -22,9 +24,30 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
+def cartesian_product(X, ndim=1):
+    batch_shape = X.shape[: -1 - ndim]
+    Q = X.shape[-1 - ndim]  # number of fluorophore dyes
+    S = X.shape[-1]  # number of states for each dye (including dye absence)
+    result_shape = batch_shape + ndim * (S**Q,)
+    result = torch.zeros(result_shape)
+
+    if ndim == 1:  # state probabilities
+        for i, s in enumerate(itertools.product(range(S), repeat=Q)):
+            result[..., i] = reduce(
+                (lambda x, y: x * y), (X[..., q, s[q]] for q in range(Q))
+            )
+    elif ndim == 2:  # transition probability matrix
+        for i, s1 in enumerate(itertools.product(range(S), repeat=Q)):
+            for j, s2 in enumerate(itertools.produce(range(S), repeat=Q)):
+                result[..., i, j] = reduce(
+                    (lambda x, y: x * y), (X[..., q, s1[q], s2[q]] for q in range(Q))
+                )
+    return result
+
+
 class Crosstalk(Model):
     r"""
-    **Single-Color Time-Independent Colocalization Model**
+    **Multi-Color Time-Independent Colocalization Model**
 
     **Reference**:
 
@@ -46,6 +69,7 @@ class Crosstalk(Model):
         self,
         S: int = 1,
         K: int = 2,
+        Q: int = 2,
         channels: Union[tuple, list] = (0,),
         device: str = "cpu",
         dtype: str = "double",
@@ -61,7 +85,10 @@ class Crosstalk(Model):
     ):
         super().__init__(S, K, channels, device, dtype)
         assert S == 1, "This is a single-state model!"
-        self.cdx = torch.tensor(self.channels)
+        self.cdx = torch.as_tensor(self.channels)
+        self.C = len(self.cdx)
+        # number of fluorophore dyes
+        self.Q = Q
         self.full_name = f"{self.name}-channel{self.cdx}"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
@@ -73,6 +100,10 @@ class Crosstalk(Model):
             "lamda_loc_0",
             "lamda_loc_1",
         ]
+        # if S=1, C=2 => [[0, 0], [0, 1], [1, 0], [1, 1]]
+        self.z_matrix = torch.tensor(
+            list(itertools.product(range(1 + self.S), repeat=self.C)), dtype=torch.long
+        )
 
     def model(self):
         r"""
@@ -80,44 +111,44 @@ class Crosstalk(Model):
 
         Model parameters:
 
-        +-----------------+-----------+-------------------------------------+
-        | Parameter       | Shape     | Description                         |
-        +=================+===========+=====================================+
-        | |g| - :math:`g` | (1,)      | camera gain                         |
-        +-----------------+-----------+-------------------------------------+
-        | |sigma| - |prox|| (1,)      | proximity                           |
-        +-----------------+-----------+-------------------------------------+
-        | ``lamda`` - |ld|| (1,)      | average rate of target-nonspecific  |
-        |                 |           | binding                             |
-        +-----------------+-----------+-------------------------------------+
-        | ``pi`` - |pi|   | (1,)      | average binding probability of      |
-        |                 |           | target-specific binding             |
-        +-----------------+-----------+-------------------------------------+
-        | |bg| - |b|      | (N, F)    | background intensity                |
-        +-----------------+-----------+-------------------------------------+
-        | |z| - :math:`z` | (N, F)    | target-specific spot presence       |
-        +-----------------+-----------+-------------------------------------+
-        | |t| - |theta|   | (N, F)    | target-specific spot index          |
-        +-----------------+-----------+-------------------------------------+
-        | |m| - :math:`m` | (K, N, F) | spot presence indicator             |
-        +-----------------+-----------+-------------------------------------+
-        | |h| - :math:`h` | (K, N, F) | spot intensity                      |
-        +-----------------+-----------+-------------------------------------+
-        | |w| - :math:`w` | (K, N, F) | spot width                          |
-        +-----------------+-----------+-------------------------------------+
-        | |x| - :math:`x` | (K, N, F) | spot position on x-axis             |
-        +-----------------+-----------+-------------------------------------+
-        | |y| - :math:`y` | (K, N, F) | spot position on y-axis             |
-        +-----------------+-----------+-------------------------------------+
-        | |D| - :math:`D` | |shape|   | observed images                     |
-        +-----------------+-----------+-------------------------------------+
+        +-----------------+--------------+-------------------------------------+
+        | Parameter       | Shape        | Description                         |
+        +=================+==============+=====================================+
+        | |g| - :math:`g` | (1,)         | camera gain                         |
+        +-----------------+--------------+-------------------------------------+
+        | |sigma| - |prox|| (C,)         | proximity                           |
+        +-----------------+--------------+-------------------------------------+
+        | ``lamda`` - |ld|| (C,)         | average rate of target-nonspecific  |
+        |                 |              | binding                             |
+        +-----------------+--------------+-------------------------------------+
+        | ``pi`` - |pi|   | (C,)         | average binding probability of      |
+        |                 |              | target-specific binding             |
+        +-----------------+--------------+-------------------------------------+
+        | |bg| - |b|      | (N, F, C)    | background intensity                |
+        +-----------------+--------------+-------------------------------------+
+        | |z| - :math:`z` | (N, F)       | target-specific spot presence       |
+        +-----------------+--------------+-------------------------------------+
+        | |t| - |theta|   | (N, F, C)    | target-specific spot index          |
+        +-----------------+--------------+-------------------------------------+
+        | |m| - :math:`m` | (K, N, F, C) | spot presence indicator             |
+        +-----------------+--------------+-------------------------------------+
+        | |h| - :math:`h` | (K, N, F, C) | spot intensity                      |
+        +-----------------+--------------+-------------------------------------+
+        | |w| - :math:`w` | (K, N, F, C) | spot width                          |
+        +-----------------+--------------+-------------------------------------+
+        | |x| - :math:`x` | (K, N, F, C) | spot position on x-axis             |
+        +-----------------+--------------+-------------------------------------+
+        | |y| - :math:`y` | (K, N, F, C) | spot position on y-axis             |
+        +-----------------+--------------+-------------------------------------+
+        | |D| - :math:`D` | |shape|      | observed images                     |
+        +-----------------+--------------+-------------------------------------+
 
         .. |ps| replace:: :math:`p(\mathsf{specific})`
         .. |theta| replace:: :math:`\theta`
         .. |prox| replace:: :math:`\sigma^{xy}`
         .. |ld| replace:: :math:`\lambda`
         .. |b| replace:: :math:`b`
-        .. |shape| replace:: (N, F, P, P)
+        .. |shape| replace:: (N, F, C, P, P)
         .. |sigma| replace:: ``proximity``
         .. |bg| replace:: ``background``
         .. |h| replace:: ``height``
@@ -164,22 +195,16 @@ class Crosstalk(Model):
         # global parameters
         gain = pyro.sample("gain", dist.HalfNormal(50))
         crosstalk = pyro.sample(
-            "crosstalk_sample",
-            dist.HalfNormal(torch.full((self.data.C,), 0.5)).to_event(1),
+            "crosstalk",
+            dist.Dirichlet(torch.ones(self.Q, self.C)).to_event(1),
         )
         pi = pyro.sample(
             "pi",
-            dist.Dirichlet(torch.ones(self.data.C, self.S + 1) / (self.S + 1)).to_event(
-                1
-            ),
+            dist.Dirichlet(torch.ones((self.Q, self.S + 1)) / (self.S + 1)).to_event(1),
         )
         pi = expand_offtarget(pi)
-        lamda = pyro.sample(
-            "lamda", dist.Exponential(torch.ones(self.data.C)).to_event(1)
-        )
-        proximity = pyro.sample(
-            "proximity", dist.Exponential(torch.ones(self.data.C)).to_event(1)
-        )
+        lamda = pyro.sample("lamda", dist.Exponential(torch.ones(self.Q)).to_event(1))
+        proximity = pyro.sample("proximity", dist.Exponential(1))
         size = torch.stack(
             (
                 torch.full_like(proximity, 2.0),
@@ -205,46 +230,45 @@ class Crosstalk(Model):
             dim=-1,
         )
 
-        with aois as ndx, frames as fdx:
+        with aois as ndx:
             ndx = ndx[:, None, None]
-            fdx = fdx[:, None]
-            # fetch data
-            obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
-            is_ontarget = is_ontarget[..., 0]
-
-        ms, heights, widths, xs, ys, backgrounds = [], [], [], [], [], []
-        for cdx in range(self.data.C):
-            with aois as ndx:
-                ndx = ndx[:, None]
-                # background mean and std
-                background_mean = pyro.sample(
-                    f"background_mean_{cdx}", dist.HalfNormal(1000)
+            # background mean and std
+            background_mean = pyro.sample(
+                "background_mean", dist.HalfNormal(1000).expand((self.C,)).to_event(1)
+            )
+            background_std = pyro.sample(
+                "background_std", dist.HalfNormal(100).expand((self.C,)).to_event(1)
+            )
+            with frames as fdx:
+                fdx = fdx[:, None]
+                # fetch data
+                obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
+                # sample background intensity
+                background = pyro.sample(
+                    "background",
+                    dist.Gamma(
+                        (background_mean / background_std) ** 2,
+                        background_mean / background_std**2,
+                    ).to_event(1),
                 )
-                background_std = pyro.sample(
-                    f"background_std_{cdx}", dist.HalfNormal(100)
-                )
-                with frames as fdx:
-                    # sample background intensity
-                    background = pyro.sample(
-                        f"background_{cdx}",
-                        dist.Gamma(
-                            (background_mean / background_std) ** 2,
-                            background_mean / background_std**2,
-                        ),
-                    )
-                    backgrounds.append(background)
 
-                    # sample hidden model state (1+S,)
-                    z = pyro.sample(
-                        f"z_{cdx}",
-                        dist.Categorical(Vindex(pi)[..., cdx, :, is_ontarget.long()]),
-                        infer={"enumerate": "parallel"},
-                    )
+                # sample hidden model state (1+S,)
+                z_probs = Vindex(pi)[..., :, is_ontarget.long()]
+                z_probs = cartesian_product(z_probs)
+                z = pyro.sample(
+                    "z",
+                    dist.Categorical(z_probs),
+                    infer={"enumerate": "parallel"},
+                )
+
+                ms, heights, widths, xs, ys = [], [], [], [], []
+                for qdx in range(self.Q):
+                    z_qdx = Vindex(self.z_matrix)[z, qdx]
                     theta = pyro.sample(
-                        f"theta_{cdx}",
+                        f"theta_{qdx}",
                         dist.Categorical(
                             Vindex(probs_theta(self.K, self.device))[
-                                torch.clamp(z, min=0, max=1)
+                                torch.clamp(z_qdx, min=0, max=1)
                             ]
                         ),
                         infer={"enumerate": "parallel"},
@@ -255,19 +279,19 @@ class Crosstalk(Model):
                         specific = onehot_theta[..., 1 + kdx]
                         # spot presence
                         m = pyro.sample(
-                            f"m_{kdx}_{cdx}",
+                            f"m_{kdx}_{qdx}",
                             dist.Bernoulli(
-                                Vindex(probs_m(lamda, self.K))[..., cdx, theta, kdx]
+                                Vindex(probs_m(lamda, self.K))[..., qdx, theta, kdx]
                             ),
                         )
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
                             height = pyro.sample(
-                                f"height_{kdx}_{cdx}",
+                                f"height_{kdx}_{qdx}",
                                 dist.HalfNormal(10000),
                             )
                             width = pyro.sample(
-                                f"width_{kdx}_{cdx}",
+                                f"width_{kdx}_{qdx}",
                                 AffineBeta(
                                     1.5,
                                     2,
@@ -276,19 +300,19 @@ class Crosstalk(Model):
                                 ),
                             )
                             x = pyro.sample(
-                                f"x_{kdx}_{cdx}",
+                                f"x_{kdx}_{qdx}",
                                 AffineBeta(
                                     0,
-                                    Vindex(size)[..., cdx, specific],
+                                    Vindex(size)[..., specific],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
                             )
                             y = pyro.sample(
-                                f"y_{kdx}_{cdx}",
+                                f"y_{kdx}_{qdx}",
                                 AffineBeta(
                                     0,
-                                    Vindex(size)[..., cdx, specific],
+                                    Vindex(size)[..., specific],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
@@ -301,49 +325,50 @@ class Crosstalk(Model):
                         xs.append(x)
                         ys.append(y)
 
-        with aois as ndx, frames as fdx:
-            heights = torch.stack(
-                (
-                    torch.stack(heights[: self.K], -1),
-                    torch.stack(heights[self.K :], -1),
-                ),
-                -2,
-            )
-            widths = torch.stack(
-                (torch.stack(widths[: self.K], -1), torch.stack(widths[self.K :], -1)),
-                -2,
-            )
-            xs = torch.stack(
-                (torch.stack(xs[: self.K], -1), torch.stack(xs[self.K :], -1)), -2
-            )
-            ys = torch.stack(
-                (torch.stack(ys[: self.K], -1), torch.stack(ys[self.K :], -1)), -2
-            )
-            ms = torch.broadcast_tensors(*ms)
-            ms = torch.stack(
-                (torch.stack(ms[: self.K], -1), torch.stack(ms[self.K :], -1)), -2
-            )
-            backgrounds = torch.stack(backgrounds, -1)
-            # observed data
-            pyro.sample(
-                "data",
-                KSMOCTGN(
-                    heights,
-                    widths,
-                    xs,
-                    ys,
-                    target_locs,
-                    backgrounds,
-                    gain,
-                    crosstalk,
-                    self.data.offset.samples,
-                    self.data.offset.logits.to(self.dtype),
-                    self.data.P,
-                    ms,
-                    self.use_pykeops,
-                ),
-                obs=obs,
-            )
+                heights = torch.stack(
+                    (
+                        torch.stack(heights[: self.K], -1),
+                        torch.stack(heights[self.K :], -1),
+                    ),
+                    -2,
+                )
+                widths = torch.stack(
+                    (
+                        torch.stack(widths[: self.K], -1),
+                        torch.stack(widths[self.K :], -1),
+                    ),
+                    -2,
+                )
+                xs = torch.stack(
+                    (torch.stack(xs[: self.K], -1), torch.stack(xs[self.K :], -1)), -2
+                )
+                ys = torch.stack(
+                    (torch.stack(ys[: self.K], -1), torch.stack(ys[self.K :], -1)), -2
+                )
+                ms = torch.broadcast_tensors(*ms)
+                ms = torch.stack(
+                    (torch.stack(ms[: self.K], -1), torch.stack(ms[self.K :], -1)), -2
+                )
+                # observed data
+                pyro.sample(
+                    "data",
+                    KSMOCTGN(
+                        heights,
+                        widths,
+                        xs,
+                        ys,
+                        target_locs,
+                        background,
+                        gain,
+                        crosstalk,
+                        self.data.offset.samples,
+                        self.data.offset.logits.to(self.dtype),
+                        self.data.P,
+                        ms,
+                        self.use_pykeops,
+                    ),
+                    obs=obs,
+                )
 
     def guide(self):
         r"""
@@ -365,7 +390,7 @@ class Crosstalk(Model):
                 pyro.param("gain_beta"),
             ),
         )
-        pyro.sample("crosstalk_sample", dist.Delta(pyro.param("crosstalk")).to_event(1))
+        pyro.sample("crosstalk", dist.Delta(pyro.param("crosstalk_loc")).to_event(2))
         pyro.sample(
             "pi",
             dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")).to_event(1),
@@ -384,7 +409,7 @@ class Crosstalk(Model):
                 pyro.param("proximity_size"),
                 0,
                 (self.data.P + 1) / math.sqrt(12),
-            ).to_event(1),
+            ),
         )
 
         # aoi sites
@@ -404,70 +429,74 @@ class Crosstalk(Model):
             dim=-1,
         )
 
-        for cdx in range(self.data.C):
-            with aois as ndx:
-                ndx = ndx[:, None]
+        with aois as ndx:
+            ndx = ndx[:, None]
+            pyro.sample(
+                "background_mean",
+                dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0]).to_event(
+                    1
+                ),
+            )
+            pyro.sample(
+                "background_std",
+                dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0]).to_event(
+                    1
+                ),
+            )
+            with frames as fdx:
+                # sample background intensity
                 pyro.sample(
-                    f"background_mean_{cdx}",
-                    dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0, cdx]),
+                    "background",
+                    dist.Gamma(
+                        Vindex(pyro.param("b_loc"))[ndx, fdx]
+                        * Vindex(pyro.param("b_beta"))[ndx, fdx],
+                        Vindex(pyro.param("b_beta"))[ndx, fdx],
+                    ).to_event(1),
                 )
-                pyro.sample(
-                    f"background_std_{cdx}",
-                    dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0, cdx]),
-                )
-                with frames as fdx:
-                    # sample background intensity
-                    pyro.sample(
-                        f"background_{cdx}",
-                        dist.Gamma(
-                            Vindex(pyro.param("b_loc"))[ndx, fdx, cdx]
-                            * Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
-                            Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
-                        ),
-                    )
 
+                for qdx in range(self.Q):
                     for kdx in range(self.K):
                         # sample spot presence m
                         m = pyro.sample(
-                            f"m_{kdx}_{cdx}",
+                            f"m_{kdx}_{qdx}",
                             dist.Bernoulli(
-                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
+                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, qdx]
                             ),
                             infer={"enumerate": "parallel"},
                         )
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
                             pyro.sample(
-                                f"height_{kdx}_{cdx}",
+                                f"height_{kdx}_{qdx}",
                                 dist.Gamma(
-                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
-                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
-                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
+                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, qdx],
+                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, qdx],
                                 ),
                             )
                             pyro.sample(
-                                f"width_{kdx}_{cdx}",
+                                f"width_{kdx}_{qdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
-                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, qdx],
+                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx, qdx],
                                     0.75,
                                     2.25,
                                 ),
                             )
                             pyro.sample(
-                                f"x_{kdx}_{cdx}",
+                                f"x_{kdx}_{qdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, cdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, qdx],
+                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
                             )
                             pyro.sample(
-                                f"y_{kdx}_{cdx}",
+                                f"y_{kdx}_{qdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, cdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, qdx],
+                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
@@ -480,13 +509,13 @@ class Crosstalk(Model):
         device = self.device
         data = self.data
         pyro.param(
-            "crosstalk",
-            lambda: torch.tensor([0.1, 0.1], device=device),
-            constraint=constraints.positive,
+            "crosstalk_loc",
+            lambda: torch.ones((self.Q, self.C), device=device) / self.C,
+            constraint=constraints.simplex,
         )
         pyro.param(
             "proximity_loc",
-            lambda: torch.tensor([0.5, 0.5], device=device),
+            lambda: torch.tensor(0.5, device=device),
             constraint=constraints.interval(
                 0,
                 (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
@@ -494,27 +523,27 @@ class Crosstalk(Model):
         )
         pyro.param(
             "proximity_size",
-            lambda: torch.tensor([100, 100], device=device),
+            lambda: torch.tensor(100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             "lamda_loc",
-            lambda: torch.tensor([0.5, 0.5], device=device),
+            lambda: torch.full((self.Q,), 0.5, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "lamda_beta",
-            lambda: torch.tensor([100, 100], device=device),
+            lambda: torch.full((self.C,), 100, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "pi_mean",
-            lambda: torch.ones((self.data.C, self.S + 1), device=device),
+            lambda: torch.ones((self.Q, self.S + 1), device=device),
             constraint=constraints.simplex,
         )
         pyro.param(
             "pi_size",
-            lambda: torch.full((self.data.C, 1), 2, device=device),
+            lambda: torch.full((self.Q, 1), 2, device=device),
             constraint=constraints.positive,
         )
 
@@ -532,7 +561,7 @@ class Crosstalk(Model):
         pyro.param(
             "background_mean_loc",
             lambda: torch.full(
-                (data.Nt, 1, self.data.C),
+                (data.Nt, 1, self.C),
                 data.median - self.data.offset.mean,
                 device=device,
             ),
@@ -540,14 +569,14 @@ class Crosstalk(Model):
         )
         pyro.param(
             "background_std_loc",
-            lambda: torch.ones(data.Nt, 1, self.data.C, device=device),
+            lambda: torch.ones(data.Nt, 1, self.C, device=device),
             constraint=constraints.positive,
         )
 
         pyro.param(
             "b_loc",
             lambda: torch.full(
-                (data.Nt, data.F, self.data.C),
+                (data.Nt, data.F, self.C),
                 data.median - self.data.offset.mean,
                 device=device,
             ),
@@ -555,28 +584,22 @@ class Crosstalk(Model):
         )
         pyro.param(
             "b_beta",
-            lambda: torch.ones(data.Nt, data.F, self.data.C, device=device),
+            lambda: torch.ones(data.Nt, data.F, self.C, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_loc",
-            lambda: torch.full(
-                (self.K, data.Nt, data.F, self.data.C), 2000, device=device
-            ),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_beta",
-            lambda: torch.full(
-                (self.K, data.Nt, data.F, self.data.C), 0.001, device=device
-            ),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.001, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "w_mean",
-            lambda: torch.full(
-                (self.K, data.Nt, data.F, self.data.C), 1.5, device=device
-            ),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 1.5, device=device),
             constraint=constraints.interval(
                 0.75 + torch.finfo(self.dtype).eps,
                 2.25 - torch.finfo(self.dtype).eps,
@@ -584,14 +607,12 @@ class Crosstalk(Model):
         )
         pyro.param(
             "w_size",
-            lambda: torch.full(
-                (self.K, data.Nt, data.F, self.data.C), 100, device=device
-            ),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             "x_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, self.data.C, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -599,7 +620,7 @@ class Crosstalk(Model):
         )
         pyro.param(
             "y_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, self.data.C, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -607,17 +628,13 @@ class Crosstalk(Model):
         )
         pyro.param(
             "size",
-            lambda: torch.full(
-                (self.K, data.Nt, data.F, self.data.C), 200, device=device
-            ),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
 
         pyro.param(
             "m_probs",
-            lambda: torch.full(
-                (self.K, data.Nt, data.F, self.data.C), 0.5, device=device
-            ),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
             constraint=constraints.unit_interval,
         )
 
@@ -632,8 +649,8 @@ class Crosstalk(Model):
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        z_probs = torch.zeros(self.data.Nt, self.data.F, self.data.C)
-        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F, self.data.C)
+        z_probs = torch.zeros(self.data.Nt, self.data.F, self.Q)
+        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F, self.Q)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
@@ -659,8 +676,7 @@ class Crosstalk(Model):
                 # p(z, theta, phi)
                 logp = 0
                 for name in [
-                    "z_0",
-                    "z_1",
+                    "z",
                     "theta_0",
                     "theta_1",
                     "m_0_0",
@@ -678,7 +694,7 @@ class Crosstalk(Model):
                 ]:
                     logp = logp + model_tr.nodes[name]["unscaled_log_prob"]
                 # p(z, theta | phi) = p(z, theta, phi) - p(z, theta, phi).sum(z, theta)
-                logp = logp - logp.logsumexp((0, 1, 2, 3))
+                logp = logp - logp.logsumexp((0, 1, 2))
                 expectation = (
                     guide_tr.nodes["m_0_0"]["unscaled_log_prob"]
                     + guide_tr.nodes["m_0_1"]["unscaled_log_prob"]
@@ -687,16 +703,17 @@ class Crosstalk(Model):
                     + logp
                 )
                 # average over m
-                result = expectation.logsumexp((4, 5, 6, 7))
+                result = expectation.logsumexp((3, 4, 5, 6))
                 # marginalize theta
-                z_logits = result.logsumexp((0, 1, 2))
-                z_probs[ndx[:, None], fdx, 0] = z_logits[1].exp().mean(-3)
-                z_logits = result.logsumexp((0, 2, 3))
-                z_probs[ndx[:, None], fdx, 1] = z_logits[1].exp().mean(-3)
+                z_logits = result.logsumexp((0, 1))
+                a = z_logits.exp().mean(-3)
+                z_probs[ndx[:, None], fdx, 0] = a[2] + a[3]
+                # z_logits = result.logsumexp((0, 2, 3))
+                z_probs[ndx[:, None], fdx, 1] = a[1] + a[3]
                 # marginalize z
-                theta_logits = result.logsumexp((0, 1, 3))
+                theta_logits = result.logsumexp((0, 2))
                 theta_probs[:, ndx[:, None], fdx, 0] = theta_logits[1:].exp().mean(-3)
-                theta_logits = result.logsumexp((1, 2, 3))
+                theta_logits = result.logsumexp((1, 2))
                 theta_probs[:, ndx[:, None], fdx, 1] = theta_logits[1:].exp().mean(-3)
         self.n = None
         self.f = None

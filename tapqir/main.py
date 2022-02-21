@@ -42,6 +42,9 @@ def format_link(link):
 class Model(str, Enum):
     cosmos = "cosmos"
     crosstalk = "crosstalk"
+    hmm = "hmm"
+    cthmm = "cthmm"
+    mshmm = "mshmm"
 
 
 def get_default(key):
@@ -443,6 +446,12 @@ def stats(
     device = "cuda" if cuda else "cpu"
     backend = "funsor" if funsor else "pyro"
 
+    settings = {}
+    settings["S"] = 1
+    settings["channels"] = channels
+    settings["device"] = device
+    settings["dtype"] = dtype
+
     # pyro backend
     if backend == "pyro":
         PYRO_BACKEND = "pyro"
@@ -457,7 +466,7 @@ def stats(
 
     with pyro_backend(PYRO_BACKEND):
 
-        model = models[model](1, 2, channels, device, dtype)
+        model = models[model](**settings)
         model.load(cd)
         model.load_checkpoint(param_only=True)
         model.nbatch_size = nbatch_size

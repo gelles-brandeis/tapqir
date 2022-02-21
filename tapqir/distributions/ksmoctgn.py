@@ -88,9 +88,11 @@ class KSMOCTGN(TorchDistribution):
         #  )
         #  image = background[..., None, None] + crosstalk_gaussians.sum(-3)
 
-        image = background[..., None, None] + gaussians.sum(-3)
-        crosstalk_image = torch.flip(image, (-3,)) * crosstalk[..., None, None]
-        image = image + crosstalk_image
+        image = background[..., None, None] + (
+            gaussians.unsqueeze(-4) * crosstalk[..., None, None, None]
+        ).sum((-3, -5))
+        # crosstalk_image = torch.flip(image, (-3,)) * crosstalk[..., None, None]
+        # image = image + crosstalk_image
 
         self.concentration = image / gain[..., None, None, None]
         self.rate = 1 / gain[..., None, None, None]
