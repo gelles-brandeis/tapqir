@@ -353,6 +353,7 @@ def fit(
         DEFAULTS["nbatch-size"] = nbatch_size
         DEFAULTS["fbatch-size"] = fbatch_size
         DEFAULTS["learning-rate"] = learning_rate
+        DEFAULTS["matlab"] = matlab
         with open(cd / ".tapqir" / "config.yaml", "w") as cfg_file:
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
@@ -700,6 +701,7 @@ def main(
             DEFAULTS["learning-rate"] = 0.005
             DEFAULTS["num-channels"] = 1
             DEFAULTS["cuda"] = True
+            DEFAULTS["matlab"] = False
             # priors settings
             DEFAULTS["background_mean_std"] = 1000
             DEFAULTS["background_std_std"] = 100
