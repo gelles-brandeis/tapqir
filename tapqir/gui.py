@@ -145,7 +145,16 @@ def cdCmd(path, DEFAULTS, tab, tensorboard=None):
     numChannels = glimpseTab.children[5].value
     fitTab.children[1].options = [str(c) for c in range(numChannels)]
     for i, flag in enumerate(
-        [False, False, "cuda", "nbatch-size", "fbatch-size", "learning-rate"]
+        [
+            False,
+            False,
+            "cuda",
+            "nbatch-size",
+            "fbatch-size",
+            "learning-rate",
+            False,
+            "matlab",
+        ]
     ):
         if flag and DEFAULTS[flag] is not None:
             fitTab.children[i].value = DEFAULTS[flag]
