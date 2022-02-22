@@ -46,7 +46,14 @@ def simulate(
         for k in range(model.K):
             samples[f"width_{k}"] = torch.full((1, N, F), params["width"])
             samples[f"height_{k}"] = torch.full((1, N, F), params["height"])
-    else:
+    elif ("init" in params) and ("trans" in params):
+        samples["init"] = params["init"]
+        samples["trans"] = params["trans"]
+        for f in range(F):
+            samples[f"background_{f}"] = torch.full((1, N, 1), params["background"])
+            for k in range(model.K):
+                samples[f"width_{k}_{f}"] = torch.full((1, N, 1), params["width"])
+    elif ("kon" in params) and ("koff" in params):
         # kinetic simulations
         samples["init"] = torch.tensor(
             [
@@ -91,17 +98,17 @@ def simulate(
     )
     samples = predictive()
     data = torch.zeros(N, F, C, P, P)
-    labels = np.zeros((N // 2, F, 1), dtype=[("aoi", int), ("frame", int), ("z", bool)])
+    labels = np.zeros((N // 2, F, 1), dtype=[("aoi", int), ("frame", int), ("z", int)])
     labels["aoi"] = np.arange(N // 2).reshape(-1, 1, 1)
     labels["frame"] = np.arange(F).reshape(-1, 1)
     if "pi" in params:
         data[:, :, 0] = samples["data"][0].data.floor()
-        labels["z"][:, :, 0] = samples["theta"][0][: N // 2].cpu() > 0
+        labels["z"][:, :, 0] = samples["z"][0][: N // 2].cpu()
     else:
         # kinetic simulations
         for f in range(F):
             data[:, f : f + 1, 0] = samples[f"data_{f}"][0].data.floor()
-            labels["z"][:, f : f + 1, 0] = samples[f"theta_{f}"][0][: N // 2].cpu() > 0
+            labels["z"][:, f : f + 1, 0] = samples[f"z_{f}"][0][: N // 2].cpu()
 
     return CosmosDataset(
         data.cpu(),

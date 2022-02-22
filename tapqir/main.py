@@ -45,6 +45,7 @@ class Model(str, Enum):
     crosstalk = "crosstalk"
     cthmm = "cthmm"
     mshmm = "mshmm"
+    mscosmos = "mscosmos"
 
 
 def get_default(key):
