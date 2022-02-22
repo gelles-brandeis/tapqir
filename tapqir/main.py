@@ -280,7 +280,7 @@ def fit(
         2, "--k-max", "-k", help="Maximum number of spots per image"
     ),
     matlab: bool = typer.Option(
-        False,
+        partial(get_default, "matlab"),
         "--matlab",
         help="Save parameters in matlab format",
         prompt="Save parameters in matlab format?",
@@ -416,7 +416,7 @@ def stats(
         prompt="Frame batch size",
     ),
     matlab: bool = typer.Option(
-        False,
+        partial(get_default, "matlab"),
         "--matlab",
         help="Save parameters in matlab format",
         prompt="Save parameters in matlab format?",

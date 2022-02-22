@@ -185,13 +185,13 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     )
                 else:
                     raise NotImplementedError
-                samples = fn.sample((num_samples,)).data.squeeze()
+                samples = fn.sample((num_samples,)).data
                 l, u = hpdi(
                     samples,
                     CI,
                     dim=0,
                 )
-                m = fn.mean.data.squeeze()
+                m = fn.mean.data
                 ll.append(l)
                 ul.append(u)
                 mean.append(m)
