@@ -70,6 +70,7 @@ class GlimpseDataset:
             drift_mat["driftlist"][:, :3], columns=["frame", "dy", "dx"]
         )
         drift_df = drift_df.astype({"frame": int}).set_index("frame")
+        drift_df["ttb"] = header["ttb"]
 
         # load aoiinfo mat file
         aoi_mat = {}
@@ -272,6 +273,8 @@ def read_glimpse(path, progress_bar, **kwargs):
     data = defaultdict(list)
     target_xy = defaultdict(list)
     labels = defaultdict(list)
+    time1 = []
+    ttb = []
     for c in range(C):
         glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
 
@@ -279,6 +282,8 @@ def read_glimpse(path, progress_bar, **kwargs):
         colors = {}
         colors["ontarget"] = "#AA3377"
         colors["offtarget"] = "#CCBB44"
+        time1.append(float(glimpse.header["time1"]))
+        ttb.append(glimpse.cumdrift["ttb"].values)
         for dtype in glimpse.dtypes:
             N = len(glimpse.aoiinfo[dtype])
             F = len(glimpse.cumdrift)
@@ -382,6 +387,8 @@ def read_glimpse(path, progress_bar, **kwargs):
     )
     data = torch.cat(tuple(data[dtype] for dtype in glimpse.dtypes), 0)
     target_xy = torch.cat(tuple(target_xy[dtype] for dtype in glimpse.dtypes), 0)
+    time1 = torch.as_tensor(time1)
+    ttb = torch.as_tensor(np.array(ttb)).T
     if all(labels[dtype] is None for dtype in glimpse.dtypes):
         labels = None
     else:
@@ -399,6 +406,8 @@ def read_glimpse(path, progress_bar, **kwargs):
         labels,
         offset_samples,
         offset_weights,
+        time1=time1,
+        ttb=ttb,
         name=name,
     )
     save(dataset, path)

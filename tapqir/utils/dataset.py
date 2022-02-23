@@ -46,6 +46,8 @@ class CosmosDataset:
         offset_samples=None,
         offset_weights=None,
         device=torch.device("cpu"),
+        time1=None,
+        ttb=None,
         name=None,
     ):
         self.images = images
@@ -54,6 +56,8 @@ class CosmosDataset:
         self.labels = labels
         self.device = device
         self.offset = OffsetData(offset_samples.to(device), offset_weights.to(device))
+        self.time1 = time1
+        self.ttb = ttb
         self.name = name
 
     @lazy_property
@@ -166,6 +170,8 @@ def save(obj, path):
             "offset_samples": obj.offset.samples,
             "offset_weights": obj.offset.weights,
             "name": obj.name,
+            "time1": obj.time1,
+            "ttb": obj.ttb,
         },
         path / "data.tpqr",
     )
