@@ -53,7 +53,7 @@ This project is licensed under the `Apache License 2.0 <https://www.apache.org/l
 By submitting a pull request to this project, you agree to license your contribution under the Apache
 License 2.0 to this project.
 
-Open soucre community
+Open source community
 ---------------------
 
 We are committed to working with users from other labs who want to incorporate Tapqir into their image processing
