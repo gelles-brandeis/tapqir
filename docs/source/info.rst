@@ -55,11 +55,13 @@ License 2.0 to this project.
 
 Open soucre community
 ---------------------
-We are committed to working with users from other labs whoe want to incorporate taquir into their image processing popelines.  We would like help from outside users to
 
--- test tapqir with other microscope or camera  (e.g., sCMOS) technologies 
--- make tapqir work with other data file formats and preprocessing piplines
--- export Tapqir results to different post-processing software
+We are committed to working with users from other labs who want to incorporate Tapqir into their image processing
+pipelines. We welcome help from outside users to:
+
+* Test Tapqir with other microscope or camera (e.g., sCMOS) technologies 
+* Make Tapqir work with other data file formats and preprocessing pipelines
+* Export Tapqir results to different post-processing software
 
 Backend
 -------
