@@ -229,6 +229,12 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()
 
+    # timestamps
+    if model.data.time1 is not None:
+        ci_stats["time1"] = model.data.time1
+    if model.data.ttb is not None:
+        ci_stats["ttb"] = model.data.ttb
+
     model.params = ci_stats
 
     # snr
@@ -297,6 +303,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     "theta_probs",
                     "z_probs",
                     "z_map",
+                    "time1",
+                    "ttb",
                 ):
                     ci_stats[param] = field.numpy()
                     continue
