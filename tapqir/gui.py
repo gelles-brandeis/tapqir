@@ -424,7 +424,7 @@ def showCmd(b, layout, view):
         step=1,
         description="Frame",
         style={"description_width": "initial"},
-        layout={"width": "270px"},
+        layout={"width": "290px"},
     )
     f1_counter = widgets.BoundedIntText(
         min=0,
@@ -438,7 +438,7 @@ def showCmd(b, layout, view):
         continuous_update=True,
         readout=False,
         readout_format="d",
-        layout={"width": "180px"},
+        layout={"width": "200px"},
     )
     f1_box = widgets.VBox()
     f1_incr = widgets.Button(description="+15", layout=widgets.Layout(width="40px"))
@@ -446,13 +446,13 @@ def showCmd(b, layout, view):
     f1_controls = widgets.HBox(
         children=[f1_decr, f1_slider, f1_incr],
         layout=widgets.Layout(
-            width="270px",
+            width="290px",
         ),
     )
     f1_box.children = [f1_text, f1_controls]
     widgets.jslink((f1_slider, "value"), (f1_text, "value"))
     widgets.jslink((f1_text, "value"), (f1_counter, "value"))
-    zoom = widgets.Checkbox(value=False, description="zoom out", indent=False)
+    zoom = widgets.Checkbox(value=False, description="Zoom out frames", indent=False)
     controls.children = [n, f1_box, zoom]
     n.observe(
         partial(updateParams, f1=f1_slider, model=model, fig=fig, item=item, ax=ax),
