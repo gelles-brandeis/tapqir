@@ -415,31 +415,63 @@ def showCmd(b, layout, view):
         max=model.data.Nt - 1,
         description="AOI",
         style={"description_width": "initial"},
+        layout={"width": "150px"},
     )
-    f1 = widgets.IntSlider(
+    f1_text = widgets.BoundedIntText(
         value=0,
         min=0,
-        max=model.data.F - 1 - 15,
+        max=model.data.F - 15,
         step=1,
         description="Frame",
+        style={"description_width": "initial"},
+        layout={"width": "290px"},
+    )
+    f1_counter = widgets.BoundedIntText(
+        min=0,
+        max=model.data.F - 15,
+    )
+    f1_slider = widgets.IntSlider(
+        value=0,
+        min=0,
+        max=model.data.F - 15,
+        step=1,
         continuous_update=True,
-        readout=True,
+        readout=False,
         readout_format="d",
+        layout={"width": "200px"},
     )
-    zoom = widgets.Checkbox(value=False, description="zoom out", indent=False)
-    controls.children = [n, f1, zoom]
+    f1_box = widgets.VBox()
+    f1_incr = widgets.Button(description="+15", layout=widgets.Layout(width="40px"))
+    f1_decr = widgets.Button(description="-15", layout=widgets.Layout(width="40px"))
+    f1_controls = widgets.HBox(
+        children=[f1_decr, f1_slider, f1_incr],
+        layout=widgets.Layout(
+            width="290px",
+        ),
+    )
+    f1_box.children = [f1_text, f1_controls]
+    widgets.jslink((f1_slider, "value"), (f1_text, "value"))
+    widgets.jslink((f1_text, "value"), (f1_counter, "value"))
+    zoom = widgets.Checkbox(value=False, description="Zoom out frames", indent=False)
+    controls.children = [n, f1_box, zoom]
     n.observe(
-        partial(updateParams, f1=f1, model=model, fig=fig, item=item, ax=ax),
+        partial(updateParams, f1=f1_slider, model=model, fig=fig, item=item, ax=ax),
         names="value",
     )
-    f1.observe(
-        partial(updateRange, n=n, model=model, fig=fig, item=item, ax=ax),
+    f1_slider.observe(
+        partial(updateRange, n=n, model=model, fig=fig, item=item, ax=ax, zoom=zoom),
         names="value",
     )
+    f1_incr.on_click(partial(incrementRange, x=15, counter=f1_counter))
+    f1_decr.on_click(partial(incrementRange, x=-15, counter=f1_counter))
     zoom.observe(
-        partial(zoomOut, f1=f1, model=model, fig=fig, ax=ax),
+        partial(zoomOut, f1=f1_slider, model=model, fig=fig, ax=ax),
         names="value",
     )
+
+
+def incrementRange(name, x, counter):
+    counter.value = counter.value + x
 
 
 def updateParams(n, f1, model, fig, item, ax):
@@ -496,7 +528,7 @@ def updateParams(n, f1, model, fig, item, ax):
     fig.canvas.draw()
 
 
-def updateRange(f1, n, model, fig, item, ax):
+def updateRange(f1, n, model, fig, item, ax, zoom):
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
@@ -525,6 +557,8 @@ def updateRange(f1, n, model, fig, item, ax):
         if not key.startswith("image") and not key.startswith("ideal"):
             a.set_xlim(f1 - 0.5, f2 - 0.5)
     fig.canvas.draw()
+
+    zoom.value = False
 
 
 def zoomOut(checked, f1, model, fig, ax):
