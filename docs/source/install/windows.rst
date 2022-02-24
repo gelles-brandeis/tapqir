@@ -26,7 +26,6 @@ Install on Windows 11
    To install (if not already installed) in the terminal run::
 
     $ sudo apt install cmake
-    $ sudo apt install gcc
     $ sudo apt install g++
 
 4. Install the linux version of the Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
