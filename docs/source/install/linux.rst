@@ -42,7 +42,6 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
    In the terminal run::
 
     $ sudo apt install cmake
-    $ sudo apt install gcc
     $ sudo apt install g++
 
    *On Arch Linux*
