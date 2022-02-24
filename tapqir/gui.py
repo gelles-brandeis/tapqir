@@ -99,7 +99,7 @@ def cdCmd(path, DEFAULTS, tab, tensorboard=None):
     main(cd=path)
     if tensorboard is not None:
         with tensorboard:
-            notebook.start(f"--logdir  {path}")
+            notebook.start(f"--logdir '{path}'")
             notebook.display(height=1000)
     glimpseTab = tab.children[0]
     for i, flag in enumerate(
