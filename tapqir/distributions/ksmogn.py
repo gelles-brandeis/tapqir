@@ -128,7 +128,6 @@ class KSMOGN(TorchDistribution):
                 variables,
                 reduction_op="LogSumExp",
                 axis=1,
-                dtype=str(dtype).split(".")[1],
             )
             concentration, value, rate = torch.broadcast_tensors(
                 self.concentration, value, self.rate

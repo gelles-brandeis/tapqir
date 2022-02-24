@@ -63,7 +63,7 @@ setuptools.setup(
         "ipywidgets",
         "matplotlib",
         "pandas",
-        "pykeops==1.5",
+        "pykeops @ git+git://github.com/getkeops/keops.git@master",
         "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
         "pyyaml>=6.0",
         "scikit-learn",
