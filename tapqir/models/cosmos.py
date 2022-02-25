@@ -40,7 +40,7 @@ class Cosmos(Model):
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
     """
 
-    name = "cosmos"
+    name = "uniformprox"
 
     def __init__(
         self,
@@ -168,8 +168,8 @@ class Cosmos(Model):
         gain = pyro.sample("gain", dist.HalfNormal(self.gain_std))
         pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
         pi = expand_offtarget(pi)
-        lamda = pyro.sample("lamda", dist.Exponential(self.lamda_rate))
-        proximity = pyro.sample("proximity", dist.Exponential(self.proximity_rate))
+        lamda = pyro.sample("lamda", dist.Exponential(1))
+        proximity = pyro.sample("proximity", dist.Uniform(0, (15)/math.sqrt(12)))
         size = torch.stack(
             (
                 torch.full_like(proximity, 2.0),

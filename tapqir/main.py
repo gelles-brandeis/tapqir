@@ -40,8 +40,7 @@ def format_link(link):
 
 # available models
 class Model(str, Enum):
-    cosmos = "cosmos"
-    hmm = "hmm"
+    cosmos = "uniformprox"
 
 
 def get_default(key):
