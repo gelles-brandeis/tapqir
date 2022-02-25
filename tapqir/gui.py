@@ -99,7 +99,7 @@ def cdCmd(path, DEFAULTS, tab, tensorboard=None):
     main(cd=path)
     if tensorboard is not None:
         with tensorboard:
-            notebook.start(f"--logdir  {path}")
+            notebook.start(f"--logdir '{path}'")
             notebook.display(height=1000)
     glimpseTab = tab.children[0]
     for i, flag in enumerate(
@@ -284,16 +284,17 @@ def fitUI(out):
     # Fit the data
     layout = widgets.VBox()
     # Model
-    modelSelect = widgets.Combobox(
+    modelSelect = widgets.Dropdown(
         description="Tapqir model",
         value="cosmos",
         options=["cosmos", "hmm", "mshmm"],
         style={"description_width": "initial"},
     )
     # Channel numbers
-    channelNumber = widgets.Combobox(
+    channelNumber = widgets.Dropdown(
         description="Channel numbers",
         value="0",
+        options=["0"],
         style={"description_width": "initial"},
     )
     # Run computations on GPU?
@@ -370,16 +371,17 @@ def showUI():
     # Fit the data
     layout = widgets.VBox()
     # Model
-    modelSelect = widgets.Combobox(
+    modelSelect = widgets.Dropdown(
         description="Tapqir model",
         value="cosmos",
         options=["cosmos", "hmm", "mshmm"],
         style={"description_width": "initial"},
     )
     # Channel numbers
-    channelNumber = widgets.Combobox(
+    channelNumber = widgets.Dropdown(
         description="Channel numbers",
         value="0",
+        options=["0"],
         style={"description_width": "initial"},
     )
     # Fit the data
@@ -499,11 +501,13 @@ def updateParams(n, f1, model, fig, item, ax):
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
         item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
 
-    params = ["z", "height", "width", "x", "y", "background"]
+    params = ["z", "z_map", "h_specific", "height", "width", "x", "y", "background"]
     for p in params:
         if p == "z":
             if "z_probs" in model.params:
                 item["pspecific"].set_ydata(model.params["z_probs"][n])
+        elif p in set({"z_map", "h_specific"}).intersection(model.params.keys()):
+            item[p].set_ydata(model.params[p][n])
         elif p == "background":
             item[f"{p}_fill"].remove()
             item[f"{p}_fill"] = ax[p].fill_between(

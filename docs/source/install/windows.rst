@@ -26,7 +26,6 @@ Install on Windows 11
    To install (if not already installed) in the terminal run::
 
     $ sudo apt install cmake
-    $ sudo apt install gcc
     $ sudo apt install g++
 
 4. Install the linux version of the Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
@@ -60,16 +59,16 @@ Install on Windows 11
 
     $ conda activate tapqir-env
 
-7. Install CUDA (this takes a few minutes) and ensure that it is version 11.5 or later::
+7. Install latest version of CUDA (needs to be version 11.5 or later).
 
-    $ conda install cuda -c nvidia
-    $ nvcc --version
+   Summary of `installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl-installation>`_::
 
-    nvcc: NVIDIA (R) Cuda compiler driver
-    Copyright (c) 2005-2021 NVIDIA Corporation
-    Built on Mon_Sep_13_19:13:29_PDT_2021
-    Cuda compilation tools, release 11.5, V11.5.50
-    Build cuda_11.5.r11.5/compiler.30411180_0
+    $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+    $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+    $ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+    $ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+    $ sudo apt update
+    $ sudo apt install cuda
 
 8. Install ``tapqir``::
 
