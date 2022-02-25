@@ -287,7 +287,7 @@ def fitUI(out):
     modelSelect = widgets.Combobox(
         description="Tapqir model",
         value="cosmos",
-        options=["cosmos"],
+        options=["cosmos", "hmm", "mshmm"],
         style={"description_width": "initial"},
     )
     # Channel numbers
@@ -373,7 +373,7 @@ def showUI():
     modelSelect = widgets.Combobox(
         description="Tapqir model",
         value="cosmos",
-        options=["cosmos"],
+        options=["cosmos", "hmm", "mshmm"],
         style={"description_width": "initial"},
     )
     # Channel numbers
