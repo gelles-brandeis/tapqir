@@ -5,9 +5,9 @@ from tapqir.models.cosmos import Cosmos
 from tapqir.models.crosstalk import Crosstalk
 from tapqir.models.crosstalkhmm2 import CrosstalkHMM
 from tapqir.models.hmm import HMM
-from tapqir.models.mshmm import MSHMM
 from tapqir.models.model import Model
 from tapqir.models.mscosmos import MSCosmos
+from tapqir.models.mshmm import MSHMM
 
 __all__ = [
     "models",

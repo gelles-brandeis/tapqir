@@ -254,7 +254,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     #  )
 
     # classification statistics
-    if model.data.labels is not None:
+    # if model.data.labels is not None:
+    if False:
         pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
         true_labels = model.data.labels["z"][: model.data.N, :, model.cdx].ravel()
 
