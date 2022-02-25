@@ -469,7 +469,7 @@ def stats(
         typer.echo("Computing stats: Done")
 
 
-def config_axis(ax, label, f1, f2, ymin, ymax, xticklabels=False):
+def config_axis(ax, label, f1, f2, ymin=None, ymax=None, xticklabels=False):
     plt.minorticks_on()
     ax.tick_params(
         direction="in",
@@ -491,7 +491,8 @@ def config_axis(ax, label, f1, f2, ymin, ymax, xticklabels=False):
     )
     ax.set_ylabel(label)
     ax.set_xlim(f1 - 0.5, f2 - 0.5)
-    ax.set_ylim(ymin, ymax)
+    if (ymin is not None) and (ymax is not None):
+        ax.set_ylim(ymin, ymax)
     if not xticklabels:
         ax.set_xticklabels([])
 
@@ -522,17 +523,17 @@ def show(
     f2 = 15
     c = model.cdx
 
-    width, height, dpi = 6.25, 5, 100
+    width, height, dpi = 6.25, 6.25, 100
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
-        nrows=8,
+        nrows=10,
         ncols=15,
-        top=0.95,
-        bottom=0.05,
+        top=0.96,
+        bottom=0.04,
         left=0.1,
         right=0.98,
         hspace=0.1,
-        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1],
+        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1, 1, 1],
     )
     ax = {}
     item = {}
@@ -570,7 +571,29 @@ def show(
         )
         ax[f"ideal_{f}"].axis("off")
 
-    ax["pspecific"] = fig.add_subplot(gs[2, :])
+    ax["z_map"] = fig.add_subplot(gs[2, :])
+    config_axis(ax["z_map"], r"$z_\mathsf{MAP}$", f1, f2, -0.1, model.S + 0.1)
+    (item["z_map"],) = ax["z_map"].plot(
+        torch.arange(0, model.data.F),
+        model.params["z_map"][n],
+        "-",
+        ms=3,
+        lw=1,
+        color="k",
+    )
+
+    ax["h_specific"] = fig.add_subplot(gs[3, :])
+    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2)
+    (item["h_specific"],) = ax["h_specific"].plot(
+        torch.arange(0, model.data.F),
+        model.params["h_specific"][n],
+        "-",
+        ms=3,
+        lw=1,
+        color="k",
+    )
+
+    ax["pspecific"] = fig.add_subplot(gs[4, :])
     config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
     (item["pspecific"],) = ax["pspecific"].plot(
         torch.arange(0, model.data.F),
@@ -581,19 +604,19 @@ def show(
         color="C2",
     )
 
-    ax["height"] = fig.add_subplot(gs[3, :])
+    ax["height"] = fig.add_subplot(gs[5, :])
     config_axis(ax["height"], r"$h$", f1, f2, -100, 8000)
 
-    ax["width"] = fig.add_subplot(gs[4, :])
+    ax["width"] = fig.add_subplot(gs[6, :])
     config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
 
-    ax["x"] = fig.add_subplot(gs[5, :])
+    ax["x"] = fig.add_subplot(gs[7, :])
     config_axis(ax["x"], r"$x$", f1, f2, -9, 9)
 
-    ax["y"] = fig.add_subplot(gs[6, :])
+    ax["y"] = fig.add_subplot(gs[8, :])
     config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
 
-    ax["background"] = fig.add_subplot(gs[7, :])
+    ax["background"] = fig.add_subplot(gs[9, :])
     config_axis(ax["background"], r"$b$", f1, f2, 0, 500, True)
     ax["background"].set_xlabel("Time (frame)")
 
