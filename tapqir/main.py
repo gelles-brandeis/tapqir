@@ -570,7 +570,7 @@ def show(
             vmax=model.data.vmax + 50,
             cmap="gray",
         )
-        ax[f"image_{f}"].set_title(f)
+        ax[f"image_{f}"].set_title(rf"${f}$", fontsize=9)
         ax[f"image_{f}"].axis("off")
         ax[f"ideal_{f}"] = fig.add_subplot(gs[1, f])
         item[f"ideal_{f}"] = ax[f"ideal_{f}"].imshow(
@@ -593,7 +593,7 @@ def show(
     )
 
     ax["h_specific"] = fig.add_subplot(gs[3, :])
-    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2)
+    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2, -100, 4000)
     (item["h_specific"],) = ax["h_specific"].plot(
         torch.arange(0, model.data.F),
         model.params["h_specific"][n],
@@ -627,7 +627,7 @@ def show(
     config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
 
     ax["background"] = fig.add_subplot(gs[9, :])
-    config_axis(ax["background"], r"$b$", f1, f2, 0, 500, True)
+    config_axis(ax["background"], r"$b$", f1, f2, 0, 50, True)
     ax["background"].set_xlabel("Time (frame)")
 
     for p in ["height", "width", "x", "y"]:
