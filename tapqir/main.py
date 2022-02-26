@@ -444,6 +444,12 @@ def stats(
     device = "cuda" if cuda else "cpu"
     backend = "funsor" if funsor else "pyro"
 
+    settings = {}
+    settings["S"] = 1
+    settings["channels"] = channels
+    settings["device"] = device
+    settings["dtype"] = dtype
+
     # pyro backend
     if backend == "pyro":
         PYRO_BACKEND = "pyro"
@@ -458,7 +464,7 @@ def stats(
 
     with pyro_backend(PYRO_BACKEND):
 
-        model = models[model](1, 2, channels, device, dtype)
+        model = models[model](**settings)
         model.load(cd)
         model.load_checkpoint(param_only=True)
         model.nbatch_size = nbatch_size
@@ -560,7 +566,7 @@ def show(
             vmax=model.data.vmax + 50,
             cmap="gray",
         )
-        ax[f"image_{f}"].set_title(f)
+        ax[f"image_{f}"].set_title(rf"${f}$", fontsize=9)
         ax[f"image_{f}"].axis("off")
         ax[f"ideal_{f}"] = fig.add_subplot(gs[1, f])
         item[f"ideal_{f}"] = ax[f"ideal_{f}"].imshow(
@@ -583,7 +589,7 @@ def show(
     )
 
     ax["h_specific"] = fig.add_subplot(gs[3, :])
-    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2)
+    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2, -100, 4000)
     (item["h_specific"],) = ax["h_specific"].plot(
         torch.arange(0, model.data.F),
         model.params["h_specific"][n],

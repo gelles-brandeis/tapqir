@@ -8,6 +8,7 @@ from pathlib import Path
 
 import ipywidgets as widgets
 import torch
+import typer
 from ipyfilechooser import FileChooser
 from tensorboard import notebook
 from tqdm import tqdm_notebook
@@ -71,7 +72,7 @@ def initUI(DEFAULTS):
     tab.children = [glimpseUI(out), fitUI(out)]
     if not IN_COLAB:
         tensorboard = widgets.Output(layout={"border": "1px solid blue"})
-        tab.children = tab.children + (showUI(), tensorboard)
+        tab.children = tab.children + (showUI(out), tensorboard)
     else:
         tensorboard = None
         tab.children = tab.children + (
@@ -367,7 +368,7 @@ def fitCmd(b, layout, out):
         )
 
 
-def showUI():
+def showUI(out):
     # Fit the data
     layout = widgets.VBox()
     # Model
@@ -386,7 +387,7 @@ def showUI():
     )
     # Fit the data
     showParams = widgets.Button(description="Load results")
-    controls = widgets.HBox()
+    controls = widgets.HBox(layout={"border": "1px solid grey"})
     view = widgets.Output(layout={"border": "1px solid red"})
     # Layout
     layout.children = [
@@ -397,11 +398,13 @@ def showUI():
         view,
     ]
     # Callbacks
-    showParams.on_click(partial(showCmd, layout=layout, view=view))
+    showParams.on_click(partial(showCmd, layout=layout, view=view, out=out))
     return layout
 
 
-def showCmd(b, layout, view):
+def showCmd(b, layout, view, out):
+    with out:
+        typer.echo("Loading results ...")
     with view:
         model, fig, item, ax = show(
             model=layout.children[0].value,
@@ -426,7 +429,7 @@ def showCmd(b, layout, view):
         step=1,
         description="Frame",
         style={"description_width": "initial"},
-        layout={"width": "290px"},
+        layout={"width": "300px"},
     )
     f1_counter = widgets.BoundedIntText(
         min=0,
@@ -440,15 +443,15 @@ def showCmd(b, layout, view):
         continuous_update=True,
         readout=False,
         readout_format="d",
-        layout={"width": "200px"},
+        layout={"width": "210px"},
     )
-    f1_box = widgets.VBox()
-    f1_incr = widgets.Button(description="+15", layout=widgets.Layout(width="40px"))
-    f1_decr = widgets.Button(description="-15", layout=widgets.Layout(width="40px"))
+    f1_box = widgets.VBox(layout=widgets.Layout(width="310px"))
+    f1_incr = widgets.Button(description="+15", layout=widgets.Layout(width="45px"))
+    f1_decr = widgets.Button(description="-15", layout=widgets.Layout(width="45px"))
     f1_controls = widgets.HBox(
         children=[f1_decr, f1_slider, f1_incr],
         layout=widgets.Layout(
-            width="290px",
+            width="305px",
         ),
     )
     f1_box.children = [f1_text, f1_controls]
@@ -470,6 +473,8 @@ def showCmd(b, layout, view):
         partial(zoomOut, f1=f1_slider, model=model, fig=fig, ax=ax),
         names="value",
     )
+    with out:
+        typer.echo("Loading results: Done")
 
 
 def incrementRange(name, x, counter):
@@ -497,7 +502,7 @@ def updateParams(n, f1, model, fig, item, ax):
     )
     img_ideal = img_ideal + gaussian.sum(-4)
     for i, f in enumerate(range(f1, f2)):
-        ax[f"image_{i}"].set_title(f)
+        ax[f"image_{i}"].set_title(rf"${f}$", fontsize=9)
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
         item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
 
@@ -553,7 +558,7 @@ def updateRange(f1, n, model, fig, item, ax, zoom):
     )
     img_ideal = img_ideal + gaussian.sum(-4)
     for i, f in enumerate(range(f1, f2)):
-        ax[f"image_{i}"].set_title(f)
+        ax[f"image_{i}"].set_title(rf"${f}$", fontsize=9)
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
         item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
 
