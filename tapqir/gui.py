@@ -488,12 +488,12 @@ def showCmd(b, layout, view, out):
     )
     # key press UI
     d = Event(source=layout, watched_events=["keydown"])
-    d.on_dom_event(partial(onKeyPress, n=n_counter, f1=f1_counter))
+    d.on_dom_event(partial(onKeyPress, n=n_counter, f1=f1_counter, zoom=zoom))
     with out:
         typer.echo("Loading results: Done")
 
 
-def onKeyPress(event, n, f1):
+def onKeyPress(event, n, f1, zoom):
     key = event["key"]
     if key == "h" or key == "ArrowLeft":
         f1.value = f1.value - 15
@@ -503,6 +503,8 @@ def onKeyPress(event, n, f1):
         n.value = n.value - 1
     elif key == "k" or key == "ArrowUp":
         n.value = n.value + 1
+    elif key == "z":
+        zoom.value = not zoom.value
 
 
 def onFrameClick(event, counter):
