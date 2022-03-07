@@ -9,6 +9,7 @@ from pathlib import Path
 import ipywidgets as widgets
 import torch
 import typer
+from ipyevents import Event
 from ipyfilechooser import FileChooser
 from tensorboard import notebook
 from tqdm import tqdm_notebook
@@ -424,6 +425,10 @@ def showCmd(b, layout, view, out):
         style={"description_width": "initial"},
         layout={"width": "150px"},
     )
+    n_counter = widgets.BoundedIntText(
+        min=0,
+        max=model.data.Nt - 1,
+    )
     f1_text = widgets.BoundedIntText(
         value=0,
         min=0,
@@ -459,6 +464,7 @@ def showCmd(b, layout, view, out):
     f1_box.children = [f1_text, f1_controls]
     widgets.jslink((f1_slider, "value"), (f1_text, "value"))
     widgets.jslink((f1_text, "value"), (f1_counter, "value"))
+    widgets.jslink((n, "value"), (n_counter, "value"))
     zoom = widgets.Checkbox(value=False, description="Zoom out frames", indent=False)
     controls.children = [n, f1_box, zoom]
     n.observe(
@@ -480,8 +486,23 @@ def showCmd(b, layout, view, out):
         "button_press_event",
         partial(onFrameClick, counter=f1_counter),
     )
+    # key press UI
+    d = Event(source=layout, watched_events=["keydown"])
+    d.on_dom_event(partial(onKeyPress, n=n_counter, f1=f1_counter))
     with out:
         typer.echo("Loading results: Done")
+
+
+def onKeyPress(event, n, f1):
+    key = event["key"]
+    if key == "h" or key == "ArrowLeft":
+        f1.value = f1.value - 15
+    elif key == "l" or key == "ArrowRight":
+        f1.value = f1.value + 15
+    elif key == "j" or key == "ArrowDown":
+        n.value = n.value - 1
+    elif key == "k" or key == "ArrowUp":
+        n.value = n.value + 1
 
 
 def onFrameClick(event, counter):
