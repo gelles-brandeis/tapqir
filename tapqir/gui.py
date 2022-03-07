@@ -9,6 +9,7 @@ from pathlib import Path
 import ipywidgets as widgets
 import torch
 import typer
+from ipyevents import Event
 from ipyfilechooser import FileChooser
 from tensorboard import notebook
 from tqdm import tqdm_notebook
@@ -142,9 +143,11 @@ def cdCmd(path, DEFAULTS, tab, tensorboard=None):
                     widget._apply_selection()
                 elif flag:
                     widget.value = DEFAULTS["channels"][c][flag]
-    fitTab = tab.children[1]
     numChannels = glimpseTab.children[5].value
+    fitTab = tab.children[1]
     fitTab.children[1].options = [str(c) for c in range(numChannels)]
+    showTab = tab.children[2]
+    showTab.children[1].options = [str(c) for c in range(numChannels)]
     for i, flag in enumerate(
         [
             False,
@@ -422,6 +425,10 @@ def showCmd(b, layout, view, out):
         style={"description_width": "initial"},
         layout={"width": "150px"},
     )
+    n_counter = widgets.BoundedIntText(
+        min=0,
+        max=model.data.Nt - 1,
+    )
     f1_text = widgets.BoundedIntText(
         value=0,
         min=0,
@@ -457,6 +464,7 @@ def showCmd(b, layout, view, out):
     f1_box.children = [f1_text, f1_controls]
     widgets.jslink((f1_slider, "value"), (f1_text, "value"))
     widgets.jslink((f1_text, "value"), (f1_counter, "value"))
+    widgets.jslink((n, "value"), (n_counter, "value"))
     zoom = widgets.Checkbox(value=False, description="Zoom out frames", indent=False)
     controls.children = [n, f1_box, zoom]
     n.observe(
@@ -470,11 +478,37 @@ def showCmd(b, layout, view, out):
     f1_incr.on_click(partial(incrementRange, x=15, counter=f1_counter))
     f1_decr.on_click(partial(incrementRange, x=-15, counter=f1_counter))
     zoom.observe(
-        partial(zoomOut, f1=f1_slider, model=model, fig=fig, ax=ax),
+        partial(zoomOut, f1=f1_slider, model=model, fig=fig, item=item, ax=ax),
         names="value",
     )
+    # mouse click UI
+    fig.canvas.mpl_connect(
+        "button_release_event",
+        partial(onFrameClick, counter=f1_counter),
+    )
+    # key press UI
+    d = Event(source=layout, watched_events=["keyup"])
+    d.on_dom_event(partial(onKeyPress, n=n_counter, f1=f1_counter, zoom=zoom))
     with out:
         typer.echo("Loading results: Done")
+
+
+def onKeyPress(event, n, f1, zoom):
+    key = event["key"]
+    if key == "h" or key == "ArrowLeft":
+        f1.value = f1.value - 15
+    elif key == "l" or key == "ArrowRight":
+        f1.value = f1.value + 15
+    elif key == "j" or key == "ArrowDown":
+        n.value = n.value - 1
+    elif key == "k" or key == "ArrowUp":
+        n.value = n.value + 1
+    elif key == "z":
+        zoom.value = not zoom.value
+
+
+def onFrameClick(event, counter):
+    counter.value = int(event.xdata)
 
 
 def incrementRange(name, x, counter):
@@ -562,22 +596,41 @@ def updateRange(f1, n, model, fig, item, ax, zoom):
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
         item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
 
-    for key, a in ax.items():
-        if not key.startswith("image") and not key.startswith("ideal"):
-            a.set_xlim(f1 - 0.5, f2 - 0.5)
+    if not zoom.value:
+        for key, a in ax.items():
+            if not key.startswith("image") and not key.startswith("ideal"):
+                a.set_xlim(f1 - 0.5, f2 - 0.5)
+    else:
+        item["z_vspan"].remove()
+        item["h_vspan"].remove()
+        item["p_vspan"].remove()
+        item["z_vspan"] = ax["z_map"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+        item["h_vspan"] = ax["h_specific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+        item["p_vspan"] = ax["pspecific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     fig.canvas.draw()
 
-    zoom.value = False
 
-
-def zoomOut(checked, f1, model, fig, ax):
+def zoomOut(checked, f1, model, fig, item, ax):
     checked = get_value(checked)
+    f1_value = get_value(f1)
     if checked:
         f1 = 0
         f2 = model.data.F
+        item["z_vspan"] = ax["z_map"].axvspan(
+            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
+        )
+        item["h_vspan"] = ax["h_specific"].axvspan(
+            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
+        )
+        item["p_vspan"] = ax["pspecific"].axvspan(
+            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
+        )
     else:
-        f1 = get_value(f1)
+        f1 = f1_value
         f2 = f1 + 15
+        item["z_vspan"].remove()
+        item["h_vspan"].remove()
+        item["p_vspan"].remove()
     for key, a in ax.items():
         if not key.startswith("image") and not key.startswith("ideal"):
             a.set_xlim(f1 - 0.5, f2 - 0.5)

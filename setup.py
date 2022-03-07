@@ -58,6 +58,7 @@ setuptools.setup(
         "colorama",
         "funsor @ git+git://github.com/ordabayevy/funsor.git@tapqir",
         "future",
+        "ipyevents",
         "ipyfilechooser",
         "ipympl",
         "ipywidgets",

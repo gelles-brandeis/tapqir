@@ -529,8 +529,7 @@ def show(
     if f1 is None:
         f1 = 0
     if f2 is None:
-        f2 = model.data.F
-    f2 = 15
+        f2 = f1 + 15
     c = model.cdx
 
     width, height, dpi = 6.25, 6.25, 100
@@ -566,8 +565,8 @@ def show(
         ax[f"image_{f}"] = fig.add_subplot(gs[0, f])
         item[f"image_{f}"] = ax[f"image_{f}"].imshow(
             model.data.images[n, f, c].numpy(),
-            vmin=model.data.vmin - 50,
-            vmax=model.data.vmax + 50,
+            vmin=model.data.vmin[model.cdx] - 50,
+            vmax=model.data.vmax[model.cdx] + 50,
             cmap="gray",
         )
         ax[f"image_{f}"].set_title(rf"${f}$", fontsize=9)
@@ -575,8 +574,8 @@ def show(
         ax[f"ideal_{f}"] = fig.add_subplot(gs[1, f])
         item[f"ideal_{f}"] = ax[f"ideal_{f}"].imshow(
             img_ideal[f].numpy(),
-            vmin=model.data.vmin - 50,
-            vmax=model.data.vmax + 50,
+            vmin=model.data.vmin[model.cdx] - 50,
+            vmax=model.data.vmax[model.cdx] + 50,
             cmap="gray",
         )
         ax[f"ideal_{f}"].axis("off")
