@@ -472,11 +472,20 @@ def showCmd(b, layout, view, out):
     f1_incr.on_click(partial(incrementRange, x=15, counter=f1_counter))
     f1_decr.on_click(partial(incrementRange, x=-15, counter=f1_counter))
     zoom.observe(
-        partial(zoomOut, f1=f1_slider, model=model, fig=fig, ax=ax),
+        partial(zoomOut, f1=f1_slider, model=model, fig=fig, item=item, ax=ax),
         names="value",
+    )
+    # mouse click UI
+    fig.canvas.mpl_connect(
+        "button_press_event",
+        partial(onFrameClick, counter=f1_counter),
     )
     with out:
         typer.echo("Loading results: Done")
+
+
+def onFrameClick(event, counter):
+    counter.value = int(event.xdata)
 
 
 def incrementRange(name, x, counter):
@@ -564,22 +573,41 @@ def updateRange(f1, n, model, fig, item, ax, zoom):
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
         item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
 
-    for key, a in ax.items():
-        if not key.startswith("image") and not key.startswith("ideal"):
-            a.set_xlim(f1 - 0.5, f2 - 0.5)
+    if not zoom.value:
+        for key, a in ax.items():
+            if not key.startswith("image") and not key.startswith("ideal"):
+                a.set_xlim(f1 - 0.5, f2 - 0.5)
+    else:
+        item["z_vspan"].remove()
+        item["h_vspan"].remove()
+        item["p_vspan"].remove()
+        item["z_vspan"] = ax["z_map"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+        item["h_vspan"] = ax["h_specific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+        item["p_vspan"] = ax["pspecific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     fig.canvas.draw()
 
-    zoom.value = False
 
-
-def zoomOut(checked, f1, model, fig, ax):
+def zoomOut(checked, f1, model, fig, item, ax):
     checked = get_value(checked)
+    f1_value = get_value(f1)
     if checked:
         f1 = 0
         f2 = model.data.F
+        item["z_vspan"] = ax["z_map"].axvspan(
+            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
+        )
+        item["h_vspan"] = ax["h_specific"].axvspan(
+            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
+        )
+        item["p_vspan"] = ax["pspecific"].axvspan(
+            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
+        )
     else:
-        f1 = get_value(f1)
+        f1 = f1_value
         f2 = f1 + 15
+        item["z_vspan"].remove()
+        item["h_vspan"].remove()
+        item["p_vspan"].remove()
     for key, a in ax.items():
         if not key.startswith("image") and not key.startswith("ideal"):
             a.set_xlim(f1 - 0.5, f2 - 0.5)

@@ -525,8 +525,7 @@ def show(
     if f1 is None:
         f1 = 0
     if f2 is None:
-        f2 = model.data.F
-    f2 = 15
+        f2 = f1 + 15
     c = model.cdx
 
     width, height, dpi = 6.25, 6.25, 100
