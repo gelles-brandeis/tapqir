@@ -497,7 +497,7 @@ class Cosmos(Model):
             "background_mean_loc",
             lambda: torch.full(
                 (data.Nt, 1),
-                data.median - self.data.offset.mean,
+                data.median[self.cdx] - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,
@@ -512,7 +512,7 @@ class Cosmos(Model):
             "b_loc",
             lambda: torch.full(
                 (data.Nt, data.F),
-                data.median - self.data.offset.mean,
+                data.median[self.cdx] - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,
