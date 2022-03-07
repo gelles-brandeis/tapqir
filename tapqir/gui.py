@@ -483,11 +483,11 @@ def showCmd(b, layout, view, out):
     )
     # mouse click UI
     fig.canvas.mpl_connect(
-        "button_press_event",
+        "button_release_event",
         partial(onFrameClick, counter=f1_counter),
     )
     # key press UI
-    d = Event(source=layout, watched_events=["keydown"])
+    d = Event(source=layout, watched_events=["keyup"])
     d.on_dom_event(partial(onKeyPress, n=n_counter, f1=f1_counter, zoom=zoom))
     with out:
         typer.echo("Loading results: Done")
