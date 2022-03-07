@@ -142,9 +142,11 @@ def cdCmd(path, DEFAULTS, tab, tensorboard=None):
                     widget._apply_selection()
                 elif flag:
                     widget.value = DEFAULTS["channels"][c][flag]
-    fitTab = tab.children[1]
     numChannels = glimpseTab.children[5].value
+    fitTab = tab.children[1]
     fitTab.children[1].options = [str(c) for c in range(numChannels)]
+    showTab = tab.children[2]
+    showTab.children[1].options = [str(c) for c in range(numChannels)]
     for i, flag in enumerate(
         [
             False,

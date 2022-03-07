@@ -117,8 +117,10 @@ class CosmosDataset:
         return self.xy[..., 1]
 
     @lazy_property
-    def median(self) -> int:
-        return torch.median(self.images).item()
+    def median(self) -> torch.Tensor:
+        return torch.stack(
+            [torch.median(self.images[..., c, :, :]) for c in range(self.C)]
+        )
 
     def fetch(self, ndx, fdx, cdx):
         return (
@@ -128,12 +130,22 @@ class CosmosDataset:
         )
 
     @lazy_property
-    def vmin(self) -> int:
-        return quantile(self.images.flatten().float(), 0.05).item()
+    def vmin(self) -> torch.Tensor:
+        return torch.stack(
+            [
+                quantile(self.images[..., c, :, :].flatten().float(), 0.05)
+                for c in range(self.C)
+            ]
+        )
 
     @lazy_property
     def vmax(self) -> int:
-        return quantile(self.images.flatten().float(), 0.99).item()
+        return torch.stack(
+            [
+                quantile(self.images[..., c, :, :].flatten().float(), 0.99)
+                for c in range(self.C)
+            ]
+        )
 
     def __repr__(self):
         samples = repr(self.offset.samples).replace("\n", "\n                  ")
