@@ -7,6 +7,7 @@ from functools import partial, singledispatch
 from pathlib import Path
 
 import ipywidgets as widgets
+import matplotlib.pyplot as plt
 import torch
 import typer
 from ipyevents import Event
@@ -17,6 +18,12 @@ from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
 from tapqir.main import fit, glimpse, main, show
+
+# disable pyplot keyboard shortcuts
+plt.rcParams["keymap.zoom"].remove("o")
+plt.rcParams["keymap.home"].remove("h")
+plt.rcParams["keymap.yscale"].remove("l")
+plt.rcParams["keymap.xscale"].remove("k")
 
 
 @singledispatch
@@ -457,22 +464,60 @@ def showCmd(b, layout, view, out):
     f1_decr = widgets.Button(description="-15", layout=widgets.Layout(width="45px"))
     f1_controls = widgets.HBox(
         children=[f1_decr, f1_slider, f1_incr],
-        layout=widgets.Layout(
-            width="305px",
-        ),
+        layout=widgets.Layout(width="305px"),
     )
     f1_box.children = [f1_text, f1_controls]
     widgets.jslink((f1_slider, "value"), (f1_text, "value"))
     widgets.jslink((f1_text, "value"), (f1_counter, "value"))
     widgets.jslink((n, "value"), (n_counter, "value"))
-    zoom = widgets.Checkbox(value=False, description="Zoom out frames", indent=False)
-    controls.children = [n, f1_box, zoom]
+    zoom = widgets.Checkbox(
+        value=False,
+        description="Zoom out frames",
+        indent=False,
+        layout={"width": "240px"},
+    )
+    labels = widgets.Checkbox(
+        value=False,
+        description="Show labels",
+        indent=False,
+        layout={"width": "240px"},
+    )
+    targets = widgets.Checkbox(
+        value=False,
+        description="Show target location",
+        indent=False,
+        layout={"width": "240px"},
+    )
+    checkboxes = widgets.VBox(layout=widgets.Layout(width="250px"))
+    if model.data.labels is None:
+        checkboxes.children = [zoom, targets]
+    else:
+        checkboxes.children = [zoom, targets, labels]
+    controls.children = [n, f1_box, checkboxes]
     n.observe(
-        partial(updateParams, f1=f1_slider, model=model, fig=fig, item=item, ax=ax),
+        partial(
+            updateParams,
+            f1=f1_slider,
+            model=model,
+            fig=fig,
+            item=item,
+            ax=ax,
+            targets=targets,
+            labels=labels,
+        ),
         names="value",
     )
     f1_slider.observe(
-        partial(updateRange, n=n, model=model, fig=fig, item=item, ax=ax, zoom=zoom),
+        partial(
+            updateRange,
+            n=n,
+            model=model,
+            fig=fig,
+            item=item,
+            ax=ax,
+            zoom=zoom,
+            targets=targets,
+        ),
         names="value",
     )
     f1_incr.on_click(partial(incrementRange, x=15, counter=f1_counter))
@@ -481,19 +526,29 @@ def showCmd(b, layout, view, out):
         partial(zoomOut, f1=f1_slider, model=model, fig=fig, item=item, ax=ax),
         names="value",
     )
+    labels.observe(
+        partial(showLabels, n=n_counter, model=model, item=item, ax=ax),
+        names="value",
+    )
+    targets.observe(
+        partial(showTargets, n=n_counter, f1=f1_slider, model=model, item=item, ax=ax),
+        names="value",
+    )
     # mouse click UI
     fig.canvas.mpl_connect(
         "button_release_event",
         partial(onFrameClick, counter=f1_counter),
     )
     # key press UI
-    d = Event(source=layout, watched_events=["keyup"])
-    d.on_dom_event(partial(onKeyPress, n=n_counter, f1=f1_counter, zoom=zoom))
+    d = Event(source=layout, watched_events=["keyup"], prevent_default_action=True)
+    d.on_dom_event(
+        partial(onKeyPress, n=n_counter, f1=f1_counter, zoom=zoom, targets=targets)
+    )
     with out:
         typer.echo("Loading results: Done")
 
 
-def onKeyPress(event, n, f1, zoom):
+def onKeyPress(event, n, f1, zoom, targets):
     key = event["key"]
     if key == "h" or key == "ArrowLeft":
         f1.value = f1.value - 15
@@ -505,6 +560,8 @@ def onKeyPress(event, n, f1, zoom):
         n.value = n.value + 1
     elif key == "z":
         zoom.value = not zoom.value
+    elif key == "o":
+        targets.value = not targets.value
 
 
 def onFrameClick(event, counter):
@@ -515,7 +572,7 @@ def incrementRange(name, x, counter):
     counter.value = counter.value + x
 
 
-def updateParams(n, f1, model, fig, item, ax):
+def updateParams(n, f1, model, fig, item, ax, targets, labels):
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
@@ -539,8 +596,19 @@ def updateParams(n, f1, model, fig, item, ax):
         ax[f"image_{i}"].set_title(rf"${f}$", fontsize=9)
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
         item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
+        if targets.value:
+            item[f"target_{i}"].remove()
+            item[f"target_{i}"] = ax[f"image_{i}"].scatter(
+                model.data.x[n, f, c].item(),
+                model.data.y[n, f, c].item(),
+                c="C0",
+                s=40,
+                marker="+",
+            )
 
     params = ["z", "z_map", "h_specific", "height", "width", "x", "y", "background"]
+    if labels.value:
+        params += ["labels"]
     for p in params:
         if p == "z":
             if "z_probs" in model.params:
@@ -557,6 +625,8 @@ def updateParams(n, f1, model, fig, item, ax):
                 color="k",
             )
             item[f"{p}_mean"].set_ydata(model.params[p]["Mean"][n])
+        elif p == "labels":
+            item[p].set_ydata(model.data.labels["z"][n, :, c])
         else:
             for k in range(model.K):
                 item[f"{p}_{k}_fill"].remove()
@@ -571,7 +641,7 @@ def updateParams(n, f1, model, fig, item, ax):
     fig.canvas.draw()
 
 
-def updateRange(f1, n, model, fig, item, ax, zoom):
+def updateRange(f1, n, model, fig, item, ax, zoom, targets):
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
@@ -595,6 +665,15 @@ def updateRange(f1, n, model, fig, item, ax, zoom):
         ax[f"image_{i}"].set_title(rf"${f}$", fontsize=9)
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
         item[f"ideal_{i}"].set_data(img_ideal[i].numpy())
+        if targets.value:
+            item[f"target_{i}"].remove()
+            item[f"target_{i}"] = ax[f"image_{i}"].scatter(
+                model.data.x[n, f, c].item(),
+                model.data.y[n, f, c].item(),
+                c="C0",
+                s=40,
+                marker="+",
+            )
 
     if not zoom.value:
         for key, a in ax.items():
@@ -635,6 +714,41 @@ def zoomOut(checked, f1, model, fig, item, ax):
         if not key.startswith("image") and not key.startswith("ideal"):
             a.set_xlim(f1 - 0.5, f2 - 0.5)
     fig.canvas.draw()
+
+
+def showLabels(checked, n, model, item, ax):
+    checked = get_value(checked)
+    n = get_value(n)
+    if checked:
+        (item["labels"],) = ax["z_map"].plot(
+            torch.arange(0, model.data.F),
+            model.data.labels["z"][n, :, model.cdx],
+            "-",
+            lw=1,
+            color="r",
+        )
+    else:
+        item["labels"].remove()
+
+
+def showTargets(checked, n, f1, model, item, ax):
+    checked = get_value(checked)
+    n = get_value(n)
+    f1 = get_value(f1)
+    f2 = f1 + 15
+    c = model.cdx
+    if checked:
+        for i, f in enumerate(range(f1, f2)):
+            item[f"target_{i}"] = ax[f"image_{i}"].scatter(
+                model.data.x[n, f, c].item(),
+                model.data.y[n, f, c].item(),
+                c="C0",
+                s=40,
+                marker="+",
+            )
+    else:
+        for i, f in enumerate(range(f1, f2)):
+            item[f"target_{i}"].remove()
 
 
 def toggleWidgets(b, widgets):
