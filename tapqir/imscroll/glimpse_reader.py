@@ -425,7 +425,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     plt.title("Empirical Distribution", fontsize=12)
     plt.ylabel("Density", fontsize=12)
     plt.xlabel("Intensity", fontsize=12)
-    plt.xlim(offset_samples.min(), dataset.vmax)
+    plt.xlim(offset_samples.min(), dataset.vmax.max())
     plt.legend()
     plt.tight_layout()
     plt.savefig(path / "offset-distribution.png", dpi=300)
