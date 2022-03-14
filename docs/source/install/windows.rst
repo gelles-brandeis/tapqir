@@ -1,41 +1,94 @@
-Install on Windows
-==================
+Install on Windows 11
+=====================
 
-.. important::
+.. note::
 
-   The Tapqir ``fit`` command does not currently work in Windows Python because of an apparent incompatibility between Windows Python and the KeOps
-   GPU package.  We recommend using Tapqir on linux or Colabs until this problem can be resolved.
+   Tapqir does not work natively on Windows but can be run in a Windows Subsystem for Linux 2 (WSL 2) window in Windows 11.  (As far as we know, this does *not* work in Windows 10 or earlier versions.)
 
-1. `Install Anaconda`_ package manager.
+1. Install *Windows* Nvidia drivers if not already installed.
 
-2. Open an Anaconda Prompt. Create a new environment and give it a name 
-   (e.g., ``tapqir-env``)::
+   `Link to Nvidia drivers <https://www.nvidia.com/download/index.aspx>`_
 
-    > conda create --name tapqir-env python=3.8
+2. Install WSL 2 (Ubuntu).
 
-3. Activate the environement (you should see the environment name
+   Install "Ubuntu" using the Windows Store app.  Run Ubuntu and in the terminal do::
+   
+    $ sudo apt update
+    $ sudo apt upgrade
+
+3. Install cmake (>=3.18) and g++ (>=7) if not already installed.
+   
+   To check installation versions in the WSL terminal run::
+
+    $ cmake --version
+    $ g++ --version
+
+   To install (if not already installed) in the terminal run::
+
+    $ sudo apt install cmake
+    $ sudo apt install g++
+
+4. Install the linux version of the Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
+   Here is the summary of required installation steps:
+
+   * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).
+
+   * Navigate to the directory containing the installer.  If you downloaded it using a Windows web browser, this will be in ``/mnt/c/Users/<your Windows username>/Downloads``.
+   
+   * Run the following command to install Anaconda (change the name of the installer file appropriately if it
+     is a newer version)::
+
+      $ bash Anaconda3-2021.11-Linux-x86_64.sh
+    
+   * Press Enter at the “In order to continue the installation process, please review the license agreement.” prompt.
+   
+   * Scroll to the bottom of the license terms and enter “Yes” to agree.
+   
+   * Press Enter to accept the default install location.
+   
+   * Type "yes" at “Do you wish the installer to initialize Anaconda3 by running conda init?” prompt.
+   
+   * After installation is complete *close the terminal and open it again*. Now you should see ``(base)`` environment indicated in the terminal.
+
+5. Create a new environment and give it a name (e.g., ``tapqir-env``)::
+
+    $ conda create --name tapqir-env python=3.8
+
+6. Activate the environement (you should see the environment name
    (i.e., ``tapqir-env``) in the command prompt)::
 
-    > conda activate tapqir-env
+    $ conda activate tapqir-env
 
-4. Install CUDA and ensure that it is version 11.5 or later::
+7. Install latest version of CUDA (needs to be version 11.5 or later).
 
-    > conda install cuda -c nvidia
-    > nvcc --version
+   Summary of `installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl-installation>`_::
 
-    nvcc: NVIDIA (R) Cuda compiler driver
-    Copyright (c) 2005-2021 NVIDIA Corporation
-    Built on Mon_Sep_13_19:13:29_PDT_2021
-    Cuda compilation tools, release 11.5, V11.5.50
-    Build cuda_11.5.r11.5/compiler.30411180_0
+    $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+    $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+    $ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+    $ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+    $ sudo apt update
+    $ sudo apt install cuda
 
-5. Install `git <https://git-scm.com/>`_ (this is needed because we will
-   install ``tapqir`` from the GitHub repository)::
+8. Install ``tapqir``::
 
-    > conda install -c anaconda git
+    $ pip install tapqir
 
-6. To install ``tapqir``, in the Anaconda Prompt, run::
+Now you can run Tapqir in the WSL window in the same way you would on a linux computer.
 
-    > pip install git+https://github.com/gelles-brandeis/tapqir.git -f https://download.pytorch.org/whl/torch_stable.html
+**Tapqir on WSL Usage tips**:
 
-.. _Install Anaconda: https://docs.anaconda.com/anaconda/install/
+When working with Tapqir in WSL, it is most convenient to work in subdirectories of the linux directory /home/<your linux username>, which is the same as the Windows directory ``\\\\wsl.localhost\\Ubuntu\\home\\<your linux username>``.
+
+When running tapqir-gui, browser windows will not open automatically.  Look for a message like::
+
+     [Voila] Voilà is running at: http://localhost:8866/
+     
+in the console window and open that URL in a windows web browsser to access the GUI.
+
+If there are two GPUs on your computer, use::
+
+     CUDA_VISIBLE_DEVICES=1 tapqir-gui
+     
+to run Tapqir on the second GPU.
+

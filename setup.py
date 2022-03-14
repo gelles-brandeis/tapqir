@@ -26,7 +26,6 @@ TEST_REQUIRE = [
     "flake8",
     "isort",
     "pytest",
-    "pytest-qt",
     "pytest-xvfb",
 ]
 # docs
@@ -40,6 +39,7 @@ DOCS_REQUIRE = [
     "sphinx-gallery",
     "sphinx-panels",
 ]
+IN_COLAB = "COLAB_GPU" in os.environ
 
 setuptools.setup(
     name="tapqir",
@@ -47,30 +47,31 @@ setuptools.setup(
     cmdclass=versioneer.get_cmdclass(),
     author="Yerdos Ordabayev",
     author_email="ordabayev@brandeis.edu",
-    description="Bayesian analysis of the single-molecule image data",
+    description="Bayesian analysis of co-localization single-molecule microscopy image data",
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description_content_type="text/x-rst",
     url="https://tapqir.readthedocs.io",
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
         "cmake>=3.18",
         "colorama",
-        "funsor==0.4.1",
+        "funsor @ git+git://github.com/ordabayevy/funsor.git@tapqir",
         "future",
+        "ipyevents",
+        "ipyfilechooser",
+        "ipympl",
+        "ipywidgets",
         "matplotlib",
         "pandas",
-        "pykeops==1.5",
-        "pyro-ppl>=1.7.0",
-        "pyqtgraph",
-        "PySide2",
+        "pykeops @ git+git://github.com/getkeops/keops.git@af5e21a0ba85555ccd7cfff33fa234373bd94211",
+        "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
-        "tensorboard",
         "typer",
-        "qtrangeslider",
-    ],
+    ]
+    + ([] if IN_COLAB else ["tensorboard", "voila"]),
     extras_require={
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
@@ -88,6 +89,9 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.main:app"],
+        "console_scripts": [
+            "tapqir=tapqir.main:app",
+            "tapqir-gui=tapqir.gui:app",
+        ],
     },
 )

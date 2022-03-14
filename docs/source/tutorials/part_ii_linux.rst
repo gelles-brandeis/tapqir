@@ -9,123 +9,89 @@ Set up the environment
 
 1. If Tapqir is not installed, please follow these :doc:`instructions </install/linux>` to do so.
 
-2. Open the terminal. Tapqir is a command-line application and we will run all the commands in the terminal.
-
-3. Activate the virtual environment (e.g., if named ``tapqir-env``)::
+2. Open the terminal and activate the virtual environment (e.g., if named ``tapqir-env``)::
 
    $ conda activate tapqir-env
 
-Initialize folder
------------------
+To start the analysis create an empty folder (here named ``tutorial``) which will be the working directory::
 
-To start the analysis create an empty folder (here named ``tutorial``), change directory to the newly created folder,
-and initialize it by running ``tapqir init`` inside the new folder::
-
-  $ mkdir tutorial
-  $ cd tutorial
-  $ tapqir init
-
-  Initialized Tapqir in the working directory.
-  ---------------------------------------------------------------
-  - Checkout the documentation: <https://tapqir.readthedocs.io/>
-  - Get help on our forum: <https://github.com/gelles-brandeis/tapqir/discussions>
-
-
-``tapqir init`` command has created a ``.tapqir`` sub-folder that will store internal files
-such as ``config.yml`` configuration file, ``loginfo`` logging file, and model checkpoints.
+  $ mkdir /tmp/tutorial
+  $ cd /tmp/tutorial
 
 Download input data
 -------------------
 
-This data was acquired with `Glimpse`_ and pre-processed with `imscroll`_ program (`Friedman et al., 2015`_).
+These data were acquired with `Glimpse`_ and pre-processed with the `imscroll`_ program (`Friedman et al., 2015`_).
 Let's download data files using `wget`_ and then unzip files::
 
   $ wget https://zenodo.org/record/5659927/files/DatasetA_glimpse.zip
   $ unzip DatasetA_glimpse.zip && rm DatasetA_glimpse.zip
 
-The raw input data are:
+The raw input data placed in ``/tmp/tutorial/DatasetA_glimpse`` are:
 
 * ``garosen00267`` - folder containing image data in glimpse format and header files
 * ``green_DNA_locations.dat`` - aoiinfo file designating target molecule (DNA) locations in the binder channel
 * ``green_nonDNA_locations.dat`` - aoiinfo file designating off-target (nonDNA) locations in the binder channel
 * ``green_driftlist.dat`` - driftlist file recording the stage movement that took place during the experiment
 
+
+Start the program
+-----------------
+
+To start the program run::
+
+  $ tapqir-gui
+
+which will open a browser window to display the Tapqir GUI:
+
+.. image:: start-page.png
+   :width: 800
+
+
+Select working directory
+------------------------
+
+Click the ``Select`` button at the top to set the working directory  to ``/tmp/tutorial``:
+
+.. image:: working-directory.png
+   :width: 800
+
+Setting working directory creates a ``.tapqir`` sub-folder that will store internal files
+such as ``config.yaml`` configuration file, ``loginfo`` logging file, and model checkpoints.
+
 Extract AOIs
 ------------
 
-Extract AOIs from raw images using ``tapqir glimpse --filepicker`` command (``--filepicker`` flag tells
-the program to use a file dialog for file/folder selection) which will run interactively::
+To extract AOIs specify the following options in the ``Extract AOIs`` tab:
 
-  $ tapqir glimpse --filepicker
-
-  Dataset name: Rpb1SNAP549
-  AOI image size - number of pixels along the axis [14]:
-  Number of color channels [1]:
-  Overwrite defaults values? [Y/n]:
-  Specify frame range? [y/N]: y
-  First frame to include in the analysis: 1
-  Last frame to include in the analysis: 790
-
-Above we specified
-
-* A dataset name (``Rpb1SNAP549``)
-* Size of AOI images (we recommend to use ``14`` pixels)
-* First and last frames included in the analysis (``1`` and ``790``). If starting and ending frames are not specified
+* A dataset name: ``Rpb1SNAP549`` (an arbitrary name)
+* Size of AOI images: we recommend using ``14`` pixels
+* Starting and ending frame numbers to be included in the analysis (``1`` and ``790``). If starting and ending frames are not specified
   then the full range of frames from the driftlist file will be analyzed.
-* The number of color channels (``1``).
+* The number of color channels: ``1`` (this data set has only one color channel available)
+* Use off-target AOI locations?: ``True`` (we recommended including off-target AOI locations in the analysis)
 
-Next, the program asks the locations of input files for each color channel (only one color channel in this example):
+And specify the locations of input files for each color channel (only one color channel in this example):
+
+* Channel name: ``SNAP549`` (an arbitrary name)
+* Header/glimpse folder: ``/tmp/tutorial/DatasetA_glimpse/garosen00267``
+* Target molecule locations file: ``/tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat``
+* Off-target control locations file: ``/tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat``
+* Driftlist file: ``/tmp/tutorial/DatasetA_glimpse/green_driftlist.dat``
 
 .. note::
 
    **About indexing**. In Python indexing starts with 0. We stick to this convention and index AOIs, frames, color channels,
-   and pixels starting with 0. Note, however, that in the ``tapqir glimpse`` command above for frame numbers we used
-   ``1`` and ``790`` which are according to Matlab indexing convention (in Matlab indexing starts with ``1``) since
-   driftlist file was produced using the Matlab script.
+   and pixels starting with 0. Note, however, that for starting and ending frame numbers we used ``1`` and ``790`` which are according to
+   Matlab indexing convention (in Matlab indexing starts with 1) since driftlist file was produced using a Matlab script.
 
-.. code-block::
+Next, click ``Extract AOIs`` button:
 
-  INPUTS FOR CHANNEL #0
+.. image:: extract-aois.png
+   :width: 800
 
-  Channel name: SNAP549
-  Header/glimpse folder:
-  /tmp/tutorial/DatasetA_glimpse/garosen00267
-
-.. image:: glimpse_folder.png
-   :width: 400
-
-.. code-block::
-
-  Target molecule locations file:
-  /tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat
-
-.. image:: DNA_locations.png
-   :width: 400
-
-.. code-block::
-
-  Add off-target AOI locations? [y/N]: y
-  Off-target control locations file:
-  /tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat
-  Driftlist file:
-  /tmp/tutorial/DatasetA_glimpse/green_driftlist.dat
-
-Above
-
-* we tell the program to include off-target AOI locations in the analysis and specify the file location using
-  the file dialog.
-* Last, we specify the location of the driftlist file.
-
-.. code-block::
-
-  Extracting AOIs ...
-  100%|███████████████████████████████████| 790/790 [00:07<00:00, 109.28it/s]
-  INFO - Dataset: N=331 on-target AOIs, Nc=526 off-target AOIs, F=790 frames, C=1 channels, Px=14 pixels, Py=14 pixels
-  INFO - Data is saved in /tmp/tutorial/data.tpqr
-  Extracting AOIs: Done
-
-Great! The program has outputted ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
-control locations), the camera offset empirical distirbution sample values and their weights::
+Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
+control locations)::
 
     $ ls
 
@@ -136,7 +102,7 @@ control locations), the camera offset empirical distirbution sample values and t
 Additionally, the program has saved
 
 * Image files (``ontarget-channel0.png`` and ``offtarget-channel0.png``) displaying locations of on-target and off-target
-  AOIs in the first frame (make sure that AOIs are *inside* the FOV):
+  AOIs in the first frame. You should inspect these images to make sure that AOIs are *inside* the field of view:
 
 .. image:: ontarget-channel0.png
    :width: 700
@@ -144,18 +110,16 @@ Additionally, the program has saved
 .. image:: offtarget-channel0.png
    :width: 700
 
-* Location from the dark corner of the image (``offset-channel0.png``) used to create the offset empirical distribution
-  (make sure that offset region is *outside* the FOV):
+* You should also look at ``offset-channel0.png`` to check that offset data is taken from a region *outside* the field of view:
 
 .. image:: offset-channel0.png
    :width: 700
 
-* The intensity distribution histograms for offset and data from different channels (``offset-distribution.png``):
+* The other two files show the intensity histograms (``offset-distribution.png``) and the offset median time record
+  (``offset-medians.png``) (offset distribution shouldn't drift over time):
 
 .. image:: offset-distribution.png
    :width: 300
-
-* Offset median change (offset distribution shouldn't drift over time) (``offset-medians.png``):
 
 .. image:: offset-medians.png
    :width: 500
@@ -163,87 +127,97 @@ Additionally, the program has saved
 Fit the data
 ------------
 
-Now the data is ready for analysis. We will fit the data to the time-independent ``cosmos`` model (`Ordabayev et al., 2021`_)::
+Now the data is ready for fitting. Options that we will select:
 
-    $ tapqir fit
-
-    Tapqir model (cosmos) [cosmos]:
-    Channel numbers (space separated if multiple) [0]:
-    Run computations on GPU? [y/n]: y
-    AOI batch size [10]:
-    Frame batch size [512]:
-    Learning rate [0.005]:
-    Number of iterations [0]:
-    Save parameters in matlab format? [y/N]: y
-    Overwrite defaults values? [Y/n]:
-    Fitting the data ...
-    100%|████████████████████████████████████| 100/100 [00:38<00:00,  2.62it/s]
-    Fitting the data: Done
-    Computing stats ...
-    Computing stats: Done
-
-Options that we selected:
-
-* Model - the default single-color time-independent model (``cosmos``).
+* Model - the default single-color time-independent ``cosmos`` model (`Ordabayev et al., 2021`_).
 * Color channel number - first chanel (``0``) (there is only one color channel in this data)
-* Run computations on GPU: yes (``y``).
+* Run computations on GPU: yes (``True``).
 * AOI batch size - use default (``10``).
 * Frame batch size - use default (``512``).
 * Learning rate - use default (``0.005``).
 * Number of iterations - use default (``0``)
 
 .. note::
-   **About batch size**. In theory, batch size should impact *training time* and *memory consumption*,
-   but not the *performance*. It can be optimized for a particular GPU hardware by
+   **About batch size**. Batch sizes should impact *training time* and *memory consumption*. Ideally,
+   it should not affect the final result. Batch sizes can be optimized for a particular GPU hardware by
    trying different batch size values and comparing training time/memory usage
-   (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values). In particular,
-   if there is a memory overflow you can decrease either frame batch size (e.g., to ``128`` or ``256``)
-   or AOI batch size (e.g., to ``5``).
+   (``nvidia-smi`` shell command shows Memory-Usage and GPU-Util values).
+
+Next, press ``Fit the data`` button:
+
+.. image:: fit-data2.png
+   :width: 800
+
+The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
+The program can be stopped at any time by clicking in the terminal window and pressing ``Ctrl-C``. To restart the program again re-run
+``tapqir-gui`` command and the program will resume from the last saved checkpoint.
+
+After fitting is finished, the program computes 95% credible intervals (CI) of model parameters and saves the parameters and CIs in
+``cosmos-channel0-params.tqpr``, ``cosmos-channel0-params.mat`` (if Matlab format is selected), and ``cosmos-channel0-summary.csv`` files.
+
+If you get an error message saying that there is a memory overflow you can decrease either frame batch size (e.g., to ``128`` or ``256``)
+or AOI batch size (e.g., to ``5``).
+
+Tensorboard
+-----------
+
+At every checkpoint the values of global variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``,
+``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard gui <https://www.tensorflow.org/tensorboard>`_
+displayed in the ``Tensorboard`` tab, which shows the parameters values as a function of iteration number:
+
+.. image:: tensorboard-tab.png
+   :width: 800
+
+Set smoothing to 0 (in the left panel) and use refresh button at the top right to refresh plots.
+
+Plateaued plots signify convergence.
 
 .. note::
    **About number of iterations**. Fitting the data requires many iterations (about 50,000-100,000) until parameters
-   converge. Setting the number of iterations to 0 will run the program till Tapqir's custom convergence criteria is satisfied.
-   We recommend to set it to 0 (default) and then run for additional number of iterations if required. Convergence of global
-   parameters can be visually checked using tensorboard_.
+   converge. Setting the number of iterations to 0 will run the program till Tapqir's custom convergence criterion is satisfied.
+   We recommend to set it to 0 (default) and then run for additional number of iterations if required.
 
-The program will save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
-Starting the program again will resume from the last saved checkpoint. The program can be stopped using ``Ctrl-C``.
-At every checkpoint the values of global variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``,
-``pi_mean``, ``lamda_loc``) are also recorded for visualization by tensorboard_. Plateaued plots signify convergence.
+View results
+------------
 
-After fitting is finished the program computes 95% credible intervals of model parameters and saves them in
-``cosmos-channel0-params.tqpr``, ``cosmos-channel0-params.mat`` (Matlab format), and ``cosmos-channel0-summary.csv`` files.
+After fitting is done open ``View results`` tab to visualize analysis results. Click on ``Load results`` button which will display parameter values
+from the ``cosmos-channel0-params.tpqr`` file:
 
-To visualize analysis results run::
+.. image:: view-results.png
+   :width: 800
 
-    $ tapqir show
+In the display panel, the top row shows raw images, the second row shows best fit images, the plots show ``p(specific)`` and parameter values (mean and 95% CI).
+The AOI number can be changed using the box widget and the frame range can be changed using the slider widget at the top. To zoom out to entire frame range click on
+the ``zoom out`` checkbox.
 
-which will open GUI displaying parameter values from ``cosmos-channel0-params.tpqr`` file (mean and 95% CI). Clicking on the
-``Images`` button will show original images along with the best fit estimates.
+Advanced settings
+-----------------
 
-.. tip::
+Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir`` sub-folder of the working directory. It also contains
+additional options that are not available through the GUI.
 
-    Use ``CUDA_VISIBLE_DEVICES`` environment variable to change CUDA device::
+Offset region
+^^^^^^^^^^^^^
 
-        $ CUDA_VISIBLE_DEVICES=1 tapqir fit ...
+Offset data region (square) can be edited using three variables:
 
-    To view available devices run::
+* ``offset_x``: left corner of the square (default is 10 pixels)
+* ``offset_y``: top corner of the square (default is 10 pixels)
+* ``offset_P``: size of the square (default is 30 pixels)
 
-        $ nvidia-smi
+Prior distributions
+^^^^^^^^^^^^^^^^^^^
 
-Tensorboard
-^^^^^^^^^^^
+Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2021`_):
 
-Fitting progress can be inspected while fitting is taking place or afterwards using `tensorboard program <https://www.tensorflow.org/tensorboard>`_::
-
-    $ tensorboard --logdir=.
-
-Viewing logging info
---------------------
-
-Tapqir logs console output to a ``.tapqir/loginfo`` text file. It can be viewed by running::
-
-    $ tapqir log
+* ``background_mean_std`` (default 1000): standard deviation of the HalfNormal distribution in Eq. 6a
+* ``background_std_std`` (default 100): standard deviation of the HalfNormal distribution in Eq. 6b
+* ``lamda_rate`` (default 1): rate parameter of the Exponential distribution in Eq. 11
+* ``heiht_std`` (default 10,000): standard deviation of the HalfNormal distribution in Eq. 12
+* ``width_min`` (default 0.75): minimum value of Uniform distribution in Eq. 13
+* ``width_max`` (default 2.25): maximum value of Uniform distribution in Eq. 13
+* ``proximity_rate`` (default 1): rate parameter of the Exponential distribution in Eq. 15
+* ``gain_std`` (default 50): standard deviation of the HalfNormal distribution in Eq. 16
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
 .. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536

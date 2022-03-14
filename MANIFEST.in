@@ -1,2 +1,3 @@
 include versioneer.py
-include cosmos/_version.py
+include tapqir/_version.py
+include tapqir/app.ipynb

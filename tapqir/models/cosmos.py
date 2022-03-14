@@ -50,15 +50,32 @@ class Cosmos(Model):
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
+        background_mean_std: float = 1000,
+        background_std_std: float = 100,
+        lamda_rate: float = 1,
+        height_std: float = 10000,
+        width_min: float = 0.75,
+        width_max: float = 2.25,
+        proximity_rate: float = 1,
+        gain_std: float = 50,
     ):
         super().__init__(S, K, channels, device, dtype)
         assert S == 1, "This is a single-state model!"
         assert len(self.channels) == 1, "Please specify exactly one color channel"
-        self.cdx = self.channels[0]
+        self.cdx = torch.tensor(self.channels[0])
         self.full_name = f"{self.name}-channel{self.cdx}"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        # priors settings
+        self.background_mean_std = background_mean_std
+        self.background_std_std = background_std_std
+        self.lamda_rate = lamda_rate
+        self.height_std = height_std
+        self.width_min = width_min
+        self.width_max = width_max
+        self.proximity_rate = proximity_rate
+        self.gain_std = gain_std
 
     def model(self):
         r"""
@@ -148,11 +165,11 @@ class Cosmos(Model):
             \end{aligned}
         """
         # global parameters
-        gain = pyro.sample("gain", dist.HalfNormal(50))
+        gain = pyro.sample("gain", dist.HalfNormal(self.gain_std))
         pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
         pi = expand_offtarget(pi)
-        lamda = pyro.sample("lamda", dist.Exponential(1))
-        proximity = pyro.sample("proximity", dist.Exponential(1))
+        lamda = pyro.sample("lamda", dist.Exponential(self.lamda_rate))
+        proximity = pyro.sample("proximity", dist.Exponential(self.proximity_rate))
         size = torch.stack(
             (
                 torch.full_like(proximity, 2.0),
@@ -183,8 +200,12 @@ class Cosmos(Model):
         with aois as ndx:
             ndx = ndx[:, None]
             # background mean and std
-            background_mean = pyro.sample("background_mean", dist.HalfNormal(1000))
-            background_std = pyro.sample("background_std", dist.HalfNormal(100))
+            background_mean = pyro.sample(
+                "background_mean", dist.HalfNormal(self.background_mean_std)
+            )
+            background_std = pyro.sample(
+                "background_std", dist.HalfNormal(self.background_std_std)
+            )
             with frames as fdx:
                 # fetch data
                 obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
@@ -193,7 +214,7 @@ class Cosmos(Model):
                     "background",
                     dist.Gamma(
                         (background_mean / background_std) ** 2,
-                        background_mean / background_std ** 2,
+                        background_mean / background_std**2,
                     ),
                 )
 
@@ -226,15 +247,15 @@ class Cosmos(Model):
                         # sample spot variables
                         height = pyro.sample(
                             f"height_{kdx}",
-                            dist.HalfNormal(10000),
+                            dist.HalfNormal(self.height_std),
                         )
                         width = pyro.sample(
                             f"width_{kdx}",
                             AffineBeta(
                                 1.5,
                                 2,
-                                0.75,
-                                2.25,
+                                self.width_min,
+                                self.width_max,
                             ),
                         )
                         x = pyro.sample(
@@ -412,6 +433,32 @@ class Cosmos(Model):
         """
         device = self.device
         data = self.data
+
+        pyro.param(
+            "pi_mean",
+            lambda: torch.ones(self.S + 1, device=device),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "pi_size",
+            lambda: torch.tensor(2, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "m_probs",
+            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
+            constraint=constraints.unit_interval,
+        )
+
+        self._init_parameters()
+
+    def _init_parameters(self):
+        """
+        Parameters shared between different models.
+        """
+        device = self.device
+        data = self.data
+
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5, device=device),
@@ -436,17 +483,6 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
         pyro.param(
-            "pi_mean",
-            lambda: torch.ones(self.S + 1, device=device),
-            constraint=constraints.simplex,
-        )
-        pyro.param(
-            "pi_size",
-            lambda: torch.tensor(2, device=device),
-            constraint=constraints.positive,
-        )
-
-        pyro.param(
             "gain_loc",
             lambda: torch.tensor(5, device=device),
             constraint=constraints.positive,
@@ -461,7 +497,7 @@ class Cosmos(Model):
             "background_mean_loc",
             lambda: torch.full(
                 (data.Nt, 1),
-                data.median - self.data.offset.mean,
+                data.median[self.cdx] - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,
@@ -476,7 +512,7 @@ class Cosmos(Model):
             "b_loc",
             lambda: torch.full(
                 (data.Nt, data.F),
-                data.median - self.data.offset.mean,
+                data.median[self.cdx] - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,
@@ -531,12 +567,6 @@ class Cosmos(Model):
             constraint=constraints.greater_than(2.0),
         )
 
-        pyro.param(
-            "m_probs",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
-            constraint=constraints.unit_interval,
-        )
-
     def TraceELBO(self, jit=False):
         """
         A trace implementation of ELBO-based SVI that supports - exhaustive enumeration over
@@ -583,9 +613,12 @@ class Cosmos(Model):
                     + guide_tr.nodes["m_1"]["unscaled_log_prob"]
                     + logp
                 )
+                # average over m
                 result = expectation.logsumexp((2, 3))
+                # marginalize theta
                 z_logits = result.logsumexp(0)
                 z_probs[ndx[:, None], fdx] = z_logits[1].exp().mean(-3)
+                # marginalize z
                 theta_logits = result.logsumexp(1)
                 theta_probs[:, ndx[:, None], fdx] = theta_logits[1:].exp().mean(-3)
         self.n = None

@@ -1,12 +1,10 @@
-Disclaimer
-==========
+.. image:: https://github.com/gelles-brandeis/tapqir/raw/latest/docs/source/_static/logo.png
+   :target: https://tapqir.readthedocs.io/
+   :alt: Tapqir logo
 
-This is an alpha version of the program. It may contain bugs and is subject to change.
+*Bayesian analysis of co-localization single-molecule microscopy image data.*
 
-Tapqir
-======
-
-Bayesian analysis of co-localization single-molecule microscopy image data.
+---------
 
 .. |ci| image:: https://github.com/gelles-brandeis/tapqir/workflows/build/badge.svg
   :target: https://github.com/gelles-brandeis/tapqir/actions
@@ -14,7 +12,11 @@ Bayesian analysis of co-localization single-molecule microscopy image data.
 .. |docs| image:: https://readthedocs.org/projects/tapqir/badge/?version=latest
     :alt: Documentation Status
     :scale: 100%
-    :target: https://tapqir.readthedocs.io/en/latest/?badge=latest
+    :target: https://tapqir.readthedocs.io/
+    
+.. |pypi| image:: https://badge.fury.io/py/tapqir.svg
+    :alt: PyPI version
+    :target: https://pypi.org/project/tapqir/
 
 .. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
   :target: https://github.com/ambv/black
@@ -23,10 +25,10 @@ Bayesian analysis of co-localization single-molecule microscopy image data.
    :target: https://doi.org/10.1101/2021.09.30.462536
    :alt: DOI
 
-|DOI| |ci| |docs| |black|
+|DOI| |ci| |docs| |pypi| |black|
 
 `Preprint <https://doi.org/10.1101/2021.09.30.462536>`_ |
-`Documentation <https://tapqir.readthedocs.io/en/latest/>`_ |
+`Documentation <https://tapqir.readthedocs.io/>`_ |
 `Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
 
 Please see the `Documentation`_ for further information.
