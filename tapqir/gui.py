@@ -298,7 +298,7 @@ def fitUI(out):
     modelSelect = widgets.Dropdown(
         description="Tapqir model",
         value="cosmos",
-        options=["cosmos", "hmm", "mshmm"],
+        options=["cosmos", "hmm", "mscosmos", "mshmm"],
         style={"description_width": "initial"},
     )
     # Channel numbers
@@ -385,7 +385,7 @@ def showUI(out):
     modelSelect = widgets.Dropdown(
         description="Tapqir model",
         value="cosmos",
-        options=["cosmos", "hmm", "mshmm"],
+        options=["cosmos", "hmm", "mscosmos", "mshmm"],
         style={"description_width": "initial"},
     )
     # Channel numbers
@@ -612,7 +612,7 @@ def updateParams(n, f1, model, fig, item, ax, targets, labels):
     for p in params:
         if p == "z":
             if "z_probs" in model.params:
-                item["pspecific"].set_ydata(model.params["z_probs"][n])
+                item["pspecific"].set_ydata(model.params["theta_probs"][:, n].sum(0))
         elif p in set({"z_map", "h_specific"}).intersection(model.params.keys()):
             item[p].set_ydata(model.params[p][n])
         elif p == "background":

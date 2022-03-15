@@ -592,7 +592,7 @@ def show(
     )
 
     ax["h_specific"] = fig.add_subplot(gs[3, :])
-    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2, -100, 12000)
+    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2, -1, 12000)
     (item["h_specific"],) = ax["h_specific"].plot(
         torch.arange(0, model.data.F),
         model.params["h_specific"][n],
@@ -606,7 +606,7 @@ def show(
     config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
     (item["pspecific"],) = ax["pspecific"].plot(
         torch.arange(0, model.data.F),
-        model.params["z_probs"][n],
+        model.params["theta_probs"][:, n].sum(0),
         "o-",
         ms=3,
         lw=1,
@@ -614,7 +614,7 @@ def show(
     )
 
     ax["height"] = fig.add_subplot(gs[5, :])
-    config_axis(ax["height"], r"$h$", f1, f2, -100, 12000)
+    config_axis(ax["height"], r"$h$", f1, f2, -1, 12000)
 
     ax["width"] = fig.add_subplot(gs[6, :])
     config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
@@ -626,7 +626,7 @@ def show(
     config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
 
     ax["background"] = fig.add_subplot(gs[9, :])
-    config_axis(ax["background"], r"$b$", f1, f2, 0, 50, True)
+    config_axis(ax["background"], r"$b$", f1, f2, 0, 1000, True)
     ax["background"].set_xlabel("Time (frame)")
 
     for p in ["height", "width", "x", "y"]:
