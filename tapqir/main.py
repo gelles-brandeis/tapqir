@@ -588,7 +588,14 @@ def show(
     )
 
     ax["h_specific"] = fig.add_subplot(gs[3, :])
-    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2, -100, 12000)
+    config_axis(
+        ax["h_specific"],
+        r"$h_\mathsf{specific}$",
+        f1,
+        f2,
+        model.params["height"]["vmin"],
+        model.params["height"]["vmax"],
+    )
     (item["h_specific"],) = ax["h_specific"].plot(
         torch.arange(0, model.data.F),
         model.params["h_specific"][n],
@@ -598,11 +605,11 @@ def show(
         color="k",
     )
 
-    ax["pspecific"] = fig.add_subplot(gs[4, :])
-    config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
-    (item["pspecific"],) = ax["pspecific"].plot(
+    ax["p_specific"] = fig.add_subplot(gs[4, :])
+    config_axis(ax["p_specific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
+    (item["p_specific"],) = ax["p_specific"].plot(
         torch.arange(0, model.data.F),
-        model.params["z_probs"][n],
+        model.params["p_specific"][n],
         "o-",
         ms=3,
         lw=1,
@@ -610,19 +617,45 @@ def show(
     )
 
     ax["height"] = fig.add_subplot(gs[5, :])
-    config_axis(ax["height"], r"$h$", f1, f2, -100, 12000)
+    config_axis(
+        ax["height"],
+        r"$h$",
+        f1,
+        f2,
+        model.params["height"]["vmin"],
+        model.params["height"]["vmax"],
+    )
 
     ax["width"] = fig.add_subplot(gs[6, :])
-    config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
+    config_axis(
+        ax["width"],
+        r"$w$",
+        f1,
+        f2,
+        model.params["width"]["vmin"],
+        model.params["width"]["vmax"],
+    )
 
     ax["x"] = fig.add_subplot(gs[7, :])
-    config_axis(ax["x"], r"$x$", f1, f2, -9, 9)
+    config_axis(
+        ax["x"], r"$x$", f1, f2, model.params["x"]["vmin"], model.params["x"]["vmax"]
+    )
 
     ax["y"] = fig.add_subplot(gs[8, :])
-    config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
+    config_axis(
+        ax["y"], r"$y$", f1, f2, model.params["y"]["vmin"], model.params["y"]["vmax"]
+    )
 
     ax["background"] = fig.add_subplot(gs[9, :])
-    config_axis(ax["background"], r"$b$", f1, f2, 0, 500, True)
+    config_axis(
+        ax["background"],
+        r"$b$",
+        f1,
+        f2,
+        model.params["background"]["vmin"],
+        model.params["background"]["vmax"],
+        True,
+    )
     ax["background"].set_xlabel("Time (frame)")
 
     for p in ["height", "width", "x", "y"]:

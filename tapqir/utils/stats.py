@@ -228,6 +228,22 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
     ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()
+    ci_stats["p_specific"] = ci_stats["theta_probs"].sum(0)
+
+    # calculate vmin/vmax
+    theta_mask = ci_stats["theta_probs"] > 0.5
+    hmax = quantile(ci_stats["height"]["Mean"][theta_mask], 0.99)
+    ci_stats["height"]["vmin"] = -0.03 * hmax
+    ci_stats["height"]["vmax"] = 1.3 * hmax
+    ci_stats["width"]["vmin"] = 0.5
+    ci_stats["width"]["vmax"] = 2.5
+    ci_stats["x"]["vmin"] = -9
+    ci_stats["x"]["vmax"] = 9
+    ci_stats["y"]["vmin"] = -9
+    ci_stats["y"]["vmax"] = 9
+    bmax = quantile(ci_stats["background"]["Mean"].flatten(), 0.99)
+    ci_stats["background"]["vmin"] = -0.03 * bmax
+    ci_stats["background"]["vmax"] = 1.3 * bmax
 
     # timestamps
     if model.data.time1 is not None:
@@ -310,6 +326,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     "theta_probs",
                     "z_probs",
                     "z_map",
+                    "p_specific",
                     "h_specific",
                     "time1",
                     "ttb",

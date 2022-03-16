@@ -95,15 +95,17 @@ def initUI(DEFAULTS):
     layout.children = [cd, tab, out]
     # callbacks
     cd.register_callback(
-        partial(cdCmd, DEFAULTS=DEFAULTS, tab=tab, tensorboard=tensorboard)
+        partial(cdCmd, DEFAULTS=DEFAULTS, tab=tab, out=out, tensorboard=tensorboard)
     )
     return layout
 
 
-def cdCmd(path, DEFAULTS, tab, tensorboard=None):
+def cdCmd(path, DEFAULTS, tab, out, tensorboard=None):
     """
     Set working directory and load default parameters (main).
     """
+    with out:
+        typer.echo("Loading configuration data ...")
     path = get_path(path)
     main(cd=path)
     if tensorboard is not None:
@@ -169,6 +171,8 @@ def cdCmd(path, DEFAULTS, tab, tensorboard=None):
     ):
         if flag and DEFAULTS[flag] is not None:
             fitTab.children[i].value = DEFAULTS[flag]
+    with out:
+        typer.echo("Loading configuration data: Done")
 
 
 def glimpseUI(out):
@@ -611,8 +615,8 @@ def updateParams(n, f1, model, fig, item, ax, targets, labels):
         params += ["labels"]
     for p in params:
         if p == "z":
-            if "z_probs" in model.params:
-                item["pspecific"].set_ydata(model.params["z_probs"][n])
+            if "p_specific" in model.params:
+                item["p_specific"].set_ydata(model.params["p_specific"][n])
         elif p in set({"z_map", "h_specific"}).intersection(model.params.keys()):
             item[p].set_ydata(model.params[p][n])
         elif p == "background":
@@ -685,7 +689,7 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets):
         item["p_vspan"].remove()
         item["z_vspan"] = ax["z_map"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
         item["h_vspan"] = ax["h_specific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
-        item["p_vspan"] = ax["pspecific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+        item["p_vspan"] = ax["p_specific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     fig.canvas.draw()
 
 
@@ -701,7 +705,7 @@ def zoomOut(checked, f1, model, fig, item, ax):
         item["h_vspan"] = ax["h_specific"].axvspan(
             f1_value, f1_value + 15, facecolor="C0", alpha=0.3
         )
-        item["p_vspan"] = ax["pspecific"].axvspan(
+        item["p_vspan"] = ax["p_specific"].axvspan(
             f1_value, f1_value + 15, facecolor="C0", alpha=0.3
         )
     else:
