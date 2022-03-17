@@ -528,17 +528,17 @@ def show(
         f2 = f1 + 15
     c = model.cdx
 
-    width, height, dpi = 6.25, 5.75, 100
+    width, height, dpi = 6.25, 6.25, 100
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
-        nrows=9,
+        nrows=10,
         ncols=15,
         top=0.96,
         bottom=0.04,
         left=0.1,
         right=0.98,
         hspace=0.1,
-        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1, 1],
+        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1, 1, 1],
     )
     ax = {}
     item = {}
@@ -582,7 +582,6 @@ def show(
         torch.arange(0, model.data.F),
         model.params["z_map"][n],
         "-",
-        ms=3,
         lw=1,
         color="k",
     )
@@ -636,9 +635,19 @@ def show(
         f2,
         model.params["background"]["vmin"],
         model.params["background"]["vmax"],
+    )
+
+    ax["chi2"] = fig.add_subplot(gs[9, :])
+    config_axis(
+        ax["chi2"],
+        r"$\chi^2 \mathsf{test}$",
+        f1,
+        f2,
+        model.params["chi2"]["vmin"],
+        model.params["chi2"]["vmax"],
         True,
     )
-    ax["background"].set_xlabel("Time (frame)")
+    ax["chi2"].set_xlabel("Time (frame)")
 
     theta_mask = model.params["theta_probs"][:, n] > 0.5
     j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
@@ -702,6 +711,15 @@ def show(
         alpha=0.3,
         color="k",
     )
+
+    (item["chi2"],) = ax["chi2"].plot(
+        torch.arange(0, model.data.F),
+        model.params["chi2"]["values"][n],
+        "-",
+        lw=1,
+        color="k",
+    )
+
     plt.show()
     return model, fig, item, ax
 
