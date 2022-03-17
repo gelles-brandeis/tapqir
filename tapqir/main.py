@@ -586,66 +586,120 @@ def show(
         torch.arange(0, model.data.F),
         model.params["z_map"][n],
         "-",
-        ms=3,
         lw=1,
         color="k",
     )
 
-    ax["h_specific"] = fig.add_subplot(gs[3, :])
-    config_axis(ax["h_specific"], r"$h_\mathsf{specific}$", f1, f2, -1, 12000)
-    (item["h_specific"],) = ax["h_specific"].plot(
+    ax["p_specific"] = fig.add_subplot(gs[3, :])
+    config_axis(ax["p_specific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
+    (item["p_specific"],) = ax["p_specific"].plot(
         torch.arange(0, model.data.F),
-        model.params["h_specific"][n],
-        "-",
-        ms=3,
-        lw=1,
-        color="k",
-    )
-
-    ax["pspecific"] = fig.add_subplot(gs[4, :])
-    config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
-    (item["pspecific"],) = ax["pspecific"].plot(
-        torch.arange(0, model.data.F),
-        model.params["theta_probs"][:, n].sum(0),
+        model.params["p_specific"][n],
         "o-",
         ms=3,
         lw=1,
         color="C2",
     )
 
-    ax["height"] = fig.add_subplot(gs[5, :])
-    config_axis(ax["height"], r"$h$", f1, f2, -1, 12000)
+    ax["height"] = fig.add_subplot(gs[4, :])
+    config_axis(
+        ax["height"],
+        r"$h$",
+        f1,
+        f2,
+        model.params["height"]["vmin"],
+        model.params["height"]["vmax"],
+    )
 
-    ax["width"] = fig.add_subplot(gs[6, :])
-    config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
+    ax["width"] = fig.add_subplot(gs[5, :])
+    config_axis(
+        ax["width"],
+        r"$w$",
+        f1,
+        f2,
+        model.params["width"]["vmin"],
+        model.params["width"]["vmax"],
+    )
 
-    ax["x"] = fig.add_subplot(gs[7, :])
-    config_axis(ax["x"], r"$x$", f1, f2, -9, 9)
+    ax["x"] = fig.add_subplot(gs[6, :])
+    config_axis(
+        ax["x"], r"$x$", f1, f2, model.params["x"]["vmin"], model.params["x"]["vmax"]
+    )
 
-    ax["y"] = fig.add_subplot(gs[8, :])
-    config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
+    ax["y"] = fig.add_subplot(gs[7, :])
+    config_axis(
+        ax["y"], r"$y$", f1, f2, model.params["y"]["vmin"], model.params["y"]["vmax"]
+    )
 
-    ax["background"] = fig.add_subplot(gs[9, :])
-    config_axis(ax["background"], r"$b$", f1, f2, 0, 1000, True)
-    ax["background"].set_xlabel("Time (frame)")
+    ax["background"] = fig.add_subplot(gs[8, :])
+    config_axis(
+        ax["background"],
+        r"$b$",
+        f1,
+        f2,
+        model.params["background"]["vmin"],
+        model.params["background"]["vmax"],
+    )
 
+    ax["chi2"] = fig.add_subplot(gs[9, :])
+    config_axis(
+        ax["chi2"],
+        r"$\chi^2 \mathsf{test}$",
+        f1,
+        f2,
+        model.params["chi2"]["vmin"],
+        model.params["chi2"]["vmax"],
+        True,
+    )
+    ax["chi2"].set_xlabel("Time (frame)")
+
+    theta_mask = model.params["theta_probs"][:, n] > 0.5
+    j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
     for p in ["height", "width", "x", "y"]:
+        # target-nonspecific spots
         for k in range(model.K):
-            (item[f"{p}_{k}_mean"],) = ax[p].plot(
-                torch.arange(0, model.data.F),
-                model.params[p]["Mean"][k, n],
-                "o-",
-                ms=3,
+            f_mask = j_mask[k]
+            mean = model.params[p]["Mean"][k, n] * f_mask
+            ll = model.params[p]["LL"][k, n] * f_mask
+            ul = model.params[p]["UL"][k, n] * f_mask
+            (item[f"{p}_nonspecific{k}_mean"],) = ax[p].plot(
+                torch.arange(0, model.data.F)[f_mask],
+                mean[f_mask],
+                "o",
+                ms=2,
                 lw=1,
                 color=f"C{k}",
             )
-            item[f"{p}_{k}_fill"] = ax[p].fill_between(
+            item[f"{p}_nonspecific{k}_fill"] = ax[p].fill_between(
                 torch.arange(0, model.data.F),
-                model.params[p]["LL"][k, n],
-                model.params[p]["UL"][k, n],
+                ll,
+                ul,
+                where=f_mask,
                 alpha=0.3,
                 color=f"C{k}",
             )
+        # target-specific spots
+        f_mask = theta_mask.sum(0).bool()
+        mean = (model.params[p]["Mean"][:, n] * theta_mask).sum(0)
+        ll = (model.params[p]["LL"][:, n] * theta_mask).sum(0)
+        ul = (model.params[p]["UL"][:, n] * theta_mask).sum(0)
+        (item[f"{p}_specific_mean"],) = ax[p].plot(
+            torch.arange(0, model.data.F)
+            if p == "height"
+            else torch.arange(0, model.data.F)[f_mask],
+            mean if p == "height" else mean[f_mask],
+            "-" if p == "height" else "o",
+            ms=2,
+            color="C2",
+        )
+        item[f"{p}_specific_fill"] = ax[p].fill_between(
+            torch.arange(0, model.data.F),
+            ll,
+            ul,
+            where=f_mask,
+            alpha=0.3,
+            color="C2",
+        )
     (item["background_mean"],) = ax["background"].plot(
         torch.arange(0, model.data.F),
         model.params["background"]["Mean"][n],
@@ -661,6 +715,15 @@ def show(
         alpha=0.3,
         color="k",
     )
+
+    (item["chi2"],) = ax["chi2"].plot(
+        torch.arange(0, model.data.F),
+        model.params["chi2"]["values"][n],
+        "-",
+        lw=1,
+        color="k",
+    )
+
     plt.show()
     return model, fig, item, ax
 

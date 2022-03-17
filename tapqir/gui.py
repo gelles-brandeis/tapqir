@@ -95,15 +95,17 @@ def initUI(DEFAULTS):
     layout.children = [cd, tab, out]
     # callbacks
     cd.register_callback(
-        partial(cdCmd, DEFAULTS=DEFAULTS, tab=tab, tensorboard=tensorboard)
+        partial(cdCmd, DEFAULTS=DEFAULTS, tab=tab, out=out, tensorboard=tensorboard)
     )
     return layout
 
 
-def cdCmd(path, DEFAULTS, tab, tensorboard=None):
+def cdCmd(path, DEFAULTS, tab, out, tensorboard=None):
     """
     Set working directory and load default parameters (main).
     """
+    with out:
+        typer.echo("Loading configuration data ...")
     path = get_path(path)
     main(cd=path)
     if tensorboard is not None:
@@ -169,6 +171,8 @@ def cdCmd(path, DEFAULTS, tab, tensorboard=None):
     ):
         if flag and DEFAULTS[flag] is not None:
             fitTab.children[i].value = DEFAULTS[flag]
+    with out:
+        typer.echo("Loading configuration data: Done")
 
 
 def glimpseUI(out):
@@ -472,7 +476,7 @@ def showCmd(b, layout, view, out):
     widgets.jslink((n, "value"), (n_counter, "value"))
     zoom = widgets.Checkbox(
         value=False,
-        description="Zoom out frames",
+        description="Zoom out frames ['z']",
         indent=False,
         layout={"width": "240px"},
     )
@@ -484,15 +488,21 @@ def showCmd(b, layout, view, out):
     )
     targets = widgets.Checkbox(
         value=False,
-        description="Show target location",
+        description="Show target location ['o']",
+        indent=False,
+        layout={"width": "240px"},
+    )
+    nonspecific = widgets.Checkbox(
+        value=True,
+        description="Show non-specific spots ['n']",
         indent=False,
         layout={"width": "240px"},
     )
     checkboxes = widgets.VBox(layout=widgets.Layout(width="250px"))
     if model.data.labels is None:
-        checkboxes.children = [zoom, targets]
+        checkboxes.children = [zoom, targets, nonspecific]
     else:
-        checkboxes.children = [zoom, targets, labels]
+        checkboxes.children = [zoom, targets, nonspecific, labels]
     controls.children = [n, f1_box, checkboxes]
     n.observe(
         partial(
@@ -503,6 +513,7 @@ def showCmd(b, layout, view, out):
             item=item,
             ax=ax,
             targets=targets,
+            nonspecific=nonspecific,
             labels=labels,
         ),
         names="value",
@@ -534,6 +545,10 @@ def showCmd(b, layout, view, out):
         partial(showTargets, n=n_counter, f1=f1_slider, model=model, item=item, ax=ax),
         names="value",
     )
+    nonspecific.observe(
+        partial(showNonspecific, n=n_counter, model=model, item=item, ax=ax),
+        names="value",
+    )
     # mouse click UI
     fig.canvas.mpl_connect(
         "button_release_event",
@@ -542,13 +557,20 @@ def showCmd(b, layout, view, out):
     # key press UI
     d = Event(source=layout, watched_events=["keyup"], prevent_default_action=True)
     d.on_dom_event(
-        partial(onKeyPress, n=n_counter, f1=f1_counter, zoom=zoom, targets=targets)
+        partial(
+            onKeyPress,
+            n=n_counter,
+            f1=f1_counter,
+            zoom=zoom,
+            targets=targets,
+            nonspecific=nonspecific,
+        )
     )
     with out:
         typer.echo("Loading results: Done")
 
 
-def onKeyPress(event, n, f1, zoom, targets):
+def onKeyPress(event, n, f1, zoom, targets, nonspecific):
     key = event["key"]
     if key == "h" or key == "ArrowLeft":
         f1.value = f1.value - 15
@@ -562,6 +584,8 @@ def onKeyPress(event, n, f1, zoom, targets):
         zoom.value = not zoom.value
     elif key == "o":
         targets.value = not targets.value
+    elif key == "n":
+        nonspecific.value = not nonspecific.value
 
 
 def onFrameClick(event, counter):
@@ -572,7 +596,7 @@ def incrementRange(name, x, counter):
     counter.value = counter.value + x
 
 
-def updateParams(n, f1, model, fig, item, ax, targets, labels):
+def updateParams(n, f1, model, fig, item, ax, targets, nonspecific, labels):
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
@@ -606,15 +630,18 @@ def updateParams(n, f1, model, fig, item, ax, targets, labels):
                 marker="+",
             )
 
-    params = ["z", "z_map", "h_specific", "height", "width", "x", "y", "background"]
+    params = ["p_specific", "z_map", "height", "width", "x", "y", "background", "chi2"]
     if labels.value:
         params += ["labels"]
+    theta_mask = model.params["theta_probs"][:, n] > 0.5
+    j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
     for p in params:
-        if p == "z":
-            if "z_probs" in model.params:
-                item["pspecific"].set_ydata(model.params["theta_probs"][:, n].sum(0))
-        elif p in set({"z_map", "h_specific"}).intersection(model.params.keys()):
+        if p == "p_specific":
             item[p].set_ydata(model.params[p][n])
+        elif p in {"z_map"}.intersection(model.params.keys()):
+            item[p].set_ydata(model.params[p][n])
+        elif p == "chi2":
+            item[p].set_ydata(model.params[p]["values"][n])
         elif p == "background":
             item[f"{p}_fill"].remove()
             item[f"{p}_fill"] = ax[p].fill_between(
@@ -627,17 +654,56 @@ def updateParams(n, f1, model, fig, item, ax, targets, labels):
             item[f"{p}_mean"].set_ydata(model.params[p]["Mean"][n])
         elif p == "labels":
             item[p].set_ydata(model.data.labels["z"][n, :, c])
-        else:
-            for k in range(model.K):
-                item[f"{p}_{k}_fill"].remove()
-                item[f"{p}_{k}_fill"] = ax[p].fill_between(
-                    torch.arange(0, model.data.F),
-                    model.params[p]["LL"][k, n],
-                    model.params[p]["UL"][k, n],
-                    alpha=0.3,
-                    color=f"C{k}",
-                )
-                item[f"{p}_{k}_mean"].set_ydata(model.params[p]["Mean"][k, n])
+        elif p in ["height", "width", "x", "y"]:
+            # target-nonspecific spots
+            if nonspecific.value:
+                for k in range(model.K):
+                    f_mask = j_mask[k]
+                    mean = model.params[p]["Mean"][k, n] * f_mask
+                    ll = model.params[p]["LL"][k, n] * f_mask
+                    ul = model.params[p]["UL"][k, n] * f_mask
+                    item[f"{p}_nonspecific{k}_mean"].remove()
+                    (item[f"{p}_nonspecific{k}_mean"],) = ax[p].plot(
+                        torch.arange(0, model.data.F)[f_mask],
+                        mean[f_mask],
+                        "o",
+                        ms=2,
+                        lw=1,
+                        color=f"C{k}",
+                    )
+                    item[f"{p}_nonspecific{k}_fill"].remove()
+                    item[f"{p}_nonspecific{k}_fill"] = ax[p].fill_between(
+                        torch.arange(0, model.data.F),
+                        ll,
+                        ul,
+                        where=f_mask,
+                        alpha=0.3,
+                        color=f"C{k}",
+                    )
+            # target-specific spots
+            f_mask = theta_mask.sum(0).bool()
+            mean = (model.params[p]["Mean"][:, n] * theta_mask).sum(0)
+            ll = (model.params[p]["LL"][:, n] * theta_mask).sum(0)
+            ul = (model.params[p]["UL"][:, n] * theta_mask).sum(0)
+            item[f"{p}_specific_fill"].remove()
+            item[f"{p}_specific_fill"] = ax[p].fill_between(
+                torch.arange(0, model.data.F),
+                ll,
+                ul,
+                where=f_mask,
+                alpha=0.3,
+                color="C2",
+            )
+            item[f"{p}_specific_mean"].remove()
+            (item[f"{p}_specific_mean"],) = ax[p].plot(
+                torch.arange(0, model.data.F)
+                if p == "height"
+                else torch.arange(0, model.data.F)[f_mask],
+                mean if p == "height" else mean[f_mask],
+                "-" if p == "height" else "o",
+                ms=2,
+                color="C2",
+            )
     fig.canvas.draw()
 
 
@@ -680,12 +746,18 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets):
             if not key.startswith("image") and not key.startswith("ideal"):
                 a.set_xlim(f1 - 0.5, f2 - 0.5)
     else:
-        item["z_vspan"].remove()
-        item["h_vspan"].remove()
-        item["p_vspan"].remove()
-        item["z_vspan"] = ax["z_map"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
-        item["h_vspan"] = ax["h_specific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
-        item["p_vspan"] = ax["pspecific"].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+        for p in [
+            "z_map",
+            "p_specific",
+            "height",
+            "width",
+            "x",
+            "y",
+            "background",
+            "chi2",
+        ]:
+            item[f"{p}_vspan"].remove()
+            item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     fig.canvas.draw()
 
 
@@ -695,21 +767,33 @@ def zoomOut(checked, f1, model, fig, item, ax):
     if checked:
         f1 = 0
         f2 = model.data.F
-        item["z_vspan"] = ax["z_map"].axvspan(
-            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
-        )
-        item["h_vspan"] = ax["h_specific"].axvspan(
-            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
-        )
-        item["p_vspan"] = ax["pspecific"].axvspan(
-            f1_value, f1_value + 15, facecolor="C0", alpha=0.3
-        )
+        for p in [
+            "z_map",
+            "p_specific",
+            "height",
+            "width",
+            "x",
+            "y",
+            "background",
+            "chi2",
+        ]:
+            item[f"{p}_vspan"] = ax[p].axvspan(
+                f1_value, f1_value + 15, facecolor="C0", alpha=0.3
+            )
     else:
         f1 = f1_value
         f2 = f1 + 15
-        item["z_vspan"].remove()
-        item["h_vspan"].remove()
-        item["p_vspan"].remove()
+        for p in [
+            "z_map",
+            "p_specific",
+            "height",
+            "width",
+            "x",
+            "y",
+            "background",
+            "chi2",
+        ]:
+            item[f"{p}_vspan"].remove()
     for key, a in ax.items():
         if not key.startswith("image") and not key.startswith("ideal"):
             a.set_xlim(f1 - 0.5, f2 - 0.5)
@@ -749,6 +833,41 @@ def showTargets(checked, n, f1, model, item, ax):
     else:
         for i, f in enumerate(range(f1, f2)):
             item[f"target_{i}"].remove()
+
+
+def showNonspecific(checked, n, model, item, ax):
+    checked = get_value(checked)
+    n = get_value(n)
+    for p in ["height", "width", "x", "y"]:
+        if checked:
+            theta_mask = model.params["theta_probs"][:, n] > 0.5
+            j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
+            # target-nonspecific spots
+            for k in range(model.K):
+                f_mask = j_mask[k]
+                mean = model.params[p]["Mean"][k, n] * f_mask
+                ll = model.params[p]["LL"][k, n] * f_mask
+                ul = model.params[p]["UL"][k, n] * f_mask
+                (item[f"{p}_nonspecific{k}_mean"],) = ax[p].plot(
+                    torch.arange(0, model.data.F)[f_mask],
+                    mean[f_mask],
+                    "o",
+                    ms=2,
+                    lw=1,
+                    color=f"C{k}",
+                )
+                item[f"{p}_nonspecific{k}_fill"] = ax[p].fill_between(
+                    torch.arange(0, model.data.F),
+                    ll,
+                    ul,
+                    where=f_mask,
+                    alpha=0.3,
+                    color=f"C{k}",
+                )
+        else:
+            for k in range(model.K):
+                item[f"{p}_nonspecific{k}_fill"].remove()
+                item[f"{p}_nonspecific{k}_mean"].remove()
 
 
 def toggleWidgets(b, widgets):
