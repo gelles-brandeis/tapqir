@@ -292,7 +292,7 @@ class MSCosmos(Model):
                             ),
                         )
 
-                    height = height * background
+                    # height = height * background
                     # append
                     ms.append(m)
                     heights.append(height)
@@ -457,28 +457,28 @@ class MSCosmos(Model):
         del checkpoint["params"]["params"]["pi_size"]
         del checkpoint["params"]["constraints"]["pi_mean"]
         del checkpoint["params"]["constraints"]["pi_size"]
-        new_h_loc = ExpTransform()(
-            checkpoint["params"]["params"]["h_loc"]
-        ) / ExpTransform()(checkpoint["params"]["params"]["b_loc"])
-        new_h_beta = ExpTransform()(
-            checkpoint["params"]["params"]["h_beta"]
-        ) * ExpTransform()(checkpoint["params"]["params"]["b_loc"])
-        del checkpoint["params"]["params"]["h_loc"]
-        del checkpoint["params"]["params"]["h_beta"]
-        del checkpoint["params"]["constraints"]["h_loc"]
-        del checkpoint["params"]["constraints"]["h_beta"]
+        #  new_h_loc = ExpTransform()(
+        #      checkpoint["params"]["params"]["h_loc"]
+        #  ) / ExpTransform()(checkpoint["params"]["params"]["b_loc"])
+        #  new_h_beta = ExpTransform()(
+        #      checkpoint["params"]["params"]["h_beta"]
+        #  ) * ExpTransform()(checkpoint["params"]["params"]["b_loc"])
+        #  del checkpoint["params"]["params"]["h_loc"]
+        #  del checkpoint["params"]["params"]["h_beta"]
+        #  del checkpoint["params"]["constraints"]["h_loc"]
+        #  del checkpoint["params"]["constraints"]["h_beta"]
         pyro.get_param_store().set_state(checkpoint["params"])
 
-        pyro.param(
-            "h_loc",
-            lambda: new_h_loc.data,
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "h_beta",
-            lambda: new_h_beta.data,
-            constraint=constraints.positive,
-        )
+        #  pyro.param(
+        #      "h_loc",
+        #      lambda: new_h_loc.data,
+        #      constraint=constraints.positive,
+        #  )
+        #  pyro.param(
+        #      "h_beta",
+        #      lambda: new_h_beta.data,
+        #      constraint=constraints.positive,
+        #  )
         pyro.param(
             "height_loc",
             # lambda: torch.tensor(1000.0, device=device),

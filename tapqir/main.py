@@ -548,9 +548,10 @@ def show(
     item = {}
 
     frames = torch.arange(f1, f2)
+    background = model.params["background"]["Mean"][n, frames, None, None]
     img_ideal = (
         model.data.offset.mean
-        + model.params["background"]["Mean"][n, frames, None, None]
+        + background
     )
     gaussian = gaussian_spots(
         model.params["height"]["Mean"][:, n, frames],
@@ -560,7 +561,7 @@ def show(
         model.data.xy[n, frames, c],
         model.data.P,
     )
-    img_ideal = img_ideal + gaussian.sum(-4)
+    img_ideal = img_ideal + background * gaussian.sum(-4)
     for f in range(15):
         ax[f"image_{f}"] = fig.add_subplot(gs[0, f])
         item[f"image_{f}"] = ax[f"image_{f}"].imshow(
