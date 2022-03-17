@@ -51,6 +51,10 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://tapqir.readthedocs.io",
+    project_urls={
+        "Documentation": "https://tapqir.readthedocs.io",
+        "Source": "https://github.com/gelles-brandeis/tapqir",
+    },
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
