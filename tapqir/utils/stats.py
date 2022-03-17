@@ -232,7 +232,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     # calculate vmin/vmax
     theta_mask = ci_stats["theta_probs"] > 0.5
-    hmax = quantile(ci_stats["height"]["Mean"][theta_mask], 0.99)
+    if theta_mask.sum():
+        hmax = quantile(ci_stats["height"]["Mean"][theta_mask], 0.99)
+    else:
+        hmax = 1
     ci_stats["height"]["vmin"] = -0.03 * hmax
     ci_stats["height"]["vmax"] = 1.3 * hmax
     ci_stats["width"]["vmin"] = 0.5
