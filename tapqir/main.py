@@ -640,9 +640,9 @@ def show(
     )
     ax["background"].set_xlabel("Time (frame)")
 
+    theta_mask = model.params["theta_probs"][:, n] > 0.5
+    j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
     for p in ["height", "width", "x", "y"]:
-        theta_mask = model.params["theta_probs"][:, n] > 0.5
-        j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
         # target-nonspecific spots
         for k in range(model.K):
             f_mask = j_mask[k]

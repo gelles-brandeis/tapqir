@@ -633,6 +633,8 @@ def updateParams(n, f1, model, fig, item, ax, targets, nonspecific, labels):
     params = ["p_specific", "z_map", "height", "width", "x", "y", "background"]
     if labels.value:
         params += ["labels"]
+    theta_mask = model.params["theta_probs"][:, n] > 0.5
+    j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
     for p in params:
         if p == "p_specific":
             item[p].set_ydata(model.params[p][n])
@@ -651,8 +653,6 @@ def updateParams(n, f1, model, fig, item, ax, targets, nonspecific, labels):
         elif p == "labels":
             item[p].set_ydata(model.data.labels["z"][n, :, c])
         elif p in ["height", "width", "x", "y"]:
-            theta_mask = model.params["theta_probs"][:, n] > 0.5
-            j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
             # target-nonspecific spots
             if nonspecific.value:
                 for k in range(model.K):
