@@ -630,7 +630,7 @@ def updateParams(n, f1, model, fig, item, ax, targets, nonspecific, labels):
                 marker="+",
             )
 
-    params = ["p_specific", "z_map", "height", "width", "x", "y", "background"]
+    params = ["p_specific", "z_map", "height", "width", "x", "y", "background", "chi2"]
     if labels.value:
         params += ["labels"]
     theta_mask = model.params["theta_probs"][:, n] > 0.5
@@ -640,6 +640,8 @@ def updateParams(n, f1, model, fig, item, ax, targets, nonspecific, labels):
             item[p].set_ydata(model.params[p][n])
         elif p in {"z_map"}.intersection(model.params.keys()):
             item[p].set_ydata(model.params[p][n])
+        elif p == "chi2":
+            item[p].set_ydata(model.params[p]["values"][n])
         elif p == "background":
             item[f"{p}_fill"].remove()
             item[f"{p}_fill"] = ax[p].fill_between(
@@ -744,7 +746,16 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets):
             if not key.startswith("image") and not key.startswith("ideal"):
                 a.set_xlim(f1 - 0.5, f2 - 0.5)
     else:
-        for p in ["z_map", "p_specific", "height", "width", "x", "y", "background"]:
+        for p in [
+            "z_map",
+            "p_specific",
+            "height",
+            "width",
+            "x",
+            "y",
+            "background",
+            "chi2",
+        ]:
             item[f"{p}_vspan"].remove()
             item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     fig.canvas.draw()
@@ -756,14 +767,32 @@ def zoomOut(checked, f1, model, fig, item, ax):
     if checked:
         f1 = 0
         f2 = model.data.F
-        for p in ["z_map", "p_specific", "height", "width", "x", "y", "background"]:
+        for p in [
+            "z_map",
+            "p_specific",
+            "height",
+            "width",
+            "x",
+            "y",
+            "background",
+            "chi2",
+        ]:
             item[f"{p}_vspan"] = ax[p].axvspan(
                 f1_value, f1_value + 15, facecolor="C0", alpha=0.3
             )
     else:
         f1 = f1_value
         f2 = f1 + 15
-        for p in ["z_map", "p_specific", "height", "width", "x", "y", "background"]:
+        for p in [
+            "z_map",
+            "p_specific",
+            "height",
+            "width",
+            "x",
+            "y",
+            "background",
+            "chi2",
+        ]:
             item[f"{p}_vspan"].remove()
     for key, a in ax.items():
         if not key.startswith("image") and not key.startswith("ideal"):

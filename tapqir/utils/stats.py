@@ -5,6 +5,7 @@ import math
 from collections import defaultdict
 from functools import partial
 from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -26,8 +27,9 @@ from tapqir.distributions.util import gaussian_spots
 pyro.enable_validation(False)
 
 
-def snr(
+def snr_and_chi2(
     data: torch.Tensor,
+    height: torch.Tensor,
     width: torch.Tensor,
     x: torch.Tensor,
     y: torch.Tensor,
@@ -38,7 +40,7 @@ def snr(
     offset_var: float,
     P: int,
     theta_probs: torch.Tensor,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     r"""
     Calculate the signal-to-noise ratio.
 
@@ -61,21 +63,29 @@ def snr(
         \dfrac{\mu_{knf} - b_{nf} - \mu_{\text{offset}}}{\sigma_{knf}}
         \text{ for } \theta_{nf} = k`
     """
-    weights = gaussian_spots(
-        torch.ones(1, device=torch.device("cpu")),
+    gaussians = gaussian_spots(
+        height,
         width,
         x,
         y,
         target_locs,
         P,
     )
+
+    # snr
+    weights = gaussians / height[..., None, None]
     signal = ((data - background[..., None, None] - offset_mean) * weights).sum(
         dim=(-2, -1)
     )
     noise = (offset_var + background * gain).sqrt()
-    result = signal / noise
+    snr_result = signal / noise
     mask = theta_probs > 0.5
-    return result[mask]
+
+    # chi2 test
+    img_ideal = background[..., None, None] + gaussians.sum(-5)
+    chi2_result = (data - img_ideal - offset_mean) ** 2 / img_ideal
+
+    return snr_result[mask], chi2_result.mean(dim=(-1, -2))
 
 
 def save_stats(model, path, CI=0.95, save_matlab=False):
@@ -263,24 +273,27 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     model.params = ci_stats
 
-    # snr
-    summary.loc["SNR", "Mean"] = (
-        snr(
-            model.data.images[:, :, model.cdx],
-            ci_stats["width"]["Mean"],
-            ci_stats["x"]["Mean"],
-            ci_stats["y"]["Mean"],
-            model.data.xy[:, :, model.cdx],
-            ci_stats["background"]["Mean"],
-            ci_stats["gain"]["Mean"],
-            model.data.offset.mean,
-            model.data.offset.var,
-            model.data.P,
-            model.theta_probs,
-        )
-        .mean()
-        .item()
+    # snr and chi2 test
+    snr_result, chi2_result = snr_and_chi2(
+        model.data.images[:, :, model.cdx],
+        ci_stats["height"]["Mean"],
+        ci_stats["width"]["Mean"],
+        ci_stats["x"]["Mean"],
+        ci_stats["y"]["Mean"],
+        model.data.xy[:, :, model.cdx],
+        ci_stats["background"]["Mean"],
+        ci_stats["gain"]["Mean"],
+        model.data.offset.mean,
+        model.data.offset.var,
+        model.data.P,
+        model.theta_probs,
     )
+    summary.loc["SNR", "Mean"] = snr_result.mean().item()
+    ci_stats["chi2"] = {}
+    ci_stats["chi2"]["values"] = chi2_result
+    cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
+    ci_stats["chi2"]["vmin"] = -0.03 * cmax
+    ci_stats["chi2"]["vmax"] = 1.3 * cmax
 
     # classification statistics
     if model.data.labels is not None:
