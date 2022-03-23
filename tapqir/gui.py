@@ -92,15 +92,22 @@ def initUI(DEFAULTS):
     tab.set_title(2, "View results")
     tab.set_title(3, "Tensorboard")
     # layout
-    layout.children = [cd, tab, out]
+    layout.children = [cd, out]
     # callbacks
     cd.register_callback(
-        partial(cdCmd, DEFAULTS=DEFAULTS, tab=tab, out=out, tensorboard=tensorboard)
+        partial(
+            cdCmd,
+            DEFAULTS=DEFAULTS,
+            tab=tab,
+            out=out,
+            layout=layout,
+            tensorboard=tensorboard,
+        )
     )
     return layout
 
 
-def cdCmd(path, DEFAULTS, tab, out, tensorboard=None):
+def cdCmd(path, DEFAULTS, tab, out, layout, tensorboard=None):
     """
     Set working directory and load default parameters (main).
     """
@@ -171,6 +178,8 @@ def cdCmd(path, DEFAULTS, tab, out, tensorboard=None):
     ):
         if flag and DEFAULTS[flag] is not None:
             fitTab.children[i].value = DEFAULTS[flag]
+    # insert tabs into GUI
+    layout.children = layout.children[:1] + (tab,) + layout.children[1:]
     with out:
         typer.echo("Loading configuration data: Done")
 
