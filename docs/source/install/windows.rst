@@ -16,16 +16,14 @@ Install on Windows 11
     $ sudo apt update
     $ sudo apt upgrade
 
-3. Install cmake (>=3.18) and g++ (>=7) if not already installed.
+3. Install g++ (>=7) if not already installed.
    
    To check installation versions in the WSL terminal run::
 
-    $ cmake --version
     $ g++ --version
 
    To install (if not already installed) in the terminal run::
 
-    $ sudo apt install cmake
     $ sudo apt install g++
 
 4. Install the linux version of the Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
@@ -63,8 +61,8 @@ Install on Windows 11
 
    Summary of `installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl-installation>`_::
 
-    $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
     $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+    $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
     $ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
     $ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
     $ sudo apt update
@@ -73,6 +71,8 @@ Install on Windows 11
 8. Install ``tapqir``::
 
     $ pip install tapqir
+    
+   After installation is done close the terminal window and open it again for an installation to take an effect.
 
 Now you can run Tapqir in the WSL window in the same way you would on a linux computer.
 
