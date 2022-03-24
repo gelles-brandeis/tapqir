@@ -31,4 +31,19 @@
 `Documentation <https://tapqir.readthedocs.io/>`_ |
 `Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
 
+Documentation & Tutorials
+-------------------------
+
 Please see the `Documentation`_ for further information.
+
+Announcements
+-------------
+
+To get notified about new releases sign in to Github, go to top right corner of the page and click on Watch -> Custom -> Releases.
+
+Q&As
+----
+
+Please post questions about the software on our `forum <https://github.com/gelles-brandeis/tapqir/discussions>`_.
+
+
