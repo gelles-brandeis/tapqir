@@ -39,7 +39,7 @@ Please see the `Documentation`_ for further information.
 Announcements
 -------------
 
-To get notified about new releases sign in to Github, go to top right corner of the page and click on Watch -> Custom -> Releases.
+To get notified about new releases sign in to Github, go to top right corner of this page and click on Watch -> Custom -> Releases.
 
 Q&As
 ----
