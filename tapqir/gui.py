@@ -226,7 +226,6 @@ def glimpseUI(out):
     )
     # Specify frame range?
     useOfftarget = widgets.Checkbox(
-        value=True,
         description="Use off-target AOI locations?",
         indent=False,
     )
