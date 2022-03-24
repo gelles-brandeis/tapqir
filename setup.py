@@ -58,7 +58,6 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "cmake>=3.18",
         "colorama",
         "funsor @ git+https://github.com/ordabayevy/funsor.git@tapqir",
         "future",
@@ -68,7 +67,7 @@ setuptools.setup(
         "ipywidgets",
         "matplotlib",
         "pandas",
-        "pykeops @ git+https://github.com/getkeops/keops.git@af5e21a0ba85555ccd7cfff33fa234373bd94211",
+        "pykeops>=2.0",
         "pyro-ppl @ git+https://github.com/ordabayevy/pyro.git@tapqir",
         "pyyaml>=6.0",
         "scikit-learn",
