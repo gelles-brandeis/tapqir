@@ -71,7 +71,9 @@ def initUI(DEFAULTS):
     layout = widgets.VBox(layout={"width": "800px", "border": "2px solid blue"})
 
     # widgets
-    cd = FileChooser(".", title="Working directory")
+    cd = FileChooser(
+        ".", title="Select working directory (analysis output will be saved here)"
+    )
     cd.show_only_dirs = True
 
     out = widgets.Output(layout={"border": "1px solid black"})
@@ -142,9 +144,9 @@ def cdCmd(path, DEFAULTS, tab, out, layout, tensorboard=None):
             [
                 "name",
                 "glimpse-folder",
+                "driftlist",
                 "ontarget-aoiinfo",
                 "offtarget-aoiinfo",
-                "driftlist",
             ],
         ):
             if DEFAULTS["channels"][c][flag] is not None:
@@ -224,12 +226,13 @@ def glimpseUI(out):
     )
     # Specify frame range?
     useOfftarget = widgets.Checkbox(
+        value=True,
         description="Use off-target AOI locations?",
         indent=False,
     )
     # Channel tabs
     channelTabs = widgets.Tab()
-    channelUI(numChannels.value, channelTabs)
+    channelUI(numChannels.value, channelTabs, useOfftarget)
     # extract AOIs
     extractAOIs = widgets.Button(description="Extract AOIs")
     # Layout
@@ -245,12 +248,31 @@ def glimpseUI(out):
         extractAOIs,
     ]
     # Callbacks
-    numChannels.observe(partial(channelUI, channelTabs=channelTabs), names="value")
+    numChannels.observe(
+        partial(channelUI, channelTabs=channelTabs, useOfftarget=useOfftarget),
+        names="value",
+    )
+    useOfftarget.observe(
+        partial(toggleUseOffTarget, channelTabs=channelTabs), names="value"
+    )
     extractAOIs.on_click(partial(glimpseCmd, layout=layout, out=out))
     specifyFrame.observe(
         partial(toggleWidgets, widgets=(firstFrame, lastFrame)), names="value"
     )
     return layout
+
+
+def toggleUseOffTarget(checked, channelTabs):
+    checked = get_value(checked)
+    if checked:
+        for tab in channelTabs.children:
+            offtargetLayout = FileChooser(
+                ".", title="Off-target control locations file"
+            )
+            tab.children = tab.children + (offtargetLayout,)
+    else:
+        for tab in channelTabs.children:
+            tab.children = tab.children[:-1]
 
 
 def glimpseCmd(b, layout, out):
@@ -266,16 +288,16 @@ def glimpseCmd(b, layout, out):
             use_offtarget=layout.children[6].value,
             name=[c.children[0].value for c in channelTabs.children],
             glimpse_folder=[c.children[1].value for c in channelTabs.children],
-            ontarget_aoiinfo=[c.children[2].value for c in channelTabs.children],
-            offtarget_aoiinfo=[c.children[3].value for c in channelTabs.children],
-            driftlist=[c.children[4].value for c in channelTabs.children],
+            ontarget_aoiinfo=[c.children[3].value for c in channelTabs.children],
+            offtarget_aoiinfo=[c.children[4].value for c in channelTabs.children],
+            driftlist=[c.children[2].value for c in channelTabs.children],
             no_input=True,
             progress_bar=tqdm_notebook,
             labels=False,
         )
 
 
-def channelUI(C, channelTabs):
+def channelUI(C, channelTabs, useOfftarget):
     C = get_value(C)
     currentC = len(channelTabs.children)
     for i in range(max(currentC, C)):
@@ -288,17 +310,18 @@ def channelUI(C, channelTabs):
             )
             headerLayout = FileChooser(".", title="Header/glimpse folder")
             ontargetLayout = FileChooser(".", title="Target molecule locations file")
-            offtargetLayout = FileChooser(
-                ".", title="Off-target control locations file"
-            )
             driftlistLayout = FileChooser(".", title="Driftlist file")
             layout.children = [
                 nameLayout,
                 headerLayout,
-                ontargetLayout,
-                offtargetLayout,
                 driftlistLayout,
+                ontargetLayout,
             ]
+            if useOfftarget.value:
+                offtargetLayout = FileChooser(
+                    ".", title="Off-target control locations file"
+                )
+                layout.children = layout.children + (offtargetLayout,)
             channelTabs.children = channelTabs.children + (layout,)
         channelTabs.set_title(i, f"Channel #{i}")
     channelTabs.children = channelTabs.children[:C]
