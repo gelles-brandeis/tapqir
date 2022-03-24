@@ -65,6 +65,7 @@ setuptools.setup(
         "ipyfilechooser",
         "ipympl",
         "ipywidgets",
+        "jinja==3.0.3",
         "matplotlib",
         "pandas",
         "pykeops>=2.0",
