@@ -27,9 +27,14 @@
 
 |DOI| |ci| |docs| |pypi| |black|
 
-`Paper <https://doi.org/10.7554/eLife.73860>`_ |
-`Documentation <https://tapqir.readthedocs.io/>`_ |
-`Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
+`Publication <https://doi.org/10.7554/eLife.73860>`_ |
+`Documentation & Tutorials <https://tapqir.readthedocs.io/>`_ |
+`Discussions/Q&As <https://github.com/gelles-brandeis/tapqir/discussions/>`_
+
+Publication
+-----------
+
+Tapqir and the *cosmos* model are described in Ordabayev et al., "Bayesian machine learning analysis of single-molecule fluorescence colocalization images" eLife 2022;11:e73860 `doi: 10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_
 
 Documentation & Tutorials
 -------------------------
@@ -41,9 +46,9 @@ Announcements
 
 To get notified about new releases sign in to Github, go to top right corner of this page and click on Watch -> Custom -> Releases.
 
-Q&As
+Discussions/Q&As
 ----
 
-Please post questions about the software on our `forum <https://github.com/gelles-brandeis/tapqir/discussions>`_.
+Please post questions about the software on our `forum <https://github.com/gelles-brandeis/tapqir/discussions>`_. We will try to respond promptly.
 
 
