@@ -21,13 +21,13 @@
 .. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
   :target: https://github.com/ambv/black
   
-.. |DOI| image:: https://img.shields.io/badge/DOI-10.1101%2F2021.09.30.462536-blue
-   :target: https://doi.org/10.1101/2021.09.30.462536
+.. |DOI| image:: https://img.shields.io/badge/DOI-10.7554%2FeLife.73860-blue
+   :target: https://doi.org/10.7554/eLife.73860
    :alt: DOI
 
 |DOI| |ci| |docs| |pypi| |black|
 
-`Preprint <https://doi.org/10.1101/2021.09.30.462536>`_ |
+`Paper <https://doi.org/10.7554/eLife.73860>`_ |
 `Documentation <https://tapqir.readthedocs.io/>`_ |
 `Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
 
