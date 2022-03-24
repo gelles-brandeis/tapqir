@@ -34,7 +34,7 @@
 Documentation & Tutorials
 -------------------------
 
-Please see the `Documentation`_ for further information.
+Please visit our `website <https://tapqir.readthedocs.io/>`_ for documentation, tutorials, and general information.
 
 Announcements
 -------------
