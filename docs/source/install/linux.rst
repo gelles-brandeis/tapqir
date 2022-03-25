@@ -7,10 +7,13 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
    *On Ubuntu 20.04*
    
-   Tip: on Ubuntu select the text to copy it and then press the middle mouse button (scrolling wheel) to paste the copied text.
+   .. tip::
+
+      On Ubuntu select the text to copy it and then press the middle mouse button (scrolling wheel) to paste the copied text.
    
    To get information about your graphic card and available drivers run::
 
+    $ sudo apt install ubuntu-drivers-common
     $ ubuntu-drivers devices
     
     // From the output
@@ -52,7 +55,7 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
    *On Ubuntu 20.04*
 
-   Summary of `installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl-installation>`_::
+   Summary of `CUDA installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl-installation>`_::
 
     $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
     $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
@@ -67,7 +70,7 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
     $ sudo pacman -S cuda
 
-5. Install Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
+5. Install Anaconda package manager (`Anaconda installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
    Here is the summary of required installation steps:
 
    * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).

@@ -36,6 +36,7 @@ DOCS_REQUIRE = [
     "sphinx",
     "sphinx-autodoc-typehints",
     "sphinx-click",
+    "sphinx-copybutton",
     "sphinx-gallery",
     "sphinx-panels",
 ]
