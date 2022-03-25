@@ -65,7 +65,7 @@ setuptools.setup(
         "ipyevents",
         "ipyfilechooser",
         "ipympl",
-        "ipywidgets>=7.6.5",
+        "ipywidgets",
         "jinja2<=3.0.3",
         "matplotlib",
         "pandas",
