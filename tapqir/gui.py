@@ -68,12 +68,10 @@ def initUI(DEFAULTS):
 
     IN_COLAB = "google.colab" in sys.modules
 
-    layout = widgets.VBox(layout={"width": "800px", "border": "2px solid blue"})
+    layout = widgets.VBox(layout={"width": "850px", "border": "2px solid blue"})
 
     # widgets
-    cd = FileChooser(
-        ".", title="Select working directory (analysis output will be saved here)"
-    )
+    cd = FileChooser(".", title="Select working directory")
     cd.show_only_dirs = True
 
     out = widgets.Output(layout={"border": "1px solid black"})
@@ -185,6 +183,8 @@ def cdCmd(path, DEFAULTS, tab, out, layout, tensorboard=None):
     with out:
         typer.echo("Loading configuration data: Done")
 
+    out.clear_output(wait=True)
+
 
 def glimpseUI(out):
     """
@@ -294,6 +294,8 @@ def glimpseCmd(b, layout, out):
             progress_bar=tqdm_notebook,
             labels=False,
         )
+
+    out.clear_output(wait=True)
 
 
 def channelUI(C, channelTabs, useOfftarget):
@@ -411,6 +413,8 @@ def fitCmd(b, layout, out):
             no_input=True,
             progress_bar=tqdm_notebook,
         )
+
+    out.clear_output(wait=True)
 
 
 def showUI(out):
@@ -599,6 +603,8 @@ def showCmd(b, layout, view, out):
     )
     with out:
         typer.echo("Loading results: Done")
+
+    out.clear_output(wait=True)
 
 
 def onKeyPress(event, n, f1, zoom, targets, nonspecific):

@@ -15,19 +15,25 @@ Set up the environment
 
 To start the analysis create an empty folder (here named ``tutorial``) which will be the working directory::
 
-  $ mkdir /tmp/tutorial
-  $ cd /tmp/tutorial
+  $ mkdir ~/Documents/tutorial
 
 Download input data
 -------------------
 
 These data were acquired with `Glimpse`_ and pre-processed with the `imscroll`_ program (`Friedman et al., 2015`_).
-Let's download data files using `wget`_ and then unzip files::
+Change directory to ``Downloads``::
+
+  $ cd ~/Downloads
+
+Download data files using `wget`_::
 
   $ wget https://zenodo.org/record/5659927/files/DatasetA_glimpse.zip
+
+Unzip and then delete the zip file::
+
   $ unzip DatasetA_glimpse.zip && rm DatasetA_glimpse.zip
 
-The raw input data placed in ``/tmp/tutorial/DatasetA_glimpse`` are:
+The raw input data placed in ``/home/{your_username}/Downloads/DatasetA_glimpse`` are:
 
 * ``garosen00267`` - folder containing image data in glimpse format and header files
 * ``green_DNA_locations.dat`` - aoiinfo file designating target molecule (DNA) locations in the binder channel
@@ -51,7 +57,7 @@ which will open a browser window to display the Tapqir GUI:
 Select working directory
 ------------------------
 
-Click the ``Select`` button at the top to set the working directory  to ``/tmp/tutorial``:
+Click the ``Select`` button at the top to set the working directory  to ``/home/{your_username}/Documents/tutorial``:
 
 .. image:: working-directory.png
    :width: 800
@@ -74,10 +80,10 @@ To extract AOIs specify the following options in the ``Extract AOIs`` tab:
 And specify the locations of input files for each color channel (only one color channel in this example):
 
 * Channel name: ``SNAP549`` (an arbitrary name)
-* Header/glimpse folder: ``/tmp/tutorial/DatasetA_glimpse/garosen00267``
-* Target molecule locations file: ``/tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat``
-* Off-target control locations file: ``/tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat``
-* Driftlist file: ``/tmp/tutorial/DatasetA_glimpse/green_driftlist.dat``
+* Header/glimpse folder: ``/home/{your_username}/Downloads/DatasetA_glimpse/garosen00267``
+* Driftlist file: ``/home/{your_username}/Downloads/DatasetA_glimpse/green_driftlist.dat``
+* Target molecule locations file: ``/home/{your_username}/Downloads/DatasetA_glimpse/green_DNA_locations.dat``
+* Off-target control locations file: ``/home/{your_username}/Downloads/DatasetA_glimpse/green_nonDNA_locations.dat``
 
 .. note::
 
@@ -93,6 +99,7 @@ Next, click ``Extract AOIs`` button:
 Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
 control locations)::
 
+    $ cd ~/Documents/tutorial
     $ ls
 
     DatasetA_glimpse     offset-distribution.png  ontarget-channel0.png
@@ -220,7 +227,7 @@ Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordab
 * ``gain_std`` (default 50): standard deviation of the HalfNormal distribution in Eq. 16
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
-.. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536
+.. _Ordabayev et al., 2021: https://doi.org/10.7554/eLife.73860
 .. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki
