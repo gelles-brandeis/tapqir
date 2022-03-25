@@ -217,7 +217,7 @@ class Model:
                     # change rng seed
                     new_seed = random.randint(0, 100)
                     pyro.set_rng_seed(new_seed)
-                    logger.warning(
+                    logger.debug(
                         f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
                     )
         return 1
