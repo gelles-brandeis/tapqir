@@ -6,9 +6,9 @@ KSMOGN
 ^^^^^^
 """
 
-import os
 from typing import Union
 
+import pykeops
 import torch
 from pykeops.torch import Genred
 from pyro.distributions import TorchDistribution
@@ -16,7 +16,7 @@ from torch.distributions import Categorical, constraints
 
 from .util import gaussian_spots
 
-os.environ["PYKEOPS_VERBOSE"] = "0"
+pykeops.set_verbose(False)
 
 
 class KSMOGN(TorchDistribution):
