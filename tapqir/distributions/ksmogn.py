@@ -16,7 +16,7 @@ from torch.distributions import Categorical, constraints
 
 from .util import gaussian_spots
 
-os.environ["PYKEOPS_VERBOSE"] = 0
+os.environ["PYKEOPS_VERBOSE"] = "0"
 
 
 class KSMOGN(TorchDistribution):
@@ -84,7 +84,7 @@ class KSMOGN(TorchDistribution):
     ):
 
         gaussians = gaussian_spots(height, width, x, y, target_locs.unsqueeze(-2), P, m)
-        image = background[..., None, None] + gaussians.sum(-3)
+        image = background[..., None, None] * (1 + gaussians.sum(-3))
 
         self.concentration = image / gain[..., None, None]
         self.rate = 1 / gain[..., None, None]
