@@ -7,7 +7,7 @@ Models
 Tapqir is a modular program that uses a chosen probabilistic model to interpret experimental data.
 There currently exists only a single model, ``cosmos``, developed for analysis of simple CoSMoS
 experiments. The ``cosmos`` model is for *time-independent* analysis of *single-channel* (i.e., one-binder)
-data sets. Our preprint (`Ordabayev et al., 2021`_) contains a comprehensive description of the
+data sets. Our publication (`Ordabayev et al., 2021`_) contains a comprehensive description of the
 ``cosmos`` model. In the future, we plan to add addional models to Tapqir, for example to integrate
 hidden-Markov kinetic analysis or to handle global analysis with multiple wavelength channels.
 
@@ -101,10 +101,10 @@ Tapqir analyzes a small area of interest (AOI) around each target or off-target 
 are extracted from raw input data. Currently Tapqir supports raw input images in `Glimpse`_ format and pre-processing
 information files from the `imscroll`_ program:
 
-* image data folder in glimpse format (contains glimpse.header file)
-* aoiinfo file designating the locations of target molecules (on-target AOIs) in the binder channel
-* (optional) aoiinfo file designating the off-target control locations (off-target AOIs) in the binder channel
+* folder containing image data in glimpse format and header files
 * driftlist file recording the stage movement that took place during the experiment
+* aoiinfo file designating target molecule locations in the binder channel
+* (optional) aoiinfo file designating off-target locations in the binder channel
 
 We plan to extend the support to other data formats. Please start a `new issue`_ if you would like to work with us 
 to extend support to file formats used in your processing pipeline.
@@ -120,7 +120,7 @@ the diagram) in order to keep the files associated with the run organized in a s
 .. image:: ../Tapqir_workflow.png
    :alt: Tapqir workflow
 
-.. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536 
+.. _Ordabayev et al., 2021: https://doi.org/10.7554/eLife.73860
 .. _Kinz-Thompson et al., 2021: https://doi.org/10.1146/annurev-biophys-082120-103921
 .. _Bingham et al., 2019: https://jmlr.org/papers/v20/18-403.html
 .. _Typer: https://typer.tiangolo.com/
