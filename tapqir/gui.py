@@ -64,9 +64,6 @@ def initUI(DEFAULTS):
     - Commands tabs.
     - Output.
     """
-    import sys
-
-    IN_COLAB = "google.colab" in sys.modules
 
     layout = widgets.VBox(layout={"width": "850px", "border": "2px solid blue"})
 
@@ -76,6 +73,34 @@ def initUI(DEFAULTS):
 
     out = widgets.Output(layout={"border": "1px solid black"})
 
+    # layout
+    layout.children = [cd, out]
+    # callbacks
+    cd.register_callback(
+        partial(
+            cdCmd,
+            DEFAULTS=DEFAULTS,
+            out=out,
+            layout=layout,
+        )
+    )
+    return layout
+
+
+def cdCmd(path, DEFAULTS, out, layout):
+    """
+    Set working directory and load default parameters (main).
+    """
+    import sys
+
+    IN_COLAB = "google.colab" in sys.modules
+
+    with out:
+        typer.echo("Loading configuration data ...")
+    path = get_path(path)
+    main(cd=path)
+
+    # Tabs
     tab = widgets.Tab()
     tab.children = [glimpseUI(out), fitUI(out)]
     if not IN_COLAB:
@@ -91,30 +116,7 @@ def initUI(DEFAULTS):
     tab.set_title(1, "Fit the data")
     tab.set_title(2, "View results")
     tab.set_title(3, "Tensorboard")
-    # layout
-    layout.children = [cd, out]
-    # callbacks
-    cd.register_callback(
-        partial(
-            cdCmd,
-            DEFAULTS=DEFAULTS,
-            tab=tab,
-            out=out,
-            layout=layout,
-            tensorboard=tensorboard,
-        )
-    )
-    return layout
 
-
-def cdCmd(path, DEFAULTS, tab, out, layout, tensorboard=None):
-    """
-    Set working directory and load default parameters (main).
-    """
-    with out:
-        typer.echo("Loading configuration data ...")
-    path = get_path(path)
-    main(cd=path)
     if tensorboard is not None:
         with tensorboard:
             notebook.start(f"--logdir '{path}'")
@@ -162,8 +164,9 @@ def cdCmd(path, DEFAULTS, tab, out, layout, tensorboard=None):
     numChannels = glimpseTab.children[5].value
     fitTab = tab.children[1]
     fitTab.children[1].options = [str(c) for c in range(numChannels)]
-    showTab = tab.children[2]
-    showTab.children[1].options = [str(c) for c in range(numChannels)]
+    if not IN_COLAB:
+        showTab = tab.children[2]
+        showTab.children[1].options = [str(c) for c in range(numChannels)]
     for i, flag in enumerate(
         [
             False,
@@ -178,8 +181,11 @@ def cdCmd(path, DEFAULTS, tab, out, layout, tensorboard=None):
     ):
         if flag and DEFAULTS[flag] is not None:
             fitTab.children[i].value = DEFAULTS[flag]
+
     # insert tabs into GUI
-    layout.children = layout.children[:1] + (tab,) + layout.children[1:]
+    wd = widgets.Label(value=f"Working directory: {path}")
+    layout.children = (wd, tab) + layout.children[1:]
+
     with out:
         typer.echo("Loading configuration data: Done")
 
