@@ -4,6 +4,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from pathlib import Path
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +17,24 @@ from tapqir.utils.dataset import CosmosDataset, save
 
 # logger
 logger = logging.getLogger(__name__)
+
+
+def bin_hist(
+    samples: torch.Tensor, weights: torch.Tensor, s: int
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    q, r = divmod(len(samples) - 1, s)
+    n = 1 + q + int(bool(r))
+    new_samples = torch.zeros(n, dtype=torch.int)
+    new_weights = torch.zeros(n)
+    new_samples[0] = samples[0]
+    new_weights[0] = weights[0]
+    new_samples[1 : 1 + q] = samples[1 + s // 2 : 1 + q * s : s]
+    for i in range(s):
+        new_weights[1 : 1 + q] += weights[1 + i : 1 + q * s : s]
+    if r:
+        new_samples[-1] = samples[1 + q * s + r // 2]
+        new_weights[-1] = weights[1 + q * s :].sum()
+    return new_samples, new_weights
 
 
 class GlimpseDataset:
@@ -51,6 +70,7 @@ class GlimpseDataset:
             drift_mat["driftlist"][:, :3], columns=["frame", "dy", "dx"]
         )
         drift_df = drift_df.astype({"frame": int}).set_index("frame")
+        drift_df["ttb"] = header["ttb"]
 
         # load aoiinfo mat file
         aoi_mat = {}
@@ -245,6 +265,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     offset_x = kwargs.pop("offset_x")
     offset_y = kwargs.pop("offset_y")
     offset_P = kwargs.pop("offset_P")
+    bin_size = kwargs.pop("bin_size")
 
     offsets = defaultdict(int)
     offset_medians = []
@@ -252,6 +273,8 @@ def read_glimpse(path, progress_bar, **kwargs):
     data = defaultdict(list)
     target_xy = defaultdict(list)
     labels = defaultdict(list)
+    time1 = []
+    ttb = []
     for c in range(C):
         glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
 
@@ -259,6 +282,8 @@ def read_glimpse(path, progress_bar, **kwargs):
         colors = {}
         colors["ontarget"] = "#AA3377"
         colors["offtarget"] = "#CCBB44"
+        time1.append(float(glimpse.header["time1"]))
+        ttb.append(glimpse.cumdrift["ttb"].values)
         for dtype in glimpse.dtypes:
             N = len(glimpse.aoiinfo[dtype])
             F = len(glimpse.cumdrift)
@@ -345,6 +370,8 @@ def read_glimpse(path, progress_bar, **kwargs):
     # convert data to torch tensor
     offset_samples = torch.tensor(offset_samples, dtype=torch.int)
     offset_weights = torch.tensor(offset_weights)
+    # thin offset histogram
+    offset_samples, offset_weights = bin_hist(offset_samples, offset_weights, bin_size)
 
     data = defaultdict(lambda: None, data)
     target_xy = defaultdict(lambda: None, target_xy)
@@ -360,6 +387,8 @@ def read_glimpse(path, progress_bar, **kwargs):
     )
     data = torch.cat(tuple(data[dtype] for dtype in glimpse.dtypes), 0)
     target_xy = torch.cat(tuple(target_xy[dtype] for dtype in glimpse.dtypes), 0)
+    time1 = torch.as_tensor(time1)
+    ttb = torch.as_tensor(np.array(ttb)).T
     if all(labels[dtype] is None for dtype in glimpse.dtypes):
         labels = None
     else:
@@ -377,6 +406,8 @@ def read_glimpse(path, progress_bar, **kwargs):
         labels,
         offset_samples,
         offset_weights,
+        time1=time1,
+        ttb=ttb,
         name=name,
     )
     save(dataset, path)
@@ -394,7 +425,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     plt.title("Empirical Distribution", fontsize=12)
     plt.ylabel("Density", fontsize=12)
     plt.xlabel("Intensity", fontsize=12)
-    plt.xlim(offset_samples.min(), dataset.vmax)
+    plt.xlim(offset_samples.min(), dataset.vmax.max())
     plt.legend()
     plt.tight_layout()
     plt.savefig(path / "offset-distribution.png", dpi=300)

@@ -62,7 +62,7 @@ class Cosmos(Model):
         super().__init__(S, K, channels, device, dtype)
         assert S == 1, "This is a single-state model!"
         assert len(self.channels) == 1, "Please specify exactly one color channel"
-        self.cdx = self.channels[0]
+        self.cdx = torch.tensor(self.channels[0])
         self.full_name = f"{self.name}-channel{self.cdx}"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
@@ -433,6 +433,32 @@ class Cosmos(Model):
         """
         device = self.device
         data = self.data
+
+        pyro.param(
+            "pi_mean",
+            lambda: torch.ones(self.S + 1, device=device),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "pi_size",
+            lambda: torch.tensor(2, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "m_probs",
+            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
+            constraint=constraints.unit_interval,
+        )
+
+        self._init_parameters()
+
+    def _init_parameters(self):
+        """
+        Parameters shared between different models.
+        """
+        device = self.device
+        data = self.data
+
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5, device=device),
@@ -457,17 +483,6 @@ class Cosmos(Model):
             constraint=constraints.positive,
         )
         pyro.param(
-            "pi_mean",
-            lambda: torch.ones(self.S + 1, device=device),
-            constraint=constraints.simplex,
-        )
-        pyro.param(
-            "pi_size",
-            lambda: torch.tensor(2, device=device),
-            constraint=constraints.positive,
-        )
-
-        pyro.param(
             "gain_loc",
             lambda: torch.tensor(5, device=device),
             constraint=constraints.positive,
@@ -482,7 +497,7 @@ class Cosmos(Model):
             "background_mean_loc",
             lambda: torch.full(
                 (data.Nt, 1),
-                data.median - self.data.offset.mean,
+                data.median[self.cdx] - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,
@@ -497,7 +512,7 @@ class Cosmos(Model):
             "b_loc",
             lambda: torch.full(
                 (data.Nt, data.F),
-                data.median - self.data.offset.mean,
+                data.median[self.cdx] - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,
@@ -552,12 +567,6 @@ class Cosmos(Model):
             constraint=constraints.greater_than(2.0),
         )
 
-        pyro.param(
-            "m_probs",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
-            constraint=constraints.unit_interval,
-        )
-
     def TraceELBO(self, jit=False):
         """
         A trace implementation of ELBO-based SVI that supports - exhaustive enumeration over
@@ -604,9 +613,12 @@ class Cosmos(Model):
                     + guide_tr.nodes["m_1"]["unscaled_log_prob"]
                     + logp
                 )
+                # average over m
                 result = expectation.logsumexp((2, 3))
+                # marginalize theta
                 z_logits = result.logsumexp(0)
                 z_probs[ndx[:, None], fdx] = z_logits[1].exp().mean(-3)
+                # marginalize z
                 theta_logits = result.logsumexp(1)
                 theta_probs[:, ndx[:, None], fdx] = theta_logits[1:].exp().mean(-3)
         self.n = None

@@ -8,12 +8,15 @@ KSMOGN
 
 from typing import Union
 
+import pykeops
 import torch
 from pykeops.torch import Genred
 from pyro.distributions import TorchDistribution
 from torch.distributions import Categorical, constraints
 
 from .util import gaussian_spots
+
+pykeops.set_verbose(False)
 
 
 class KSMOGN(TorchDistribution):
@@ -128,7 +131,6 @@ class KSMOGN(TorchDistribution):
                 variables,
                 reduction_op="LogSumExp",
                 axis=1,
-                dtype=str(dtype).split(".")[1],
             )
             concentration, value, rate = torch.broadcast_tensors(
                 self.concentration, value, self.rate

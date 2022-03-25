@@ -21,8 +21,10 @@ runner = CliRunner()
 def dataset_path(request, tmp_path):
     params = {}
     if request.param == Cosmos:
+        model = request.param()
         params["pi"] = 0.15
     elif request.param == HMM:
+        model = request.param(vectorized=False)
         params["kon"] = 0.2
         params["koff"] = 0.2
     params["width"] = 1.4
@@ -37,7 +39,6 @@ def dataset_path(request, tmp_path):
     C = 1
     P = 14
 
-    model = request.param()
     data = simulate(model, N, F, C, P, params=params)
 
     # save data

@@ -279,7 +279,7 @@ def fit(
         2, "--k-max", "-k", help="Maximum number of spots per image"
     ),
     matlab: bool = typer.Option(
-        False,
+        partial(get_default, "matlab"),
         "--matlab",
         help="Save parameters in matlab format",
         prompt="Save parameters in matlab format?",
@@ -348,6 +348,7 @@ def fit(
         DEFAULTS["nbatch-size"] = nbatch_size
         DEFAULTS["fbatch-size"] = fbatch_size
         DEFAULTS["learning-rate"] = learning_rate
+        DEFAULTS["matlab"] = matlab
         with open(cd / ".tapqir" / "config.yaml", "w") as cfg_file:
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
@@ -414,7 +415,7 @@ def stats(
         prompt="Frame batch size",
     ),
     matlab: bool = typer.Option(
-        False,
+        partial(get_default, "matlab"),
         "--matlab",
         help="Save parameters in matlab format",
         prompt="Save parameters in matlab format?",
@@ -442,6 +443,12 @@ def stats(
     device = "cuda" if cuda else "cpu"
     backend = "funsor" if funsor else "pyro"
 
+    settings = {}
+    settings["S"] = 1
+    settings["channels"] = channels
+    settings["device"] = device
+    settings["dtype"] = dtype
+
     # pyro backend
     if backend == "pyro":
         PYRO_BACKEND = "pyro"
@@ -456,7 +463,7 @@ def stats(
 
     with pyro_backend(PYRO_BACKEND):
 
-        model = models[model](1, 2, channels, device, dtype)
+        model = models[model](**settings)
         model.load(cd)
         model.load_checkpoint(param_only=True)
         model.nbatch_size = nbatch_size
@@ -467,7 +474,7 @@ def stats(
         typer.echo("Computing stats: Done")
 
 
-def config_axis(ax, label, f1, f2, ymin, ymax, xticklabels=False):
+def config_axis(ax, label, f1, f2, ymin=None, ymax=None, xticklabels=False):
     plt.minorticks_on()
     ax.tick_params(
         direction="in",
@@ -489,7 +496,8 @@ def config_axis(ax, label, f1, f2, ymin, ymax, xticklabels=False):
     )
     ax.set_ylabel(label)
     ax.set_xlim(f1 - 0.5, f2 - 0.5)
-    ax.set_ylim(ymin, ymax)
+    if (ymin is not None) and (ymax is not None):
+        ax.set_ylim(ymin, ymax)
     if not xticklabels:
         ax.set_xticklabels([])
 
@@ -516,21 +524,20 @@ def show(
     if f1 is None:
         f1 = 0
     if f2 is None:
-        f2 = model.data.F
-    f2 = 15
+        f2 = f1 + 15
     c = model.cdx
 
-    width, height, dpi = 6.25, 5, 100
+    width, height, dpi = 6.25, 6.25, 100
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
-        nrows=8,
+        nrows=10,
         ncols=15,
-        top=0.95,
-        bottom=0.05,
+        top=0.96,
+        bottom=0.04,
         left=0.1,
         right=0.98,
         hspace=0.1,
-        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1],
+        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1, 1, 1],
     )
     ax = {}
     item = {}
@@ -553,65 +560,141 @@ def show(
         ax[f"image_{f}"] = fig.add_subplot(gs[0, f])
         item[f"image_{f}"] = ax[f"image_{f}"].imshow(
             model.data.images[n, f, c].numpy(),
-            vmin=model.data.vmin - 50,
-            vmax=model.data.vmax + 50,
+            vmin=model.data.vmin[model.cdx] - 50,
+            vmax=model.data.vmax[model.cdx] + 50,
             cmap="gray",
         )
-        ax[f"image_{f}"].set_title(f)
+        ax[f"image_{f}"].set_title(rf"${f}$", fontsize=9)
         ax[f"image_{f}"].axis("off")
         ax[f"ideal_{f}"] = fig.add_subplot(gs[1, f])
         item[f"ideal_{f}"] = ax[f"ideal_{f}"].imshow(
             img_ideal[f].numpy(),
-            vmin=model.data.vmin - 50,
-            vmax=model.data.vmax + 50,
+            vmin=model.data.vmin[model.cdx] - 50,
+            vmax=model.data.vmax[model.cdx] + 50,
             cmap="gray",
         )
         ax[f"ideal_{f}"].axis("off")
 
-    ax["pspecific"] = fig.add_subplot(gs[2, :])
-    config_axis(ax["pspecific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
-    (item["pspecific"],) = ax["pspecific"].plot(
+    ax["z_map"] = fig.add_subplot(gs[2, :])
+    config_axis(ax["z_map"], r"$z_\mathsf{MAP}$", f1, f2, -0.1, model.S + 0.1)
+    (item["z_map"],) = ax["z_map"].plot(
         torch.arange(0, model.data.F),
-        model.params["z_probs"][n],
+        model.params["z_map"][n],
+        "-",
+        lw=1,
+        color="k",
+    )
+
+    ax["p_specific"] = fig.add_subplot(gs[3, :])
+    config_axis(ax["p_specific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
+    (item["p_specific"],) = ax["p_specific"].plot(
+        torch.arange(0, model.data.F),
+        model.params["p_specific"][n],
         "o-",
         ms=3,
         lw=1,
         color="C2",
     )
 
-    ax["height"] = fig.add_subplot(gs[3, :])
-    config_axis(ax["height"], r"$h$", f1, f2, -100, 8000)
+    ax["height"] = fig.add_subplot(gs[4, :])
+    config_axis(
+        ax["height"],
+        r"$h$",
+        f1,
+        f2,
+        model.params["height"]["vmin"],
+        model.params["height"]["vmax"],
+    )
 
-    ax["width"] = fig.add_subplot(gs[4, :])
-    config_axis(ax["width"], r"$w$", f1, f2, 0.5, 2.5)
+    ax["width"] = fig.add_subplot(gs[5, :])
+    config_axis(
+        ax["width"],
+        r"$w$",
+        f1,
+        f2,
+        model.params["width"]["vmin"],
+        model.params["width"]["vmax"],
+    )
 
-    ax["x"] = fig.add_subplot(gs[5, :])
-    config_axis(ax["x"], r"$x$", f1, f2, -9, 9)
+    ax["x"] = fig.add_subplot(gs[6, :])
+    config_axis(
+        ax["x"], r"$x$", f1, f2, model.params["x"]["vmin"], model.params["x"]["vmax"]
+    )
 
-    ax["y"] = fig.add_subplot(gs[6, :])
-    config_axis(ax["y"], r"$y$", f1, f2, -9, 9)
+    ax["y"] = fig.add_subplot(gs[7, :])
+    config_axis(
+        ax["y"], r"$y$", f1, f2, model.params["y"]["vmin"], model.params["y"]["vmax"]
+    )
 
-    ax["background"] = fig.add_subplot(gs[7, :])
-    config_axis(ax["background"], r"$b$", f1, f2, 0, 500, True)
-    ax["background"].set_xlabel("Time (frame)")
+    ax["background"] = fig.add_subplot(gs[8, :])
+    config_axis(
+        ax["background"],
+        r"$b$",
+        f1,
+        f2,
+        model.params["background"]["vmin"],
+        model.params["background"]["vmax"],
+    )
 
+    ax["chi2"] = fig.add_subplot(gs[9, :])
+    config_axis(
+        ax["chi2"],
+        r"$\chi^2 \mathsf{test}$",
+        f1,
+        f2,
+        model.params["chi2"]["vmin"],
+        model.params["chi2"]["vmax"],
+        True,
+    )
+    ax["chi2"].set_xlabel("Time (frame)")
+
+    theta_mask = model.params["theta_probs"][:, n] > 0.5
+    j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
     for p in ["height", "width", "x", "y"]:
+        # target-nonspecific spots
         for k in range(model.K):
-            (item[f"{p}_{k}_mean"],) = ax[p].plot(
-                torch.arange(0, model.data.F),
-                model.params[p]["Mean"][k, n],
-                "o-",
-                ms=3,
+            f_mask = j_mask[k]
+            mean = model.params[p]["Mean"][k, n] * f_mask
+            ll = model.params[p]["LL"][k, n] * f_mask
+            ul = model.params[p]["UL"][k, n] * f_mask
+            (item[f"{p}_nonspecific{k}_mean"],) = ax[p].plot(
+                torch.arange(0, model.data.F)[f_mask],
+                mean[f_mask],
+                "o",
+                ms=2,
                 lw=1,
                 color=f"C{k}",
             )
-            item[f"{p}_{k}_fill"] = ax[p].fill_between(
+            item[f"{p}_nonspecific{k}_fill"] = ax[p].fill_between(
                 torch.arange(0, model.data.F),
-                model.params[p]["LL"][k, n],
-                model.params[p]["UL"][k, n],
+                ll,
+                ul,
+                where=f_mask,
                 alpha=0.3,
                 color=f"C{k}",
             )
+        # target-specific spots
+        f_mask = theta_mask.sum(0).bool()
+        mean = (model.params[p]["Mean"][:, n] * theta_mask).sum(0)
+        ll = (model.params[p]["LL"][:, n] * theta_mask).sum(0)
+        ul = (model.params[p]["UL"][:, n] * theta_mask).sum(0)
+        (item[f"{p}_specific_mean"],) = ax[p].plot(
+            torch.arange(0, model.data.F)
+            if p == "height"
+            else torch.arange(0, model.data.F)[f_mask],
+            mean if p == "height" else mean[f_mask],
+            "-" if p == "height" else "o",
+            ms=2,
+            color="C2",
+        )
+        item[f"{p}_specific_fill"] = ax[p].fill_between(
+            torch.arange(0, model.data.F),
+            ll,
+            ul,
+            where=f_mask,
+            alpha=0.3,
+            color="C2",
+        )
     (item["background_mean"],) = ax["background"].plot(
         torch.arange(0, model.data.F),
         model.params["background"]["Mean"][n],
@@ -627,6 +710,15 @@ def show(
         alpha=0.3,
         color="k",
     )
+
+    (item["chi2"],) = ax["chi2"].plot(
+        torch.arange(0, model.data.F),
+        model.params["chi2"]["values"][n],
+        "-",
+        lw=1,
+        color="k",
+    )
+
     plt.show()
     return model, fig, item, ax
 
@@ -689,6 +781,7 @@ def main(
             DEFAULTS["learning-rate"] = 0.005
             DEFAULTS["num-channels"] = 1
             DEFAULTS["cuda"] = True
+            DEFAULTS["matlab"] = False
             # priors settings
             DEFAULTS["background_mean_std"] = 1000
             DEFAULTS["background_std_std"] = 100
@@ -702,6 +795,7 @@ def main(
             DEFAULTS["offset_x"] = 10
             DEFAULTS["offset_y"] = 10
             DEFAULTS["offset_P"] = 30
+            DEFAULTS["bin_size"] = 1
             # save config file
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},
@@ -714,7 +808,7 @@ def main(
                 f"Initialized Tapqir at {TAPQIR_PATH}.\n"
                 "{yellow}---------------------------------------------------------------{nc}\n"
                 f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
-                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
+                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}\n"
             ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
         )
 
