@@ -47,7 +47,7 @@ Announcements
 To get notified about new releases sign in to Github, go to top right corner of this page and click on Watch -> Custom -> Releases.
 
 Discussions/Q&As
-----
+----------------
 
 Please post questions about the software on our `forum <https://github.com/gelles-brandeis/tapqir/discussions>`_. We will try to respond promptly.
 

@@ -41,7 +41,7 @@ Initial development and validation of Tapqir is described in
 |DOI|
 
 Ordabayev YA, Friedman LJ, Gelles J, Theobald DL. *Bayesian machine learning analysis of single-molecule
-fluorescence colocalization images*. bioRxiv. 2021 Oct.
+fluorescence colocalization images*.  eLife 2022;11:e73860.
 
 If you publish work that uses Tapqir, please consider citing this article. 
 
@@ -79,6 +79,6 @@ without memory overflow.
 .. _Pyro: https://pyro.ai/
 .. _KeOps: https://www.kernel-operations.io/keops/index.html
 .. _PyTorch: https://pytorch.org/
-.. |DOI| image:: https://img.shields.io/badge/DOI-10.1101%2F2021.09.30.462536-blue
-   :target: https://doi.org/10.1101/2021.09.30.462536
+.. |DOI| image:: https://img.shields.io/badge/DOI-10.7554%2FeLife.73860-blue
+   :target: https://doi.org/10.7554/eLife.73860
    :alt: DOI

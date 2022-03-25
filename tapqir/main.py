@@ -41,7 +41,6 @@ def format_link(link):
 # available models
 class Model(str, Enum):
     cosmos = "cosmos"
-    hmm = "hmm"
 
 
 def get_default(key):
@@ -809,7 +808,7 @@ def main(
                 f"Initialized Tapqir at {TAPQIR_PATH}.\n"
                 "{yellow}---------------------------------------------------------------{nc}\n"
                 f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
-                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
+                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}\n"
             ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
         )
 

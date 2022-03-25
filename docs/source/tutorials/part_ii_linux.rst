@@ -13,26 +13,32 @@ Set up the environment
 
    $ conda activate tapqir-env
 
-To start the analysis create an empty folder (here named ``tutorial``) which will be the working directory::
-
-  $ mkdir /tmp/tutorial
-  $ cd /tmp/tutorial
-
 Download input data
 -------------------
 
 These data were acquired with `Glimpse`_ and pre-processed with the `imscroll`_ program (`Friedman et al., 2015`_).
-Let's download data files using `wget`_ and then unzip files::
+Change directory to user's home directory::
+
+  $ cd ~
+
+Download data files using `wget`_::
 
   $ wget https://zenodo.org/record/5659927/files/DatasetA_glimpse.zip
+
+Unzip and then delete the zip file::
+
   $ unzip DatasetA_glimpse.zip && rm DatasetA_glimpse.zip
 
-The raw input data placed in ``/tmp/tutorial/DatasetA_glimpse`` are:
+The raw input data placed in ``/home/{your_username}/DatasetA_glimpse`` are:
 
 * ``garosen00267`` - folder containing image data in glimpse format and header files
 * ``green_DNA_locations.dat`` - aoiinfo file designating target molecule (DNA) locations in the binder channel
 * ``green_nonDNA_locations.dat`` - aoiinfo file designating off-target (nonDNA) locations in the binder channel
 * ``green_driftlist.dat`` - driftlist file recording the stage movement that took place during the experiment
+
+To start the analysis create an empty folder (here named ``tutorial``) which will be the working directory::
+
+  $ mkdir ~/tutorial
 
 
 Start the program
@@ -51,7 +57,7 @@ which will open a browser window to display the Tapqir GUI:
 Select working directory
 ------------------------
 
-Click the ``Select`` button at the top to set the working directory  to ``/tmp/tutorial``:
+Click the ``Select`` button at the top to set the working directory  to ``/home/{your_username}/tutorial``:
 
 .. image:: working-directory.png
    :width: 800
@@ -74,10 +80,10 @@ To extract AOIs specify the following options in the ``Extract AOIs`` tab:
 And specify the locations of input files for each color channel (only one color channel in this example):
 
 * Channel name: ``SNAP549`` (an arbitrary name)
-* Header/glimpse folder: ``/tmp/tutorial/DatasetA_glimpse/garosen00267``
-* Target molecule locations file: ``/tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat``
-* Off-target control locations file: ``/tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat``
-* Driftlist file: ``/tmp/tutorial/DatasetA_glimpse/green_driftlist.dat``
+* Header/glimpse folder: ``/home/{your_username}/DatasetA_glimpse/garosen00267``
+* Driftlist file: ``/home/{your_username}/DatasetA_glimpse/green_driftlist.dat``
+* Target molecule locations file: ``/home/{your_username}/DatasetA_glimpse/green_DNA_locations.dat``
+* Off-target control locations file: ``/home/{your_username}/DatasetA_glimpse/green_nonDNA_locations.dat``
 
 .. note::
 
@@ -93,11 +99,10 @@ Next, click ``Extract AOIs`` button:
 Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
 control locations)::
 
-    $ ls
+    $ ls ~/tutorial
 
-    DatasetA_glimpse     offset-distribution.png  ontarget-channel0.png
-    data.tpqr            offset-medians.png
-    offset-channel0.png  offtarget-channel0.png
+    data.tpqr            offset-distribution.png  offtarget-channel0.png
+    offset-channel0.png  offset-medians.png       ontarget-channel0.png
 
 Additionally, the program has saved
 
@@ -149,7 +154,7 @@ Next, press ``Fit the data`` button:
    :width: 800
 
 The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
-The program can be stopped at any time by clicking in the terminal window and pressing ``Ctrl-C``. To restart the program again re-run
+The program can be stopped at any time by clicking in the *terminal window* and pressing ``Ctrl-C``. To restart the program again re-run
 ``tapqir-gui`` command and the program will resume from the last saved checkpoint.
 
 After fitting is finished, the program computes 95% credible intervals (CI) of model parameters and saves the parameters and CIs in
@@ -162,17 +167,20 @@ Tensorboard
 -----------
 
 At every checkpoint the values of global variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``,
-``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard gui <https://www.tensorflow.org/tensorboard>`_
+``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard program <https://www.tensorflow.org/tensorboard>`_
 displayed in the ``Tensorboard`` tab, which shows the parameters values as a function of iteration number:
 
 .. image:: tensorboard-tab.png
    :width: 800
 
-Set smoothing to 0 (in the left panel) and use refresh button at the top right to refresh plots.
+.. tip::
+
+   Set smoothing to 0 (in the left panel) and use refresh button at the top right to refresh plots.
 
 Plateaued plots signify convergence.
 
 .. note::
+
    **About number of iterations**. Fitting the data requires many iterations (about 50,000-100,000) until parameters
    converge. Setting the number of iterations to 0 will run the program till Tapqir's custom convergence criterion is satisfied.
    We recommend to set it to 0 (default) and then run for additional number of iterations if required.
@@ -182,6 +190,11 @@ View results
 
 After fitting is done open ``View results`` tab to visualize analysis results. Click on ``Load results`` button which will display parameter values
 from the ``cosmos-channel0-params.tpqr`` file:
+
+.. note::
+
+   ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has completed or
+   the model has converged).
 
 .. image:: view-results.png
    :width: 800
@@ -220,7 +233,7 @@ Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordab
 * ``gain_std`` (default 50): standard deviation of the HalfNormal distribution in Eq. 16
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
-.. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536
+.. _Ordabayev et al., 2021: https://doi.org/10.7554/eLife.73860
 .. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki
