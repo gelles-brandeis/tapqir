@@ -28,16 +28,31 @@ Install on Windows 11
     
 4. Install latest version of CUDA (needs to be version 11.5 or later).
 
-   Summary of `installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl-installation>`_::
+   Summary of `CUDA installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl-installation>`_::
 
     $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+
+   .. code-block::
+
     $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+
+   .. code-block::
+
     $ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+
+   .. code-block::
+
     $ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+
+   .. code-block::
+
     $ sudo apt update
+
+   .. code-block::
+
     $ sudo apt install cuda
 
-5. Install the linux version of the Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
+5. Install the linux version of the Anaconda package manager (`Anaconda installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
    Here is the summary of required installation steps:
 
    * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).
@@ -71,8 +86,6 @@ Install on Windows 11
 8. Install ``tapqir``::
 
     $ pip install tapqir
-    
-   After installation is done *close the terminal window and open it again* for an installation to take an effect.
 
 Now you can run Tapqir in the WSL window in the same way you would on a linux computer.
 
@@ -88,7 +101,7 @@ in the console window and open that URL in a windows web browsser to access the 
 
 If there are two GPUs on your computer, use::
 
-     CUDA_VISIBLE_DEVICES=1 tapqir-gui
+     $ CUDA_VISIBLE_DEVICES=1 tapqir-gui
      
 to run Tapqir on the second GPU.
 

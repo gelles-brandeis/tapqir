@@ -102,8 +102,6 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 8. Install ``tapqir``::
 
     $ pip install tapqir
-    
-   After installation is done *close the terminal window and open it again* for an installation to take an effect.
 
 Install linux server tools (optional)
 -------------------------------------
