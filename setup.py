@@ -60,7 +60,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "colorama",
-        "funsor @ git+https://github.com/ordabayevy/funsor.git@tapqir",
+        "funsor>=0.4.3",
         "future",
         "ipyevents",
         "ipyfilechooser",
@@ -70,7 +70,7 @@ setuptools.setup(
         "matplotlib",
         "pandas",
         "pykeops>=2.0",
-        "pyro-ppl @ git+https://github.com/ordabayevy/pyro.git@tapqir",
+        "pyro-ppl>=1.8.1",
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
