@@ -1,5 +1,5 @@
-Part II: Tapqir analysis (Linux)
-================================
+Part II: Tapqir analysis (Linux/WSL 2)
+======================================
 
 In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2021`_. The data
 are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `imscroll`_ (`Friedman et al., 2015`_).
@@ -177,7 +177,7 @@ displayed in the ``Tensorboard`` tab, which shows the parameters values as a fun
 
    Set smoothing to 0 (in the left panel) and use refresh button at the top right to refresh plots.
 
-Plateaued plots signify convergence.
+Plateaued plots of ``-ELBO``, ``gain_loc``, ``proximity_loc``, ``pi_mean``, and ``lamda_loc`` signify convergence.
 
 .. note::
 
