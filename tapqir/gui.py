@@ -95,10 +95,10 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     IN_COLAB = "google.colab" in sys.modules
 
-    with out:
-        typer.echo("Loading configuration data ...")
     path = get_path(path)
-    main(cd=path)
+    with out:
+        main(cd=path)
+        typer.echo("Loading configuration data ...")
 
     # Tabs
     tab = widgets.Tab()
