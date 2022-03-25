@@ -97,8 +97,8 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     path = get_path(path)
     with out:
-        main(cd=path)
         typer.echo("Loading configuration data ...")
+        main(cd=path)
 
     # Tabs
     tab = widgets.Tab()
