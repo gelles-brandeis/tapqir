@@ -1,7 +1,7 @@
 Part II: Tapqir analysis (Linux/WSL 2)
 ======================================
 
-In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2021`_. The data
+In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2022`_. The data
 are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `imscroll`_ (`Friedman et al., 2015`_).
 
 Set up the environment
@@ -134,7 +134,7 @@ Fit the data
 
 Now the data is ready for fitting. Options that we will select:
 
-* Model - the default single-color time-independent ``cosmos`` model (`Ordabayev et al., 2021`_).
+* Model - the default single-color time-independent ``cosmos`` model (`Ordabayev et al., 2022`_).
 * Color channel number - first chanel (``0``) (there is only one color channel in this data)
 * Run computations on GPU: yes (``True``).
 * AOI batch size - use default (``10``).
@@ -150,7 +150,7 @@ Now the data is ready for fitting. Options that we will select:
 
 Next, press ``Fit the data`` button:
 
-.. image:: fit-data2.png
+.. image:: fit-data.png
    :width: 800
 
 The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
@@ -193,7 +193,7 @@ from the ``cosmos-channel0-params.tpqr`` file:
 
 .. note::
 
-   ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has completed or
+   ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has finished or
    the model has converged).
 
 .. image:: view-results.png
@@ -209,8 +209,8 @@ Advanced settings
 Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir`` sub-folder of the working directory. It also contains
 additional options that are not available through the GUI.
 
-Offset region
-^^^^^^^^^^^^^
+Offset
+^^^^^^
 
 Offset data region (square) can be edited using three variables:
 
@@ -218,10 +218,14 @@ Offset data region (square) can be edited using three variables:
 * ``offset_y``: top corner of the square (default is 10 pixels)
 * ``offset_P``: size of the square (default is 30 pixels)
 
+Bin size for the offset intensity histogram by default is 1. The bin size can be increased (try 3 or 5; odd number) to make the histogram sparser which will speed up fitting.
+
+* ``bin_size``: offset intensity histogram bin size (default is 1)
+
 Prior distributions
 ^^^^^^^^^^^^^^^^^^^
 
-Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2021`_):
+Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2022`_):
 
 * ``background_mean_std`` (default 1000): standard deviation of the HalfNormal distribution in Eq. 6a
 * ``background_std_std`` (default 100): standard deviation of the HalfNormal distribution in Eq. 6b
@@ -233,7 +237,7 @@ Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordab
 * ``gain_std`` (default 50): standard deviation of the HalfNormal distribution in Eq. 16
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
-.. _Ordabayev et al., 2021: https://doi.org/10.7554/eLife.73860
+.. _Ordabayev et al., 2022: https://doi.org/10.7554/eLife.73860
 .. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki

@@ -7,7 +7,7 @@ Models
 Tapqir is a modular program that uses a chosen probabilistic model to interpret experimental data.
 There currently exists only a single model, ``cosmos``, developed for analysis of simple CoSMoS
 experiments. The ``cosmos`` model is for *time-independent* analysis of *single-channel* (i.e., one-binder)
-data sets. Our publication (`Ordabayev et al., 2021`_) contains a comprehensive description of the
+data sets. Our publication (`Ordabayev et al., 2022`_) contains a comprehensive description of the
 ``cosmos`` model. In the future, we plan to add addional models to Tapqir, for example to integrate
 hidden-Markov kinetic analysis or to handle global analysis with multiple wavelength channels.
 
@@ -75,7 +75,7 @@ Tapqir estimates the values of the ``cosmos`` model parameters:
 
 where "shape" is the dimensionality of the parameters, e.g., (1,) shape means a scalar
 parameter and (K, N, F) shape means that *each* spot in *each* AOI in *each* frame
-has a separate value of the parameter. `Ordabayev et al., 2021`_ has a more detailed
+has a separate value of the parameter. `Ordabayev et al., 2022`_ has a more detailed
 description of the parameters.
 
 Some basic Linux commands
@@ -120,7 +120,7 @@ the diagram) in order to keep the files associated with the run organized in a s
 .. image:: ../Tapqir_workflow.png
    :alt: Tapqir workflow
 
-.. _Ordabayev et al., 2021: https://doi.org/10.7554/eLife.73860
+.. _Ordabayev et al., 2022: https://doi.org/10.7554/eLife.73860
 .. _Kinz-Thompson et al., 2021: https://doi.org/10.1146/annurev-biophys-082120-103921
 .. _Bingham et al., 2019: https://jmlr.org/papers/v20/18-403.html
 .. _Typer: https://typer.tiangolo.com/
