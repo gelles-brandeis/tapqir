@@ -1,7 +1,7 @@
 Part II: Tapqir analysis (Linux/WSL 2)
 ======================================
 
-In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2021`_. The data
+In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2022`_. The data
 are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `imscroll`_ (`Friedman et al., 2015`_).
 
 Set up the environment
@@ -50,16 +50,16 @@ To start the program run::
 
 which will open a browser window to display the Tapqir GUI:
 
-.. image:: start-page.png
+.. figure:: start-page.png
    :width: 800
 
 
 Select working directory
 ------------------------
 
-Click the ``Select`` button at the top to set the working directory  to ``/home/{your_username}/tutorial``:
+Click the ``Select`` button to set the working directory  to ``/home/{your_username}/tutorial``:
 
-.. image:: working-directory.png
+.. figure:: working-directory.png
    :width: 800
 
 Setting working directory creates a ``.tapqir`` sub-folder that will store internal files
@@ -93,7 +93,7 @@ And specify the locations of input files for each color channel (only one color 
 
 Next, click ``Extract AOIs`` button:
 
-.. image:: extract-aois.png
+.. figure:: extract-aois.png
    :width: 800
 
 Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
@@ -109,24 +109,24 @@ Additionally, the program has saved
 * Image files (``ontarget-channel0.png`` and ``offtarget-channel0.png``) displaying locations of on-target and off-target
   AOIs in the first frame. You should inspect these images to make sure that AOIs are *inside* the field of view:
 
-.. image:: ontarget-channel0.png
+.. figure:: ontarget-channel0.png
    :width: 700
 
-.. image:: offtarget-channel0.png
+.. figure:: offtarget-channel0.png
    :width: 700
 
 * You should also look at ``offset-channel0.png`` to check that offset data is taken from a region *outside* the field of view:
 
-.. image:: offset-channel0.png
+.. figure:: offset-channel0.png
    :width: 700
 
 * The other two files show the intensity histograms (``offset-distribution.png``) and the offset median time record
   (``offset-medians.png``) (offset distribution shouldn't drift over time):
 
-.. image:: offset-distribution.png
+.. figure:: offset-distribution.png
    :width: 300
 
-.. image:: offset-medians.png
+.. figure:: offset-medians.png
    :width: 500
 
 Fit the data
@@ -134,7 +134,7 @@ Fit the data
 
 Now the data is ready for fitting. Options that we will select:
 
-* Model - the default single-color time-independent ``cosmos`` model (`Ordabayev et al., 2021`_).
+* Model - the default single-color time-independent ``cosmos`` model (`Ordabayev et al., 2022`_).
 * Color channel number - first chanel (``0``) (there is only one color channel in this data)
 * Run computations on GPU: yes (``True``).
 * AOI batch size - use default (``10``).
@@ -150,7 +150,7 @@ Now the data is ready for fitting. Options that we will select:
 
 Next, press ``Fit the data`` button:
 
-.. image:: fit-data2.png
+.. figure:: fit-data.png
    :width: 800
 
 The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
@@ -170,7 +170,7 @@ At every checkpoint the values of global variational parameters (``-ELBO``, ``ga
 ``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard program <https://www.tensorflow.org/tensorboard>`_
 displayed in the ``Tensorboard`` tab, which shows the parameters values as a function of iteration number:
 
-.. image:: tensorboard-tab.png
+.. figure:: tensorboard-tab.png
    :width: 800
 
 .. tip::
@@ -193,10 +193,10 @@ from the ``cosmos-channel0-params.tpqr`` file:
 
 .. note::
 
-   ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has completed or
+   ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has finished or
    the model has converged).
 
-.. image:: view-results.png
+.. figure:: view-results.png
    :width: 800
 
 In the display panel, the top row shows raw images, the second row shows best fit images, the plots show ``p(specific)`` and parameter values (mean and 95% CI).
@@ -209,8 +209,8 @@ Advanced settings
 Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir`` sub-folder of the working directory. It also contains
 additional options that are not available through the GUI.
 
-Offset region
-^^^^^^^^^^^^^
+Offset
+^^^^^^
 
 Offset data region (square) can be edited using three variables:
 
@@ -218,10 +218,14 @@ Offset data region (square) can be edited using three variables:
 * ``offset_y``: top corner of the square (default is 10 pixels)
 * ``offset_P``: size of the square (default is 30 pixels)
 
+Bin size for the offset intensity histogram by default is 1. The bin size can be increased (try 3 or 5; odd number) to make the histogram sparser which will speed up fitting.
+
+* ``bin_size``: offset intensity histogram bin size (default is 1)
+
 Prior distributions
 ^^^^^^^^^^^^^^^^^^^
 
-Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2021`_):
+Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2022`_):
 
 * ``background_mean_std`` (default 1000): standard deviation of the HalfNormal distribution in Eq. 6a
 * ``background_std_std`` (default 100): standard deviation of the HalfNormal distribution in Eq. 6b
@@ -233,7 +237,7 @@ Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordab
 * ``gain_std`` (default 50): standard deviation of the HalfNormal distribution in Eq. 16
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
-.. _Ordabayev et al., 2021: https://doi.org/10.7554/eLife.73860
+.. _Ordabayev et al., 2022: https://doi.org/10.7554/eLife.73860
 .. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki
