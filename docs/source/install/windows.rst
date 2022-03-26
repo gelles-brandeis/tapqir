@@ -99,9 +99,10 @@ When running tapqir-gui, browser windows will not open automatically.  Look for 
      
 in the console window and open that URL in a windows web browsser to access the GUI.
 
-If there are two GPUs on your computer, use::
+.. tip::
 
-     $ CUDA_VISIBLE_DEVICES=1 tapqir-gui
-     
-to run Tapqir on the second GPU.
+   If there are two GPUs on your computer, use::
 
+      $ CUDA_VISIBLE_DEVICES=1 tapqir-gui
+
+   to run Tapqir on the second GPU.
