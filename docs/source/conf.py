@@ -135,7 +135,7 @@ html_theme_options = {
             "url": "https://github.com/gelles-brandeis/tapqir/discussions",
         },
     ],
-    "show_prev_next": False,
+    "show_prev_next": True,
     "use_edit_page_button": True,
 }
 
