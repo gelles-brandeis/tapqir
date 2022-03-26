@@ -50,16 +50,16 @@ To start the program run::
 
 which will open a browser window to display the Tapqir GUI:
 
-.. image:: start-page.png
+.. figure:: start-page.png
    :width: 800
 
 
 Select working directory
 ------------------------
 
-Click the ``Select`` button at the top to set the working directory  to ``/home/{your_username}/tutorial``:
+Click the ``Select`` button to set the working directory  to ``/home/{your_username}/tutorial``:
 
-.. image:: working-directory.png
+.. figure:: working-directory.png
    :width: 800
 
 Setting working directory creates a ``.tapqir`` sub-folder that will store internal files
@@ -93,7 +93,7 @@ And specify the locations of input files for each color channel (only one color 
 
 Next, click ``Extract AOIs`` button:
 
-.. image:: extract-aois.png
+.. figure:: extract-aois.png
    :width: 800
 
 Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
@@ -109,24 +109,24 @@ Additionally, the program has saved
 * Image files (``ontarget-channel0.png`` and ``offtarget-channel0.png``) displaying locations of on-target and off-target
   AOIs in the first frame. You should inspect these images to make sure that AOIs are *inside* the field of view:
 
-.. image:: ontarget-channel0.png
+.. figure:: ontarget-channel0.png
    :width: 700
 
-.. image:: offtarget-channel0.png
+.. figure:: offtarget-channel0.png
    :width: 700
 
 * You should also look at ``offset-channel0.png`` to check that offset data is taken from a region *outside* the field of view:
 
-.. image:: offset-channel0.png
+.. figure:: offset-channel0.png
    :width: 700
 
 * The other two files show the intensity histograms (``offset-distribution.png``) and the offset median time record
   (``offset-medians.png``) (offset distribution shouldn't drift over time):
 
-.. image:: offset-distribution.png
+.. figure:: offset-distribution.png
    :width: 300
 
-.. image:: offset-medians.png
+.. figure:: offset-medians.png
    :width: 500
 
 Fit the data
@@ -150,7 +150,7 @@ Now the data is ready for fitting. Options that we will select:
 
 Next, press ``Fit the data`` button:
 
-.. image:: fit-data.png
+.. figure:: fit-data.png
    :width: 800
 
 The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
@@ -170,7 +170,7 @@ At every checkpoint the values of global variational parameters (``-ELBO``, ``ga
 ``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard program <https://www.tensorflow.org/tensorboard>`_
 displayed in the ``Tensorboard`` tab, which shows the parameters values as a function of iteration number:
 
-.. image:: tensorboard-tab.png
+.. figure:: tensorboard-tab.png
    :width: 800
 
 .. tip::
@@ -196,7 +196,7 @@ from the ``cosmos-channel0-params.tpqr`` file:
    ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has finished or
    the model has converged).
 
-.. image:: view-results.png
+.. figure:: view-results.png
    :width: 800
 
 In the display panel, the top row shows raw images, the second row shows best fit images, the plots show ``p(specific)`` and parameter values (mean and 95% CI).
