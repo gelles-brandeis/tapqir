@@ -199,15 +199,28 @@ from the ``cosmos-channel0-params.tpqr`` file:
 .. figure:: view-results.png
    :width: 800
 
-In the display panel, the top row shows raw images, the second row shows best fit images, the plots show ``p(specific)`` and parameter values (mean and 95% CI).
-The AOI number can be changed using the box widget and the frame range can be changed using the slider widget at the top. To zoom out to entire frame range click on
-the ``zoom out`` checkbox.
+In the display panel:
+
+* the top row shows raw images and the second row shows best fit images
+* target-specific spot presence probability ``p(specific)`` and its most likely value ``z``
+* values (mean and 95% CI) of ``h``, ``w``, ``x``, ``y``, and ``b`` parameters for target-specific spot (green) and
+  target-nonspecific spots (spot 1 is blue and spot 2 is orange; remember that spot numbering is arbitrary)
+* chi-squared test of how well the model fits each particular image (higher number means worse fit)
+
+The AOI number can be changed using the box widget or ``Down``, ``Up`` arrow keys or ``j``, ``k`` keys
+(hover the mouse over the ``View results`` tab for keys to work).
+
+Frame range can be toggled to zoom out to entire frame range by clicking on the ``Zoom out frames`` checkbox
+or using the ``z`` key. When zoomed out the range of frames corresponding to AOI images is highlighted in blue.
+
+The frame range can be changed by using the slider widget at the top or ``Left``, ``Right`` arrow keys or ``h``, ``l``
+keys or by left-clicking on the plot.
 
 Advanced settings
 -----------------
 
-Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir`` sub-folder of the working directory. It also contains
-additional options that are not available through the GUI.
+Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir``
+sub-folder of the working directory. It also contains additional options that are not available through the GUI.
 
 Offset
 ^^^^^^
@@ -218,7 +231,8 @@ Offset data region (square) can be edited using three variables:
 * ``offset_y``: top corner of the square (default is 10 pixels)
 * ``offset_P``: size of the square (default is 30 pixels)
 
-Bin size for the offset intensity histogram by default is 1. The bin size can be increased (try 3 or 5; odd number) to make the histogram sparser which will speed up fitting.
+Bin size for the offset intensity histogram by default is 1. The bin size can be increased (try 3 or 5; odd number)
+to make the histogram sparser which will speed up fitting.
 
 * ``bin_size``: offset intensity histogram bin size (default is 1)
 
