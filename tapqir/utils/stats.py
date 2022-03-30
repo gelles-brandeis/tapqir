@@ -1,16 +1,12 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
-import math
-from collections import defaultdict
-from functools import partial
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
 import pyro
-import pyro.distributions as dist
 import torch
 from pyro.ops.indexing import Vindex
 from pyro.ops.stats import hpdi, quantile
@@ -21,8 +17,8 @@ from sklearn.metrics import (
     recall_score,
 )
 
-from tapqir.distributions import AffineBeta
 from tapqir.distributions.util import gaussian_spots
+from tapqir.handlers import StatsMessenger
 
 pyro.enable_validation(False)
 
@@ -95,134 +91,38 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         index=global_params,
         columns=["Mean", f"{int(100*CI)}% LL", f"{int(100*CI)}% UL"],
     )
-    # local parameters
-    local_params = [
-        "height",
-        "width",
-        "x",
-        "y",
-        "background",
-    ]
 
-    ci_stats = defaultdict(partial(defaultdict, list))
-    num_samples = 10000
-    for param in global_params:
-        if param == "gain":
-            fn = dist.Gamma(
-                pyro.param("gain_loc") * pyro.param("gain_beta"),
-                pyro.param("gain_beta"),
-            )
-        elif param == "pi":
-            fn = dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size"))
-        elif param == "lamda":
-            fn = dist.Gamma(
-                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                pyro.param("lamda_beta"),
-            )
-        elif param == "proximity":
-            fn = AffineBeta(
-                pyro.param("proximity_loc"),
-                pyro.param("proximity_size"),
-                0,
-                (model.data.P + 1) / math.sqrt(12),
-            )
-        elif param == "trans":
-            fn = dist.Dirichlet(
-                pyro.param("trans_mean") * pyro.param("trans_size")
-            ).to_event(1)
-        else:
-            raise NotImplementedError
-        samples = fn.sample((num_samples,)).data.squeeze()
-        ci_stats[param] = {}
-        LL, UL = hpdi(
-            samples,
-            CI,
-            dim=0,
-        )
-        ci_stats[param]["LL"] = LL.cpu()
-        ci_stats[param]["UL"] = UL.cpu()
-        ci_stats[param]["Mean"] = fn.mean.data.squeeze().cpu()
+    nbatch_size = model.nbatch_size
+    fbatch_size = model.fbatch_size
+    model.nbatch_size = None
+    model.fbatch_size = None
+    with StatsMessenger(CI=CI) as ci_stats:
+        model.guide()
+    model.nbatch_size = nbatch_size
+    model.fbatch_size = fbatch_size
 
-        # calculate Keq
-        if param == "pi":
-            ci_stats["Keq"] = {}
-            LL, UL = hpdi(samples[:, 1] / (1 - samples[:, 1]), CI, dim=0)
-            ci_stats["Keq"]["LL"] = LL.cpu()
-            ci_stats["Keq"]["UL"] = UL.cpu()
-            ci_stats["Keq"]["Mean"] = (samples[:, 1] / (1 - samples[:, 1])).mean().cpu()
-
-    # this does not need to be very accurate
-    num_samples = 1000
-    for param in local_params:
-        LL, UL, Mean = [], [], []
-        for ndx in torch.split(torch.arange(model.data.Nt), model.nbatch_size):
-            ndx = ndx[:, None]
-            kdx = torch.arange(model.K)[:, None, None]
-            ll, ul, mean = [], [], []
-            for fdx in torch.split(torch.arange(model.data.F), model.fbatch_size):
-                if param == "background":
-                    fn = dist.Gamma(
-                        Vindex(pyro.param("b_loc"))[ndx, fdx]
-                        * Vindex(pyro.param("b_beta"))[ndx, fdx],
-                        Vindex(pyro.param("b_beta"))[ndx, fdx],
-                    )
-                elif param == "height":
-                    fn = dist.Gamma(
-                        Vindex(pyro.param("h_loc"))[kdx, ndx, fdx]
-                        * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
-                    )
-                elif param == "width":
-                    fn = AffineBeta(
-                        Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
-                        0.75,
-                        2.25,
-                    )
-                elif param == "x":
-                    fn = AffineBeta(
-                        Vindex(pyro.param("x_mean"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("size"))[kdx, ndx, fdx],
-                        -(model.data.P + 1) / 2,
-                        (model.data.P + 1) / 2,
-                    )
-                elif param == "y":
-                    fn = AffineBeta(
-                        Vindex(pyro.param("y_mean"))[kdx, ndx, fdx],
-                        Vindex(pyro.param("size"))[kdx, ndx, fdx],
-                        -(model.data.P + 1) / 2,
-                        (model.data.P + 1) / 2,
-                    )
-                else:
-                    raise NotImplementedError
-                samples = fn.sample((num_samples,)).data
-                l, u = hpdi(
-                    samples,
-                    CI,
-                    dim=0,
-                )
-                m = fn.mean.data
-                ll.append(l)
-                ul.append(u)
-                mean.append(m)
-            else:
-                LL.append(torch.cat(ll, -1))
-                UL.append(torch.cat(ul, -1))
-                Mean.append(torch.cat(mean, -1))
-        else:
-            ci_stats[param]["LL"] = torch.cat(LL, -2).cpu()
-            ci_stats[param]["UL"] = torch.cat(UL, -2).cpu()
-            ci_stats[param]["Mean"] = torch.cat(Mean, -2).cpu()
+    # combine K local params
+    for param in list(ci_stats.keys()):
+        if param.endswith("_0"):
+            base_name = param.split("_")[0]
+            ci_stats[base_name] = {}
+            ci_stats[base_name]["Mean"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.K)], dim=0
+            )
+            ci_stats[base_name]["LL"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.K)], dim=0
+            )
+            ci_stats[base_name]["UL"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.K)], dim=0
+            )
+            for k in range(model.K):
+                del ci_stats[f"{base_name}_{k}"]
 
     for param in global_params:
         if param == "pi":
             summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
-            # Keq
-            summary.loc["Keq", "Mean"] = ci_stats["Keq"]["Mean"].item()
-            summary.loc["Keq", "95% LL"] = ci_stats["Keq"]["LL"].item()
-            summary.loc["Keq", "95% UL"] = ci_stats["Keq"]["UL"].item()
         elif param == "trans":
             summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
             summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
@@ -243,7 +143,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     # calculate vmin/vmax
     theta_mask = ci_stats["theta_probs"] > 0.5
     if theta_mask.sum():
-        hmax = quantile(ci_stats["height"]["Mean"][theta_mask], 0.99)
+        hmax = np.percentile(ci_stats["height"]["Mean"][theta_mask], 99)
     else:
         hmax = 1
     ci_stats["height"]["vmin"] = -0.03 * hmax
@@ -254,7 +154,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     ci_stats["x"]["vmax"] = 9
     ci_stats["y"]["vmin"] = -9
     ci_stats["y"]["vmax"] = 9
-    bmax = quantile(ci_stats["background"]["Mean"].flatten(), 0.99)
+    bmax = np.percentile(ci_stats["background"]["Mean"].flatten(), 99)
     ci_stats["background"]["vmin"] = -0.03 * bmax
     ci_stats["background"]["vmax"] = 1.3 * bmax
 
