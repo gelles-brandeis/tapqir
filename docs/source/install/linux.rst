@@ -123,7 +123,7 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
 8. Install ``tapqir``::
 
-    $ pip install tapqir
+    $ pip install tapqir[desktop]
 
 .. tip::
 

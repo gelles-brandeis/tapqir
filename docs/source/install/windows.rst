@@ -85,7 +85,7 @@ Install on Windows 11
 
 8. Install ``tapqir``::
 
-    $ pip install tapqir
+    $ pip install tapqir[desktop]
 
 Now you can run Tapqir in the WSL window in the same way you would on a linux computer.
 
