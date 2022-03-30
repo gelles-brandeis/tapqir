@@ -370,16 +370,15 @@ def fit(
 
     with pyro_backend(PYRO_BACKEND):
 
+        typer.echo("Fitting the data ...")
         model = models[model](**settings)
         model.load(cd)
 
         model.init(learning_rate, nbatch_size, fbatch_size)
-        typer.echo("Fitting the data ...")
         exit_code = model.run(num_iter, progress_bar=progress_bar)
-        if exit_code == 0:
-            typer.echo("Fitting the data: Done")
-        elif exit_code == 1:
+        if exit_code == 1:
             typer.echo("The model hasn't converged!")
+        typer.echo("Fitting the data: Done")
         typer.echo("Computing stats ...")
         save_stats(model, cd, save_matlab=matlab)
         typer.echo("Computing stats: Done")
