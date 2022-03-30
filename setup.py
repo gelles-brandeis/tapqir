@@ -40,7 +40,7 @@ DOCS_REQUIRE = [
     "sphinx-gallery",
     "sphinx-panels",
 ]
-IN_COLAB = "COLAB_GPU" in os.environ
+DESKTOP_REQUIRE = ["voila"]
 
 setuptools.setup(
     name="tapqir",
@@ -59,6 +59,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
+        "click<=8.0.4",
         "colorama",
         "funsor==0.4.2",
         "future",
@@ -73,15 +74,16 @@ setuptools.setup(
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
+        "tensorboard",
         "torch==1.10.0",
         "typer",
-    ]
-    + ([] if IN_COLAB else ["tensorboard", "voila"]),
+    ],
     extras_require={
+        "desktop": DESKTOP_REQUIRE,
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
         "docs": DOCS_REQUIRE,
-        "dev": EXTRAS_REQUIRE + TEST_REQUIRE + DOCS_REQUIRE,
+        "dev": DESKTOP_REQUIRE + EXTRAS_REQUIRE + TEST_REQUIRE + DOCS_REQUIRE,
     },
     keywords="image-classification probabilistic-programming cosmos pyro",
     license="Apache 2.0",
