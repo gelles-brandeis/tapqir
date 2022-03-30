@@ -40,7 +40,7 @@ DOCS_REQUIRE = [
     "sphinx-gallery",
     "sphinx-panels",
 ]
-DESKTOP_REQUIRE = ["tensorboard", "voila"]
+DESKTOP_REQUIRE = ["voila"]
 
 setuptools.setup(
     name="tapqir",
@@ -74,6 +74,7 @@ setuptools.setup(
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
+        "tensorboard",
         "torch==1.10.0",
         "typer",
     ],
