@@ -8,6 +8,10 @@ from pyroapi import distributions as dist
 
 
 class StatsMessenger(Messenger):
+    """
+    Confidence interval with equal areas around the median.
+    """
+
     def __init__(self, CI=0.95):
         super().__init__()
         self.CI = CI
