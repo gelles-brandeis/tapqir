@@ -590,11 +590,13 @@ class Cosmos(Model):
                 self.nbatch_size = len(ndx)
                 self.fbatch_size = len(fdx)
                 with torch.no_grad(), pyro.plate(
-                    "particles", size=25, dim=-3
+                    "particles", size=50, dim=-3
                 ), handlers.enum(first_available_dim=-4):
                     guide_tr = handlers.trace(self.guide).get_trace()
                     model_tr = handlers.trace(
-                        handlers.replay(self.model, trace=guide_tr)
+                        handlers.replay(
+                            handlers.block(self.model, hide=["data"]), trace=guide_tr
+                        )
                     ).get_trace()
                 model_tr.compute_log_prob()
                 guide_tr.compute_log_prob()
