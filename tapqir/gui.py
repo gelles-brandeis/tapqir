@@ -102,7 +102,7 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     # Tabs
     tab = widgets.Tab()
-    tab.children = [glimpseUI(out), fitUI(out)]
+    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out)]
     if not IN_COLAB:
         tensorboard = widgets.Output(layout={"border": "1px solid blue"})
         tab.children = tab.children + (showUI(out), tensorboard)
@@ -192,7 +192,7 @@ def cdCmd(path, DEFAULTS, out, layout):
     out.clear_output(wait=True)
 
 
-def glimpseUI(out):
+def glimpseUI(out, DEFAULTS):
     """
     Glimpse command layout.
     """
@@ -258,7 +258,8 @@ def glimpseUI(out):
         names="value",
     )
     useOfftarget.observe(
-        partial(toggleUseOffTarget, channelTabs=channelTabs), names="value"
+        partial(toggleUseOffTarget, channelTabs=channelTabs, DEFAULTS=DEFAULTS),
+        names="value",
     )
     extractAOIs.on_click(partial(glimpseCmd, layout=layout, out=out))
     specifyFrame.observe(
@@ -267,13 +268,19 @@ def glimpseUI(out):
     return layout
 
 
-def toggleUseOffTarget(checked, channelTabs):
+def toggleUseOffTarget(checked, channelTabs, DEFAULTS):
     checked = get_value(checked)
     if checked:
-        for tab in channelTabs.children:
+        for c, tab in enumerate(channelTabs.children):
             offtargetLayout = FileChooser(
                 ".", title="Off-target control locations file"
             )
+            if DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None:
+                offtargetLayout.reset(
+                    path=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).parent,
+                    filename=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).name,
+                )
+                offtargetLayout._apply_selection()
             tab.children = tab.children + (offtargetLayout,)
     else:
         for tab in channelTabs.children:
