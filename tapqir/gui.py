@@ -207,6 +207,8 @@ def glimpseUI(out, DEFAULTS):
     aoiSize = widgets.IntText(
         description="AOI image size",
         style={"description_width": "initial"},
+        min=5,
+        max=50,
     )
     # Specify frame range?
     specifyFrame = widgets.Checkbox(
@@ -216,11 +218,18 @@ def glimpseUI(out, DEFAULTS):
     firstFrame = widgets.IntText(
         description="Starting frame",
         style={"description_width": "initial"},
+        min=0,
     )
     # Last frame
     lastFrame = widgets.IntText(
         description="Ending frame",
         style={"description_width": "initial"},
+        min=1,
+    )
+    # Specify frame range?
+    useOfftarget = widgets.Checkbox(
+        description="Use off-target AOI locations?",
+        indent=False,
     )
     # Number of channels
     numChannels = widgets.BoundedIntText(
@@ -229,11 +238,6 @@ def glimpseUI(out, DEFAULTS):
         step=1,
         description="Number of color channels",
         style={"description_width": "initial"},
-    )
-    # Specify frame range?
-    useOfftarget = widgets.Checkbox(
-        description="Use off-target AOI locations?",
-        indent=False,
     )
     # Channel tabs
     channelTabs = widgets.Tab()
