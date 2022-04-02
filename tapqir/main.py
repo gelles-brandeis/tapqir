@@ -9,6 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import List, Optional
 
+import click
 import colorama
 import matplotlib.pyplot as plt
 import torch
@@ -44,14 +45,6 @@ class Model(str, Enum):
 
 
 def get_default(key):
-    if key in [
-        "name",
-        "glimpse-folder",
-        "ontarget-aoiinfo",
-        "offtarget-aoiinfo",
-        "driftlist",
-    ]:
-        return [c.get(key, None) for c in DEFAULTS["channels"]]
     return DEFAULTS[key]
 
 
@@ -76,8 +69,10 @@ def glimpse(
         partial(get_default, "P"),
         "--aoi-size",
         "-P",
+        min=5,
+        max=50,
         help="AOI image size - number of pixels along the axis",
-        prompt="AOI image size - number of pixels along the axis",
+        prompt="AOI image size",
     ),
     frame_range: bool = typer.Option(
         partial(get_default, "frame-range"),
@@ -87,37 +82,58 @@ def glimpse(
     ),
     frame_start: Optional[int] = typer.Option(
         partial(get_default, "frame-start"),
+        min=0,
         help="Starting frame.",
         prompt="Starting frame",
     ),
     frame_end: Optional[int] = typer.Option(
         partial(get_default, "frame-end"),
+        min=1,
         help="Ending frame.",
         prompt="Ending frame",
-    ),
-    num_channels: int = typer.Option(
-        partial(get_default, "num-channels"),
-        "--num-channels",
-        "-C",
-        help="Number of color channels",
-        prompt="Number of color channels",
     ),
     use_offtarget: bool = typer.Option(
         partial(get_default, "use-offtarget"),
         help="Use off-target AOI locations.",
         prompt="Use off-target AOI locations?",
     ),
-    name: Optional[List[str]] = typer.Option(partial(get_default, "name")),
-    glimpse_folder: Optional[List[str]] = typer.Option(
-        partial(get_default, "glimpse-folder")
+    num_channels: int = typer.Option(
+        partial(get_default, "num-channels"),
+        "--num-channels",
+        "-C",
+        min=1,
+        help="Number of color channels",
+        prompt="Number of color channels",
     ),
-    ontarget_aoiinfo: Optional[List[str]] = typer.Option(
-        partial(get_default, "ontarget-aoiinfo")
+    name: Optional[List[str]] = typer.Option(None),
+    glimpse_folder: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
     ),
-    offtarget_aoiinfo: Optional[List[str]] = typer.Option(
-        partial(get_default, "offtarget-aoiinfo")
+    driftlist: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
     ),
-    driftlist: Optional[List[str]] = typer.Option(partial(get_default, "driftlist")),
+    ontarget_aoiinfo: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    offtarget_aoiinfo: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
     overwrite: bool = typer.Option(
         True,
         "--overwrite",
@@ -162,54 +178,83 @@ def glimpse(
     if progress_bar is None:
         progress_bar = tqdm
 
-    # fill in default values
+    # read parameter input values
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
-    DEFAULTS["num-channels"] = num_channels
     DEFAULTS["frame-range"] = frame_range
     DEFAULTS["frame-start"] = frame_start
     DEFAULTS["frame-end"] = frame_end
     DEFAULTS["use-offtarget"] = use_offtarget
+    DEFAULTS["num-channels"] = num_channels
     DEFAULTS["labels"] = labels
 
-    # inputs descriptions
-    desc = {}
-    desc["name"] = "Channel name"
-    desc["glimpse-folder"] = "Header/glimpse folder"
-    desc["driftlist"] = "Driftlist file"
-    desc["ontarget-aoiinfo"] = "Target molecule locations file"
-    desc["offtarget-aoiinfo"] = "Off-target control locations file"
-    desc["ontarget-labels"] = "On-target AOI binding labels"
-    desc["offtarget-labels"] = "Off-target AOI binding labels"
-
-    keys = [
+    # parameter names
+    param_names = [
         "name",
         "glimpse-folder",
+        "driftlist",
         "ontarget-aoiinfo",
         "offtarget-aoiinfo",
-        "driftlist",
     ]
-    flags = [name, glimpse_folder, ontarget_aoiinfo, offtarget_aoiinfo, driftlist]
+    if labels:
+        param_names += ["ontarget-labels", "offtarget-labels"]
+
+    # parameter flags
+    param_flag = {}
+    param_flag["name"] = name
+    param_flag["glimpse-folder"] = glimpse_folder
+    param_flag["driftlist"] = driftlist
+    param_flag["ontarget-aoiinfo"] = ontarget_aoiinfo
+    param_flag["offtarget-aoiinfo"] = offtarget_aoiinfo
+
+    # parameter prompts
+    param_prompt = {}
+    param_prompt["name"] = "Channel name"
+    param_prompt["glimpse-folder"] = "Header/glimpse folder"
+    param_prompt["driftlist"] = "Driftlist file"
+    param_prompt["ontarget-aoiinfo"] = "Target molecule locations file"
+    param_prompt["offtarget-aoiinfo"] = "Off-target control locations file"
+    param_prompt["ontarget-labels"] = "On-target AOI binding labels"
+    param_prompt["offtarget-labels"] = "Off-target AOI binding labels"
+
+    # parameter types
+    param_type = {}
+    param_type["name"] = str
+    param_type["glimpse-folder"] = click.Path(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True
+    )
+    param_type["driftlist"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["ontarget-aoiinfo"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["offtarget-aoiinfo"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["ontarget-labels"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["offtarget-labels"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
 
     for c in range(num_channels):
+        typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
         if len(DEFAULTS["channels"]) < c + 1:
             DEFAULTS["channels"].append({})
-        for flag, key in zip(flags, keys):
-            DEFAULTS["channels"][c][key] = flag[c] if c < len(flag) else None
-
-    # interactive input
-    if not no_input:
-        for c in range(num_channels):
-            if labels:
-                keys += ["ontarget-labels", "offtarget-labels"]
-            typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
-            for key in keys:
-                if key == "offtarget-aoiinfo" and not use_offtarget:
-                    continue
-
-                DEFAULTS["channels"][c][key] = typer.prompt(
-                    desc[key], default=DEFAULTS["channels"][c][key]
-                )
+        for param_name in param_names:
+            if param_name == "offtarget-aoiinfo" and not use_offtarget:
+                continue
+            if c >= len(param_flag[param_name]):
+                if not no_input:
+                    DEFAULTS["channels"][c][param_name] = typer.prompt(
+                        param_prompt[param_name],
+                        default=DEFAULTS["channels"][c][param_name],
+                        type=param_type[param_name],
+                    )
+            else:
+                DEFAULTS["channels"][c][param_name] = param_flag[param_name][c]
 
     DEFAULTS = dict(DEFAULTS)
     for c in range(num_channels):
