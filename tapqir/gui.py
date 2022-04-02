@@ -102,10 +102,10 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     # Tabs
     tab = widgets.Tab()
-    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out)]
+    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
     if not IN_COLAB:
         tensorboard = widgets.Output(layout={"border": "1px solid blue"})
-        tab.children = tab.children + (showUI(out), tensorboard)
+        tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
     else:
         tensorboard = None
         tab.children = tab.children + (
@@ -121,66 +121,6 @@ def cdCmd(path, DEFAULTS, out, layout):
         with tensorboard:
             notebook.start(f"--logdir '{path}'")
             notebook.display(height=1000)
-    glimpseTab = tab.children[0]
-    for i, flag in enumerate(
-        [
-            "dataset",
-            "P",
-            "frame-range",
-            "frame-start",
-            "frame-end",
-            "num-channels",
-            "use-offtarget",
-        ]
-    ):
-        if DEFAULTS[flag] is not None:
-            glimpseTab.children[i].value = DEFAULTS[flag]
-    channelTabs = glimpseTab.children[7]
-    for c, channel in enumerate(channelTabs.children):
-        if len(DEFAULTS["channels"]) < c + 1:
-            DEFAULTS["channels"].append(defaultdict(lambda: None))
-        for widget, flag in zip(
-            channel.children,
-            [
-                "name",
-                "glimpse-folder",
-                "driftlist",
-                "ontarget-aoiinfo",
-                "offtarget-aoiinfo",
-            ],
-        ):
-            if DEFAULTS["channels"][c][flag] is not None:
-                if isinstance(widget, FileChooser):
-                    if flag == "glimpse-folder":
-                        widget.reset(path=Path(DEFAULTS["channels"][c][flag]))
-                    else:
-                        widget.reset(
-                            path=Path(DEFAULTS["channels"][c][flag]).parent,
-                            filename=Path(DEFAULTS["channels"][c][flag]).name,
-                        )
-                    widget._apply_selection()
-                elif flag:
-                    widget.value = DEFAULTS["channels"][c][flag]
-    numChannels = glimpseTab.children[5].value
-    fitTab = tab.children[1]
-    fitTab.children[1].options = [str(c) for c in range(numChannels)]
-    if not IN_COLAB:
-        showTab = tab.children[2]
-        showTab.children[1].options = [str(c) for c in range(numChannels)]
-    for i, flag in enumerate(
-        [
-            False,
-            False,
-            "cuda",
-            "nbatch-size",
-            "fbatch-size",
-            "learning-rate",
-            False,
-            "matlab",
-        ]
-    ):
-        if flag and DEFAULTS[flag] is not None:
-            fitTab.children[i].value = DEFAULTS[flag]
 
     # insert tabs into GUI
     wd = widgets.Label(value=f"Working directory: {path}")
@@ -200,39 +140,45 @@ def glimpseUI(out, DEFAULTS):
     layout = widgets.VBox()
     # Dataset name
     datasetName = widgets.Text(
+        value=DEFAULTS["dataset"],
         description="Dataset name",
         style={"description_width": "initial"},
     )
     # AOI image size
     aoiSize = widgets.IntText(
-        description="AOI image size",
-        style={"description_width": "initial"},
+        value=DEFAULTS["P"],
         min=5,
         max=50,
+        description="AOI image size",
+        style={"description_width": "initial"},
     )
     # Specify frame range?
     specifyFrame = widgets.Checkbox(
-        value=False, description="Specify frame range?", indent=False
+        value=DEFAULTS["frame-range"], description="Specify frame range?", indent=False
     )
     # First frame
     firstFrame = widgets.IntText(
+        value=DEFAULTS["frame-start"],
+        min=0,
         description="Starting frame",
         style={"description_width": "initial"},
-        min=0,
     )
     # Last frame
     lastFrame = widgets.IntText(
+        value=DEFAULTS["frame-end"],
+        min=1,
         description="Ending frame",
         style={"description_width": "initial"},
-        min=1,
     )
     # Specify frame range?
     useOfftarget = widgets.Checkbox(
+        value=DEFAULTS["use-offtarget"],
         description="Use off-target AOI locations?",
         indent=False,
     )
     # Number of channels
     numChannels = widgets.BoundedIntText(
+        value=DEFAULTS["num-channels"],
         min=1,
         max=4,
         step=1,
@@ -241,7 +187,7 @@ def glimpseUI(out, DEFAULTS):
     )
     # Channel tabs
     channelTabs = widgets.Tab()
-    channelUI(numChannels.value, channelTabs, useOfftarget)
+    channelUI(numChannels.value, channelTabs, useOfftarget, DEFAULTS)
     # extract AOIs
     extractAOIs = widgets.Button(description="Extract AOIs")
     # Layout
@@ -251,14 +197,19 @@ def glimpseUI(out, DEFAULTS):
         specifyFrame,
         firstFrame,
         lastFrame,
-        numChannels,
         useOfftarget,
+        numChannels,
         channelTabs,
         extractAOIs,
     ]
     # Callbacks
     numChannels.observe(
-        partial(channelUI, channelTabs=channelTabs, useOfftarget=useOfftarget),
+        partial(
+            channelUI,
+            channelTabs=channelTabs,
+            useOfftarget=useOfftarget,
+            DEFAULTS=DEFAULTS,
+        ),
         names="value",
     )
     useOfftarget.observe(
@@ -315,20 +266,34 @@ def glimpseCmd(b, layout, out):
     out.clear_output(wait=True)
 
 
-def channelUI(C, channelTabs, useOfftarget):
+def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
     C = get_value(C)
     currentC = len(channelTabs.children)
-    for i in range(max(currentC, C)):
-        if i < C and i < currentC:
+    for c in range(max(currentC, C)):
+        if c < C and c < currentC:
             continue
-        elif i < C and i >= currentC:
+        elif c < C and c >= currentC:
             layout = widgets.VBox()
             nameLayout = widgets.Text(
-                description="Channel name", style={"description_width": "initial"}
+                value=DEFAULTS["channels"][c]["name"],
+                description="Channel name",
+                style={"description_width": "initial"},
             )
             headerLayout = FileChooser(".", title="Header/glimpse folder")
-            ontargetLayout = FileChooser(".", title="Target molecule locations file")
+            headerLayout.reset(path=Path(DEFAULTS["channels"][c]["glimpse-folder"]))
+            headerLayout._apply_selection()
             driftlistLayout = FileChooser(".", title="Driftlist file")
+            driftlistLayout.reset(
+                path=Path(DEFAULTS["channels"][c]["driftlist"]).parent,
+                filename=Path(DEFAULTS["channels"][c]["driftlist"]).name,
+            )
+            driftlistLayout._apply_selection()
+            ontargetLayout = FileChooser(".", title="Target molecule locations file")
+            ontargetLayout.reset(
+                path=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).parent,
+                filename=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).name,
+            )
+            ontargetLayout._apply_selection()
             layout.children = [
                 nameLayout,
                 headerLayout,
@@ -339,13 +304,18 @@ def channelUI(C, channelTabs, useOfftarget):
                 offtargetLayout = FileChooser(
                     ".", title="Off-target control locations file"
                 )
+                offtargetLayout.reset(
+                    path=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).parent,
+                    filename=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).name,
+                )
+                offtargetLayout._apply_selection()
                 layout.children = layout.children + (offtargetLayout,)
             channelTabs.children = channelTabs.children + (layout,)
-        channelTabs.set_title(i, f"Channel #{i}")
+        channelTabs.set_title(c, f"Channel #{c}")
     channelTabs.children = channelTabs.children[:C]
 
 
-def fitUI(out):
+def fitUI(out, DEFAULTS):
     # Fit the data
     layout = widgets.VBox()
     # Model
@@ -359,27 +329,30 @@ def fitUI(out):
     channelNumber = widgets.Dropdown(
         description="Channel numbers",
         value="0",
-        options=["0"],
+        options=[str(c) for c in range(DEFAULTS["num-channels"])],
         style={"description_width": "initial"},
     )
     # Run computations on GPU?
     useGpu = widgets.Checkbox(
-        value=True,
+        value=DEFAULTS["cuda"],
         description="Run computations on GPU?",
         style={"description_width": "initial"},
     )
     # AOI batch size
     aoiBatch = widgets.IntText(
+        value=DEFAULTS["nbatch-size"],
         description="AOI batch size",
         style={"description_width": "initial"},
     )
     # Frame batch size
     frameBatch = widgets.IntText(
+        value=DEFAULTS["fbatch-size"],
         description="Frame batch size",
         style={"description_width": "initial"},
     )
     # Learning rate
     learningRate = widgets.FloatText(
+        value=DEFAULTS["learning-rate"],
         description="Learning rate",
         style={"description_width": "initial"},
     )
@@ -390,7 +363,7 @@ def fitUI(out):
     )
     # Save parameters in matlab format?
     saveMatlab = widgets.Checkbox(
-        value=False,
+        value=DEFAULTS["matlab"],
         description="Save parameters in matlab format?",
         style={"description_width": "initial"},
     )
@@ -434,7 +407,7 @@ def fitCmd(b, layout, out):
     out.clear_output(wait=True)
 
 
-def showUI(out):
+def showUI(out, DEFAULTS):
     # Fit the data
     layout = widgets.VBox()
     # Model
@@ -448,7 +421,7 @@ def showUI(out):
     channelNumber = widgets.Dropdown(
         description="Channel numbers",
         value="0",
-        options=["0"],
+        options=[str(c) for c in range(DEFAULTS["num-channels"])],
         style={"description_width": "initial"},
     )
     # Fit the data
