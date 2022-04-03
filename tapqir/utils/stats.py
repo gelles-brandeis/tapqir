@@ -249,10 +249,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     "time1",
                     "ttb",
                 ):
-                    ci_stats[param] = field.numpy()
+                    ci_stats[param] = np.asarray(field)
                     continue
                 for stat, value in field.items():
-                    ci_stats[param][stat] = value.cpu().numpy()
+                    ci_stats[param][stat] = np.asarray(value)
             mat_path = path / f"{model.full_name}-params.mat"
             savemat(mat_path, ci_stats)
             logger.info(f"Matlab parameters were saved in {mat_path}")
