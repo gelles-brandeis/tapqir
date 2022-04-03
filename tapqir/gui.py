@@ -157,7 +157,7 @@ def glimpseUI(out, DEFAULTS):
         value=DEFAULTS["frame-range"], description="Specify frame range?", indent=False
     )
     # First frame
-    firstFrame = widgets.IntText(
+    firstFrame = widgets.BoundedIntText(
         value=DEFAULTS["frame-start"],
         min=0,
         disabled=not DEFAULTS["frame-range"],
@@ -165,7 +165,7 @@ def glimpseUI(out, DEFAULTS):
         style={"description_width": "initial"},
     )
     # Last frame
-    lastFrame = widgets.IntText(
+    lastFrame = widgets.BoundedIntText(
         value=DEFAULTS["frame-end"],
         min=1,
         disabled=not DEFAULTS["frame-range"],
