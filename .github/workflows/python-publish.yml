@@ -23,6 +23,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install twine
           pip install .
+          git fetch --tags --all
+          tapqir --version
       - name: Build and Upload to TestPyPI
         run: |
           python setup.py sdist bdist_wheel
