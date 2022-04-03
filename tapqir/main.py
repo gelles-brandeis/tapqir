@@ -19,6 +19,7 @@ from tqdm import tqdm
 
 from tapqir import __version__
 from tapqir.distributions.util import gaussian_spots
+from tapqir.exceptions import CudaOutOfMemoryError, TapqirFileNotFoundError
 
 app = typer.Typer()
 
@@ -172,6 +173,8 @@ def glimpse(
 
     torch.set_default_tensor_type(torch.FloatTensor)
 
+    logger = logging.getLogger("tapqir")
+
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
@@ -269,13 +272,15 @@ def glimpse(
                 sort_keys=False,
             )
 
-    typer.echo("Extracting AOIs ...")
+    logger.info("Extracting AOIs ...")
     read_glimpse(
         path=cd,
         progress_bar=progress_bar,
         **DEFAULTS,
     )
-    typer.echo("Extracting AOIs: Done")
+    logger.info("Extracting AOIs: Done")
+
+    return 0
 
 
 @app.command()
@@ -370,7 +375,8 @@ def fit(
     from pyroapi import pyro_backend
 
     from tapqir.models import models
-    from tapqir.utils.stats import save_stats
+
+    logger = logging.getLogger("tapqir")
 
     settings = {}
     settings["S"] = 1
@@ -416,18 +422,31 @@ def fit(
 
     with pyro_backend(PYRO_BACKEND):
 
-        typer.echo("Fitting the data ...")
+        logger.info("Fitting the data ...")
         model = models[model](**settings)
-        model.load(cd)
+        try:
+            model.load(cd)
+        except TapqirFileNotFoundError:
+            logger.exception("Failed to load data file")
+            return 1
 
         model.init(learning_rate, nbatch_size, fbatch_size)
-        exit_code = model.run(num_iter, progress_bar=progress_bar)
-        if exit_code == 1:
-            typer.echo("The model hasn't converged!")
-        typer.echo("Fitting the data: Done")
-        typer.echo("Computing stats ...")
-        save_stats(model, cd, save_matlab=matlab)
-        typer.echo("Computing stats: Done")
+        try:
+            model.run(num_iter, progress_bar=progress_bar)
+        except CudaOutOfMemoryError:
+            logger.exception("Failed to fit the data")
+            return 1
+        logger.info("Fitting the data: Done")
+
+        logger.info("Computing stats ...")
+        try:
+            model.compute_stats(save_matlab=matlab)
+        except CudaOutOfMemoryError:
+            logger.exception("Failed to compute stats")
+            return 1
+        logger.info("Computing stats: Done")
+
+    return 0
 
 
 @app.command()
@@ -479,7 +498,8 @@ def stats(
     from pyroapi import pyro_backend
 
     from tapqir.models import models
-    from tapqir.utils.stats import save_stats
+
+    logger = logging.getLogger("tapqir")
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
@@ -508,15 +528,24 @@ def stats(
 
     with pyro_backend(PYRO_BACKEND):
 
+        logger.info("Computing stats ...")
         model = models[model](**settings)
-        model.load(cd)
+        try:
+            model.load(cd)
+        except TapqirFileNotFoundError:
+            logger.exception("Failed to load data file")
+            return 1
         model.load_checkpoint(param_only=True)
         model.nbatch_size = nbatch_size
         model.fbatch_size = fbatch_size
+        try:
+            model.compute_stats(save_matlab=matlab)
+        except CudaOutOfMemoryError:
+            logger.exception("Failed to compute stats")
+            return 1
+        logger.info("Computing stats: Done")
 
-        typer.echo("Computing stats ...")
-        save_stats(model, cd, save_matlab=matlab)
-        typer.echo("Computing stats: Done")
+    return 0
 
 
 def config_axis(ax, label, f1, f2, ymin=None, ymax=None, xticklabels=False):
@@ -807,6 +836,8 @@ def main(
     and files that are created by commands such as ``tapqir fit``.
     """
 
+    from dvc.logger import ColorFormatter
+
     global DEFAULTS
     # set working directory
     DEFAULTS["cd"] = cd
@@ -857,12 +888,6 @@ def main(
             ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
         )
 
-    # read defaults from config file
-    with open(CONFIG_PATH, "r") as cfg_file:
-        cfg_defaults = yaml.safe_load(cfg_file) or {}
-        DEFAULTS.update(cfg_defaults)
-        typer.echo(f"Configuration options are read from {CONFIG_PATH}.")
-
     # create logger
     logger = logging.getLogger("tapqir")
 
@@ -872,7 +897,7 @@ def main(
     formatter = logging.Formatter(
         fmt="%(levelname)s - %(message)s",
     )
-    ch.setFormatter(formatter)
+    ch.setFormatter(ColorFormatter())
     logger.addHandler(ch)
 
     fh = logging.FileHandler(cd / ".tapqir" / "loginfo")
@@ -883,6 +908,12 @@ def main(
     )
     fh.setFormatter(formatter)
     logger.addHandler(fh)
+
+    # read defaults from config file
+    with open(CONFIG_PATH, "r") as cfg_file:
+        cfg_defaults = yaml.safe_load(cfg_file) or {}
+        DEFAULTS.update(cfg_defaults)
+        logger.info(f"Configuration options are read from {CONFIG_PATH}.")
 
 
 # click object is required to generate docs with sphinx-click

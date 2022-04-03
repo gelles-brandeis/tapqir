@@ -21,6 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from tapqir import __version__ as tapqir_version
+from tapqir.exceptions import CudaOutOfMemoryError, TapqirFileNotFoundError
 from tapqir.utils.dataset import load
 from tapqir.utils.stats import save_stats
 
@@ -110,10 +111,14 @@ class Model:
 
         # load fit results
         if not data_only:
-            self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
-            self.summary = pd.read_csv(
-                self.path / f"{self.full_name}-summary.csv", index_col=0
-            )
+            try:
+                self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
+                self.summary = pd.read_csv(
+                    self.path / f"{self.full_name}-summary.csv", index_col=0
+                )
+            except FileNotFoundError:
+                logger.warning("Unable to load parameter or summary file")
+                self.compute_stats()
 
     def model(self):
         """
@@ -161,7 +166,7 @@ class Model:
 
         try:
             self.load_checkpoint()
-        except (FileNotFoundError, TypeError):
+        except TapqirFileNotFoundError:
             pyro.clear_param_store()
             self.iter = 0
             self.converged = False
@@ -174,13 +179,12 @@ class Model:
         self.nbatch_size = min(nbatch_size, self.data.Nt)
         self.fbatch_size = min(fbatch_size, self.data.F)
 
-    def run(self, num_iter: int = 0, progress_bar=tqdm) -> int:
+    def run(self, num_iter: int = 0, progress_bar=tqdm) -> None:
         """
         Run inference procedure for a specified number of iterations.
         If num_iter equals zero then run till model converges.
 
         :param num_iter: Number of iterations.
-        :return: Exit code.
         """
         use_crit = False
         if not num_iter:
@@ -204,8 +208,8 @@ class Model:
                     if not self.iter % 200:
                         self.save_checkpoint(writer)
                         if use_crit and self.converged:
-                            logger.debug(f"Iteration #{self.iter} model converged.")
-                            return 0
+                            logger.info(f"Iteration #{self.iter} model converged.")
+                            break
                     self.iter += 1
                 except ValueError:
                     # load last checkpoint
@@ -220,7 +224,11 @@ class Model:
                     logger.debug(
                         f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
                     )
-        return 1
+                except RuntimeError as err:
+                    assert err.args[0].startswith("CUDA out of memory")
+                    raise CudaOutOfMemoryError()
+            else:
+                logger.warning(f"Iteration #{self.iter} model has not converged.")
 
     def save_checkpoint(self, writer: SummaryWriter = None):
         """
@@ -315,10 +323,16 @@ class Model:
         """
         device = self.device
         path = Path(path) if path else self.run_path
+        try:
+            checkpoint = torch.load(
+                path / f"{self.full_name}-model.tpqr", map_location=device
+            )
+        except FileNotFoundError:
+            raise TapqirFileNotFoundError(
+                "model", path / f"{self.full_name}-model.tpqr"
+            )
+
         pyro.clear_param_store()
-        checkpoint = torch.load(
-            path / f"{self.full_name}-model.tpqr", map_location=device
-        )
         pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
             self.converged = checkpoint["convergence_status"]
@@ -338,8 +352,16 @@ class Model:
         :param CI: credible region.
         :param save_matlab: Save output in Matlab format as well.
         """
-        save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
+        try:
+            save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
+        except RuntimeError as err:
+            assert err.args[0].startswith("CUDA out of memory")
+            raise CudaOutOfMemoryError()
+        logger.debug("Computing stats: Successful.")
+
         if self.path is not None:
             logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
             if save_matlab:
-                logger.info(f"Parameters were saved in {self.path / 'params.mat'}")
+                logger.info(
+                    f"Matlab parameters were saved in {self.path / 'params.mat'}"
+                )
