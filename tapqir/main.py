@@ -844,7 +844,7 @@ def main(
     and files that are created by commands such as ``tapqir fit``.
     """
 
-    from dvc.logger import ColorFormatter
+    from tapqir.logger import ColorFormatter
 
     global DEFAULTS
     # set working directory
