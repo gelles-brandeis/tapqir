@@ -1,12 +1,12 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
-import pyro
 import torch
 from pyro.ops.indexing import Vindex
 from pyro.ops.stats import hpdi, quantile
@@ -20,7 +20,7 @@ from sklearn.metrics import (
 from tapqir.distributions.util import gaussian_spots
 from tapqir.handlers import StatsMessenger
 
-pyro.enable_validation(False)
+logger = logging.getLogger(__name__)
 
 
 def snr_and_chi2(
@@ -232,7 +232,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        torch.save(ci_stats, path / f"{model.full_name}-params.tpqr")
+        param_path = path / f"{model.full_name}-params.tpqr"
+        torch.save(ci_stats, param_path)
+        logger.info(f"Parameters were saved in {param_path}")
         if save_matlab:
             from scipy.io import savemat
 
@@ -247,11 +249,13 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     "time1",
                     "ttb",
                 ):
-                    ci_stats[param] = field.numpy()
+                    ci_stats[param] = np.asarray(field)
                     continue
                 for stat, value in field.items():
-                    ci_stats[param][stat] = value.cpu().numpy()
-            savemat(path / f"{model.full_name}-params.mat", ci_stats)
-        summary.to_csv(
-            path / f"{model.full_name}-summary.csv",
-        )
+                    ci_stats[param][stat] = np.asarray(value)
+            mat_path = path / f"{model.full_name}-params.mat"
+            savemat(mat_path, ci_stats)
+            logger.info(f"Matlab parameters were saved in {mat_path}")
+        csv_path = path / f"{model.full_name}-summary.csv"
+        summary.to_csv(csv_path)
+        logger.info(f"Summary statistics were saved in {csv_path}")

@@ -77,6 +77,7 @@ def test_commands_cpu(dataset_path):
             "--fbatch-size",
             "5",
             "--cpu",
+            "--matlab",
             "--no-input",
         ],
     ]

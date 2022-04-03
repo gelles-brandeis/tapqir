@@ -1,6 +1,7 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 import os
 from collections import defaultdict
 from functools import partial, singledispatch
@@ -9,7 +10,6 @@ from pathlib import Path
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import torch
-import typer
 from ipyevents import Event
 from ipyfilechooser import FileChooser
 from tensorboard import notebook
@@ -18,6 +18,8 @@ from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
 from tapqir.main import fit, glimpse, main, show
+
+logger = logging.getLogger("tapqir")
 
 # disable pyplot keyboard shortcuts
 plt.rcParams["keymap.zoom"].remove("o")
@@ -97,7 +99,7 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     path = get_path(path)
     with out:
-        typer.echo("Loading configuration data ...")
+        logger.info("Loading configuration data ...")
         main(cd=path)
 
     # Tabs
@@ -127,7 +129,7 @@ def cdCmd(path, DEFAULTS, out, layout):
     layout.children = (wd, tab) + layout.children[1:]
 
     with out:
-        typer.echo("Loading configuration data: Done")
+        logger.info("Loading configuration data: Done")
 
     out.clear_output(wait=True)
 
@@ -453,15 +455,21 @@ def showUI(out, DEFAULTS):
 
 def showCmd(b, layout, view, out):
     with out:
-        typer.echo("Loading results ...")
-    with view:
-        model, fig, item, ax = show(
+        logger.info("Loading results ...")
+        show_ret = show(
             model=layout.children[0].value,
             channels=[int(layout.children[1].value)],
             n=0,
             f1=None,
             f2=None,
+            gui=True,
         )
+        if show_ret == 1:
+            out.clear_output(wait=True)
+            return
+        model, fig, item, ax = show_ret
+    with view:
+        plt.show()
     controls = layout.children[3]
     n = widgets.BoundedIntText(
         value=0,
@@ -602,7 +610,7 @@ def showCmd(b, layout, view, out):
         )
     )
     with out:
-        typer.echo("Loading results: Done")
+        logger.info("Loading results: Done")
 
     out.clear_output(wait=True)
 

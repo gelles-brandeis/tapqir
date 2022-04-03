@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import typer
 from matplotlib.patches import Rectangle
 from scipy.io import loadmat
 
@@ -337,7 +336,7 @@ def read_glimpse(path, progress_bar, **kwargs):
             assert (target_xy[dtype][c] > 0.5 * P - 1).all()
             assert (target_xy[dtype][c] < 0.5 * P).all()
 
-    typer.echo("Processing extracted AOIs ...")
+    logger.info("Processing extracted AOIs ...")
     min_data = np.inf
     for dtype in data.keys():
         # concatenate color channels
