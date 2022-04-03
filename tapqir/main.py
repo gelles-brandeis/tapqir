@@ -240,9 +240,10 @@ def glimpse(
     )
 
     for c in range(num_channels):
-        typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
         if len(DEFAULTS["channels"]) < c + 1:
             DEFAULTS["channels"].append({})
+        if not no_input:
+            typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
         for param_name in param_names:
             if param_name == "offtarget-aoiinfo" and not use_offtarget:
                 continue
