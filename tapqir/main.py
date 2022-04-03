@@ -426,8 +426,8 @@ def fit(
         model = models[model](**settings)
         try:
             model.load(cd)
-        except TapqirFileNotFoundError:
-            logger.exception("Failed to load data file")
+        except TapqirFileNotFoundError as err:
+            logger.exception(f"Failed to load {err.name} file")
             return 1
 
         model.init(learning_rate, nbatch_size, fbatch_size)
@@ -587,14 +587,21 @@ def show(
     n: int = typer.Option(0, help="n", prompt="n"),
     f1: Optional[int] = None,
     f2: Optional[int] = None,
+    gui=None,
 ):
     from tapqir.models import models
+
+    logger = logging.getLogger("tapqir")
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
     model = models[model](1, 2, channels, "cpu", "float")
-    model.load(cd, data_only=False)
+    try:
+        model.load(cd, data_only=False)
+    except TapqirFileNotFoundError as err:
+        logger.exception(f"Failed to load {err.name} file")
+        return 1
     if f1 is None:
         f1 = 0
     if f2 is None:
@@ -793,7 +800,8 @@ def show(
         color="k",
     )
 
-    plt.show()
+    if not gui:
+        plt.show()
     return model, fig, item, ax
 
 

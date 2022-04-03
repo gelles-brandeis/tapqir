@@ -113,12 +113,18 @@ class Model:
         if not data_only:
             try:
                 self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
+            except FileNotFoundError:
+                raise TapqirFileNotFoundError(
+                    "parameter", self.path / f"{self.full_name}-params.tpqr"
+                )
+            try:
                 self.summary = pd.read_csv(
                     self.path / f"{self.full_name}-summary.csv", index_col=0
                 )
             except FileNotFoundError:
-                logger.warning("Unable to load parameter or summary file")
-                self.compute_stats()
+                raise TapqirFileNotFoundError(
+                    "summary", self.path / f"{self.full_name}-summary.csv"
+                )
 
     def model(self):
         """
@@ -323,14 +329,11 @@ class Model:
         """
         device = self.device
         path = Path(path) if path else self.run_path
+        model_path = path / f"{self.full_name}-model.tpqr"
         try:
-            checkpoint = torch.load(
-                path / f"{self.full_name}-model.tpqr", map_location=device
-            )
+            checkpoint = torch.load(model_path, map_location=device)
         except FileNotFoundError:
-            raise TapqirFileNotFoundError(
-                "model", path / f"{self.full_name}-model.tpqr"
-            )
+            raise TapqirFileNotFoundError("model", model_path)
 
         pyro.clear_param_store()
         pyro.get_param_store().set_state(checkpoint["params"])
@@ -340,7 +343,7 @@ class Model:
             self.iter = checkpoint["iter"]
             self.optim.set_state(checkpoint["optimizer"])
             logger.info(
-                f"Iteration #{self.iter}. Loaded a model checkpoint from {path}"
+                f"Iteration #{self.iter}. Loaded a model checkpoint from {model_path}"
             )
         if warnings and not checkpoint["convergence_status"]:
             logger.warning(f"Model at {path} has not been fully trained")
@@ -358,10 +361,3 @@ class Model:
             assert err.args[0].startswith("CUDA out of memory")
             raise CudaOutOfMemoryError()
         logger.debug("Computing stats: Successful.")
-
-        if self.path is not None:
-            logger.info(f"Parameters were saved in {self.path / 'params.tpqr'}")
-            if save_matlab:
-                logger.info(
-                    f"Matlab parameters were saved in {self.path / 'params.mat'}"
-                )

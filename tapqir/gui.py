@@ -99,36 +99,35 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     path = get_path(path)
     with out:
-        logger.info("Loading configuration data ...")
         main(cd=path)
+        logger.info("Loading configuration data ...")
 
-    # Tabs
-    tab = widgets.Tab()
-    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
-    if not IN_COLAB:
-        tensorboard = widgets.Output(layout={"border": "1px solid blue"})
-        tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
-    else:
-        tensorboard = None
-        tab.children = tab.children + (
-            widgets.Label(value="Disabled in Colab"),
-            widgets.Label(value="Disabled in Colab"),
-        )
-    tab.set_title(0, "Extract AOIs")
-    tab.set_title(1, "Fit the data")
-    tab.set_title(2, "View results")
-    tab.set_title(3, "Tensorboard")
+        # Tabs
+        tab = widgets.Tab()
+        tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
+        if not IN_COLAB:
+            tensorboard = widgets.Output(layout={"border": "1px solid blue"})
+            tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
+        else:
+            tensorboard = None
+            tab.children = tab.children + (
+                widgets.Label(value="Disabled in Colab"),
+                widgets.Label(value="Disabled in Colab"),
+            )
+        tab.set_title(0, "Extract AOIs")
+        tab.set_title(1, "Fit the data")
+        tab.set_title(2, "View results")
+        tab.set_title(3, "Tensorboard")
 
-    if tensorboard is not None:
-        with tensorboard:
-            notebook.start(f"--logdir '{path}'")
-            notebook.display(height=1000)
+        if tensorboard is not None:
+            with tensorboard:
+                notebook.start(f"--logdir '{path}'")
+                notebook.display(height=1000)
 
-    # insert tabs into GUI
-    wd = widgets.Label(value=f"Working directory: {path}")
-    layout.children = (wd, tab) + layout.children[1:]
+        # insert tabs into GUI
+        wd = widgets.Label(value=f"Working directory: {path}")
+        layout.children = (wd, tab) + layout.children[1:]
 
-    with out:
         logger.info("Loading configuration data: Done")
 
     out.clear_output(wait=True)
@@ -456,14 +455,20 @@ def showUI(out, DEFAULTS):
 def showCmd(b, layout, view, out):
     with out:
         logger.info("Loading results ...")
-    with view:
-        model, fig, item, ax = show(
+        show_ret = show(
             model=layout.children[0].value,
             channels=[int(layout.children[1].value)],
             n=0,
             f1=None,
             f2=None,
+            gui=True,
         )
+        if show_ret == 1:
+            out.clear_output(wait=True)
+            return
+        model, fig, item, ax = show_ret
+    with view:
+        plt.show()
     controls = layout.children[3]
     n = widgets.BoundedIntText(
         value=0,
