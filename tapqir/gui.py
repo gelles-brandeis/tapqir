@@ -102,8 +102,7 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     # Tabs
     tab = widgets.Tab()
-    with out:
-        tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
+    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
     if not IN_COLAB:
         tensorboard = widgets.Output(layout={"border": "1px solid blue"})
         tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
