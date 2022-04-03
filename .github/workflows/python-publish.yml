@@ -24,6 +24,7 @@ jobs:
           pip install twine
           git fetch --tags --all
           pip install .
+          git tag -l
           tapqir --version
       - name: Build and Upload to TestPyPI
         run: |
