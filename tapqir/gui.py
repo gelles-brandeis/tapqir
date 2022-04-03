@@ -99,35 +99,36 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     path = get_path(path)
     with out:
-        main(cd=path)
         logger.info("Loading configuration data ...")
+        main(cd=path)
 
-        # Tabs
-        tab = widgets.Tab()
-        tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
-        if not IN_COLAB:
-            tensorboard = widgets.Output(layout={"border": "1px solid blue"})
-            tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
-        else:
-            tensorboard = None
-            tab.children = tab.children + (
-                widgets.Label(value="Disabled in Colab"),
-                widgets.Label(value="Disabled in Colab"),
-            )
-        tab.set_title(0, "Extract AOIs")
-        tab.set_title(1, "Fit the data")
-        tab.set_title(2, "View results")
-        tab.set_title(3, "Tensorboard")
+    # Tabs
+    tab = widgets.Tab()
+    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
+    if not IN_COLAB:
+        tensorboard = widgets.Output(layout={"border": "1px solid blue"})
+        tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
+    else:
+        tensorboard = None
+        tab.children = tab.children + (
+            widgets.Label(value="Disabled in Colab"),
+            widgets.Label(value="Disabled in Colab"),
+        )
+    tab.set_title(0, "Extract AOIs")
+    tab.set_title(1, "Fit the data")
+    tab.set_title(2, "View results")
+    tab.set_title(3, "Tensorboard")
 
-        if tensorboard is not None:
-            with tensorboard:
-                notebook.start(f"--logdir '{path}'")
-                notebook.display(height=1000)
+    if tensorboard is not None:
+        with tensorboard:
+            notebook.start(f"--logdir '{path}'")
+            notebook.display(height=1000)
 
-        # insert tabs into GUI
-        wd = widgets.Label(value=f"Working directory: {path}")
-        layout.children = (wd, tab) + layout.children[1:]
+    # insert tabs into GUI
+    wd = widgets.Label(value=f"Working directory: {path}")
+    layout.children = (wd, tab) + layout.children[1:]
 
+    with out:
         logger.info("Loading configuration data: Done")
 
     out.clear_output(wait=True)
