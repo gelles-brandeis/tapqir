@@ -28,6 +28,7 @@ jobs:
           tapqir --version
       - name: Build and Upload to TestPyPI
         run: |
+          git tag -l
           python setup.py sdist bdist_wheel
           twine check dist/*
           twine upload dist/*
