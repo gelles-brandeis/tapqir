@@ -102,7 +102,8 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     # Tabs
     tab = widgets.Tab()
-    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
+    with out:
+        tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
     if not IN_COLAB:
         tensorboard = widgets.Output(layout={"border": "1px solid blue"})
         tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
@@ -273,6 +274,8 @@ def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
         if c < C and c < currentC:
             continue
         elif c < C and c >= currentC:
+            if len(DEFAULTS["channels"]) < c + 1:
+                DEFAULTS["channels"].append(defaultdict(lambda: None))
             layout = widgets.VBox()
             nameLayout = widgets.Text(
                 value=DEFAULTS["channels"][c]["name"],
@@ -280,20 +283,23 @@ def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
                 style={"description_width": "initial"},
             )
             headerLayout = FileChooser(".", title="Header/glimpse folder")
-            headerLayout.reset(path=Path(DEFAULTS["channels"][c]["glimpse-folder"]))
-            headerLayout._apply_selection()
+            if DEFAULTS["channels"][c]["glimpse-folder"] is not None:
+                headerLayout.reset(path=Path(DEFAULTS["channels"][c]["glimpse-folder"]))
+                headerLayout._apply_selection()
             driftlistLayout = FileChooser(".", title="Driftlist file")
-            driftlistLayout.reset(
-                path=Path(DEFAULTS["channels"][c]["driftlist"]).parent,
-                filename=Path(DEFAULTS["channels"][c]["driftlist"]).name,
-            )
-            driftlistLayout._apply_selection()
+            if DEFAULTS["channels"][c]["driftlist"] is not None:
+                driftlistLayout.reset(
+                    path=Path(DEFAULTS["channels"][c]["driftlist"]).parent,
+                    filename=Path(DEFAULTS["channels"][c]["driftlist"]).name,
+                )
+                driftlistLayout._apply_selection()
             ontargetLayout = FileChooser(".", title="Target molecule locations file")
-            ontargetLayout.reset(
-                path=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).parent,
-                filename=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).name,
-            )
-            ontargetLayout._apply_selection()
+            if DEFAULTS["channels"][c]["ontarget-aoiinfo"] is not None:
+                ontargetLayout.reset(
+                    path=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).parent,
+                    filename=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).name,
+                )
+                ontargetLayout._apply_selection()
             layout.children = [
                 nameLayout,
                 headerLayout,
@@ -304,11 +310,14 @@ def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
                 offtargetLayout = FileChooser(
                     ".", title="Off-target control locations file"
                 )
-                offtargetLayout.reset(
-                    path=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).parent,
-                    filename=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).name,
-                )
-                offtargetLayout._apply_selection()
+                if DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None:
+                    offtargetLayout.reset(
+                        path=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).parent,
+                        filename=Path(
+                            DEFAULTS["channels"][c]["offtarget-aoiinfo"]
+                        ).name,
+                    )
+                    offtargetLayout._apply_selection()
                 layout.children = layout.children + (offtargetLayout,)
             channelTabs.children = channelTabs.children + (layout,)
         channelTabs.set_title(c, f"Channel #{c}")
