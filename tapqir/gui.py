@@ -943,11 +943,11 @@ def logUI(out):
 
 def logCmd(b, layout, logView, out):
     with out:
-        logger.info("Loading log info ...")
+        logger.info("Loading logs ...")
     with logView:
         log()
     with out:
-        logger.info("Loading log info: Done")
+        logger.info("Loading logs: Done")
     logView.clear_output(wait=True)
     out.clear_output(wait=True)
 
