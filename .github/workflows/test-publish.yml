@@ -1,11 +1,11 @@
 # This workflow will upload a Python Package using Twine when a release is created
-# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
+# For more information see: https://dev.to/arnu515/create-a-pypi-pip-package-test-it-and-publish-it-using-github-actions-part-2-1o83
 
 name: Publish Python 🐍 distributions 📦 to PyPI and TestPyPI
 
 on:
   push:
-    branches: [ test-pypi ]
+    branches: [ latest ]
 
 jobs:
   deploy:
