@@ -26,7 +26,7 @@ jobs:
           git fetch --tags --all
           pip install .
           git tag -l
-          git describe --tags
+          git describe --tags --dirty --always --long
           tapqir --version
       - name: Build and Upload to TestPyPI
         run: |
