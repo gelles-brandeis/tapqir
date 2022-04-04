@@ -17,7 +17,7 @@ from tqdm import tqdm_notebook
 from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
-from tapqir.main import fit, glimpse, main, show
+from tapqir.main import fit, glimpse, log, main, show
 
 logger = logging.getLogger("tapqir")
 
@@ -114,10 +114,12 @@ def cdCmd(path, DEFAULTS, out, layout):
             widgets.Label(value="Disabled in Colab"),
             widgets.Label(value="Disabled in Colab"),
         )
+    tab.children = tab.children + (logUI(out),)
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
     tab.set_title(2, "View results")
     tab.set_title(3, "Tensorboard")
+    tab.set_title(4, "View logs")
 
     if tensorboard is not None:
         with tensorboard:
@@ -420,7 +422,7 @@ def fitCmd(b, layout, out):
 
 
 def showUI(out, DEFAULTS):
-    # Fit the data
+    # View results
     layout = widgets.VBox()
     # Model
     modelSelect = widgets.Dropdown(
@@ -919,6 +921,35 @@ def toggleWidgets(b, widgets):
     checked = get_value(b)
     for w in widgets:
         w.disabled = not checked
+
+
+def logUI(out):
+    # View logs
+    layout = widgets.VBox()
+    # Load logs
+    showLog = widgets.Button(description="(Re)-load logs")
+    logView = widgets.Output(
+        layout={"max_height": "850px", "overflow": "auto", "border": "1px solid red"}
+    )
+    # Layout
+    layout.children = [
+        showLog,
+        logView,
+    ]
+    # Callbacks
+    showLog.on_click(partial(logCmd, layout=layout, logView=logView, out=out))
+    return layout
+
+
+def logCmd(b, layout, logView, out):
+    with out:
+        logger.info("Loading logs ...")
+    with logView:
+        log()
+    with out:
+        logger.info("Loading logs: Done")
+    logView.clear_output(wait=True)
+    out.clear_output(wait=True)
 
 
 def app():
