@@ -422,7 +422,7 @@ def fitCmd(b, layout, out):
 
 
 def showUI(out, DEFAULTS):
-    # Fit the data
+    # View results
     layout = widgets.VBox()
     # Model
     modelSelect = widgets.Dropdown(
@@ -924,9 +924,9 @@ def toggleWidgets(b, widgets):
 
 
 def logUI(out):
-    # Fit the data
+    # View logs
     layout = widgets.VBox()
-    # Fit the data
+    # Load logs
     showLog = widgets.Button(description="(Re)-load logs")
     logView = widgets.Output(
         layout={"max_height": "850px", "overflow": "auto", "border": "1px solid red"}
