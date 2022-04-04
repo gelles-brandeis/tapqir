@@ -14,6 +14,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
@@ -22,15 +24,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install twine
-          git tag -l
-          git fetch --tags --all
           pip install .
           git tag -l
-          git describe --tags --dirty --always --long
           tapqir --version
       - name: Build and Upload to TestPyPI
         run: |
-          git tag -l
           python setup.py sdist bdist_wheel
           twine check dist/*
           twine upload dist/*
