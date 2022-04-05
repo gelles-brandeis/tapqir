@@ -20,5 +20,12 @@ start.
 
     !pip install --quiet tapqir > install.log
 
+Check version
+-------------
+
+To check Tapqir version run::
+
+   !tapqir --version
+
 .. _a new notebook: https://colab.research.google.com/?utm_source=scs-index 
 .. _example notebook: https://colab.research.google.com/github/gelles-brandeis/tapqir/blob/latest/notebooks/part_ii_colab.ipynb
