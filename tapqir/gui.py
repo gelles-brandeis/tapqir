@@ -99,8 +99,8 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     path = get_path(path)
     with out:
-        logger.info("Loading configuration data ...")
         main(cd=path)
+        logger.info("Loading configuration data ...")
 
     # Tabs
     tab = widgets.Tab()
@@ -161,17 +161,15 @@ def glimpseUI(out, DEFAULTS):
         value=DEFAULTS["frame-range"], description="Specify frame range?", indent=False
     )
     # First frame
-    firstFrame = widgets.BoundedIntText(
+    firstFrame = widgets.IntText(
         value=DEFAULTS["frame-start"],
-        min=0,
         disabled=not DEFAULTS["frame-range"],
         description="Starting frame",
         style={"description_width": "initial"},
     )
     # Last frame
-    lastFrame = widgets.BoundedIntText(
+    lastFrame = widgets.IntText(
         value=DEFAULTS["frame-end"],
-        min=1,
         disabled=not DEFAULTS["frame-range"],
         description="Ending frame",
         style={"description_width": "initial"},
@@ -257,8 +255,8 @@ def glimpseCmd(b, layout, out):
             frame_range=layout.children[2].value,
             frame_start=layout.children[3].value,
             frame_end=layout.children[4].value,
-            num_channels=layout.children[5].value,
-            use_offtarget=layout.children[6].value,
+            use_offtarget=layout.children[5].value,
+            num_channels=layout.children[6].value,
             name=[c.children[0].value for c in channelTabs.children],
             glimpse_folder=[c.children[1].value for c in channelTabs.children],
             ontarget_aoiinfo=[c.children[3].value for c in channelTabs.children],
