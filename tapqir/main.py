@@ -902,9 +902,6 @@ def main(
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        fmt="%(levelname)s - %(message)s",
-    )
     ch.setFormatter(ColorFormatter())
     logger.addHandler(ch)
 

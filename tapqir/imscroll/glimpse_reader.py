@@ -276,6 +276,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     time1 = []
     ttb = []
     for c in range(C):
+        logger.info(f"Channel #{c} ({channels[c]['name']})")
         glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
 
         raw_target_xy = {}
