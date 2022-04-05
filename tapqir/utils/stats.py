@@ -75,13 +75,12 @@ def snr_and_chi2(
     )
     noise = (offset_var + background * gain).sqrt()
     snr_result = signal / noise
-    mask = theta_probs > 0.5
 
     # chi2 test
-    img_ideal = background[..., None, None] + gaussians.sum(-5)
+    img_ideal = background[..., None, None] + gaussians.sum(-4)
     chi2_result = (data - img_ideal - offset_mean) ** 2 / img_ideal
 
-    return snr_result[mask], chi2_result.mean(dim=(-1, -2))
+    return snr_result, chi2_result.mean(dim=(-1, -2))
 
 
 def save_stats(model, path, CI=0.95, save_matlab=False):
@@ -92,6 +91,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         columns=["Mean", f"{int(100*CI)}% LL", f"{int(100*CI)}% UL"],
     )
 
+    logger.info("- credible intervals")
     nbatch_size = model.nbatch_size
     fbatch_size = model.fbatch_size
     model.nbatch_size = None
@@ -134,6 +134,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+    logger.info("- spot probabilities")
     ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
     ci_stats["z_probs"] = model.z_probs.data.cpu()
@@ -173,24 +174,29 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     model.params = ci_stats
 
+    logger.info("- SNR and Chi2-test")
     # snr and chi2 test
-    snr_result, chi2_result = snr_and_chi2(
-        model.data.images[:, :, model.cdx],
-        ci_stats["height"]["Mean"],
-        ci_stats["width"]["Mean"],
-        ci_stats["x"]["Mean"],
-        ci_stats["y"]["Mean"],
-        model.data.xy[:, :, model.cdx],
-        ci_stats["background"]["Mean"],
-        ci_stats["gain"]["Mean"],
-        model.data.offset.mean,
-        model.data.offset.var,
-        model.data.P,
-        model.theta_probs,
-    )
-    summary.loc["SNR", "Mean"] = snr_result.mean().item()
+    snr = torch.zeros(model.K, model.data.Nt, model.data.F, device=torch.device("cpu"))
+    chi2 = torch.zeros(model.data.Nt, model.data.F, device=torch.device("cpu"))
+    for n in range(model.data.Nt):
+        snr[:, n], chi2[n] = snr_and_chi2(
+            model.data.images[n, :, model.cdx],
+            ci_stats["height"]["Mean"][:, n],
+            ci_stats["width"]["Mean"][:, n],
+            ci_stats["x"]["Mean"][:, n],
+            ci_stats["y"]["Mean"][:, n],
+            model.data.xy[n, :, model.cdx],
+            ci_stats["background"]["Mean"][n],
+            ci_stats["gain"]["Mean"],
+            model.data.offset.mean,
+            model.data.offset.var,
+            model.data.P,
+            ci_stats["theta_probs"][:, n],
+        )
+    snr_masked = snr[ci_stats["theta_probs"] > 0.5]
+    summary.loc["SNR", "Mean"] = snr_masked.mean().item()
     ci_stats["chi2"] = {}
-    ci_stats["chi2"]["values"] = chi2_result
+    ci_stats["chi2"]["values"] = chi2
     cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
     ci_stats["chi2"]["vmin"] = -0.03 * cmax
     ci_stats["chi2"]["vmax"] = 1.3 * cmax
