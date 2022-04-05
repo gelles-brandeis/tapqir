@@ -133,6 +133,20 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
    to run Tapqir on the second GPU.
 
+Update Tapqir
+-------------
+
+To update Tapqir run (make sure that ``tapqir-env`` environment is activated)::
+
+   $ pip install tapqir -U
+
+Check version
+-------------
+
+To check Tapqir version run::
+
+   $ tapqir --version
+
 Install linux server tools (optional)
 -------------------------------------
 

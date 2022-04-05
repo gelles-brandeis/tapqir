@@ -89,7 +89,22 @@ Install on Windows 11
 
 Now you can run Tapqir in the WSL window in the same way you would on a linux computer.
 
-**Tapqir on WSL Usage tips**:
+Update Tapqir
+-------------
+
+To update Tapqir run (make sure that ``tapqir-env`` environment is activated)::
+
+   $ pip install tapqir -U
+
+Check version
+-------------
+
+To check Tapqir version run::
+
+   $ tapqir --version
+
+Tapqir on WSL Usage tips
+------------------------
 
 When working with Tapqir in WSL, it is most convenient to work in subdirectories of the linux directory /home/<your linux username>, which is the same as the Windows directory ``\\\\wsl.localhost\\Ubuntu\\home\\<your linux username>``.
 
