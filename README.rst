@@ -51,4 +51,7 @@ Discussions/Q&As
 
 Please post questions about the software on our `forum <https://github.com/gelles-brandeis/tapqir/discussions>`_. We will try to respond promptly.
 
+Changelog
+---------
 
+To see the entire list of releases and changelogs go to `releases <https://github.com/gelles-brandeis/tapqir/releases>`_.

@@ -9,6 +9,8 @@ from pyro.ops.indexing import Vindex
 from pyro.ops.stats import quantile
 from torch.distributions.utils import lazy_property, probs_to_logits
 
+from tapqir.exceptions import TapqirFileNotFoundError
+
 
 class OffsetData(namedtuple("OffsetData", ["samples", "weights"])):
     @lazy_property
@@ -191,5 +193,8 @@ def save(obj, path):
 
 def load(path, device=torch.device("cpu")):
     path = Path(path)
-    data_tapqir = torch.load(path / "data.tpqr")
+    try:
+        data_tapqir = torch.load(path / "data.tpqr")
+    except FileNotFoundError:
+        raise TapqirFileNotFoundError("data", path / "data.tpqr")
     return CosmosDataset(**data_tapqir, **{"device": device})

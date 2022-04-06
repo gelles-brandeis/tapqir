@@ -276,6 +276,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     time1 = []
     ttb = []
     for c in range(C):
+        logger.info(f"Channel #{c} ({channels[c]['name']})")
         glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
 
         raw_target_xy = {}
@@ -336,6 +337,7 @@ def read_glimpse(path, progress_bar, **kwargs):
             assert (target_xy[dtype][c] > 0.5 * P - 1).all()
             assert (target_xy[dtype][c] < 0.5 * P).all()
 
+    logger.info("Processing extracted AOIs ...")
     min_data = np.inf
     for dtype in data.keys():
         # concatenate color channels
