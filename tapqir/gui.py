@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import torch
 from ipyevents import Event
 from ipyfilechooser import FileChooser
+from IPython.display import Image, display
 from tensorboard import notebook
 from tqdm import tqdm_notebook
 from traitlets.utils.bunch import Bunch
@@ -67,13 +68,13 @@ def initUI(DEFAULTS):
     - Output.
     """
 
-    layout = widgets.VBox(layout={"width": "850px", "border": "2px solid blue"})
+    layout = widgets.VBox(layout={"width": "850px", "border": "2px solid black"})
 
     # widgets
     cd = FileChooser(".", title="Select working directory")
     cd.show_only_dirs = True
 
-    out = widgets.Output(layout={"border": "1px solid black"})
+    out = widgets.Output()
 
     # layout
     layout.children = [cd, out]
@@ -94,8 +95,11 @@ def cdCmd(path, DEFAULTS, out, layout):
     Set working directory and load default parameters (main).
     """
     import sys
+    from platform import uname
 
     IN_COLAB = "google.colab" in sys.modules
+    IN_WSL2 = "microsoft-standard" in uname().release
+    IN_LINUX = not IN_COLAB and not IN_WSL2
 
     path = get_path(path)
     with out:
@@ -105,10 +109,19 @@ def cdCmd(path, DEFAULTS, out, layout):
     # Tabs
     tab = widgets.Tab()
     tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
-    if not IN_COLAB:
-        tensorboard = widgets.Output(layout={"border": "1px solid blue"})
+    if IN_LINUX:
+        tensorboard = widgets.Output()
         tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
-    else:
+    elif IN_WSL2:
+        tensorboard = None
+        tensorboard_info = widgets.Label(
+            value=(
+                'Run "tensorboard --logdir=<working directory>" in the terminal'
+                ' and then open "localhost:6006" in the browser'
+            )
+        )
+        tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard_info)
+    elif IN_COLAB:
         tensorboard = None
         tab.children = tab.children + (
             widgets.Label(value="Disabled in Colab"),
@@ -437,23 +450,29 @@ def showUI(out, DEFAULTS):
         style={"description_width": "initial"},
     )
     # Fit the data
-    showParams = widgets.Button(description="Load results")
-    controls = widgets.HBox(layout={"border": "1px solid grey"})
-    view = widgets.Output(layout={"border": "1px solid red"})
+    showParams = widgets.Button(
+        description="Load results", layout=widgets.Layout(margin="10px 0px 10px 0px")
+    )
+    controls = widgets.HBox()
+    view = widgets.Output()
+    params = widgets.VBox(children=[controls, view])
+    summary = widgets.Output()
+    fov = widgets.Output()
+    sum_view = widgets.Accordion(children=[params, summary, fov])
+    sum_view.set_title(0, "AOI images and parameters")
+    sum_view.set_title(1, "Summary statistics")
+    sum_view.set_title(2, "FOV, AOI, and offset images")
+    sum_view.selected_index = 0
     # Layout
-    layout.children = [
-        modelSelect,
-        channelNumber,
-        showParams,
-        controls,
-        view,
-    ]
+    layout.children = [modelSelect, channelNumber, showParams, sum_view]
     # Callbacks
-    showParams.on_click(partial(showCmd, layout=layout, view=view, out=out))
+    showParams.on_click(partial(showCmd, layout=layout, out=out))
     return layout
 
 
-def showCmd(b, layout, view, out):
+def showCmd(b, layout, out):
+    params, summary, fov = layout.children[-1].children
+    controls, view = params.children
     with out:
         logger.info("Loading results ...")
         show_ret = show(
@@ -468,14 +487,21 @@ def showCmd(b, layout, view, out):
             out.clear_output(wait=True)
             return
         model, fig, item, ax = show_ret
+    with summary:
+        display(model.summary)
     with view:
         plt.show()
-    controls = layout.children[3]
+    with fov:
+        display(Image(filename=model.path / f"ontarget-channel{model.cdx}.png"))
+        display(Image(filename=model.path / f"offtarget-channel{model.cdx}.png"))
+        display(Image(filename=model.path / f"offset-channel{model.cdx}.png"))
+        display(Image(filename=model.path / "offset-distribution.png", width=500))
+        display(Image(filename=model.path / "offset-medians.png"))
     n = widgets.BoundedIntText(
         value=0,
         min=0,
         max=model.data.Nt - 1,
-        description="AOI",
+        description=f"AOI (0-{model.data.Nt-1})",
         style={"description_width": "initial"},
         layout={"width": "150px"},
     )
@@ -488,7 +514,7 @@ def showCmd(b, layout, view, out):
         min=0,
         max=model.data.F - 15,
         step=1,
-        description="Frame",
+        description=f"Frame (0-{model.data.F-1})",
         style={"description_width": "initial"},
         layout={"width": "300px"},
     )
@@ -926,9 +952,7 @@ def logUI(out):
     layout = widgets.VBox()
     # Load logs
     showLog = widgets.Button(description="(Re)-load logs")
-    logView = widgets.Output(
-        layout={"max_height": "850px", "overflow": "auto", "border": "1px solid red"}
-    )
+    logView = widgets.Output(layout={"max_height": "850px", "overflow": "auto"})
     # Layout
     layout.children = [
         showLog,
@@ -958,8 +982,6 @@ def app():
 
 
 def run():
-    from IPython.display import display
-
     from tapqir.main import DEFAULTS
 
     display(initUI(DEFAULTS))
