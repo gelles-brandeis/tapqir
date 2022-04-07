@@ -170,6 +170,18 @@ At every checkpoint the values of global variational parameters (``-ELBO``, ``ga
 ``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard program <https://www.tensorflow.org/tensorboard>`_
 displayed in the ``Tensorboard`` tab, which shows the parameters values as a function of iteration number:
 
+.. note::
+
+   On WSL the Tensorboard tab does not work. To view tensorboard open a new terminal, activate the environment::
+
+      $ conda activate tapqir-env
+
+   run tensorboard::
+
+      $ tensorboard --logdir=<your working directory>
+
+   and then open localhost port (typically ``http://localhost:6006``) in a browser window. To quit tensorboard press ``Ctrl-C``.
+
 .. figure:: tensorboard-tab.png
    :width: 800
 
