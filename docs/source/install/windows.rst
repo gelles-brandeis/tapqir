@@ -14,6 +14,9 @@ Install on Windows 11
    Install "Ubuntu" using the Windows Store app.  Run Ubuntu and in the terminal do::
    
     $ sudo apt update
+
+   .. code-block::
+
     $ sudo apt upgrade
 
 3. Install g++ (>=7) if not already installed.
