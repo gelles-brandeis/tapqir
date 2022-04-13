@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import torch
 from ipyevents import Event
 from ipyfilechooser import FileChooser
-from IPython.display import Image, display
+from IPython.display import display
 from tensorboard import notebook
 from tqdm import tqdm_notebook
 from traitlets.utils.bunch import Bunch
@@ -457,8 +457,7 @@ def showUI(out, DEFAULTS):
     view = widgets.Output()
     params = widgets.VBox(children=[controls, view])
     summary = widgets.Output()
-    fov = widgets.Output()
-    sum_view = widgets.Accordion(children=[params, summary, fov])
+    sum_view = widgets.Accordion(children=[params, summary])
     sum_view.set_title(0, "AOI images and parameters")
     sum_view.set_title(1, "Summary statistics")
     sum_view.set_title(2, "FOV, AOI, and offset images")
@@ -471,7 +470,7 @@ def showUI(out, DEFAULTS):
 
 
 def showCmd(b, layout, out):
-    params, summary, fov = layout.children[-1].children
+    params, summary = layout.children[-1].children
     controls, view = params.children
     with out:
         logger.info("Loading results ...")
@@ -487,16 +486,10 @@ def showCmd(b, layout, out):
             out.clear_output(wait=True)
             return
         model, fig, item, ax = show_ret
-    with summary:
-        display(model.summary)
     with view:
         plt.show()
-    with fov:
-        display(Image(filename=model.path / f"ontarget-channel{model.cdx}.png"))
-        display(Image(filename=model.path / f"offtarget-channel{model.cdx}.png"))
-        display(Image(filename=model.path / f"offset-channel{model.cdx}.png"))
-        display(Image(filename=model.path / "offset-distribution.png", width=500))
-        display(Image(filename=model.path / "offset-medians.png"))
+    with summary:
+        display(model.summary)
     n = widgets.BoundedIntText(
         value=0,
         min=0,
@@ -639,6 +632,7 @@ def showCmd(b, layout, out):
         logger.info("Loading results: Done")
 
     out.clear_output(wait=True)
+    b.disabled = True
 
 
 def onKeyPress(event, n, f1, zoom, targets, nonspecific):
