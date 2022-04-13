@@ -460,7 +460,6 @@ def showUI(out, DEFAULTS):
     sum_view = widgets.Accordion(children=[params, summary])
     sum_view.set_title(0, "AOI images and parameters")
     sum_view.set_title(1, "Summary statistics")
-    sum_view.set_title(2, "FOV, AOI, and offset images")
     sum_view.selected_index = 0
     # Layout
     layout.children = [modelSelect, channelNumber, showParams, sum_view]
