@@ -3,7 +3,7 @@
 
 import logging
 import os
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from functools import partial, singledispatch
 from pathlib import Path
 
@@ -59,6 +59,63 @@ def _(x: FileChooser):
     return Path(x.selected_path)
 
 
+class inputBox(widgets.VBox):
+    def __init__(self, **kwargs):
+        self._children = OrderedDict()
+        super().__init__(children=[], **kwargs)
+
+    def build_children(self) -> None:
+        self.children = [
+            child["widget"] for child in self._children.values() if not child["hide"]
+        ]
+
+    def add_child(self, name, widget, hide=False, beginning=False) -> None:
+        self._children[name] = {
+            "widget": widget,
+            "hide": hide,
+        }
+        if beginning:
+            self._children.move_to_end(name, last=False)
+        self.build_children()
+
+    def remove_child(self, name) -> None:
+        self._children.pop(name)
+        self.build_children()
+
+    def toggle_hide(self, a=None, names=None) -> None:
+        for name in names:
+            self._children[name]["hide"] = not self._children[name]["hide"]
+        self.build_children()
+
+    def __getitem__(self, name):
+        return self._children[name]["widget"]
+
+    @property
+    def kwargs(self):
+        result = {}
+        for name, v in self._children.items():
+            if isinstance(
+                v["widget"],
+                (
+                    widgets.Button,
+                    widgets.Output,
+                    widgets.Accordion,
+                    widgets.VBox,
+                    widgets.HBox,
+                ),
+            ):
+                continue
+            if isinstance(v["widget"], widgets.Tab):
+                keys = v["widget"].children[0]._children.keys()
+                for k in keys:
+                    result[k] = [get_value(c[k]) for c in v["widget"].children]
+                continue
+            result[name] = get_value(v["widget"])
+            if name == "channels":  # FIXME
+                result[name] = [int(result[name])]
+        return result
+
+
 def initUI(DEFAULTS):
     """
     Main layout.
@@ -68,7 +125,7 @@ def initUI(DEFAULTS):
     - Output.
     """
 
-    layout = widgets.VBox(layout={"width": "850px", "border": "2px solid black"})
+    layout = inputBox(layout={"width": "850px", "border": "2px solid black"})
 
     # widgets
     cd = FileChooser(".", title="Select working directory")
@@ -77,20 +134,20 @@ def initUI(DEFAULTS):
     out = widgets.Output()
 
     # layout
-    layout.children = [cd, out]
+    layout.add_child("cd", cd)
+    layout.add_child("out", out)
     # callbacks
     cd.register_callback(
         partial(
             cdCmd,
             DEFAULTS=DEFAULTS,
-            out=out,
             layout=layout,
         )
     )
     return layout
 
 
-def cdCmd(path, DEFAULTS, out, layout):
+def cdCmd(path, DEFAULTS, layout):
     """
     Set working directory and load default parameters (main).
     """
@@ -101,6 +158,7 @@ def cdCmd(path, DEFAULTS, out, layout):
     IN_WSL2 = "microsoft-standard" in uname().release
     IN_LINUX = not IN_COLAB and not IN_WSL2
 
+    out = layout["out"]
     path = get_path(path)
     with out:
         main(cd=path)
@@ -141,7 +199,9 @@ def cdCmd(path, DEFAULTS, out, layout):
 
     # insert tabs into GUI
     wd = widgets.Label(value=f"Working directory: {path}")
-    layout.children = (wd, tab) + layout.children[1:]
+    layout.remove_child("cd")
+    layout.add_child("tab", tab, beginning=True)
+    layout.add_child("wd", wd, beginning=True)
 
     with out:
         logger.info("Loading configuration data: Done")
@@ -153,128 +213,109 @@ def glimpseUI(out, DEFAULTS):
     """
     Glimpse command layout.
     """
-    # Extract AOIs
-    layout = widgets.VBox()
-    # Dataset name
-    datasetName = widgets.Text(
-        value=DEFAULTS["dataset"],
-        description="Dataset name",
-        style={"description_width": "initial"},
+    layout = inputBox()
+    layout.add_child(
+        "dataset",
+        widgets.Text(
+            value=DEFAULTS["dataset"],
+            description="Dataset name",
+            style={"description_width": "initial"},
+        ),
     )
-    # AOI image size
-    aoiSize = widgets.IntText(
-        value=DEFAULTS["P"],
-        min=5,
-        max=50,
-        description="AOI image size",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "P",
+        widgets.IntText(
+            value=DEFAULTS["P"],
+            min=5,
+            max=50,
+            description="AOI image size",
+            style={"description_width": "initial"},
+        ),
     )
-    # Specify frame range?
-    specifyFrame = widgets.Checkbox(
-        value=DEFAULTS["frame-range"], description="Specify frame range?", indent=False
+    layout.add_child(
+        "frame_range",
+        widgets.Checkbox(
+            value=DEFAULTS["frame-range"],
+            description="Specify frame range?",
+            indent=False,
+        ),
     )
-    # First frame
-    firstFrame = widgets.IntText(
-        value=DEFAULTS["frame-start"],
-        disabled=not DEFAULTS["frame-range"],
-        description="Starting frame",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "frame_start",
+        widgets.IntText(
+            value=DEFAULTS["frame-start"],
+            disabled=not DEFAULTS["frame-range"],
+            description="Starting frame",
+            style={"description_width": "initial"},
+        ),
     )
-    # Last frame
-    lastFrame = widgets.IntText(
-        value=DEFAULTS["frame-end"],
-        disabled=not DEFAULTS["frame-range"],
-        description="Ending frame",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "frame_end",
+        widgets.IntText(
+            value=DEFAULTS["frame-end"],
+            disabled=not DEFAULTS["frame-range"],
+            description="Ending frame",
+            style={"description_width": "initial"},
+        ),
     )
-    # Specify frame range?
-    useOfftarget = widgets.Checkbox(
-        value=DEFAULTS["use-offtarget"],
-        description="Use off-target AOI locations?",
-        indent=False,
+    layout.add_child(
+        "use_offtarget",
+        widgets.Checkbox(
+            value=DEFAULTS["use-offtarget"],
+            description="Use off-target AOI locations?",
+            indent=False,
+        ),
     )
-    # Number of channels
-    numChannels = widgets.BoundedIntText(
-        value=DEFAULTS["num-channels"],
-        min=1,
-        max=4,
-        step=1,
-        description="Number of color channels",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "num_channels",
+        widgets.BoundedIntText(
+            value=DEFAULTS["num-channels"],
+            min=1,
+            max=4,
+            step=1,
+            description="Number of color channels",
+            style={"description_width": "initial"},
+        ),
     )
-    # Channel tabs
-    channelTabs = widgets.Tab()
-    channelUI(numChannels.value, channelTabs, useOfftarget, DEFAULTS)
-    # extract AOIs
-    extractAOIs = widgets.Button(description="Extract AOIs")
-    # Layout
-    layout.children = [
-        datasetName,
-        aoiSize,
-        specifyFrame,
-        firstFrame,
-        lastFrame,
-        useOfftarget,
-        numChannels,
-        channelTabs,
-        extractAOIs,
-    ]
+    layout.add_child("channels", widgets.Tab())
+    channelUI(
+        layout["num_channels"].value,
+        layout["channels"],
+        layout["use_offtarget"],
+        DEFAULTS,
+    )
+    layout.add_child("extract_aois", widgets.Button(description="Extract AOIs"))
     # Callbacks
-    numChannels.observe(
+    layout["num_channels"].observe(
         partial(
             channelUI,
-            channelTabs=channelTabs,
-            useOfftarget=useOfftarget,
+            channelTabs=layout["channels"],
+            useOfftarget=layout["use_offtarget"],
             DEFAULTS=DEFAULTS,
         ),
         names="value",
     )
-    useOfftarget.observe(
-        partial(toggleUseOffTarget, channelTabs=channelTabs, DEFAULTS=DEFAULTS),
+    layout["use_offtarget"].observe(
+        partial(toggleUseOffTarget, channelTabs=layout["channels"]),
         names="value",
     )
-    extractAOIs.on_click(partial(glimpseCmd, layout=layout, out=out))
-    specifyFrame.observe(
-        partial(toggleWidgets, widgets=(firstFrame, lastFrame)), names="value"
+    layout["extract_aois"].on_click(partial(glimpseCmd, layout=layout, out=out))
+    layout["frame_range"].observe(
+        partial(layout.toggle_hide, names=("frame_start", "frame_end")),
+        names="value",
     )
     return layout
 
 
-def toggleUseOffTarget(checked, channelTabs, DEFAULTS):
-    checked = get_value(checked)
-    if checked:
-        for c, tab in enumerate(channelTabs.children):
-            offtargetLayout = FileChooser(
-                ".", title="Off-target control locations file"
-            )
-            if DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None:
-                offtargetLayout.reset(
-                    path=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).parent,
-                    filename=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).name,
-                )
-                offtargetLayout._apply_selection()
-            tab.children = tab.children + (offtargetLayout,)
-    else:
-        for tab in channelTabs.children:
-            tab.children = tab.children[:-1]
+def toggleUseOffTarget(checked, channelTabs):
+    for c, tab in enumerate(channelTabs.children):
+        tab.toggle_hide(names=("offtarget_aoiinfo",))
 
 
 def glimpseCmd(b, layout, out):
-    channelTabs = layout.children[7]
     with out:
         glimpse(
-            dataset=layout.children[0].value,
-            P=layout.children[1].value,
-            frame_range=layout.children[2].value,
-            frame_start=layout.children[3].value,
-            frame_end=layout.children[4].value,
-            use_offtarget=layout.children[5].value,
-            num_channels=layout.children[6].value,
-            name=[c.children[0].value for c in channelTabs.children],
-            glimpse_folder=[c.children[1].value for c in channelTabs.children],
-            ontarget_aoiinfo=[c.children[3].value for c in channelTabs.children],
-            offtarget_aoiinfo=[c.children[4].value for c in channelTabs.children],
-            driftlist=[c.children[2].value for c in channelTabs.children],
+            **layout.kwargs,
             no_input=True,
             progress_bar=tqdm_notebook,
             labels=False,
@@ -292,49 +333,51 @@ def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
         elif c < C and c >= currentC:
             if len(DEFAULTS["channels"]) < c + 1:
                 DEFAULTS["channels"].append(defaultdict(lambda: None))
-            layout = widgets.VBox()
-            nameLayout = widgets.Text(
-                value=DEFAULTS["channels"][c]["name"],
-                description="Channel name",
-                style={"description_width": "initial"},
+            layout = inputBox()
+            layout.add_child(
+                "name",
+                widgets.Text(
+                    value=DEFAULTS["channels"][c]["name"],
+                    description="Channel name",
+                    style={"description_width": "initial"},
+                ),
             )
-            headerLayout = FileChooser(".", title="Header/glimpse folder")
+            layout.add_child(
+                "glimpse_folder", FileChooser(".", title="Header/glimpse folder")
+            )
             if DEFAULTS["channels"][c]["glimpse-folder"] is not None:
-                headerLayout.reset(path=Path(DEFAULTS["channels"][c]["glimpse-folder"]))
-                headerLayout._apply_selection()
-            driftlistLayout = FileChooser(".", title="Driftlist file")
+                layout["glimpse_folder"].reset(
+                    path=Path(DEFAULTS["channels"][c]["glimpse-folder"])
+                )
+                layout["glimpse_folder"]._apply_selection()
+            layout.add_child("driftlist", FileChooser(".", title="Driftlist file"))
             if DEFAULTS["channels"][c]["driftlist"] is not None:
-                driftlistLayout.reset(
+                layout["driftlist"].reset(
                     path=Path(DEFAULTS["channels"][c]["driftlist"]).parent,
                     filename=Path(DEFAULTS["channels"][c]["driftlist"]).name,
                 )
-                driftlistLayout._apply_selection()
-            ontargetLayout = FileChooser(".", title="Target molecule locations file")
+                layout["driftlist"]._apply_selection()
+            layout.add_child(
+                "ontarget_aoiinfo",
+                FileChooser(".", title="Target molecule locations file"),
+            )
             if DEFAULTS["channels"][c]["ontarget-aoiinfo"] is not None:
-                ontargetLayout.reset(
+                layout["ontarget_aoiinfo"].reset(
                     path=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).parent,
                     filename=Path(DEFAULTS["channels"][c]["ontarget-aoiinfo"]).name,
                 )
-                ontargetLayout._apply_selection()
-            layout.children = [
-                nameLayout,
-                headerLayout,
-                driftlistLayout,
-                ontargetLayout,
-            ]
-            if useOfftarget.value:
-                offtargetLayout = FileChooser(
-                    ".", title="Off-target control locations file"
+                layout["ontarget_aoiinfo"]._apply_selection()
+            layout.add_child(
+                "offtarget_aoiinfo",
+                FileChooser(".", title="Off-target control locations file"),
+                hide=not useOfftarget.value,
+            )
+            if DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None:
+                layout["offtarget_aoiinfo"].reset(
+                    path=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).parent,
+                    filename=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).name,
                 )
-                if DEFAULTS["channels"][c]["offtarget-aoiinfo"] is not None:
-                    offtargetLayout.reset(
-                        path=Path(DEFAULTS["channels"][c]["offtarget-aoiinfo"]).parent,
-                        filename=Path(
-                            DEFAULTS["channels"][c]["offtarget-aoiinfo"]
-                        ).name,
-                    )
-                    offtargetLayout._apply_selection()
-                layout.children = layout.children + (offtargetLayout,)
+                layout["offtarget_aoiinfo"]._apply_selection()
             channelTabs.children = channelTabs.children + (layout,)
         channelTabs.set_title(c, f"Channel #{c}")
     channelTabs.children = channelTabs.children[:C]
@@ -342,86 +385,83 @@ def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
 
 def fitUI(out, DEFAULTS):
     # Fit the data
-    layout = widgets.VBox()
-    # Model
-    modelSelect = widgets.Dropdown(
-        description="Tapqir model",
-        value="cosmos",
-        options=["cosmos"],
-        style={"description_width": "initial"},
+    layout = inputBox()
+    layout.add_child(
+        "model",
+        widgets.Dropdown(
+            description="Tapqir model",
+            value="cosmos",
+            options=["cosmos"],
+            style={"description_width": "initial"},
+        ),
     )
-    # Channel numbers
-    channelNumber = widgets.Dropdown(
-        description="Channel numbers",
-        value="0",
-        options=[str(c) for c in range(DEFAULTS["num-channels"])],
-        style={"description_width": "initial"},
+    layout.add_child(
+        "channels",
+        widgets.Dropdown(
+            description="Channel numbers",
+            value="0",
+            options=[str(c) for c in range(DEFAULTS["num-channels"])],
+            style={"description_width": "initial"},
+        ),
     )
-    # Run computations on GPU?
-    useGpu = widgets.Checkbox(
-        value=DEFAULTS["cuda"],
-        description="Run computations on GPU?",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "cuda",
+        widgets.Checkbox(
+            value=DEFAULTS["cuda"],
+            description="Run computations on GPU?",
+            style={"description_width": "initial"},
+        ),
     )
-    # AOI batch size
-    aoiBatch = widgets.IntText(
-        value=DEFAULTS["nbatch-size"],
-        description="AOI batch size",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "nbatch_size",
+        widgets.IntText(
+            value=DEFAULTS["nbatch-size"],
+            description="AOI batch size",
+            style={"description_width": "initial"},
+        ),
     )
-    # Frame batch size
-    frameBatch = widgets.IntText(
-        value=DEFAULTS["fbatch-size"],
-        description="Frame batch size",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "fbatch_size",
+        widgets.IntText(
+            value=DEFAULTS["fbatch-size"],
+            description="Frame batch size",
+            style={"description_width": "initial"},
+        ),
     )
-    # Learning rate
-    learningRate = widgets.FloatText(
-        value=DEFAULTS["learning-rate"],
-        description="Learning rate",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "learning_rate",
+        widgets.FloatText(
+            value=DEFAULTS["learning-rate"],
+            description="Learning rate",
+            style={"description_width": "initial"},
+        ),
     )
-    # Number of iterations
-    iterationNumber = widgets.IntText(
-        description="Number of iterations",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "num_iter",
+        widgets.IntText(
+            description="Number of iterations",
+            style={"description_width": "initial"},
+        ),
     )
-    # Save parameters in matlab format?
-    saveMatlab = widgets.Checkbox(
-        value=DEFAULTS["matlab"],
-        description="Save parameters in matlab format?",
-        style={"description_width": "initial"},
+    layout.add_child(
+        "matlab",
+        widgets.Checkbox(
+            value=DEFAULTS["matlab"],
+            description="Save parameters in matlab format?",
+            style={"description_width": "initial"},
+        ),
     )
     # Fit the data
-    fitData = widgets.Button(description="Fit the data")
-    # Layout
-    layout.children = [
-        modelSelect,
-        channelNumber,
-        useGpu,
-        aoiBatch,
-        frameBatch,
-        learningRate,
-        iterationNumber,
-        saveMatlab,
-        fitData,
-    ]
+    layout.add_child("fit", widgets.Button(description="Fit the data"))
     # Callbacks
-    fitData.on_click(partial(fitCmd, layout=layout, out=out))
+    layout["fit"].on_click(partial(fitCmd, layout=layout, out=out))
     return layout
 
 
 def fitCmd(b, layout, out):
     with out:
         fit(
-            model=layout.children[0].value,
-            channels=[int(layout.children[1].value)],
-            cuda=layout.children[2].value,
-            nbatch_size=layout.children[3].value,
-            fbatch_size=layout.children[4].value,
-            learning_rate=layout.children[5].value,
-            num_iter=layout.children[6].value,
-            matlab=layout.children[7].value,
+            **layout.kwargs,
             k_max=2,
             funsor=False,
             pykeops=True,
@@ -434,24 +474,32 @@ def fitCmd(b, layout, out):
 
 def showUI(out, DEFAULTS):
     # View results
-    layout = widgets.VBox()
-    # Model
-    modelSelect = widgets.Dropdown(
-        description="Tapqir model",
-        value="cosmos",
-        options=["cosmos"],
-        style={"description_width": "initial"},
+    layout = inputBox()
+    layout.add_child(
+        "model",
+        widgets.Dropdown(
+            description="Tapqir model",
+            value="cosmos",
+            options=["cosmos"],
+            style={"description_width": "initial"},
+        ),
     )
-    # Channel numbers
-    channelNumber = widgets.Dropdown(
-        description="Channel numbers",
-        value="0",
-        options=[str(c) for c in range(DEFAULTS["num-channels"])],
-        style={"description_width": "initial"},
+    layout.add_child(
+        "channels",
+        widgets.Dropdown(
+            description="Channel numbers",
+            value="0",
+            options=[str(c) for c in range(DEFAULTS["num-channels"])],
+            style={"description_width": "initial"},
+        ),
     )
-    # Fit the data
-    showParams = widgets.Button(
-        description="Load results", layout=widgets.Layout(margin="10px 0px 10px 0px")
+    # Load results
+    layout.add_child(
+        "show",
+        widgets.Button(
+            description="Load results",
+            layout=widgets.Layout(margin="10px 0px 10px 0px"),
+        ),
     )
     controls = widgets.HBox()
     view = widgets.Output()
@@ -461,21 +509,19 @@ def showUI(out, DEFAULTS):
     sum_view.set_title(0, "AOI images and parameters")
     sum_view.set_title(1, "Summary statistics")
     sum_view.selected_index = 0
-    # Layout
-    layout.children = [modelSelect, channelNumber, showParams, sum_view]
+    layout.add_child("view", sum_view)
     # Callbacks
-    showParams.on_click(partial(showCmd, layout=layout, out=out))
+    layout["show"].on_click(partial(showCmd, layout=layout, out=out))
     return layout
 
 
 def showCmd(b, layout, out):
-    params, summary = layout.children[-1].children
+    params, summary = layout["view"].children
     controls, view = params.children
     with out:
         logger.info("Loading results ...")
         show_ret = show(
-            model=layout.children[0].value,
-            channels=[int(layout.children[1].value)],
+            **layout.kwargs,
             n=0,
             f1=None,
             f2=None,
@@ -932,12 +978,6 @@ def showNonspecific(checked, n, model, item, ax):
             for k in range(model.K):
                 item[f"{p}_nonspecific{k}_fill"].remove()
                 item[f"{p}_nonspecific{k}_mean"].remove()
-
-
-def toggleWidgets(b, widgets):
-    checked = get_value(b)
-    for w in widgets:
-        w.disabled = not checked
 
 
 def logUI(out):
