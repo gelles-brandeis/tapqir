@@ -78,7 +78,7 @@ class inputBox(widgets.VBox):
             self._children.move_to_end(name, last=False)
         self.build_children()
 
-    def remove_input(self, name) -> None:
+    def remove_child(self, name) -> None:
         self._children.pop(name)
         self.build_children()
 
@@ -199,7 +199,7 @@ def cdCmd(path, DEFAULTS, layout):
 
     # insert tabs into GUI
     wd = widgets.Label(value=f"Working directory: {path}")
-    layout.remove_input("cd")
+    layout.remove_child("cd")
     layout.add_child("tab", tab, beginning=True)
     layout.add_child("wd", wd, beginning=True)
 
