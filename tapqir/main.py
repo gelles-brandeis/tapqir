@@ -587,8 +587,10 @@ def show(
     n: int = typer.Option(0, help="n", prompt="n"),
     f1: Optional[int] = None,
     f2: Optional[int] = None,
+    show_fov: bool = True,
     gui=None,
 ):
+    from tapqir.imscroll import GlimpseDataset
     from tapqir.models import models
 
     logger = logging.getLogger("tapqir")
@@ -608,18 +610,28 @@ def show(
         f2 = f1 + 15
     c = model.cdx
 
-    width, height, dpi = 6.25, 6.25, 100
+    width, dpi = 6.25, 100
+    height = 10 if show_fov else 6.25
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
         nrows=10,
         ncols=15,
         top=0.96,
-        bottom=0.04,
+        bottom=0.39 if show_fov else 0.02,
         left=0.1,
         right=0.98,
         hspace=0.1,
         height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1, 1, 1],
     )
+    if show_fov:
+        gs2 = fig.add_gridspec(
+            nrows=1,
+            ncols=1,
+            top=0.32,
+            bottom=0.02,
+            left=0.1,
+            right=0.98,
+        )
     ax = {}
     item = {}
 
@@ -800,9 +812,26 @@ def show(
         color="k",
     )
 
+    if show_fov:
+        ax["glimpse"] = fig.add_subplot(gs2[0])
+        P = DEFAULTS.pop("P")
+        channels = DEFAULTS.pop("channels")
+        glimpse_data = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
+        glimpse_data.plot(
+            glimpse_data.dtypes,
+            P,
+            n=0,
+            f=0,
+            save=False,
+            ax=ax["glimpse"],
+            item=item,
+        )
+    else:
+        glimpse_data = None
+
     if not gui:
         plt.show()
-    return model, fig, item, ax
+    return model, fig, item, ax, glimpse_data
 
 
 @app.command()
