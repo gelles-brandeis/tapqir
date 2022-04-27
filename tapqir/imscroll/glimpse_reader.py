@@ -458,6 +458,14 @@ def read_glimpse(path, progress_bar, **kwargs):
         ttb=ttb,
         name=name,
     )
+    logger.info(
+        f"Dataset: N={dataset.N} on-target AOIs, "
+        f"Nc={dataset.Nc} off-target AOIs, "
+        f"F={dataset.F} frames, "
+        f"C={dataset.C} channels, "
+        f"Px={dataset.P} pixels, "
+        f"Py={dataset.P} pixels"
+    )
     save(dataset, path)
 
     # plot offset distribution
@@ -487,13 +495,3 @@ def read_glimpse(path, progress_bar, **kwargs):
     plt.legend()
     plt.tight_layout()
     plt.savefig(path / "offset-medians.png", dpi=300)
-
-    logger.info(
-        f"Dataset: N={dataset.N} on-target AOIs, "
-        f"Nc={dataset.Nc} off-target AOIs, "
-        f"F={dataset.F} frames, "
-        f"C={dataset.C} channels, "
-        f"Px={dataset.P} pixels, "
-        f"Py={dataset.P} pixels"
-    )
-    logger.info(f"Data is saved in {Path(path) / 'data.tpqr'}")
