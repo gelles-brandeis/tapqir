@@ -493,6 +493,14 @@ def showUI(out, DEFAULTS):
             style={"description_width": "initial"},
         ),
     )
+    layout.add_child(
+        "show_fov",
+        widgets.Checkbox(
+            value=True,
+            description="Show FOV images",
+            indent=False,
+        ),
+    )
     # Load results
     layout.add_child(
         "show",
@@ -503,7 +511,8 @@ def showUI(out, DEFAULTS):
     )
     controls = widgets.HBox()
     view = widgets.Output()
-    params = widgets.VBox(children=[controls, view])
+    fov_controls = inputBox()
+    params = widgets.VBox(children=[controls, view, fov_controls])
     summary = widgets.Output()
     sum_view = widgets.Accordion(children=[params, summary])
     sum_view.set_title(0, "AOI images and parameters")
@@ -516,8 +525,9 @@ def showUI(out, DEFAULTS):
 
 
 def showCmd(b, layout, out):
+    layout.toggle_hide(names=("show",))
     params, summary = layout["view"].children
-    controls, view = params.children
+    controls, view, fov_controls = params.children
     with out:
         logger.info("Loading results ...")
         show_ret = show(
@@ -530,7 +540,7 @@ def showCmd(b, layout, out):
         if show_ret == 1:
             out.clear_output(wait=True)
             return
-        model, fig, item, ax = show_ret
+        model, fig, item, ax, fov = show_ret
     with view:
         plt.show()
     with summary:
@@ -611,6 +621,23 @@ def showCmd(b, layout, out):
     else:
         checkboxes.children = [zoom, targets, nonspecific, labels]
     controls.children = [n, f1_box, checkboxes]
+    # fov controls
+    if fov is not None:
+        for dtype in fov.dtypes:
+            fov_controls.add_child(
+                dtype, widgets.Checkbox(value=True, description=f"Show {dtype} AOIs")
+            )
+            fov_controls[dtype].observe(
+                partial(
+                    showAOIs,
+                    fov=fov,
+                    n=n_counter,
+                    item=item,
+                    fig=fig,
+                ),
+                names="value",
+            )
+    # callbacks
     n.observe(
         partial(
             updateParams,
@@ -622,6 +649,7 @@ def showCmd(b, layout, out):
             targets=targets,
             nonspecific=nonspecific,
             labels=labels,
+            fov_controls=fov_controls,
         ),
         names="value",
     )
@@ -635,6 +663,7 @@ def showCmd(b, layout, out):
             ax=ax,
             zoom=zoom,
             targets=targets,
+            fov=fov,
         ),
         names="value",
     )
@@ -680,6 +709,22 @@ def showCmd(b, layout, out):
     b.disabled = True
 
 
+def showAOIs(checked, fov, n, item, fig):
+    dtype = "ontarget" if "ontarget" in checked.owner.description else "offtarget"
+    n = get_value(n)
+    for key, value in item.items():
+        if key.startswith("aoi_"):
+            i = int(key.split("_")[1])
+            if n == i:
+                continue
+            if dtype == "ontarget" and i >= fov.N:
+                continue
+            if dtype == "offtarget" and i < fov.N:
+                continue
+            item[key].set(visible=get_value(checked))
+    fig.canvas.draw()
+
+
 def onKeyPress(event, n, f1, zoom, targets, nonspecific):
     key = event["key"]
     if key == "h" or key == "ArrowLeft":
@@ -706,7 +751,10 @@ def incrementRange(name, x, counter):
     counter.value = counter.value + x
 
 
-def updateParams(n, f1, model, fig, item, ax, targets, nonspecific, labels):
+def updateParams(
+    n, f1, model, fig, item, ax, targets, nonspecific, labels, fov_controls
+):
+    n_old = n.old
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
@@ -814,10 +862,19 @@ def updateParams(n, f1, model, fig, item, ax, targets, nonspecific, labels):
                 ms=2,
                 color="C2",
             )
+
+    ax["glimpse"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
+    item[f"aoi_{n}"].set_edgecolor("C2")
+    item[f"aoi_{n}"].set(zorder=2, visible=True)
+    n_old_dtype = "ontarget" if n_old < model.data.N else "offtarget"
+    n_old_visible = fov_controls[n_old_dtype].value
+    colors = {"ontarget": "#AA3377", "offtarget": "#CCBB44"}
+    item[f"aoi_{n_old}"].set_edgecolor(colors[n_old_dtype])
+    item[f"aoi_{n_old}"].set(zorder=1, visible=n_old_visible)
     fig.canvas.draw()
 
 
-def updateRange(f1, n, model, fig, item, ax, zoom, targets):
+def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov):
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
@@ -853,8 +910,9 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets):
 
     if not zoom.value:
         for key, a in ax.items():
-            if not key.startswith("image") and not key.startswith("ideal"):
-                a.set_xlim(f1 - 0.5, f2 - 0.5)
+            if key.startswith("image") or key.startswith("ideal") or key == "glimpse":
+                continue
+            a.set_xlim(f1 - 0.5, f2 - 0.5)
     else:
         for p in [
             "z_map",
@@ -868,6 +926,16 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets):
         ]:
             item[f"{p}_vspan"].remove()
             item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+    if fov is not None:
+        fov.plot(
+            fov.dtypes,
+            model.data.P,
+            n=n,
+            f=f1,
+            save=False,
+            ax=ax["glimpse"],
+            item=item,
+        )
     fig.canvas.draw()
 
 
@@ -905,8 +973,9 @@ def zoomOut(checked, f1, model, fig, item, ax):
         ]:
             item[f"{p}_vspan"].remove()
     for key, a in ax.items():
-        if not key.startswith("image") and not key.startswith("ideal"):
-            a.set_xlim(f1 - 0.5, f2 - 0.5)
+        if key.startswith("image") or key.startswith("ideal") or key == "glimpse":
+            continue
+        a.set_xlim(f1 - 0.5, f2 - 0.5)
     fig.canvas.draw()
 
 

@@ -203,7 +203,18 @@ class GlimpseDataset:
     def __str__(self):
         return f"{self.__class__.__name__}(N={self.N}, Nc={self.Nc}, F={self.F})"
 
-    def plot(self, dtype: str, P: int, path: Path, save: bool):
+    def plot(
+        self,
+        dtypes: Tuple[str, ...],
+        P: int,
+        n: int = None,
+        f: int = 0,
+        save: bool = False,
+        path: Path = None,
+        ax=None,
+        item: dict = {},
+        title: str = None,
+    ) -> None:
         """
         Plot AOIs in the field of view.
 
@@ -215,41 +226,74 @@ class GlimpseDataset:
         colors = {}
         colors["ontarget"] = "#AA3377"
         colors["offtarget"] = "#CCBB44"
-        fig = plt.figure(figsize=(10, 10 * self.height / self.width))
-        ax = fig.add_subplot(1, 1, 1)
-        fov = self[self.cumdrift.index[0]]
-        vmin = np.percentile(fov, 1)
-        vmax = np.percentile(fov, 99)
-        ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
-        if dtype in ["ontarget", "offtarget"]:
-            for aoi in self.aoiinfo[dtype].index:
-                # areas of interest
-                y_pos = round(self.aoiinfo[dtype].at[aoi, "y"] - 0.5 * (P - 1)) - 0.5
-                x_pos = round(self.aoiinfo[dtype].at[aoi, "x"] - 0.5 * (P - 1)) - 0.5
+
+        if ax is None:
+            fig = plt.figure(figsize=(10, 10 * self.height / self.width))
+            ax = fig.add_subplot(1, 1, 1)
+
+        frame = self.cumdrift.index[f]
+        fov = self[frame]
+        if "fov" in item:
+            item["fov"].set_data(fov)
+        else:
+            vmin = np.percentile(fov, 1)
+            vmax = np.percentile(fov, 99)
+            item["fov"] = ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
+
+        for dtype in dtypes:
+            if dtype in ["ontarget", "offtarget"]:
+                for i, aoi in enumerate(self.aoiinfo[dtype].index):
+                    if dtype == "offtarget":
+                        i = i + self.N
+                    # areas of interest
+                    y_pos = (
+                        round(
+                            self.aoiinfo[dtype].at[aoi, "y"]
+                            + self.cumdrift.at[frame, "dy"]
+                            - 0.5 * (P - 1)
+                        )
+                        - 0.5
+                    )
+                    x_pos = (
+                        round(
+                            self.aoiinfo[dtype].at[aoi, "x"]
+                            + self.cumdrift.at[frame, "dx"]
+                            - 0.5 * (P - 1)
+                        )
+                        - 0.5
+                    )
+                    if f"aoi_{i}" in item:
+                        item[f"aoi_{i}"].set_xy((x_pos, y_pos))
+                    else:
+                        item[f"aoi_{i}"] = ax.add_patch(
+                            Rectangle(
+                                (x_pos, y_pos),
+                                P,
+                                P,
+                                edgecolor=colors[dtype],
+                                lw=1,
+                                facecolor="none",
+                            )
+                        )
+                    if n == i:
+                        item[f"aoi_{i}"].set_edgecolor("C2")
+                        item[f"aoi_{i}"].set(zorder=2)
+            elif dtype == "offset":
                 ax.add_patch(
                     Rectangle(
-                        (x_pos, y_pos),
+                        (10, 10),
                         P,
                         P,
-                        edgecolor=colors[dtype],
+                        edgecolor="#CCBB44",
                         lw=1,
                         facecolor="none",
                     )
                 )
-        elif dtype == "offset":
-            ax.add_patch(
-                Rectangle(
-                    (10, 10),
-                    P,
-                    P,
-                    edgecolor="#CCBB44",
-                    lw=1,
-                    facecolor="none",
-                )
-            )
-        ax.set_title(f"{dtype} locations for channel {self.c}", fontsize=16)
-        ax.set_xlabel("x", fontsize=16)
-        ax.set_ylabel("y", fontsize=16)
+        if title is None:
+            title = rf"AOI ${n}$, Frame ${f}$"
+        ax.set_title(title, fontsize=9)
+        ax.set_xlabel(r"$x$", fontsize=9)
+        ax.set_ylabel(r"$y$", fontsize=9)
         if save:
             plt.savefig(path / f"{dtype}-channel{self.c}.png", dpi=300)
 
@@ -301,10 +345,12 @@ def read_glimpse(path, progress_bar, **kwargs):
             )
             labels[dtype].append(glimpse.labels[dtype])
 
-            glimpse.plot(dtype, P, path=path, save=True)
+            title = f"{dtype} locations for channel {c}"
+            glimpse.plot((dtype,), P, path=path, save=True, item={}, title=title)
 
         # plot offset in raw FOV images
-        glimpse.plot("offset", offset_P, path=path, save=True)
+        title = f"{dtype} locations for channel {c}"
+        glimpse.plot(("offset",), offset_P, path=path, save=True, item={}, title=title)
 
         # loop through each frame
         for f, frame in enumerate(progress_bar(glimpse.cumdrift.index)):
