@@ -609,6 +609,7 @@ def show(
     if f2 is None:
         f2 = f1 + 15
     c = model.cdx
+    color = "C2" if model.data.mask[n] else "C7"
 
     width, dpi = 6.25, 100
     height = 10 if show_fov else 6.25
@@ -686,7 +687,7 @@ def show(
         "o-",
         ms=3,
         lw=1,
-        color="C2",
+        color=color,
     )
 
     ax["height"] = fig.add_subplot(gs[4, :])
@@ -778,7 +779,7 @@ def show(
             mean if p == "height" else mean[f_mask],
             "-" if p == "height" else "o",
             ms=2,
-            color="C2",
+            color=color,
         )
         item[f"{p}_specific_fill"] = ax[p].fill_between(
             torch.arange(0, model.data.F),
@@ -786,7 +787,7 @@ def show(
             ul,
             where=f_mask,
             alpha=0.3,
-            color="C2",
+            color=color,
         )
     (item["background_mean"],) = ax["background"].plot(
         torch.arange(0, model.data.F),

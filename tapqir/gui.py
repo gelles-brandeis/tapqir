@@ -19,6 +19,7 @@ from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
 from tapqir.main import fit, glimpse, log, main, show
+from tapqir.utils.dataset import save
 
 logger = logging.getLogger("tapqir")
 
@@ -615,11 +616,17 @@ def showCmd(b, layout, out):
         indent=False,
         layout={"width": "240px"},
     )
+    exclude_aoi = widgets.Checkbox(
+        value=not model.data.mask[0],
+        description="Exclude AOI from analysis ['e']",
+        indent=False,
+        layout={"width": "240px"},
+    )
     checkboxes = widgets.VBox(layout=widgets.Layout(width="250px"))
     if model.data.labels is None:
-        checkboxes.children = [zoom, targets, nonspecific]
+        checkboxes.children = [zoom, targets, nonspecific, exclude_aoi]
     else:
-        checkboxes.children = [zoom, targets, nonspecific, labels]
+        checkboxes.children = [zoom, targets, nonspecific, exclude_aoi, labels]
     controls.children = [n, f1_box, checkboxes]
     # fov controls
     if fov is not None:
@@ -637,6 +644,7 @@ def showCmd(b, layout, out):
                 ),
                 names="value",
             )
+    fov_controls.add_child("save_data", widgets.Button(description="Save data"))
     # callbacks
     n.observe(
         partial(
@@ -650,6 +658,7 @@ def showCmd(b, layout, out):
             nonspecific=nonspecific,
             labels=labels,
             fov_controls=fov_controls,
+            exclude_aoi=exclude_aoi,
         ),
         names="value",
     )
@@ -685,6 +694,13 @@ def showCmd(b, layout, out):
         partial(showNonspecific, n=n_counter, model=model, item=item, ax=ax),
         names="value",
     )
+    exclude_aoi.observe(
+        partial(excludeAOI, n=n_counter, model=model, item=item),
+        names="value",
+    )
+    fov_controls["save_data"].on_click(
+        partial(saveData, data=model.data, path=model.path, out=out)
+    )
     # mouse click UI
     fig.canvas.mpl_connect(
         "button_release_event",
@@ -700,6 +716,7 @@ def showCmd(b, layout, out):
             zoom=zoom,
             targets=targets,
             nonspecific=nonspecific,
+            exclude_aoi=exclude_aoi,
         )
     )
     with out:
@@ -707,6 +724,12 @@ def showCmd(b, layout, out):
 
     out.clear_output(wait=True)
     b.disabled = True
+
+
+def saveData(b, data, path, out):
+    with out:
+        logger.info("Saving data ...")
+        save(data, path)
 
 
 def showAOIs(checked, fov, n, item, fig):
@@ -725,7 +748,7 @@ def showAOIs(checked, fov, n, item, fig):
     fig.canvas.draw()
 
 
-def onKeyPress(event, n, f1, zoom, targets, nonspecific):
+def onKeyPress(event, n, f1, zoom, targets, nonspecific, exclude_aoi):
     key = event["key"]
     if key == "h" or key == "ArrowLeft":
         f1.value = f1.value - 15
@@ -741,6 +764,8 @@ def onKeyPress(event, n, f1, zoom, targets, nonspecific):
         targets.value = not targets.value
     elif key == "n":
         nonspecific.value = not nonspecific.value
+    elif key == "e":
+        exclude_aoi.value = not exclude_aoi.value
 
 
 def onFrameClick(event, counter):
@@ -752,13 +777,16 @@ def incrementRange(name, x, counter):
 
 
 def updateParams(
-    n, f1, model, fig, item, ax, targets, nonspecific, labels, fov_controls
+    n, f1, model, fig, item, ax, targets, nonspecific, labels, fov_controls, exclude_aoi
 ):
     n_old = n.old
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
     c = model.cdx
+    color = "C2" if model.data.mask[n] else "C7"
+
+    exclude_aoi.value = not model.data.mask[n]
 
     frames = torch.arange(f1, f2)
     img_ideal = (
@@ -796,6 +824,7 @@ def updateParams(
     for p in params:
         if p == "p_specific":
             item[p].set_ydata(model.params[p][n])
+            item[p].set_color(color)
         elif p in {"z_map"}.intersection(model.params.keys()):
             item[p].set_ydata(model.params[p][n])
         elif p == "chi2":
@@ -850,7 +879,7 @@ def updateParams(
                 ul,
                 where=f_mask,
                 alpha=0.3,
-                color="C2",
+                color=color,
             )
             item[f"{p}_specific_mean"].remove()
             (item[f"{p}_specific_mean"],) = ax[p].plot(
@@ -860,11 +889,11 @@ def updateParams(
                 mean if p == "height" else mean[f_mask],
                 "-" if p == "height" else "o",
                 ms=2,
-                color="C2",
+                color=color,
             )
 
     ax["glimpse"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
-    item[f"aoi_{n}"].set_edgecolor("C2")
+    item[f"aoi_{n}"].set_edgecolor(color)
     item[f"aoi_{n}"].set(zorder=2, visible=True)
     n_old_dtype = "ontarget" if n_old < model.data.N else "offtarget"
     n_old_visible = fov_controls[n_old_dtype].value
@@ -1047,6 +1076,23 @@ def showNonspecific(checked, n, model, item, ax):
             for k in range(model.K):
                 item[f"{p}_nonspecific{k}_fill"].remove()
                 item[f"{p}_nonspecific{k}_mean"].remove()
+
+
+def excludeAOI(checked, n, model, item):
+    checked = get_value(checked)
+    n = get_value(n)
+    model.data.mask[n] = not checked
+    color = "C7" if checked else "C2"
+    item["p_specific"].set_color(color)
+    item["height_specific_mean"].set_color(color)
+    item["height_specific_fill"].set_color(color)
+    item["width_specific_mean"].set_color(color)
+    item["width_specific_fill"].set_color(color)
+    item["x_specific_mean"].set_color(color)
+    item["x_specific_fill"].set_color(color)
+    item["y_specific_mean"].set_color(color)
+    item["y_specific_fill"].set_color(color)
+    item[f"aoi_{n}"].set_edgecolor(color)
 
 
 def logUI(out):

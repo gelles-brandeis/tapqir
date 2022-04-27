@@ -107,7 +107,7 @@ def simulate(
         data.cpu(),
         target_locs.cpu(),
         is_ontarget.cpu(),
-        labels,
+        labels=labels,
         offset_samples=offset,
         offset_weights=torch.ones(3) / 3,
         device=model.device,

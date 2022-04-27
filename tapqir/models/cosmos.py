@@ -199,110 +199,114 @@ class Cosmos(Model):
 
         with aois as ndx:
             ndx = ndx[:, None]
-            # background mean and std
-            background_mean = pyro.sample(
-                "background_mean", dist.HalfNormal(self.background_mean_std)
-            )
-            background_std = pyro.sample(
-                "background_std", dist.HalfNormal(self.background_std_std)
-            )
-            with frames as fdx:
-                # fetch data
-                obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
-                # sample background intensity
-                background = pyro.sample(
-                    "background",
-                    dist.Gamma(
-                        (background_mean / background_std) ** 2,
-                        background_mean / background_std**2,
-                    ),
+            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            with handlers.mask(mask=mask):
+                # background mean and std
+                background_mean = pyro.sample(
+                    "background_mean", dist.HalfNormal(self.background_mean_std)
                 )
-
-                # sample hidden model state (1+S,)
-                z = pyro.sample(
-                    "z",
-                    dist.Categorical(Vindex(pi)[..., :, is_ontarget.long()]),
-                    infer={"enumerate": "parallel"},
+                background_std = pyro.sample(
+                    "background_std", dist.HalfNormal(self.background_std_std)
                 )
-                theta = pyro.sample(
-                    "theta",
-                    dist.Categorical(
-                        Vindex(probs_theta(self.K, self.device))[
-                            torch.clamp(z, min=0, max=1)
-                        ]
-                    ),
-                    infer={"enumerate": "parallel"},
-                )
-                onehot_theta = one_hot(theta, num_classes=1 + self.K)
-
-                ms, heights, widths, xs, ys = [], [], [], [], []
-                for kdx in spots:
-                    specific = onehot_theta[..., 1 + kdx]
-                    # spot presence
-                    m = pyro.sample(
-                        f"m_{kdx}",
-                        dist.Bernoulli(Vindex(probs_m(lamda, self.K))[..., theta, kdx]),
+                with frames as fdx:
+                    # fetch data
+                    obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
+                    # sample background intensity
+                    background = pyro.sample(
+                        "background",
+                        dist.Gamma(
+                            (background_mean / background_std) ** 2,
+                            background_mean / background_std**2,
+                        ),
                     )
-                    with handlers.mask(mask=m > 0):
-                        # sample spot variables
-                        height = pyro.sample(
-                            f"height_{kdx}",
-                            dist.HalfNormal(self.height_std),
-                        )
-                        width = pyro.sample(
-                            f"width_{kdx}",
-                            AffineBeta(
-                                1.5,
-                                2,
-                                self.width_min,
-                                self.width_max,
-                            ),
-                        )
-                        x = pyro.sample(
-                            f"x_{kdx}",
-                            AffineBeta(
-                                0,
-                                Vindex(size)[..., specific],
-                                -(self.data.P + 1) / 2,
-                                (self.data.P + 1) / 2,
-                            ),
-                        )
-                        y = pyro.sample(
-                            f"y_{kdx}",
-                            AffineBeta(
-                                0,
-                                Vindex(size)[..., specific],
-                                -(self.data.P + 1) / 2,
-                                (self.data.P + 1) / 2,
-                            ),
-                        )
 
-                    # append
-                    ms.append(m)
-                    heights.append(height)
-                    widths.append(width)
-                    xs.append(x)
-                    ys.append(y)
+                    # sample hidden model state (1+S,)
+                    z = pyro.sample(
+                        "z",
+                        dist.Categorical(Vindex(pi)[..., :, is_ontarget.long()]),
+                        infer={"enumerate": "parallel"},
+                    )
+                    theta = pyro.sample(
+                        "theta",
+                        dist.Categorical(
+                            Vindex(probs_theta(self.K, self.device))[
+                                torch.clamp(z, min=0, max=1)
+                            ]
+                        ),
+                        infer={"enumerate": "parallel"},
+                    )
+                    onehot_theta = one_hot(theta, num_classes=1 + self.K)
 
-                # observed data
-                pyro.sample(
-                    "data",
-                    KSMOGN(
-                        torch.stack(heights, -1),
-                        torch.stack(widths, -1),
-                        torch.stack(xs, -1),
-                        torch.stack(ys, -1),
-                        target_locs,
-                        background,
-                        gain,
-                        self.data.offset.samples,
-                        self.data.offset.logits.to(self.dtype),
-                        self.data.P,
-                        torch.stack(torch.broadcast_tensors(*ms), -1),
-                        self.use_pykeops,
-                    ),
-                    obs=obs,
-                )
+                    ms, heights, widths, xs, ys = [], [], [], [], []
+                    for kdx in spots:
+                        specific = onehot_theta[..., 1 + kdx]
+                        # spot presence
+                        m = pyro.sample(
+                            f"m_{kdx}",
+                            dist.Bernoulli(
+                                Vindex(probs_m(lamda, self.K))[..., theta, kdx]
+                            ),
+                        )
+                        with handlers.mask(mask=m > 0):
+                            # sample spot variables
+                            height = pyro.sample(
+                                f"height_{kdx}",
+                                dist.HalfNormal(self.height_std),
+                            )
+                            width = pyro.sample(
+                                f"width_{kdx}",
+                                AffineBeta(
+                                    1.5,
+                                    2,
+                                    self.width_min,
+                                    self.width_max,
+                                ),
+                            )
+                            x = pyro.sample(
+                                f"x_{kdx}",
+                                AffineBeta(
+                                    0,
+                                    Vindex(size)[..., specific],
+                                    -(self.data.P + 1) / 2,
+                                    (self.data.P + 1) / 2,
+                                ),
+                            )
+                            y = pyro.sample(
+                                f"y_{kdx}",
+                                AffineBeta(
+                                    0,
+                                    Vindex(size)[..., specific],
+                                    -(self.data.P + 1) / 2,
+                                    (self.data.P + 1) / 2,
+                                ),
+                            )
+
+                        # append
+                        ms.append(m)
+                        heights.append(height)
+                        widths.append(width)
+                        xs.append(x)
+                        ys.append(y)
+
+                    # observed data
+                    pyro.sample(
+                        "data",
+                        KSMOGN(
+                            torch.stack(heights, -1),
+                            torch.stack(widths, -1),
+                            torch.stack(xs, -1),
+                            torch.stack(ys, -1),
+                            target_locs,
+                            background,
+                            gain,
+                            self.data.offset.samples,
+                            self.data.offset.logits.to(self.dtype),
+                            self.data.P,
+                            torch.stack(torch.broadcast_tensors(*ms), -1),
+                            self.use_pykeops,
+                        ),
+                        obs=obs,
+                    )
 
     def guide(self):
         r"""
@@ -363,69 +367,73 @@ class Cosmos(Model):
 
         with aois as ndx:
             ndx = ndx[:, None]
-            pyro.sample(
-                "background_mean",
-                dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0]),
-            )
-            pyro.sample(
-                "background_std",
-                dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0]),
-            )
-            with frames as fdx:
-                # sample background intensity
+            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            with handlers.mask(mask=mask):
                 pyro.sample(
-                    "background",
-                    dist.Gamma(
-                        Vindex(pyro.param("b_loc"))[ndx, fdx]
-                        * Vindex(pyro.param("b_beta"))[ndx, fdx],
-                        Vindex(pyro.param("b_beta"))[ndx, fdx],
-                    ),
+                    "background_mean",
+                    dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0]),
                 )
-
-                for kdx in spots:
-                    # sample spot presence m
-                    m = pyro.sample(
-                        f"m_{kdx}",
-                        dist.Bernoulli(Vindex(pyro.param("m_probs"))[kdx, ndx, fdx]),
-                        infer={"enumerate": "parallel"},
+                pyro.sample(
+                    "background_std",
+                    dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0]),
+                )
+                with frames as fdx:
+                    # sample background intensity
+                    pyro.sample(
+                        "background",
+                        dist.Gamma(
+                            Vindex(pyro.param("b_loc"))[ndx, fdx]
+                            * Vindex(pyro.param("b_beta"))[ndx, fdx],
+                            Vindex(pyro.param("b_beta"))[ndx, fdx],
+                        ),
                     )
-                    with handlers.mask(mask=m > 0):
-                        # sample spot variables
-                        pyro.sample(
-                            f"height_{kdx}",
-                            dist.Gamma(
-                                Vindex(pyro.param("h_loc"))[kdx, ndx, fdx]
-                                * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
-                                Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
+
+                    for kdx in spots:
+                        # sample spot presence m
+                        m = pyro.sample(
+                            f"m_{kdx}",
+                            dist.Bernoulli(
+                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx]
                             ),
+                            infer={"enumerate": "parallel"},
                         )
-                        pyro.sample(
-                            f"width_{kdx}",
-                            AffineBeta(
-                                Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
-                                Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
-                                0.75,
-                                2.25,
-                            ),
-                        )
-                        pyro.sample(
-                            f"x_{kdx}",
-                            AffineBeta(
-                                Vindex(pyro.param("x_mean"))[kdx, ndx, fdx],
-                                Vindex(pyro.param("size"))[kdx, ndx, fdx],
-                                -(self.data.P + 1) / 2,
-                                (self.data.P + 1) / 2,
-                            ),
-                        )
-                        pyro.sample(
-                            f"y_{kdx}",
-                            AffineBeta(
-                                Vindex(pyro.param("y_mean"))[kdx, ndx, fdx],
-                                Vindex(pyro.param("size"))[kdx, ndx, fdx],
-                                -(self.data.P + 1) / 2,
-                                (self.data.P + 1) / 2,
-                            ),
-                        )
+                        with handlers.mask(mask=m > 0):
+                            # sample spot variables
+                            pyro.sample(
+                                f"height_{kdx}",
+                                dist.Gamma(
+                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx]
+                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
+                                ),
+                            )
+                            pyro.sample(
+                                f"width_{kdx}",
+                                AffineBeta(
+                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
+                                    0.75,
+                                    2.25,
+                                ),
+                            )
+                            pyro.sample(
+                                f"x_{kdx}",
+                                AffineBeta(
+                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("size"))[kdx, ndx, fdx],
+                                    -(self.data.P + 1) / 2,
+                                    (self.data.P + 1) / 2,
+                                ),
+                            )
+                            pyro.sample(
+                                f"y_{kdx}",
+                                AffineBeta(
+                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("size"))[kdx, ndx, fdx],
+                                    -(self.data.P + 1) / 2,
+                                    (self.data.P + 1) / 2,
+                                ),
+                            )
 
     def init_parameters(self):
         """
