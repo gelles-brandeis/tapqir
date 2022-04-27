@@ -664,7 +664,6 @@ def showCmd(b, layout, out):
             zoom=zoom,
             targets=targets,
             fov=fov,
-            out=out,
         ),
         names="value",
     )
@@ -875,7 +874,7 @@ def updateParams(
     fig.canvas.draw()
 
 
-def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov, out):
+def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov):
     n = get_value(n)
     f1 = get_value(f1)
     f2 = f1 + 15
@@ -929,7 +928,7 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov, out):
             item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     if fov is not None:
         fov.plot(
-            ("ontarget",),
+            fov.dtypes,
             model.data.P,
             n=n,
             f=f1,

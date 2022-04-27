@@ -816,9 +816,9 @@ def show(
         ax["glimpse"] = fig.add_subplot(gs2[0])
         P = DEFAULTS.pop("P")
         channels = DEFAULTS.pop("channels")
-        glimpse_data = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
-        glimpse_data.plot(
-            glimpse_data.dtypes,
+        fov = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
+        fov.plot(
+            fov.dtypes,
             P,
             n=0,
             f=0,
@@ -827,11 +827,11 @@ def show(
             item=item,
         )
     else:
-        glimpse_data = None
+        fov = None
 
     if not gui:
         plt.show()
-    return model, fig, item, ax, glimpse_data
+    return model, fig, item, ax, fov
 
 
 @app.command()

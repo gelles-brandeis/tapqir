@@ -231,7 +231,8 @@ class GlimpseDataset:
             fig = plt.figure(figsize=(10, 10 * self.height / self.width))
             ax = fig.add_subplot(1, 1, 1)
 
-        fov = self[self.cumdrift.index[f]]
+        frame = self.cumdrift.index[f]
+        fov = self[frame]
         if "fov" in item:
             item["fov"].set_data(fov)
         else:
@@ -239,7 +240,6 @@ class GlimpseDataset:
             vmax = np.percentile(fov, 99)
             item["fov"] = ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
 
-        frame = self.cumdrift.index[f]
         for dtype in dtypes:
             if dtype in ["ontarget", "offtarget"]:
                 for i, aoi in enumerate(self.aoiinfo[dtype].index):
