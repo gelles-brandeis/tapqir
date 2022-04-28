@@ -1,6 +1,7 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 from collections import namedtuple
 from pathlib import Path
 
@@ -8,6 +9,10 @@ import torch
 from pyro.ops.indexing import Vindex
 from pyro.ops.stats import quantile
 from torch.distributions.utils import lazy_property, probs_to_logits
+
+from tapqir.exceptions import TapqirFileNotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 class OffsetData(namedtuple("OffsetData", ["samples", "weights"])):
@@ -42,6 +47,7 @@ class CosmosDataset:
         images,
         xy,
         is_ontarget,
+        mask=None,
         labels=None,
         offset_samples=None,
         offset_weights=None,
@@ -53,6 +59,9 @@ class CosmosDataset:
         self.images = images
         self.xy = xy
         self.is_ontarget = is_ontarget
+        if mask is None:
+            mask = torch.ones_like(is_ontarget, dtype=torch.bool)
+        self.mask = mask
         self.labels = labels
         self.device = device
         self.offset = OffsetData(offset_samples.to(device), offset_weights.to(device))
@@ -178,6 +187,7 @@ def save(obj, path):
             "images": obj.images,
             "xy": obj.xy,
             "is_ontarget": obj.is_ontarget,
+            "mask": obj.mask,
             "labels": obj.labels,
             "offset_samples": obj.offset.samples,
             "offset_weights": obj.offset.weights,
@@ -187,9 +197,13 @@ def save(obj, path):
         },
         path / "data.tpqr",
     )
+    logger.info(f"Data is saved in {path / 'data.tpqr'}")
 
 
 def load(path, device=torch.device("cpu")):
     path = Path(path)
-    data_tapqir = torch.load(path / "data.tpqr")
+    try:
+        data_tapqir = torch.load(path / "data.tpqr")
+    except FileNotFoundError:
+        raise TapqirFileNotFoundError("data", path / "data.tpqr")
     return CosmosDataset(**data_tapqir, **{"device": device})

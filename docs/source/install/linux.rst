@@ -7,7 +7,9 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
    *On Ubuntu 20.04*
    
-   Tip: on Ubuntu select the text to copy it and then press the middle mouse button (scrolling wheel) to paste the copied text.
+   .. tip::
+
+      On Ubuntu select the text to copy it and then press the middle mouse button (scrolling wheel) to paste the copied text.
    
    To get information about your graphic card and available drivers run::
 
@@ -28,11 +30,10 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
     $ sudo pacman -S nvidia
 
-2. Install cmake (>=3.18) and g++ (>=7) if not already installed.
+2. Install g++ (>=7) if not already installed.
    
    To check installation versions in the terminal run::
 
-    $ cmake --version
     $ g++ --version
 
    To install (if not already installed):
@@ -41,17 +42,57 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
    In the terminal run::
 
-    $ sudo apt install cmake
     $ sudo apt install g++
 
    *On Arch Linux*
 
    In the terminal run::
 
-    $ sudo pacman -S cmake
     $ sudo pacman -S gcc
+    
+4. Install latest version of CUDA (needs to be version 11.5 or later).
 
-3. Install Anaconda package manager (`installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
+   *On Ubuntu 20.04*
+
+   Summary of `CUDA installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu-installation>`_::
+
+    $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+
+   .. code-block::
+
+    $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+
+   .. code-block::
+
+    $ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+
+   .. code-block::
+
+    $ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+
+   .. code-block::
+
+    $ sudo apt update
+
+   .. code-block::
+
+    $ sudo apt install cuda
+
+   Reboot the system::
+
+    $ sudo reboot
+
+   *On Arch Linux*
+
+   In the terminal run::
+
+    $ sudo pacman -S cuda
+
+   Reboot the system::
+
+    $ sudo reboot
+
+5. Install Anaconda package manager (`Anaconda installation instructions <https://docs.anaconda.com/anaconda/install/linux/>`_).
    Here is the summary of required installation steps:
 
    * Download installer from `<https://www.anaconda.com/products/individual>`_ (anaconda nucleus sign-up page can be ignored).
@@ -71,29 +112,40 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
    
    * After installation is complete close the terminal and open it again. Now you should see ``(base)`` environment indicated in the terminal.
 
-4. Create a new environment and give it a name (e.g., ``tapqir-env``)::
+6. Create a new environment and give it a name (e.g., ``tapqir-env``)::
 
     $ conda create --name tapqir-env python=3.8
 
-5. Activate the environement (you should see the environment name
+7. Activate the environement (you should see the environment name
    (i.e., ``tapqir-env``) in the command prompt)::
 
     $ conda activate tapqir-env
 
-6. Install CUDA and ensure that it is version 11.5 or later::
+8. Install ``tapqir``::
 
-    $ conda install cuda -c nvidia
-    $ nvcc --version
+    $ pip install tapqir[desktop]
 
-    nvcc: NVIDIA (R) Cuda compiler driver
-    Copyright (c) 2005-2021 NVIDIA Corporation
-    Built on Mon_Sep_13_19:13:29_PDT_2021
-    Cuda compilation tools, release 11.5, V11.5.50
-    Build cuda_11.5.r11.5/compiler.30411180_0
+.. tip::
 
-7. Install ``tapqir``::
+   If there are two GPUs on your computer, use::
 
-    $ pip install tapqir
+      $ CUDA_VISIBLE_DEVICES=1 tapqir-gui
+
+   to run Tapqir on the second GPU.
+
+Update Tapqir
+-------------
+
+To update Tapqir run (make sure that ``tapqir-env`` environment is activated)::
+
+   $ pip install tapqir -U
+
+Check version
+-------------
+
+To check Tapqir version run::
+
+   $ tapqir --version
 
 Install linux server tools (optional)
 -------------------------------------

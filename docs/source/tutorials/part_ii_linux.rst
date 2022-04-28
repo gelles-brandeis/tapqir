@@ -1,7 +1,7 @@
-Part II: Tapqir analysis (Linux)
-================================
+Part II: Tapqir analysis (Linux/WSL 2)
+======================================
 
-In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2021`_. The data
+In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2022`_. The data
 are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `imscroll`_ (`Friedman et al., 2015`_).
 
 Set up the environment
@@ -13,26 +13,32 @@ Set up the environment
 
    $ conda activate tapqir-env
 
-To start the analysis create an empty folder (here named ``tutorial``) which will be the working directory::
-
-  $ mkdir /tmp/tutorial
-  $ cd /tmp/tutorial
-
 Download input data
 -------------------
 
 These data were acquired with `Glimpse`_ and pre-processed with the `imscroll`_ program (`Friedman et al., 2015`_).
-Let's download data files using `wget`_ and then unzip files::
+Change directory to user's home directory::
+
+  $ cd ~
+
+Download data files using `wget`_::
 
   $ wget https://zenodo.org/record/5659927/files/DatasetA_glimpse.zip
+
+Unzip and then delete the zip file::
+
   $ unzip DatasetA_glimpse.zip && rm DatasetA_glimpse.zip
 
-The raw input data placed in ``/tmp/tutorial/DatasetA_glimpse`` are:
+The raw input data placed in ``/home/{your_username}/DatasetA_glimpse`` are:
 
 * ``garosen00267`` - folder containing image data in glimpse format and header files
 * ``green_DNA_locations.dat`` - aoiinfo file designating target molecule (DNA) locations in the binder channel
 * ``green_nonDNA_locations.dat`` - aoiinfo file designating off-target (nonDNA) locations in the binder channel
 * ``green_driftlist.dat`` - driftlist file recording the stage movement that took place during the experiment
+
+To start the analysis create an empty folder (here named ``tutorial``) which will be the working directory::
+
+  $ mkdir ~/tutorial
 
 
 Start the program
@@ -44,16 +50,16 @@ To start the program run::
 
 which will open a browser window to display the Tapqir GUI:
 
-.. image:: start-page.png
+.. figure:: start-page.png
    :width: 800
 
 
 Select working directory
 ------------------------
 
-Click the ``Select`` button at the top to set the working directory  to ``/tmp/tutorial``:
+Click the ``Select`` button to set the working directory  to ``/home/{your_username}/tutorial``:
 
-.. image:: working-directory.png
+.. figure:: working-directory.png
    :width: 800
 
 Setting working directory creates a ``.tapqir`` sub-folder that will store internal files
@@ -74,10 +80,10 @@ To extract AOIs specify the following options in the ``Extract AOIs`` tab:
 And specify the locations of input files for each color channel (only one color channel in this example):
 
 * Channel name: ``SNAP549`` (an arbitrary name)
-* Header/glimpse folder: ``/tmp/tutorial/DatasetA_glimpse/garosen00267``
-* Target molecule locations file: ``/tmp/tutorial/DatasetA_glimpse/green_DNA_locations.dat``
-* Off-target control locations file: ``/tmp/tutorial/DatasetA_glimpse/green_nonDNA_locations.dat``
-* Driftlist file: ``/tmp/tutorial/DatasetA_glimpse/green_driftlist.dat``
+* Header/glimpse folder: ``/home/{your_username}/DatasetA_glimpse/garosen00267``
+* Driftlist file: ``/home/{your_username}/DatasetA_glimpse/green_driftlist.dat``
+* Target molecule locations file: ``/home/{your_username}/DatasetA_glimpse/green_DNA_locations.dat``
+* Off-target control locations file: ``/home/{your_username}/DatasetA_glimpse/green_nonDNA_locations.dat``
 
 .. note::
 
@@ -87,41 +93,40 @@ And specify the locations of input files for each color channel (only one color 
 
 Next, click ``Extract AOIs`` button:
 
-.. image:: extract-aois.png
+.. figure:: extract-aois.png
    :width: 800
 
 Great! The program has outputted a ``data.tpqr`` file containing extracted AOI images (N=331 target and Nc=526 off-target
 control locations)::
 
-    $ ls
+    $ ls ~/tutorial
 
-    DatasetA_glimpse     offset-distribution.png  ontarget-channel0.png
-    data.tpqr            offset-medians.png
-    offset-channel0.png  offtarget-channel0.png
+    data.tpqr            offset-distribution.png  offtarget-channel0.png
+    offset-channel0.png  offset-medians.png       ontarget-channel0.png
 
 Additionally, the program has saved
 
 * Image files (``ontarget-channel0.png`` and ``offtarget-channel0.png``) displaying locations of on-target and off-target
   AOIs in the first frame. You should inspect these images to make sure that AOIs are *inside* the field of view:
 
-.. image:: ontarget-channel0.png
+.. figure:: ontarget-channel0.png
    :width: 700
 
-.. image:: offtarget-channel0.png
+.. figure:: offtarget-channel0.png
    :width: 700
 
 * You should also look at ``offset-channel0.png`` to check that offset data is taken from a region *outside* the field of view:
 
-.. image:: offset-channel0.png
+.. figure:: offset-channel0.png
    :width: 700
 
 * The other two files show the intensity histograms (``offset-distribution.png``) and the offset median time record
   (``offset-medians.png``) (offset distribution shouldn't drift over time):
 
-.. image:: offset-distribution.png
+.. figure:: offset-distribution.png
    :width: 300
 
-.. image:: offset-medians.png
+.. figure:: offset-medians.png
    :width: 500
 
 Fit the data
@@ -129,7 +134,7 @@ Fit the data
 
 Now the data is ready for fitting. Options that we will select:
 
-* Model - the default single-color time-independent ``cosmos`` model (`Ordabayev et al., 2021`_).
+* Model - the default single-color time-independent ``cosmos`` model (`Ordabayev et al., 2022`_).
 * Color channel number - first chanel (``0``) (there is only one color channel in this data)
 * Run computations on GPU: yes (``True``).
 * AOI batch size - use default (``10``).
@@ -145,11 +150,11 @@ Now the data is ready for fitting. Options that we will select:
 
 Next, press ``Fit the data`` button:
 
-.. image:: fit-data2.png
+.. figure:: fit-data.png
    :width: 800
 
 The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
-The program can be stopped at any time by clicking in the terminal window and pressing ``Ctrl-C``. To restart the program again re-run
+The program can be stopped at any time by clicking in the *terminal window* and pressing ``Ctrl-C``. To restart the program again re-run
 ``tapqir-gui`` command and the program will resume from the last saved checkpoint.
 
 After fitting is finished, the program computes 95% credible intervals (CI) of model parameters and saves the parameters and CIs in
@@ -162,17 +167,32 @@ Tensorboard
 -----------
 
 At every checkpoint the values of global variational parameters (``-ELBO``, ``gain_loc``, ``proximity_loc``,
-``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard gui <https://www.tensorflow.org/tensorboard>`_
+``pi_mean``, ``lamda_loc``) are recorded. Fitting progress can be inspected while fitting is taking place or afterwards with the `tensorboard program <https://www.tensorflow.org/tensorboard>`_
 displayed in the ``Tensorboard`` tab, which shows the parameters values as a function of iteration number:
 
-.. image:: tensorboard-tab.png
+.. note::
+
+   On WSL the Tensorboard tab does not work. To view tensorboard open a new terminal, activate the environment::
+
+      $ conda activate tapqir-env
+
+   run tensorboard::
+
+      $ tensorboard --logdir=<your working directory>
+
+   and then open localhost port (typically ``http://localhost:6006``) in a browser window. To quit tensorboard press ``Ctrl-C``.
+
+.. figure:: tensorboard-tab.png
    :width: 800
 
-Set smoothing to 0 (in the left panel) and use refresh button at the top right to refresh plots.
+.. tip::
 
-Plateaued plots signify convergence.
+   Set smoothing to 0 (in the left panel) and use refresh button at the top right to refresh plots.
+
+Plateaued plots of ``-ELBO``, ``gain_loc``, ``proximity_loc``, ``pi_mean``, and ``lamda_loc`` signify convergence.
 
 .. note::
+
    **About number of iterations**. Fitting the data requires many iterations (about 50,000-100,000) until parameters
    converge. Setting the number of iterations to 0 will run the program till Tapqir's custom convergence criterion is satisfied.
    We recommend to set it to 0 (default) and then run for additional number of iterations if required.
@@ -183,21 +203,39 @@ View results
 After fitting is done open ``View results`` tab to visualize analysis results. Click on ``Load results`` button which will display parameter values
 from the ``cosmos-channel0-params.tpqr`` file:
 
-.. image:: view-results.png
+.. note::
+
+   ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has finished or
+   the model has converged).
+
+.. figure:: view-results.png
    :width: 800
 
-In the display panel, the top row shows raw images, the second row shows best fit images, the plots show ``p(specific)`` and parameter values (mean and 95% CI).
-The AOI number can be changed using the box widget and the frame range can be changed using the slider widget at the top. To zoom out to entire frame range click on
-the ``zoom out`` checkbox.
+In the display panel:
+
+* the top row shows raw images and the second row shows best fit images
+* target-specific spot presence probability ``p(specific)`` and its most likely value ``z``
+* values (mean and 95% CI) of ``h``, ``w``, ``x``, ``y``, and ``b`` parameters for target-specific spot (green) and
+  target-nonspecific spots (spot 1 is blue and spot 2 is orange; remember that spot numbering is arbitrary)
+* chi-squared test of how well the model fits each particular image (higher number means worse fit)
+
+The AOI number can be changed using the box widget or ``Down``, ``Up`` arrow keys or ``j``, ``k`` keys
+(hover the mouse over the ``View results`` tab for keys to work).
+
+Frame range can be toggled to zoom out to entire frame range by clicking on the ``Zoom out frames`` checkbox
+or using the ``z`` key. When zoomed out the range of frames corresponding to AOI images is highlighted in blue.
+
+The frame range can be changed by using the slider widget at the top or ``Left``, ``Right`` arrow keys or ``h``, ``l``
+keys or by left-clicking on the plot.
 
 Advanced settings
 -----------------
 
-Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir`` sub-folder of the working directory. It also contains
-additional options that are not available through the GUI.
+Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir``
+sub-folder of the working directory. It also contains additional options that are not available through the GUI.
 
-Offset region
-^^^^^^^^^^^^^
+Offset
+^^^^^^
 
 Offset data region (square) can be edited using three variables:
 
@@ -205,10 +243,15 @@ Offset data region (square) can be edited using three variables:
 * ``offset_y``: top corner of the square (default is 10 pixels)
 * ``offset_P``: size of the square (default is 30 pixels)
 
+Bin size for the offset intensity histogram by default is 1. The bin size can be increased (try 3 or 5; odd number)
+to make the histogram sparser which will speed up fitting.
+
+* ``bin_size``: offset intensity histogram bin size (default is 1)
+
 Prior distributions
 ^^^^^^^^^^^^^^^^^^^
 
-Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2021`_):
+Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordabayev et al., 2022`_):
 
 * ``background_mean_std`` (default 1000): standard deviation of the HalfNormal distribution in Eq. 6a
 * ``background_std_std`` (default 100): standard deviation of the HalfNormal distribution in Eq. 6b
@@ -220,7 +263,7 @@ Parameters of prior distirbutions (Eqs. 6a, 6b, 11, 12, 13, 15, and 16 in `Ordab
 * ``gain_std`` (default 50): standard deviation of the HalfNormal distribution in Eq. 16
 
 .. _Rosen et al., 2020: https://dx.doi.org/10.1073/pnas.2011224117
-.. _Ordabayev et al., 2021: https://doi.org/10.1101/2021.09.30.462536
+.. _Ordabayev et al., 2022: https://doi.org/10.7554/eLife.73860
 .. _Friedman et al., 2015: https://dx.doi.org/10.1016/j.ymeth.2015.05.026
 .. _Glimpse: https://github.com/gelles-brandeis/Glimpse
 .. _imscroll: https://github.com/gelles-brandeis/CoSMoS_Analysis/wiki

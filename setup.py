@@ -36,10 +36,11 @@ DOCS_REQUIRE = [
     "sphinx",
     "sphinx-autodoc-typehints",
     "sphinx-click",
+    "sphinx-copybutton",
     "sphinx-gallery",
     "sphinx-panels",
 ]
-IN_COLAB = "COLAB_GPU" in os.environ
+DESKTOP_REQUIRE = ["voila"]
 
 setuptools.setup(
     name="tapqir",
@@ -58,9 +59,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "cmake>=3.18",
         "colorama",
-        "funsor @ git+https://github.com/ordabayevy/funsor.git@tapqir",
+        "funsor==0.4.2",
         "future",
         "ipyevents",
         "ipyfilechooser",
@@ -68,19 +68,21 @@ setuptools.setup(
         "ipywidgets",
         "matplotlib",
         "pandas",
-        "pykeops @ git+https://github.com/getkeops/keops.git@af5e21a0ba85555ccd7cfff33fa234373bd94211",
-        "pyro-ppl @ git+https://github.com/ordabayevy/pyro.git@tapqir",
+        "pykeops>=2.0",
+        "pyro-ppl==1.8.0",
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
+        "tensorboard",
+        "torch==1.10.0",
         "typer",
-    ]
-    + ([] if IN_COLAB else ["tensorboard", "voila"]),
+    ],
     extras_require={
+        "desktop": DESKTOP_REQUIRE,
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
         "docs": DOCS_REQUIRE,
-        "dev": EXTRAS_REQUIRE + TEST_REQUIRE + DOCS_REQUIRE,
+        "dev": DESKTOP_REQUIRE + EXTRAS_REQUIRE + TEST_REQUIRE + DOCS_REQUIRE,
     },
     keywords="image-classification probabilistic-programming cosmos pyro",
     license="Apache 2.0",

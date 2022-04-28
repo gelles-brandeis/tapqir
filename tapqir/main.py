@@ -9,6 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import List, Optional
 
+import click
 import colorama
 import matplotlib.pyplot as plt
 import torch
@@ -18,6 +19,7 @@ from tqdm import tqdm
 
 from tapqir import __version__
 from tapqir.distributions.util import gaussian_spots
+from tapqir.exceptions import CudaOutOfMemoryError, TapqirFileNotFoundError
 
 app = typer.Typer()
 
@@ -49,14 +51,6 @@ class Model(str, Enum):
 
 
 def get_default(key):
-    if key in [
-        "name",
-        "glimpse-folder",
-        "ontarget-aoiinfo",
-        "offtarget-aoiinfo",
-        "driftlist",
-    ]:
-        return [c.get(key, None) for c in DEFAULTS["channels"]]
     return DEFAULTS[key]
 
 
@@ -81,8 +75,10 @@ def glimpse(
         partial(get_default, "P"),
         "--aoi-size",
         "-P",
+        min=5,
+        max=50,
         help="AOI image size - number of pixels along the axis",
-        prompt="AOI image size - number of pixels along the axis",
+        prompt="AOI image size",
     ),
     frame_range: bool = typer.Option(
         partial(get_default, "frame-range"),
@@ -92,37 +88,58 @@ def glimpse(
     ),
     frame_start: Optional[int] = typer.Option(
         partial(get_default, "frame-start"),
+        min=0,
         help="Starting frame.",
         prompt="Starting frame",
     ),
     frame_end: Optional[int] = typer.Option(
         partial(get_default, "frame-end"),
+        min=1,
         help="Ending frame.",
         prompt="Ending frame",
-    ),
-    num_channels: int = typer.Option(
-        partial(get_default, "num-channels"),
-        "--num-channels",
-        "-C",
-        help="Number of color channels",
-        prompt="Number of color channels",
     ),
     use_offtarget: bool = typer.Option(
         partial(get_default, "use-offtarget"),
         help="Use off-target AOI locations.",
         prompt="Use off-target AOI locations?",
     ),
-    name: Optional[List[str]] = typer.Option(partial(get_default, "name")),
-    glimpse_folder: Optional[List[str]] = typer.Option(
-        partial(get_default, "glimpse-folder")
+    num_channels: int = typer.Option(
+        partial(get_default, "num-channels"),
+        "--num-channels",
+        "-C",
+        min=1,
+        help="Number of color channels",
+        prompt="Number of color channels",
     ),
-    ontarget_aoiinfo: Optional[List[str]] = typer.Option(
-        partial(get_default, "ontarget-aoiinfo")
+    name: Optional[List[str]] = typer.Option(None),
+    glimpse_folder: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
     ),
-    offtarget_aoiinfo: Optional[List[str]] = typer.Option(
-        partial(get_default, "offtarget-aoiinfo")
+    driftlist: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
     ),
-    driftlist: Optional[List[str]] = typer.Option(partial(get_default, "driftlist")),
+    ontarget_aoiinfo: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    offtarget_aoiinfo: Optional[List[Path]] = typer.Option(
+        None,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
     overwrite: bool = typer.Option(
         True,
         "--overwrite",
@@ -161,60 +178,92 @@ def glimpse(
 
     torch.set_default_tensor_type(torch.FloatTensor)
 
+    logger = logging.getLogger("tapqir")
+
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
     if progress_bar is None:
         progress_bar = tqdm
 
-    # fill in default values
+    # read parameter input values
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
-    DEFAULTS["num-channels"] = num_channels
     DEFAULTS["frame-range"] = frame_range
     DEFAULTS["frame-start"] = frame_start
     DEFAULTS["frame-end"] = frame_end
     DEFAULTS["use-offtarget"] = use_offtarget
+    DEFAULTS["num-channels"] = num_channels
     DEFAULTS["labels"] = labels
 
-    # inputs descriptions
-    desc = {}
-    desc["name"] = "Channel name"
-    desc["glimpse-folder"] = "Header/glimpse folder"
-    desc["driftlist"] = "Driftlist file"
-    desc["ontarget-aoiinfo"] = "Target molecule locations file"
-    desc["offtarget-aoiinfo"] = "Off-target control locations file"
-    desc["ontarget-labels"] = "On-target AOI binding labels"
-    desc["offtarget-labels"] = "Off-target AOI binding labels"
-
-    keys = [
+    # parameter names
+    param_names = [
         "name",
         "glimpse-folder",
+        "driftlist",
         "ontarget-aoiinfo",
         "offtarget-aoiinfo",
-        "driftlist",
     ]
-    flags = [name, glimpse_folder, ontarget_aoiinfo, offtarget_aoiinfo, driftlist]
+    if labels:
+        param_names += ["ontarget-labels", "offtarget-labels"]
+
+    # parameter flags
+    param_flag = {}
+    param_flag["name"] = name
+    param_flag["glimpse-folder"] = glimpse_folder
+    param_flag["driftlist"] = driftlist
+    param_flag["ontarget-aoiinfo"] = ontarget_aoiinfo
+    param_flag["offtarget-aoiinfo"] = offtarget_aoiinfo
+
+    # parameter prompts
+    param_prompt = {}
+    param_prompt["name"] = "Channel name"
+    param_prompt["glimpse-folder"] = "Header/glimpse folder"
+    param_prompt["driftlist"] = "Driftlist file"
+    param_prompt["ontarget-aoiinfo"] = "Target molecule locations file"
+    param_prompt["offtarget-aoiinfo"] = "Off-target control locations file"
+    param_prompt["ontarget-labels"] = "On-target AOI binding labels"
+    param_prompt["offtarget-labels"] = "Off-target AOI binding labels"
+
+    # parameter types
+    param_type = {}
+    param_type["name"] = str
+    param_type["glimpse-folder"] = click.Path(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True
+    )
+    param_type["driftlist"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["ontarget-aoiinfo"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["offtarget-aoiinfo"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["ontarget-labels"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
+    param_type["offtarget-labels"] = click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    )
 
     for c in range(num_channels):
         if len(DEFAULTS["channels"]) < c + 1:
             DEFAULTS["channels"].append({})
-        for flag, key in zip(flags, keys):
-            DEFAULTS["channels"][c][key] = flag[c] if c < len(flag) else None
-
-    # interactive input
-    if not no_input:
-        for c in range(num_channels):
-            if labels:
-                keys += ["ontarget-labels", "offtarget-labels"]
+        if not no_input:
             typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
-            for key in keys:
-                if key == "offtarget-aoiinfo" and not use_offtarget:
-                    continue
-
-                DEFAULTS["channels"][c][key] = typer.prompt(
-                    desc[key], default=DEFAULTS["channels"][c][key]
-                )
+        for param_name in param_names:
+            if param_name == "offtarget-aoiinfo" and not use_offtarget:
+                continue
+            if c >= len(param_flag[param_name]):
+                if not no_input:
+                    DEFAULTS["channels"][c][param_name] = typer.prompt(
+                        param_prompt[param_name],
+                        default=DEFAULTS["channels"][c][param_name],
+                        type=param_type[param_name],
+                    )
+            else:
+                DEFAULTS["channels"][c][param_name] = param_flag[param_name][c]
 
     DEFAULTS = dict(DEFAULTS)
     for c in range(num_channels):
@@ -228,13 +277,15 @@ def glimpse(
                 sort_keys=False,
             )
 
-    typer.echo("Extracting AOIs ...")
+    logger.info("Extracting AOIs ...")
     read_glimpse(
         path=cd,
         progress_bar=progress_bar,
         **DEFAULTS,
     )
-    typer.echo("Extracting AOIs: Done")
+    logger.info("Extracting AOIs: Done")
+
+    return 0
 
 
 @app.command()
@@ -329,7 +380,8 @@ def fit(
     from pyroapi import pyro_backend
 
     from tapqir.models import models
-    from tapqir.utils.stats import save_stats
+
+    logger = logging.getLogger("tapqir")
 
     settings = {}
     settings["S"] = 1
@@ -375,19 +427,31 @@ def fit(
 
     with pyro_backend(PYRO_BACKEND):
 
+        logger.info("Fitting the data ...")
         model = models[model](**settings)
-        model.load(cd)
+        try:
+            model.load(cd)
+        except TapqirFileNotFoundError as err:
+            logger.exception(f"Failed to load {err.name} file")
+            return 1
 
         model.init(learning_rate, nbatch_size, fbatch_size)
-        typer.echo("Fitting the data ...")
-        exit_code = model.run(num_iter, progress_bar=progress_bar)
-        if exit_code == 0:
-            typer.echo("Fitting the data: Done")
-        elif exit_code == 1:
-            typer.echo("The model hasn't converged!")
-        typer.echo("Computing stats ...")
-        save_stats(model, cd, save_matlab=matlab)
-        typer.echo("Computing stats: Done")
+        try:
+            model.run(num_iter, progress_bar=progress_bar)
+        except CudaOutOfMemoryError:
+            logger.exception("Failed to fit the data")
+            return 1
+        logger.info("Fitting the data: Done")
+
+        logger.info("Computing stats ...")
+        try:
+            model.compute_stats(save_matlab=matlab)
+        except CudaOutOfMemoryError:
+            logger.exception("Failed to compute stats")
+            return 1
+        logger.info("Computing stats: Done")
+
+    return 0
 
 
 @app.command()
@@ -439,7 +503,8 @@ def stats(
     from pyroapi import pyro_backend
 
     from tapqir.models import models
-    from tapqir.utils.stats import save_stats
+
+    logger = logging.getLogger("tapqir")
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
@@ -468,15 +533,24 @@ def stats(
 
     with pyro_backend(PYRO_BACKEND):
 
+        logger.info("Computing stats ...")
         model = models[model](**settings)
-        model.load(cd)
+        try:
+            model.load(cd)
+        except TapqirFileNotFoundError:
+            logger.exception("Failed to load data file")
+            return 1
         model.load_checkpoint(param_only=True)
         model.nbatch_size = nbatch_size
         model.fbatch_size = fbatch_size
+        try:
+            model.compute_stats(save_matlab=matlab)
+        except CudaOutOfMemoryError:
+            logger.exception("Failed to compute stats")
+            return 1
+        logger.info("Computing stats: Done")
 
-        typer.echo("Computing stats ...")
-        save_stats(model, cd, save_matlab=matlab)
-        typer.echo("Computing stats: Done")
+    return 0
 
 
 def config_axis(ax, label, f1, f2, ymin=None, ymax=None, xticklabels=False):
@@ -518,32 +592,52 @@ def show(
     n: int = typer.Option(0, help="n", prompt="n"),
     f1: Optional[int] = None,
     f2: Optional[int] = None,
+    show_fov: bool = True,
+    gui=None,
 ):
+    from tapqir.imscroll import GlimpseDataset
     from tapqir.models import models
+
+    logger = logging.getLogger("tapqir")
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
     model = models[model](1, 2, channels, "cpu", "float")
-    model.load(cd, data_only=False)
+    try:
+        model.load(cd, data_only=False)
+    except TapqirFileNotFoundError as err:
+        logger.exception(f"Failed to load {err.name} file")
+        return 1
     if f1 is None:
         f1 = 0
     if f2 is None:
         f2 = f1 + 15
     c = model.cdx
+    color = "C2" if model.data.mask[n] else "C7"
 
-    width, height, dpi = 6.25, 6.25, 100
+    width, dpi = 6.25, 100
+    height = 10 if show_fov else 6.25
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
         nrows=10,
         ncols=15,
         top=0.96,
-        bottom=0.04,
+        bottom=0.39 if show_fov else 0.02,
         left=0.1,
         right=0.98,
         hspace=0.1,
         height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1, 1, 1],
     )
+    if show_fov:
+        gs2 = fig.add_gridspec(
+            nrows=1,
+            ncols=1,
+            top=0.32,
+            bottom=0.02,
+            left=0.1,
+            right=0.98,
+        )
     ax = {}
     item = {}
 
@@ -582,7 +676,7 @@ def show(
         ax[f"ideal_{f}"].axis("off")
 
     ax["z_map"] = fig.add_subplot(gs[2, :])
-    config_axis(ax["z_map"], r"$z_\mathsf{MAP}$", f1, f2, -0.1, model.S + 0.1)
+    config_axis(ax["z_map"], r"$z$", f1, f2, -0.1, model.S + 0.1)
     (item["z_map"],) = ax["z_map"].plot(
         torch.arange(0, model.data.F),
         model.params["z_map"][n],
@@ -599,7 +693,7 @@ def show(
         "o-",
         ms=3,
         lw=1,
-        color="C2",
+        color=color,
     )
 
     ax["height"] = fig.add_subplot(gs[4, :])
@@ -691,7 +785,7 @@ def show(
             mean if p == "height" else mean[f_mask],
             "-" if p == "height" else "o",
             ms=2,
-            color="C2",
+            color=color,
         )
         item[f"{p}_specific_fill"] = ax[p].fill_between(
             torch.arange(0, model.data.F),
@@ -699,7 +793,7 @@ def show(
             ul,
             where=f_mask,
             alpha=0.3,
-            color="C2",
+            color=color,
         )
     (item["background_mean"],) = ax["background"].plot(
         torch.arange(0, model.data.F),
@@ -725,8 +819,26 @@ def show(
         color="k",
     )
 
-    plt.show()
-    return model, fig, item, ax
+    if show_fov:
+        ax["glimpse"] = fig.add_subplot(gs2[0])
+        P = DEFAULTS.pop("P")
+        channels = DEFAULTS.pop("channels")
+        fov = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
+        fov.plot(
+            fov.dtypes,
+            P,
+            n=0,
+            f=0,
+            save=False,
+            ax=ax["glimpse"],
+            item=item,
+        )
+    else:
+        fov = None
+
+    if not gui:
+        plt.show()
+    return model, fig, item, ax, fov
 
 
 @app.command()
@@ -767,6 +879,8 @@ def main(
     a ``.tapqir`` sub-directory for storing ``config.yaml`` file, ``loginfo`` file,
     and files that are created by commands such as ``tapqir fit``.
     """
+
+    from tapqir.logger import ColorFormatter
 
     global DEFAULTS
     # set working directory
@@ -814,15 +928,9 @@ def main(
                 f"Initialized Tapqir at {TAPQIR_PATH}.\n"
                 "{yellow}---------------------------------------------------------------{nc}\n"
                 f"- Checkout the documentation: {format_link('https://tapqir.readthedocs.io/')}\n"
-                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}"
+                f"- Get help on our forum: {format_link('https://github.com/gelles-brandeis/tapqir/discussions')}\n"
             ).format(yellow=colorama.Fore.YELLOW, nc=colorama.Fore.RESET)
         )
-
-    # read defaults from config file
-    with open(CONFIG_PATH, "r") as cfg_file:
-        cfg_defaults = yaml.safe_load(cfg_file) or {}
-        DEFAULTS.update(cfg_defaults)
-        typer.echo(f"Configuration options are read from {CONFIG_PATH}.")
 
     # create logger
     logger = logging.getLogger("tapqir")
@@ -830,10 +938,7 @@ def main(
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        fmt="%(levelname)s - %(message)s",
-    )
-    ch.setFormatter(formatter)
+    ch.setFormatter(ColorFormatter())
     logger.addHandler(ch)
 
     fh = logging.FileHandler(cd / ".tapqir" / "loginfo")
@@ -844,6 +949,12 @@ def main(
     )
     fh.setFormatter(formatter)
     logger.addHandler(fh)
+
+    # read defaults from config file
+    with open(CONFIG_PATH, "r") as cfg_file:
+        cfg_defaults = yaml.safe_load(cfg_file) or {}
+        DEFAULTS.update(cfg_defaults)
+        logger.info(f"Configuration options are read from {CONFIG_PATH}.")
 
 
 # click object is required to generate docs with sphinx-click

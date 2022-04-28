@@ -46,12 +46,14 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_autodoc_typehints",
     "sphinx_click",
+    "sphinx_copybutton",
     "sphinx_gallery.load_style",
-    "sphinx_panels",
     "IPython.sphinxext.ipython_console_highlighting",
 ]
 
 autodoc_member_order = "bysource"
+
+copybutton_prompt_text = "$ "
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -133,7 +135,7 @@ html_theme_options = {
             "url": "https://github.com/gelles-brandeis/tapqir/discussions",
         },
     ],
-    "show_prev_next": False,
+    "show_prev_next": True,
     "use_edit_page_button": True,
 }
 

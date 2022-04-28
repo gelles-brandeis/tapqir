@@ -8,12 +8,16 @@ KSMOGN
 
 from typing import Union
 
+import pykeops
 import torch
 from pykeops.torch import Genred
 from pyro.distributions import TorchDistribution
 from torch.distributions import Categorical, constraints
+from torch.distributions.utils import lazy_property
 
 from .util import gaussian_spots
+
+pykeops.set_verbose(False)
 
 
 class KSMOGN(TorchDistribution):
@@ -80,21 +84,55 @@ class KSMOGN(TorchDistribution):
         validate_args=None,
     ):
 
-        gaussians = gaussian_spots(height, width, x, y, target_locs.unsqueeze(-2), P, m)
-        image = background[..., None, None] + gaussians.sum(-3)
+        self.height = height
+        self.width = width
+        self.x = x
+        self.y = y
+        self.target_locs = target_locs
+        self.background = background
+        self.gain = gain
+        self.m = m
 
-        self.concentration = image / gain[..., None, None]
         self.rate = 1 / gain[..., None, None]
         self.offset_samples = offset_samples
         self.offset_logits = offset_logits
         self.P = P
         self.use_pykeops = use_pykeops
         if self.use_pykeops:
-            device = self.concentration.device.type
+            device = self.target_locs.device.type
             self.device_pykeops = "GPU" if device == "cuda" else "CPU"
-        batch_shape = image.shape[:-2]
-        event_shape = image.shape[-2:]
+
+        # calculate batch shape
+        batch_shape = torch.broadcast_shapes(
+            height.shape, width.shape, x.shape, y.shape
+        )
+        if m is not None:
+            batch_shape = torch.broadcast_shapes(batch_shape, m.shape)
+        batch_shape = torch.broadcast_shapes(
+            batch_shape[:-1], background.shape, target_locs.shape[:-1]
+        )
+        event_shape = torch.Size([P, P])
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
+
+    @lazy_property
+    def gaussians(self):
+        return gaussian_spots(
+            self.height,
+            self.width,
+            self.x,
+            self.y,
+            self.target_locs.unsqueeze(-2),
+            self.P,
+            self.m,
+        )
+
+    @lazy_property
+    def image(self):
+        return self.background[..., None, None] + self.gaussians.sum(-3)
+
+    @lazy_property
+    def concentration(self):
+        return self.image / self.gain[..., None, None]
 
     def rsample(self, sample_shape=torch.Size()):
         odx = (
