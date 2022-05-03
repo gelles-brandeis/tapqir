@@ -43,6 +43,10 @@ def format_link(link):
 # available models
 class Model(str, Enum):
     cosmos = "cosmos"
+    cosmos2 = "cosmos2"
+    mscosmos = "mscosmos"
+    mshmm = "mshmm"
+    ebcosmos = "ebcosmos"
 
 
 def get_default(key):
@@ -670,7 +674,7 @@ def show(
         ax[f"ideal_{f}"].axis("off")
 
     ax["z_map"] = fig.add_subplot(gs[2, :])
-    config_axis(ax["z_map"], r"$z$", f1, f2, -0.1, model.S + 0.1)
+    config_axis(ax["z_map"], r"$z$", f1, f2, -0.1, model.S + 0.5)
     (item["z_map"],) = ax["z_map"].plot(
         torch.arange(0, model.data.F),
         model.params["z_map"][n],

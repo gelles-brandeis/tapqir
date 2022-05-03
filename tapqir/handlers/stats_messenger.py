@@ -65,5 +65,7 @@ def torch_to_scipy_dist(torch_dist):
                 - torch_dist.concentration.detach()
             ).cpu(),
         )
+    elif isinstance(torch_dist, dist.Independent):
+        return torch_to_scipy_dist(torch_dist.base_dist)
     else:
         raise NotImplementedError

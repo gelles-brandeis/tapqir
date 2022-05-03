@@ -245,19 +245,19 @@ def glimpseUI(out, DEFAULTS):
         "frame_start",
         widgets.IntText(
             value=DEFAULTS["frame-start"],
-            disabled=not DEFAULTS["frame-range"],
             description="Starting frame",
             style={"description_width": "initial"},
         ),
+        hide=not DEFAULTS["frame-range"],
     )
     layout.add_child(
         "frame_end",
         widgets.IntText(
             value=DEFAULTS["frame-end"],
-            disabled=not DEFAULTS["frame-range"],
             description="Ending frame",
             style={"description_width": "initial"},
         ),
+        hide=not DEFAULTS["frame-range"],
     )
     layout.add_child(
         "use_offtarget",
@@ -392,7 +392,7 @@ def fitUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos"],
+            options=["cosmos", "cosmos2", "mscosmos", "mshmm"],
             style={"description_width": "initial"},
         ),
     )
@@ -481,7 +481,7 @@ def showUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos"],
+            options=["cosmos", "cosmos2", "mscosmos", "mshmm"],
             style={"description_width": "initial"},
         ),
     )
