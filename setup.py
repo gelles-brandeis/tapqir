@@ -1,5 +1,5 @@
 # Copyright Contributors to the Tapqir project.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 import os
 
@@ -18,20 +18,29 @@ with open("README.rst", "r") as fh:
 
 # examples/tutorials
 EXTRAS_REQUIRE = [
-    "ipywidgets",
     "notebook",
-    "matplotlib",
-    "openpyxl",
 ]
 # tests
 TEST_REQUIRE = [
-    "black",
+    "black[jupyter]",
     "flake8",
     "isort",
     "pytest",
-    "pytest-qt",
     "pytest-xvfb",
 ]
+# docs
+DOCS_REQUIRE = [
+    "IPython",
+    "nbsphinx>=0.8.5",
+    "pydata_sphinx_theme",
+    "sphinx",
+    "sphinx-autodoc-typehints",
+    "sphinx-click",
+    "sphinx-copybutton",
+    "sphinx-gallery",
+    "sphinx-panels",
+]
+DESKTOP_REQUIRE = ["voila"]
 
 setuptools.setup(
     name="tapqir",
@@ -39,53 +48,56 @@ setuptools.setup(
     cmdclass=versioneer.get_cmdclass(),
     author="Yerdos Ordabayev",
     author_email="ordabayev@brandeis.edu",
-    description="Bayesian analysis of the single-molecule image data",
+    description="Bayesian analysis of co-localization single-molecule microscopy image data",
     long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/ordabayevy/tapqir",
+    long_description_content_type="text/x-rst",
+    url="https://tapqir.readthedocs.io",
+    project_urls={
+        "Documentation": "https://tapqir.readthedocs.io",
+        "Source": "https://github.com/gelles-brandeis/tapqir",
+    },
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "cliff",
-        "configparser",
-        "funsor @ git+git://github.com/pyro-ppl/funsor.git@d742f1c855b02629866c38cc9782a44b6675194b",
-        # "funsor==0.4.0",
+        "colorama",
+        "funsor==0.4.2",
         "future",
+        "ipyevents",
+        "ipyfilechooser",
+        "ipympl",
+        "ipywidgets",
+        "matplotlib",
         "pandas",
-        "pyro-ppl @ git+git://github.com/ordabayevy/pyro.git@tapqir",
-        "pyqtgraph",
-        "PySide2",
+        "pykeops>=2.0",
+        "pyro-ppl==1.8.0",
+        "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
         "tensorboard",
+        "torch==1.10.0",
+        "typer",
     ],
     extras_require={
+        "desktop": DESKTOP_REQUIRE,
         "extras": EXTRAS_REQUIRE,
         "test": EXTRAS_REQUIRE + TEST_REQUIRE,
-        "dev": EXTRAS_REQUIRE
-        + TEST_REQUIRE
-        + [
-            "nbsphinx",
-            "sphinx",
-            "pydata_sphinx_theme",
-            "sphinx-gallery",
-            "sphinx-panels",
-        ],
+        "docs": DOCS_REQUIRE,
+        "dev": DESKTOP_REQUIRE + EXTRAS_REQUIRE + TEST_REQUIRE + DOCS_REQUIRE,
     },
+    keywords="image-classification probabilistic-programming cosmos pyro",
+    license="Apache 2.0",
     classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     entry_points={
-        "console_scripts": ["tapqir=tapqir.commands.app:main"],
-        "tapqir.app": [
-            "config=tapqir.commands.config:Config",
-            "fit=tapqir.commands.fit:Fit",
-            "show=tapqir.commands.show:Show",
-            "glimpse=tapqir.commands.glimpse:Glimpse",
-            "save=tapqir.commands.save:Save",
+        "console_scripts": [
+            "tapqir=tapqir.main:app",
+            "tapqir-gui=tapqir.gui:app",
         ],
     },
 )

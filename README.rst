@@ -1,8 +1,10 @@
-======
-Tapqir
-======
+.. image:: https://github.com/gelles-brandeis/tapqir/raw/latest/docs/source/_static/logo.png
+   :target: https://tapqir.readthedocs.io/
+   :alt: Tapqir logo
 
-Bayesian analysis of co-localization single-molecule microscopy image data.
+*Bayesian analysis of co-localization single-molecule microscopy image data.*
+
+---------
 
 .. |ci| image:: https://github.com/gelles-brandeis/tapqir/workflows/build/badge.svg
   :target: https://github.com/gelles-brandeis/tapqir/actions
@@ -10,44 +12,46 @@ Bayesian analysis of co-localization single-molecule microscopy image data.
 .. |docs| image:: https://readthedocs.org/projects/tapqir/badge/?version=latest
     :alt: Documentation Status
     :scale: 100%
-    :target: https://tapqir.readthedocs.io/en/latest/?badge=latest
+    :target: https://tapqir.readthedocs.io/
+    
+.. |pypi| image:: https://badge.fury.io/py/tapqir.svg
+    :alt: PyPI version
+    :target: https://pypi.org/project/tapqir/
 
 .. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
   :target: https://github.com/ambv/black
+  
+.. |DOI| image:: https://img.shields.io/badge/DOI-10.7554%2FeLife.73860-blue
+   :target: https://doi.org/10.7554/eLife.73860
+   :alt: DOI
 
-|ci| |docs| |black|
+|DOI| |ci| |docs| |pypi| |black|
 
-`Documentation <https://tapqir.readthedocs.io/en/latest/>`_ |
-`Discussions <https://github.com/gelles-brandeis/tapqir/discussions/>`_
+`Publication <https://doi.org/10.7554/eLife.73860>`_ |
+`Documentation & Tutorials <https://tapqir.readthedocs.io/>`_ |
+`Discussions/Q&As <https://github.com/gelles-brandeis/tapqir/discussions/>`_
 
+Publication
+-----------
 
-Disclaimer
-==========
+Tapqir and the *cosmos* model are described in Ordabayev et al., "Bayesian machine learning analysis of single-molecule fluorescence colocalization images" eLife 2022;11:e73860 `doi: 10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_
 
-This is an alpha version of the program. It may contain bugs and is subject to change. A preprint describing the model and algorithm is forthcoming.
+Documentation & Tutorials
+-------------------------
 
-Installing
-==========
+Please visit our `website <https://tapqir.readthedocs.io/>`_ for documentation, tutorials, and general information.
 
-Using pip::
+Announcements
+-------------
 
-  pip install git+https://github.com/gelles-brandeis/tapqir.git
+To get notified about new releases sign in to Github, go to top right corner of this page and click on Watch -> Custom -> Releases.
 
-Documentation
-=============
+Discussions/Q&As
+----------------
 
-Full documentation and tutorial available at `tapqir.readthedocs.io <https://tapqir.readthedocs.io/>`_.
+Please post questions about the software on our `forum <https://github.com/gelles-brandeis/tapqir/discussions>`_. We will try to respond promptly.
 
-Citation
-========
+Changelog
+---------
 
-If you use Tapqir, please consider citing::
-
-  @article{ordabayev2021tapqir,
-    author    = {Yerdos A. Ordabayev and
-                 Larry Friedman and
-                 Douglas L. Theobald and
-                 Jeff Gelles},
-    title     = {Bayesian Analysis of the Colocalization Single Molecule Image Data},
-    year      = {2021},
-  }
+To see the entire list of releases and changelogs go to `releases <https://github.com/gelles-brandeis/tapqir/releases>`_.
