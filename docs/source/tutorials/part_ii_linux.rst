@@ -208,6 +208,11 @@ from the ``cosmos-channel0-params.tpqr`` file:
    ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has finished or
    the model has converged).
 
+.. note::
+
+   If ``Show FOV images`` is checked then the image of the entire field of view will be displayed at the bottom. Note, however,
+   that raw glimpse files as specified at AOI extraction step need to be present on the local disk.
+
 .. figure:: view-results.png
    :width: 800
 

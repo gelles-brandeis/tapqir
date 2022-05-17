@@ -30,7 +30,7 @@ class Cosmos(Model):
 
     1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
-       bioRxiv. 2021 Oct. doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
+       eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
 
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.

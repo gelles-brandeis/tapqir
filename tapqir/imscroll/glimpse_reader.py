@@ -451,9 +451,9 @@ def read_glimpse(path, progress_bar, **kwargs):
         data,
         target_xy,
         is_ontarget,
-        labels,
-        offset_samples,
-        offset_weights,
+        labels=labels,
+        offset_samples=offset_samples,
+        offset_weights=offset_weights,
         time1=time1,
         ttb=ttb,
         name=name,
@@ -468,6 +468,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     )
     save(dataset, path)
 
+    logger.info("- saving images")
     # plot offset distribution
     plt.figure(figsize=(3, 3))
     plt.bar(offset_samples, offset_weights, alpha=0.5, label="Offset")
