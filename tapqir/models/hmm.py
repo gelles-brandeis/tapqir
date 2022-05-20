@@ -43,7 +43,6 @@ class HMM(Cosmos):
 
     def __init__(
         self,
-        S: int = 1,
         K: int = 2,
         channels: Union[tuple, list] = (0,),
         device: str = "cpu",
@@ -60,8 +59,7 @@ class HMM(Cosmos):
         gain_std: float = 50,
     ):
         self.vectorized = vectorized
-        super().__init__(S, K, channels, device, dtype, use_pykeops)
-        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        super().__init__(K, channels, device, dtype, use_pykeops)
         self._global_params = ["gain", "proximity", "lamda", "trans"]
 
     def model(self):
@@ -214,7 +212,7 @@ class HMM(Cosmos):
                         self.data.offset.logits.to(self.dtype),
                         self.data.P,
                         torch.stack(torch.broadcast_tensors(*ms), -1),
-                        self.use_pykeops,
+                        use_pykeops=self.use_pykeops,
                     ),
                     obs=obs,
                 )

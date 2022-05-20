@@ -379,7 +379,6 @@ def fit(
     logger = logging.getLogger("tapqir")
 
     settings = {}
-    settings["S"] = 1
     settings["K"] = k_max
     settings["channels"] = channels
     settings["device"] = "cuda" if cuda else "cpu"
@@ -509,7 +508,6 @@ def stats(
     backend = "funsor" if funsor else "pyro"
 
     settings = {}
-    settings["S"] = 1
     settings["channels"] = channels
     settings["device"] = device
     settings["dtype"] = dtype
