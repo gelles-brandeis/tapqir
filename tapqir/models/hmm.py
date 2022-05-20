@@ -58,11 +58,8 @@ class HMM(Cosmos):
         proximity_rate: float = 1,
         gain_std: float = 50,
     ):
-        S, Q = 1, 1
         self.vectorized = vectorized
-        super().__init__(S, K, Q, channels, device, dtype, use_pykeops)
-        assert self.C == 1, "Please specify exactly one color channel"
-        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        super().__init__(K, channels, device, dtype, use_pykeops)
         self._global_params = ["gain", "proximity", "lamda", "trans"]
 
     def model(self):
