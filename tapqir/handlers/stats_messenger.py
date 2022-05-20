@@ -71,5 +71,4 @@ def torch_to_scipy_dist(torch_dist):
     elif isinstance(torch_dist, dist.Delta):
         return None
     else:
-        breakpoint()
         raise NotImplementedError

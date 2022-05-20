@@ -392,7 +392,7 @@ def fitUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos", "hmm", "mscosmos", "mshmm"],
+            options=["cosmos", "crosstalk"],
             style={"description_width": "initial"},
         ),
     )
@@ -481,7 +481,7 @@ def showUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos", "hmm", "mscosmos", "mshmm"],
+            options=["cosmos", "crosstalk"],
             style={"description_width": "initial"},
         ),
     )
@@ -910,10 +910,9 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov):
     c = model.cdx
 
     frames = torch.arange(f1, f2)
-    background = model.params["background"]["Mean"][n, frames, None, None]
     img_ideal = (
         model.data.offset.mean
-        + background
+        + model.params["background"]["Mean"][n, frames, None, None]
     )
     gaussian = gaussian_spots(
         model.params["height"]["Mean"][:, n, frames],
@@ -923,7 +922,7 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov):
         model.data.xy[n, frames, c],
         model.data.P,
     )
-    img_ideal = img_ideal + background * gaussian.sum(-4)
+    img_ideal = img_ideal + gaussian.sum(-4)
     for i, f in enumerate(range(f1, f2)):
         ax[f"image_{i}"].set_title(rf"${f}$", fontsize=9)
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())
