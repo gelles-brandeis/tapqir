@@ -19,7 +19,7 @@ from pyroapi import handlers, infer, pyro
 from torch.distributions.utils import lazy_property
 from torch.nn.functional import one_hot
 
-from tapqir.distributions import KSMOCTGN, AffineBeta
+from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
@@ -67,7 +67,6 @@ class Crosstalk(Model):
 
     def __init__(
         self,
-        S: int = 1,
         K: int = 2,
         Q: int = 2,
         channels: Union[tuple, list] = (0,),
@@ -83,13 +82,8 @@ class Crosstalk(Model):
         proximity_rate: float = 1,
         gain_std: float = 50,
     ):
-        super().__init__(S, K, channels, device, dtype)
-        assert S == 1, "This is a single-state model!"
-        self.cdx = torch.as_tensor(self.channels)
-        self.C = len(self.cdx)
-        # number of fluorophore dyes
-        self.Q = Q
-        self.full_name = f"{self.name}-channel{self.cdx}"
+        S = 1
+        super().__init__(S, K, Q, channels, device, dtype)
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = [
@@ -351,7 +345,7 @@ class Crosstalk(Model):
                 # observed data
                 pyro.sample(
                     "data",
-                    KSMOCTGN(
+                    KSMOGN(
                         heights,
                         widths,
                         xs,
@@ -359,12 +353,12 @@ class Crosstalk(Model):
                         target_locs,
                         background,
                         gain,
-                        crosstalk,
                         self.data.offset.samples,
                         self.data.offset.logits.to(self.dtype),
                         self.data.P,
                         ms,
-                        self.use_pykeops,
+                        crosstalk,
+                        use_pykeops=self.use_pykeops,
                     ),
                     obs=obs,
                 )
