@@ -43,7 +43,6 @@ class HMM(Cosmos):
 
     def __init__(
         self,
-        S: int = 1,
         K: int = 2,
         channels: Union[tuple, list] = (0,),
         device: str = "cpu",
@@ -59,8 +58,10 @@ class HMM(Cosmos):
         proximity_rate: float = 1,
         gain_std: float = 50,
     ):
+        S, Q = 1, 1
         self.vectorized = vectorized
-        super().__init__(S, K, channels, device, dtype, use_pykeops)
+        super().__init__(S, K, Q, channels, device, dtype, use_pykeops)
+        assert self.C == 1, "Please specify exactly one color channel"
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
         self._global_params = ["gain", "proximity", "lamda", "trans"]
 
@@ -214,7 +215,7 @@ class HMM(Cosmos):
                         self.data.offset.logits.to(self.dtype),
                         self.data.P,
                         torch.stack(torch.broadcast_tensors(*ms), -1),
-                        self.use_pykeops,
+                        use_pykeops=self.use_pykeops,
                     ),
                     obs=obs,
                 )

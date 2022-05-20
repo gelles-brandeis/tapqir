@@ -44,7 +44,6 @@ class Cosmos(Model):
 
     def __init__(
         self,
-        S: int = 1,
         K: int = 2,
         channels: Union[tuple, list] = (0,),
         device: str = "cpu",
@@ -59,11 +58,9 @@ class Cosmos(Model):
         proximity_rate: float = 1,
         gain_std: float = 50,
     ):
-        super().__init__(S, K, channels, device, dtype)
-        assert S == 1, "This is a single-state model!"
-        assert len(self.channels) == 1, "Please specify exactly one color channel"
-        self.cdx = torch.tensor(self.channels[0])
-        self.full_name = f"{self.name}-channel{self.cdx}"
+        S, Q = 1, 1
+        super().__init__(S, K, Q, channels, device, dtype)
+        assert self.C == 1, "Please specify exactly one color channel"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
@@ -303,7 +300,7 @@ class Cosmos(Model):
                             self.data.offset.logits.to(self.dtype),
                             self.data.P,
                             torch.stack(torch.broadcast_tensors(*ms), -1),
-                            self.use_pykeops,
+                            use_pykeops=self.use_pykeops,
                         ),
                         obs=obs,
                     )

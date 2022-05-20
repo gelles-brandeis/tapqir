@@ -379,7 +379,6 @@ def fit(
     logger = logging.getLogger("tapqir")
 
     settings = {}
-    settings["S"] = 1
     settings["K"] = k_max
     settings["channels"] = channels
     settings["device"] = "cuda" if cuda else "cpu"
