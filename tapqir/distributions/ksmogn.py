@@ -94,7 +94,6 @@ class KSMOGN(TorchDistribution):
         self.target_locs = target_locs
         self.m = m
         if alpha is not None:
-            Q = alpha.shape[-2]
             C = alpha.shape[-1]
             self.background = background[..., None, None, None]
             self.gain = gain[..., None, None, None]
