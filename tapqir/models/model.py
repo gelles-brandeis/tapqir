@@ -59,8 +59,11 @@ class Model:
         self.K = K
         self.Q = Q
         self.C = len(channels)
+        if self.C == 1:
+            channels = channels[0]
         self.cdx = torch.as_tensor(channels)
         self.channels = channels
+        self.full_name = f"{self.name}-channel{channels}"
         self.nbatch_size = None
         self.fbatch_size = None
         # for plotting
