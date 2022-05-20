@@ -21,13 +21,14 @@ class StatsMessenger(Messenger):
         if (
             type(msg["fn"]).__name__ == "_Subsample"
             or msg["infer"].get("enumerate", None) == "parallel"
-            or isinstance(msg["fn"], dist.Delta)
         ):
             return
         name = msg["name"]
-        self.ci_stats[name] = {}
         scipy_dist = torch_to_scipy_dist(msg["fn"])
+        if scipy_dist is None:
+            return
         LL, UL = scipy_dist.interval(alpha=self.CI)
+        self.ci_stats[name] = {}
         self.ci_stats[name]["LL"] = torch.as_tensor(LL, device=torch.device("cpu"))
         self.ci_stats[name]["UL"] = torch.as_tensor(UL, device=torch.device("cpu"))
         self.ci_stats[name]["Mean"] = msg["fn"].mean.detach().cpu()
@@ -65,5 +66,10 @@ def torch_to_scipy_dist(torch_dist):
                 - torch_dist.concentration.detach()
             ).cpu(),
         )
+    elif isinstance(torch_dist, dist.Independent):
+        return torch_to_scipy_dist(torch_dist.base_dist)
+    elif isinstance(torch_dist, dist.Delta):
+        return None
     else:
+        breakpoint()
         raise NotImplementedError

@@ -94,8 +94,7 @@ class Crosstalk(Model):
         self.use_pykeops = use_pykeops
         self.conv_params = [
             "-ELBO",
-            "proximity_loc_0",
-            "proximity_loc_1",
+            "proximity_loc",
             "gain_loc",
             "lamda_loc_0",
             "lamda_loc_1",
@@ -558,13 +557,10 @@ class Crosstalk(Model):
             constraint=constraints.positive,
         )
 
+        data_median = data.median[self.cdx].to(device)
         pyro.param(
             "background_mean_loc",
-            lambda: torch.full(
-                (data.Nt, 1, self.C),
-                data.median - self.data.offset.mean,
-                device=device,
-            ),
+            lambda:  (data_median - self.data.offset.mean).expand(data.Nt, 1, self.C),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -575,11 +571,7 @@ class Crosstalk(Model):
 
         pyro.param(
             "b_loc",
-            lambda: torch.full(
-                (data.Nt, data.F, self.C),
-                data.median - self.data.offset.mean,
-                device=device,
-            ),
+            lambda:  (data_median - self.data.offset.mean).expand(data.Nt, data.F, self.C),
             constraint=constraints.positive,
         )
         pyro.param(

@@ -101,10 +101,29 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.nbatch_size = nbatch_size
     model.fbatch_size = fbatch_size
 
+    # combine Q local params
+    for param in list(ci_stats.keys()):
+        if param.endswith("_0"):
+            base_name = param.split("_")[:-1]
+            base_name = "_".join(base_name)
+            ci_stats[base_name] = {}
+            ci_stats[base_name]["Mean"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.Q)], dim=-1
+            )
+            ci_stats[base_name]["LL"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.Q)], dim=-1
+            )
+            ci_stats[base_name]["UL"] = torch.stack(
+                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.Q)], dim=-1
+            )
+            for k in range(model.K):
+                del ci_stats[f"{base_name}_{k}"]
+
     # combine K local params
     for param in list(ci_stats.keys()):
         if param.endswith("_0"):
-            base_name = param.split("_")[0]
+            base_name = param.split("_")[:-1]
+            base_name = "_".join(base_name)
             ci_stats[base_name] = {}
             ci_stats[base_name]["Mean"] = torch.stack(
                 [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.K)], dim=0
@@ -118,22 +137,22 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             for k in range(model.K):
                 del ci_stats[f"{base_name}_{k}"]
 
-    for param in global_params:
-        if param == "pi":
-            summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
-            summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
-            summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
-        elif param == "trans":
-            summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
-            summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
-            summary.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
-            summary.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
-            summary.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
-            summary.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
-        else:
-            summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
-            summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
-            summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+    #  for param in global_params:
+    #      if param == "pi":
+    #          summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
+    #          summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
+    #          summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
+    #      elif param == "trans":
+    #          summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
+    #          summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
+    #          summary.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
+    #          summary.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
+    #          summary.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
+    #          summary.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
+    #      else:
+    #          summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
+    #          summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
+    #          summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
     logger.info("- spot probabilities")
     ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
@@ -167,39 +186,39 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     # intensity of target-specific spots
     theta_mask = torch.argmax(ci_stats["theta_probs"], dim=0)
-    h_specific = Vindex(ci_stats["height"]["Mean"])[
-        theta_mask, torch.arange(model.data.Nt)[:, None], torch.arange(model.data.F)
-    ]
-    ci_stats["h_specific"] = h_specific * (ci_stats["z_map"] > 0).long()
+    #  h_specific = Vindex(ci_stats["height"]["Mean"])[
+    #      theta_mask, torch.arange(model.data.Nt)[:, None], torch.arange(model.data.F)
+    #  ]
+    #  ci_stats["h_specific"] = h_specific * (ci_stats["z_map"] > 0).long()
 
     model.params = ci_stats
 
-    logger.info("- SNR and Chi2-test")
-    # snr and chi2 test
-    snr = torch.zeros(model.K, model.data.Nt, model.data.F, device=torch.device("cpu"))
-    chi2 = torch.zeros(model.data.Nt, model.data.F, device=torch.device("cpu"))
-    for n in range(model.data.Nt):
-        snr[:, n], chi2[n] = snr_and_chi2(
-            model.data.images[n, :, model.cdx],
-            ci_stats["height"]["Mean"][:, n],
-            ci_stats["width"]["Mean"][:, n],
-            ci_stats["x"]["Mean"][:, n],
-            ci_stats["y"]["Mean"][:, n],
-            model.data.xy[n, :, model.cdx],
-            ci_stats["background"]["Mean"][n],
-            ci_stats["gain"]["Mean"],
-            model.data.offset.mean,
-            model.data.offset.var,
-            model.data.P,
-            ci_stats["theta_probs"][:, n],
-        )
-    snr_masked = snr[ci_stats["theta_probs"] > 0.5]
-    summary.loc["SNR", "Mean"] = snr_masked.mean().item()
-    ci_stats["chi2"] = {}
-    ci_stats["chi2"]["values"] = chi2
-    cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
-    ci_stats["chi2"]["vmin"] = -0.03 * cmax
-    ci_stats["chi2"]["vmax"] = 1.3 * cmax
+    #  logger.info("- SNR and Chi2-test")
+    #  # snr and chi2 test
+    #  snr = torch.zeros(model.K, model.data.Nt, model.data.F, device=torch.device("cpu"))
+    #  chi2 = torch.zeros(model.data.Nt, model.data.F, device=torch.device("cpu"))
+    #  for n in range(model.data.Nt):
+    #      snr[:, n], chi2[n] = snr_and_chi2(
+    #          model.data.images[n, :, model.cdx],
+    #          ci_stats["height"]["Mean"][:, n],
+    #          ci_stats["width"]["Mean"][:, n],
+    #          ci_stats["x"]["Mean"][:, n],
+    #          ci_stats["y"]["Mean"][:, n],
+    #          model.data.xy[n, :, model.cdx],
+    #          ci_stats["background"]["Mean"][n],
+    #          ci_stats["gain"]["Mean"],
+    #          model.data.offset.mean,
+    #          model.data.offset.var,
+    #          model.data.P,
+    #          ci_stats["theta_probs"][:, n],
+    #      )
+    #  snr_masked = snr[ci_stats["theta_probs"] > 0.5]
+    #  summary.loc["SNR", "Mean"] = snr_masked.mean().item()
+    #  ci_stats["chi2"] = {}
+    #  ci_stats["chi2"]["values"] = chi2
+    #  cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
+    #  ci_stats["chi2"]["vmin"] = -0.03 * cmax
+    #  ci_stats["chi2"]["vmax"] = 1.3 * cmax
 
     # classification statistics
     # if model.data.labels is not None:
