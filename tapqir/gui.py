@@ -392,7 +392,7 @@ def fitUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos"],
+            options=["cosmos", "cosmos2", "mscosmos", "mshmm"],
             style={"description_width": "initial"},
         ),
     )
@@ -481,7 +481,7 @@ def showUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos"],
+            options=["cosmos", "cosmos2", "mscosmos", "mshmm"],
             style={"description_width": "initial"},
         ),
     )

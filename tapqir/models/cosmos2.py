@@ -22,7 +22,7 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
-class Cosmos(Model):
+class Cosmos2(Model):
     r"""
     **Single-Color Time-Independent Colocalization Model**
 
@@ -30,7 +30,7 @@ class Cosmos(Model):
 
     1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
-       eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
+       bioRxiv. 2021 Oct. doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
 
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
@@ -40,11 +40,12 @@ class Cosmos(Model):
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
     """
 
-    name = "cosmos"
-    normalize_intensity = False
+    name = "cosmos2"
+    normalize_intensity = True
 
     def __init__(
         self,
+        S: int = 1,
         K: int = 2,
         channels: Union[tuple, list] = (0,),
         device: str = "cpu",
@@ -53,15 +54,17 @@ class Cosmos(Model):
         background_mean_std: float = 1000,
         background_std_std: float = 100,
         lamda_rate: float = 1,
-        height_std: float = 10000,
+        height_std: float = 100,
         width_min: float = 0.75,
         width_max: float = 2.25,
         proximity_rate: float = 1,
         gain_std: float = 50,
     ):
-        S, Q = 1, 1
-        super().__init__(S, K, Q, channels, device, dtype)
-        assert self.C == 1, "Please specify exactly one color channel"
+        super().__init__(S, K, channels, device, dtype)
+        assert S == 1, "This is a single-state model!"
+        assert len(self.channels) == 1, "Please specify exactly one color channel"
+        self.cdx = torch.tensor(self.channels[0])
+        self.full_name = f"{self.name}-channel{self.cdx}"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
@@ -249,7 +252,7 @@ class Cosmos(Model):
                             # sample spot variables
                             height = pyro.sample(
                                 f"height_{kdx}",
-                                dist.HalfNormal(self.height_std),
+                                dist.HalfNormal(pyro.param("height_std")),
                             )
                             width = pyro.sample(
                                 f"width_{kdx}",
@@ -280,6 +283,7 @@ class Cosmos(Model):
                             )
 
                         # append
+                        height = height * background
                         ms.append(m)
                         heights.append(height)
                         widths.append(width)
@@ -301,7 +305,7 @@ class Cosmos(Model):
                             self.data.offset.logits.to(self.dtype),
                             self.data.P,
                             torch.stack(torch.broadcast_tensors(*ms), -1),
-                            use_pykeops=self.use_pykeops,
+                            self.use_pykeops,
                         ),
                         obs=obs,
                     )
@@ -466,6 +470,11 @@ class Cosmos(Model):
         data = self.data
 
         pyro.param(
+            "height_std",
+            lambda: torch.tensor(100, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5, device=device),
             constraint=constraints.interval(
@@ -530,12 +539,12 @@ class Cosmos(Model):
         )
         pyro.param(
             "h_loc",
-            lambda: torch.full((self.K, data.Nt, data.F), 2000, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_beta",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.001, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 0.01, device=device),
             constraint=constraints.positive,
         )
         pyro.param(

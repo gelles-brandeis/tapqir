@@ -118,6 +118,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             for k in range(model.K):
                 del ci_stats[f"{base_name}_{k}"]
 
+    if model.normalize_intensity:
+        for key, value in ci_stats["height"].items():
+            ci_stats["height"][key] = value * ci_stats["background"]["Mean"]
+
     for param in global_params:
         if param == "pi":
             summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()

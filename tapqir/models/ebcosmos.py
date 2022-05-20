@@ -18,11 +18,11 @@ from torch.distributions.utils import lazy_property
 from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
+from tapqir.distributions.util import expand_eye, expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
-class Cosmos(Model):
+class EBCosmos(Model):
     r"""
     **Single-Color Time-Independent Colocalization Model**
 
@@ -30,7 +30,7 @@ class Cosmos(Model):
 
     1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
-       eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
+       bioRxiv. 2021 Oct. doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
 
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
@@ -40,11 +40,12 @@ class Cosmos(Model):
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
     """
 
-    name = "cosmos"
-    normalize_intensity = False
+    name = "ebcosmos"
+    normalize_intensity = True
 
     def __init__(
         self,
+        S: int = 1,
         K: int = 2,
         channels: Union[tuple, list] = (0,),
         device: str = "cpu",
@@ -53,15 +54,17 @@ class Cosmos(Model):
         background_mean_std: float = 1000,
         background_std_std: float = 100,
         lamda_rate: float = 1,
-        height_std: float = 10000,
+        height_std: float = 100,
         width_min: float = 0.75,
         width_max: float = 2.25,
         proximity_rate: float = 1,
         gain_std: float = 50,
     ):
-        S, Q = 1, 1
-        super().__init__(S, K, Q, channels, device, dtype)
-        assert self.C == 1, "Please specify exactly one color channel"
+        super().__init__(S, K, channels, device, dtype)
+        assert S == 1, "This is a single-state model!"
+        assert len(self.channels) == 1, "Please specify exactly one color channel"
+        self.cdx = torch.tensor(self.channels[0])
+        self.full_name = f"{self.name}-channel{self.cdx}"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
@@ -74,98 +77,16 @@ class Cosmos(Model):
         self.width_max = width_max
         self.proximity_rate = proximity_rate
         self.gain_std = gain_std
+        self.S = 4
 
     def model(self):
         r"""
         **Generative Model**
-
-        Model parameters:
-
-        +-----------------+-----------+-------------------------------------+
-        | Parameter       | Shape     | Description                         |
-        +=================+===========+=====================================+
-        | |g| - :math:`g` | (1,)      | camera gain                         |
-        +-----------------+-----------+-------------------------------------+
-        | |sigma| - |prox|| (1,)      | proximity                           |
-        +-----------------+-----------+-------------------------------------+
-        | ``lamda`` - |ld|| (1,)      | average rate of target-nonspecific  |
-        |                 |           | binding                             |
-        +-----------------+-----------+-------------------------------------+
-        | ``pi`` - |pi|   | (1,)      | average binding probability of      |
-        |                 |           | target-specific binding             |
-        +-----------------+-----------+-------------------------------------+
-        | |bg| - |b|      | (N, F)    | background intensity                |
-        +-----------------+-----------+-------------------------------------+
-        | |z| - :math:`z` | (N, F)    | target-specific spot presence       |
-        +-----------------+-----------+-------------------------------------+
-        | |t| - |theta|   | (N, F)    | target-specific spot index          |
-        +-----------------+-----------+-------------------------------------+
-        | |m| - :math:`m` | (K, N, F) | spot presence indicator             |
-        +-----------------+-----------+-------------------------------------+
-        | |h| - :math:`h` | (K, N, F) | spot intensity                      |
-        +-----------------+-----------+-------------------------------------+
-        | |w| - :math:`w` | (K, N, F) | spot width                          |
-        +-----------------+-----------+-------------------------------------+
-        | |x| - :math:`x` | (K, N, F) | spot position on x-axis             |
-        +-----------------+-----------+-------------------------------------+
-        | |y| - :math:`y` | (K, N, F) | spot position on y-axis             |
-        +-----------------+-----------+-------------------------------------+
-        | |D| - :math:`D` | |shape|   | observed images                     |
-        +-----------------+-----------+-------------------------------------+
-
-        .. |ps| replace:: :math:`p(\mathsf{specific})`
-        .. |theta| replace:: :math:`\theta`
-        .. |prox| replace:: :math:`\sigma^{xy}`
-        .. |ld| replace:: :math:`\lambda`
-        .. |b| replace:: :math:`b`
-        .. |shape| replace:: (N, F, P, P)
-        .. |sigma| replace:: ``proximity``
-        .. |bg| replace:: ``background``
-        .. |h| replace:: ``height``
-        .. |w| replace:: ``width``
-        .. |D| replace:: ``data``
-        .. |m| replace:: ``m``
-        .. |z| replace:: ``z``
-        .. |t| replace:: ``theta``
-        .. |x| replace:: ``x``
-        .. |y| replace:: ``y``
-        .. |pi| replace:: :math:`\pi`
-        .. |g| replace:: ``gain``
-
-        Full joint distribution:
-
-        .. math::
-
-            \begin{aligned}
-                p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
-                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
-                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) p(z | \pi) p(\theta | z)
-                \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
-                &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
-                p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
-                \prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}} \sum_{\delta} p(\delta)
-                p(D | \mu^I, g, \delta) \right] \right]
-            \end{aligned}
-
-        :math:`z` and :math:`\theta` marginalized joint distribution:
-
-        .. math::
-
-            \begin{aligned}
-                \sum_{z, \theta} p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
-                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
-                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) \sum_{z} p(z | \pi) \sum_{\theta} p(\theta | z)
-                \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
-                &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
-                p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
-                \prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}} \sum_{\delta} p(\delta)
-                p(D | \mu^I, g, \delta) \right] \right]
-            \end{aligned}
         """
         # global parameters
         gain = pyro.sample("gain", dist.HalfNormal(self.gain_std))
-        pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
-        pi = expand_offtarget(pi)
+        hpi = pyro.sample("hpi", dist.Dirichlet(torch.ones(self.S) / self.S))
+        hpi = expand_eye(hpi)
         lamda = pyro.sample("lamda", dist.Exponential(self.lamda_rate))
         proximity = pyro.sample("proximity", dist.Exponential(self.proximity_rate))
         size = torch.stack(
@@ -195,10 +116,32 @@ class Cosmos(Model):
             dim=-1,
         )
 
+        #  height_loc = torch.cat((torch.tensor([1]), pyro.param("height_loc")), -1)
+        #  height_beta = torch.cat((torch.tensor([1]), pyro.param("height_beta")), -1)
+
         with aois as ndx:
             ndx = ndx[:, None]
             mask = Vindex(self.data.mask)[ndx].to(self.device)
             with handlers.mask(mask=mask):
+                pi = pyro.sample(
+                    "pi",
+                    dist.Dirichlet(pyro.param("rho_mean") * pyro.param("rho_size")),
+                )
+                pi = expand_offtarget(pi)
+                height_loc = pyro.sample(
+                    "height_loc",
+                    dist.Gamma(
+                        pyro.param("H_loc_loc") * pyro.param("H_loc_beta"),
+                        pyro.param("H_loc_beta"),
+                    ).to_event(1),
+                )
+                height_beta = pyro.sample(
+                    "height_beta",
+                    dist.Gamma(
+                        pyro.param("H_beta_loc") * pyro.param("H_beta_beta"),
+                        pyro.param("H_beta_beta"),
+                    ).to_event(1),
+                )
                 # background mean and std
                 background_mean = pyro.sample(
                     "background_mean", dist.HalfNormal(self.background_mean_std)
@@ -247,9 +190,18 @@ class Cosmos(Model):
                         )
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
+                            h = pyro.sample(
+                                f"h_{kdx}",
+                                dist.Categorical(Vindex(hpi)[..., :, z * specific]),
+                                infer={"enumerate": "parallel"},
+                            )
                             height = pyro.sample(
                                 f"height_{kdx}",
-                                dist.HalfNormal(self.height_std),
+                                dist.Gamma(
+                                    Vindex(height_loc)[..., h]
+                                    * Vindex(height_beta)[..., h],
+                                    Vindex(height_beta)[..., h],
+                                ),
                             )
                             width = pyro.sample(
                                 f"width_{kdx}",
@@ -280,6 +232,7 @@ class Cosmos(Model):
                             )
 
                         # append
+                        height = height * background
                         ms.append(m)
                         heights.append(height)
                         widths.append(width)
@@ -301,7 +254,7 @@ class Cosmos(Model):
                             self.data.offset.logits.to(self.dtype),
                             self.data.P,
                             torch.stack(torch.broadcast_tensors(*ms), -1),
-                            use_pykeops=self.use_pykeops,
+                            self.use_pykeops,
                         ),
                         obs=obs,
                     )
@@ -326,7 +279,9 @@ class Cosmos(Model):
                 pyro.param("gain_beta"),
             ),
         )
-        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
+        pyro.sample(
+            "hpi", dist.Dirichlet(pyro.param("hpi_mean") * pyro.param("hpi_size"))
+        )
         pyro.sample(
             "lamda",
             dist.Gamma(
@@ -367,6 +322,25 @@ class Cosmos(Model):
             ndx = ndx[:, None]
             mask = Vindex(self.data.mask)[ndx].to(self.device)
             with handlers.mask(mask=mask):
+                pyro.sample(
+                    "pi",
+                    dist.Dirichlet(
+                        Vindex(pyro.param("pi_mean"))[ndx, 0]
+                        * Vindex(pyro.param("pi_size"))[ndx, 0]
+                    ),
+                )
+                pyro.sample(
+                    "height_loc",
+                    dist.Delta(Vindex(pyro.param("height_loc_loc"))[ndx, 0]).to_event(
+                        1
+                    ),
+                )
+                pyro.sample(
+                    "height_beta",
+                    dist.Delta(Vindex(pyro.param("height_beta_loc"))[ndx, 0]).to_event(
+                        1
+                    ),
+                )
                 pyro.sample(
                     "background_mean",
                     dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0]),
@@ -440,23 +414,87 @@ class Cosmos(Model):
         device = self.device
         data = self.data
 
+        checkpoint = torch.load(
+            self.run_path / f"cosmos2-channel{self.cdx}-model.tpqr", map_location=device
+        )
+        del checkpoint["params"]["params"]["pi_mean"]
+        del checkpoint["params"]["params"]["pi_size"]
+        del checkpoint["params"]["constraints"]["pi_mean"]
+        del checkpoint["params"]["constraints"]["pi_size"]
+        pyro.get_param_store().set_state(checkpoint["params"])
+
         pyro.param(
-            "pi_mean",
+            "H_loc_loc",
+            lambda: torch.tensor([10, 20, 30, 40], device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "H_loc_beta",
+            lambda: torch.full((self.S,), 0.5, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "H_beta_loc",
+            lambda: torch.full((self.S,), 0.5, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "H_beta_beta",
+            lambda: torch.full((self.S,), 0.5, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "height_loc_loc",
+            lambda: torch.tensor([10, 20, 30, 40], device=device).expand(
+                data.Nt, 1, self.S
+            ),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "height_beta_loc",
+            lambda: torch.full(
+                (
+                    data.Nt,
+                    1,
+                    self.S,
+                ),
+                0.5,
+                device=device,
+            ),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "rho_mean",
             lambda: torch.ones(self.S + 1, device=device),
             constraint=constraints.simplex,
         )
         pyro.param(
-            "pi_size",
+            "rho_size",
             lambda: torch.tensor(2, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
-            "m_probs",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
-            constraint=constraints.unit_interval,
+            "pi_mean",
+            lambda: torch.ones((data.Nt, 1, self.S + 1), device=device),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "pi_size",
+            lambda: torch.full((data.Nt, 1, 1), 2, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "hpi_mean",
+            lambda: torch.ones(self.S, device=device),
+            constraint=constraints.simplex,
+        )
+        pyro.param(
+            "hpi_size",
+            lambda: torch.tensor(2, device=device),
+            constraint=constraints.positive,
         )
 
-        self._init_parameters()
+        # self._init_parameters()
 
     def _init_parameters(self):
         """
@@ -465,6 +503,11 @@ class Cosmos(Model):
         device = self.device
         data = self.data
 
+        pyro.param(
+            "height_std",
+            lambda: torch.tensor(100, device=device),
+            constraint=constraints.positive,
+        )
         pyro.param(
             "proximity_loc",
             lambda: torch.tensor(0.5, device=device),
@@ -530,12 +573,12 @@ class Cosmos(Model):
         )
         pyro.param(
             "h_loc",
-            lambda: torch.full((self.K, data.Nt, data.F), 2000, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_beta",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.001, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F), 0.01, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -584,7 +627,7 @@ class Cosmos(Model):
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        z_probs = torch.zeros(self.data.Nt, self.data.F)
+        z_probs = torch.zeros(self.data.Nt, self.data.F, self.S + 1)
         theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
@@ -612,9 +655,24 @@ class Cosmos(Model):
                 # 3 - m_0
                 # p(z, theta, phi)
                 logp = 0
-                for name in ["z", "theta", "m_0", "m_1", "x_0", "x_1", "y_0", "y_1"]:
+                for name in [
+                    "z",
+                    "theta",
+                    "h_0",
+                    "h_1",
+                    "m_0",
+                    "m_1",
+                    "height_0",
+                    "height_1",
+                    "x_0",
+                    "x_1",
+                    "y_0",
+                    "y_1",
+                ]:
                     logp = logp + model_tr.nodes[name]["unscaled_log_prob"]
                 # p(z, theta | phi) = p(z, theta, phi) - p(z, theta, phi).sum(z, theta)
+                # breakpoint()
+                logp = logp.logsumexp((0, 1))
                 logp = logp - logp.logsumexp((0, 1))
                 expectation = (
                     guide_tr.nodes["m_0"]["unscaled_log_prob"]
@@ -625,7 +683,7 @@ class Cosmos(Model):
                 result = expectation.logsumexp((2, 3))
                 # marginalize theta
                 z_logits = result.logsumexp(0)
-                z_probs[ndx[:, None], fdx] = z_logits[1].exp().mean(-3)
+                z_probs[ndx[:, None], fdx, :] = z_logits.exp().mean(1).permute(1, 2, 0)
                 # marginalize z
                 theta_logits = result.logsumexp(1)
                 theta_probs[:, ndx[:, None], fdx] = theta_logits[1:].exp().mean(-3)
@@ -661,8 +719,8 @@ class Cosmos(Model):
         r"""
         Probability of there being a target-specific spot :math:`p(\mathsf{specific})`
         """
-        return self.z_probs
+        return self.theta_probs.sum(0)
 
     @property
     def z_map(self) -> torch.Tensor:
-        return self.z_probs > 0.5
+        return self.z_probs.argmax(-1)

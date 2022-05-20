@@ -171,3 +171,15 @@ def probs_theta(K: int, device: torch.device) -> torch.Tensor:
     result[0, 0] = 1
     result[1, 1:] = 1 / K
     return result
+
+
+def expand_eye(probs: torch.Tensor) -> torch.Tensor:
+    batch_shape = probs.shape[:-1]
+    event_shape = probs.shape[-1:] * 2
+    eye_probs = torch.zeros(
+        batch_shape + event_shape, dtype=probs.dtype, device=probs.device
+    )
+    eye_probs[..., :, :] = torch.eye(
+        probs.shape[-1], dtype=probs.dtype, device=probs.device
+    )
+    return torch.cat([probs.unsqueeze(-1), eye_probs], dim=-1)
