@@ -313,7 +313,7 @@ class HMM(Cosmos):
 
                 for kdx in spots:
                     # spot presence
-                    m_probs = Vindex(pyro.param("m_probs"))[kdx, ndx, fdx]
+                    m_probs = Vindex(pyro.param("m_probs"))[z_curr, kdx, ndx, fdx]
                     m = pyro.sample(
                         f"m_{kdx}_{fsx}",
                         dist.Categorical(torch.stack((1 - m_probs, m_probs), -1)),
@@ -402,7 +402,7 @@ class HMM(Cosmos):
         pyro.param(
             "m_probs",
             lambda: torch.full(
-                (self.K, self.data.Nt, self.data.F),
+                (1 + self.S, self.K, self.data.Nt, self.data.F),
                 0.5,
                 device=device,
             ),
@@ -503,7 +503,6 @@ class HMM(Cosmos):
 
             logp = {}
             result = {}
-            q = 3
             for fsx in ("0", f"slice(1, {self.data.F}, None)"):
                 logp[fsx] = 0
                 # collect log_prob terms p(z, theta, phi)
@@ -511,7 +510,7 @@ class HMM(Cosmos):
                     logp[fsx] += model_tr.nodes[f"{name}_{fsx}"]["funsor"]["log_prob"]
                 if fsx == "0":
                     # substitute MAP values of z into p(z=z_map, theta, phi)
-                    z_map = funsor.Tensor(self.z_map[ndx, 0].long(), dtype=q)["aois"]
+                    z_map = funsor.Tensor(self.z_map[ndx, 0].long(), dtype=2)["aois"]
                     logp[fsx] = logp[fsx](**{f"z_{fsx}": z_map})
                     # compute log_measure q for given z_map
                     log_measure = guide_tr.nodes[f"m_0_{fsx}"]["funsor"]["log_measure"]
@@ -519,10 +518,10 @@ class HMM(Cosmos):
                     log_measure = log_measure(**{f"z_{fsx}": z_map})
                 else:
                     # substitute MAP values of z into p(z=z_map, theta, phi)
-                    z_map = funsor.Tensor(self.z_map[ndx, 1:].long(), dtype=q)[
+                    z_map = funsor.Tensor(self.z_map[ndx, 1:].long(), dtype=2)[
                         "aois", "frames"
                     ]
-                    z_map_prev = funsor.Tensor(self.z_map[ndx, :-1].long(), dtype=q)[
+                    z_map_prev = funsor.Tensor(self.z_map[ndx, :-1].long(), dtype=2)[
                         "aois", "frames"
                     ]
                     fsx_prev = f"slice(0, {self.data.F-1}, None)"

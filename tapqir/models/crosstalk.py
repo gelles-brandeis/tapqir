@@ -24,39 +24,12 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
-def cartesian_product(X, ndim=1):
-    batch_shape = X.shape[: -1 - ndim]
-    Q = X.shape[-1 - ndim]  # number of fluorophore dyes
-    S = X.shape[-1]  # number of states for each dye (including dye absence)
-    result_shape = batch_shape + ndim * (S**Q,)
-    result = torch.zeros(result_shape)
-
-    if ndim == 1:  # state probabilities
-        for i, s in enumerate(itertools.product(range(S), repeat=Q)):
-            result[..., i] = reduce(
-                (lambda x, y: x * y), (X[..., q, s[q]] for q in range(Q))
-            )
-    elif ndim == 2:  # transition probability matrix
-        for i, s1 in enumerate(itertools.product(range(S), repeat=Q)):
-            for j, s2 in enumerate(itertools.produce(range(S), repeat=Q)):
-                result[..., i, j] = reduce(
-                    (lambda x, y: x * y), (X[..., q, s1[q], s2[q]] for q in range(Q))
-                )
-    return result
-
-
 class Crosstalk(Model):
     r"""
     **Multi-Color Time-Independent Colocalization Model**
 
-    **Reference**:
-
-    1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
-       Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
-       bioRxiv. 2021 Oct. doi: `10.1101/2021.09.30.462536 <https://doi.org/10.1101/2021.09.30.462536>`_.
-
-    :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
+    :param Q: Number of fluorescent dyes.
     :param channels: Number of color channels.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
@@ -100,95 +73,12 @@ class Crosstalk(Model):
 
     def model(self):
         r"""
-        **Generative Model**
-
-        Model parameters:
-
-        +-----------------+--------------+-------------------------------------+
-        | Parameter       | Shape        | Description                         |
-        +=================+==============+=====================================+
-        | |g| - :math:`g` | (1,)         | camera gain                         |
-        +-----------------+--------------+-------------------------------------+
-        | |sigma| - |prox|| (C,)         | proximity                           |
-        +-----------------+--------------+-------------------------------------+
-        | ``lamda`` - |ld|| (C,)         | average rate of target-nonspecific  |
-        |                 |              | binding                             |
-        +-----------------+--------------+-------------------------------------+
-        | ``pi`` - |pi|   | (C,)         | average binding probability of      |
-        |                 |              | target-specific binding             |
-        +-----------------+--------------+-------------------------------------+
-        | |bg| - |b|      | (N, F, C)    | background intensity                |
-        +-----------------+--------------+-------------------------------------+
-        | |z| - :math:`z` | (N, F)       | target-specific spot presence       |
-        +-----------------+--------------+-------------------------------------+
-        | |t| - |theta|   | (N, F, C)    | target-specific spot index          |
-        +-----------------+--------------+-------------------------------------+
-        | |m| - :math:`m` | (K, N, F, C) | spot presence indicator             |
-        +-----------------+--------------+-------------------------------------+
-        | |h| - :math:`h` | (K, N, F, C) | spot intensity                      |
-        +-----------------+--------------+-------------------------------------+
-        | |w| - :math:`w` | (K, N, F, C) | spot width                          |
-        +-----------------+--------------+-------------------------------------+
-        | |x| - :math:`x` | (K, N, F, C) | spot position on x-axis             |
-        +-----------------+--------------+-------------------------------------+
-        | |y| - :math:`y` | (K, N, F, C) | spot position on y-axis             |
-        +-----------------+--------------+-------------------------------------+
-        | |D| - :math:`D` | |shape|      | observed images                     |
-        +-----------------+--------------+-------------------------------------+
-
-        .. |ps| replace:: :math:`p(\mathsf{specific})`
-        .. |theta| replace:: :math:`\theta`
-        .. |prox| replace:: :math:`\sigma^{xy}`
-        .. |ld| replace:: :math:`\lambda`
-        .. |b| replace:: :math:`b`
-        .. |shape| replace:: (N, F, C, P, P)
-        .. |sigma| replace:: ``proximity``
-        .. |bg| replace:: ``background``
-        .. |h| replace:: ``height``
-        .. |w| replace:: ``width``
-        .. |D| replace:: ``data``
-        .. |m| replace:: ``m``
-        .. |z| replace:: ``z``
-        .. |t| replace:: ``theta``
-        .. |x| replace:: ``x``
-        .. |y| replace:: ``y``
-        .. |pi| replace:: :math:`\pi`
-        .. |g| replace:: ``gain``
-
-        Full joint distribution:
-
-        .. math::
-
-            \begin{aligned}
-                p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
-                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
-                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) p(z | \pi) p(\theta | z)
-                \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
-                &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
-                p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
-                \prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}} \sum_{\delta} p(\delta)
-                p(D | \mu^I, g, \delta) \right] \right]
-            \end{aligned}
-
-        :math:`z` and :math:`\theta` marginalized joint distribution:
-
-        .. math::
-
-            \begin{aligned}
-                \sum_{z, \theta} p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
-                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
-                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) \sum_{z} p(z | \pi) \sum_{\theta} p(\theta | z)
-                \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
-                &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
-                p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
-                \prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}} \sum_{\delta} p(\delta)
-                p(D | \mu^I, g, \delta) \right] \right]
-            \end{aligned}
+        Generative Model
         """
         # global parameters
         gain = pyro.sample("gain", dist.HalfNormal(50))
-        crosstalk = pyro.sample(
-            "crosstalk",
+        alpha = pyro.sample(
+            "alpha",
             dist.Dirichlet(torch.ones(self.Q, self.C)).to_event(1),
         )
         pi = pyro.sample(
@@ -224,156 +114,162 @@ class Crosstalk(Model):
         )
 
         with aois as ndx:
-            ndx = ndx[:, None, None]
-            # background mean and std
-            background_mean = pyro.sample(
-                "background_mean", dist.HalfNormal(1000).expand((self.C,)).to_event(1)
-            )
-            background_std = pyro.sample(
-                "background_std", dist.HalfNormal(100).expand((self.C,)).to_event(1)
-            )
-            with frames as fdx:
-                fdx = fdx[:, None]
-                # fetch data
-                obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
-                # sample background intensity
-                background = pyro.sample(
-                    "background",
-                    dist.Gamma(
-                        (background_mean / background_std) ** 2,
-                        background_mean / background_std**2,
-                    ).to_event(1),
+            ndx = ndx[:, None]
+            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            with handlers.mask(mask=mask):
+                # background mean and std
+                background_mean = pyro.sample(
+                    "background_mean",
+                    dist.HalfNormal(1000).expand((self.C,)).to_event(1),
                 )
-
-                # sample hidden model state (1+S,)
-                z_probs = Vindex(pi)[..., :, is_ontarget.long()]
-                z_probs = cartesian_product(z_probs)
-                z = pyro.sample(
-                    "z",
-                    dist.Categorical(z_probs),
-                    infer={"enumerate": "parallel"},
+                background_std = pyro.sample(
+                    "background_std", dist.HalfNormal(100).expand((self.C,)).to_event(1)
                 )
-
-                ms, heights, widths, xs, ys = [], [], [], [], []
-                for qdx in range(self.Q):
-                    z_qdx = Vindex(self.z_matrix)[z, qdx]
-                    theta = pyro.sample(
-                        f"theta_{qdx}",
-                        dist.Categorical(
-                            Vindex(probs_theta(self.K, self.device))[
-                                torch.clamp(z_qdx, min=0, max=1)
-                            ]
-                        ),
-                        infer={"enumerate": "parallel"},
+                with frames as fdx:
+                    # fetch data
+                    obs, target_locs, is_ontarget = self.data.fetch(
+                        ndx.unsqueeze(-1), fdx.unsqueeze(-1), self.cdx
                     )
-                    onehot_theta = one_hot(theta, num_classes=1 + self.K)
+                    # sample background intensity
+                    background = pyro.sample(
+                        "background",
+                        dist.Gamma(
+                            (background_mean / background_std) ** 2,
+                            background_mean / background_std**2,
+                        ).to_event(1),
+                    )
 
-                    for kdx in range(self.K):
-                        specific = onehot_theta[..., 1 + kdx]
-                        # spot presence
-                        m = pyro.sample(
-                            f"m_{kdx}_{qdx}",
-                            dist.Bernoulli(
-                                Vindex(probs_m(lamda, self.K))[..., qdx, theta, kdx]
-                            ),
+                    ms, heights, widths, xs, ys = [], [], [], [], []
+                    is_ontarget = is_ontarget.squeeze(-1)
+                    for qdx in range(self.Q):
+                        # sample hidden model state (1+S)
+                        z_probs = Vindex(pi)[..., qdx, :, is_ontarget.long()]
+                        z = pyro.sample(
+                            f"z_q{qdx}",
+                            dist.Categorical(z_probs),
+                            infer={"enumerate": "parallel"},
                         )
-                        with handlers.mask(mask=m > 0):
-                            # sample spot variables
-                            height = pyro.sample(
-                                f"height_{kdx}_{qdx}",
-                                dist.HalfNormal(10000),
-                            )
-                            width = pyro.sample(
-                                f"width_{kdx}_{qdx}",
-                                AffineBeta(
-                                    1.5,
-                                    2,
-                                    0.75,
-                                    2.25,
-                                ),
-                            )
-                            x = pyro.sample(
-                                f"x_{kdx}_{qdx}",
-                                AffineBeta(
-                                    0,
-                                    Vindex(size)[..., specific],
-                                    -(self.data.P + 1) / 2,
-                                    (self.data.P + 1) / 2,
-                                ),
-                            )
-                            y = pyro.sample(
-                                f"y_{kdx}_{qdx}",
-                                AffineBeta(
-                                    0,
-                                    Vindex(size)[..., specific],
-                                    -(self.data.P + 1) / 2,
-                                    (self.data.P + 1) / 2,
-                                ),
-                            )
+                        theta = pyro.sample(
+                            f"theta_q{qdx}",
+                            dist.Categorical(
+                                Vindex(probs_theta(self.K, self.device))[
+                                    torch.clamp(z, min=0, max=1)
+                                ]
+                            ),
+                            infer={"enumerate": "parallel"},
+                        )
+                        onehot_theta = one_hot(theta, num_classes=1 + self.K)
 
-                        # append
-                        ms.append(m)
-                        heights.append(height)
-                        widths.append(width)
-                        xs.append(x)
-                        ys.append(y)
+                        for kdx in range(self.K):
+                            specific = onehot_theta[..., 1 + kdx]
+                            # spot presence
+                            m = pyro.sample(
+                                f"m_k{kdx}_q{qdx}",
+                                dist.Bernoulli(
+                                    Vindex(probs_m(lamda, self.K))[..., qdx, theta, kdx]
+                                ),
+                            )
+                            with handlers.mask(mask=m > 0):
+                                # sample spot variables
+                                height = pyro.sample(
+                                    f"height_k{kdx}_q{qdx}",
+                                    dist.HalfNormal(10000),
+                                )
+                                width = pyro.sample(
+                                    f"width_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        1.5,
+                                        2,
+                                        0.75,
+                                        2.25,
+                                    ),
+                                )
+                                x = pyro.sample(
+                                    f"x_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        0,
+                                        Vindex(size)[..., specific],
+                                        -(self.data.P + 1) / 2,
+                                        (self.data.P + 1) / 2,
+                                    ),
+                                )
+                                y = pyro.sample(
+                                    f"y_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        0,
+                                        Vindex(size)[..., specific],
+                                        -(self.data.P + 1) / 2,
+                                        (self.data.P + 1) / 2,
+                                    ),
+                                )
 
-                heights = torch.stack(
-                    (
-                        torch.stack(heights[: self.K], -1),
-                        torch.stack(heights[self.K :], -1),
-                    ),
-                    -2,
-                )
-                widths = torch.stack(
-                    (
-                        torch.stack(widths[: self.K], -1),
-                        torch.stack(widths[self.K :], -1),
-                    ),
-                    -2,
-                )
-                xs = torch.stack(
-                    (torch.stack(xs[: self.K], -1), torch.stack(xs[self.K :], -1)), -2
-                )
-                ys = torch.stack(
-                    (torch.stack(ys[: self.K], -1), torch.stack(ys[self.K :], -1)), -2
-                )
-                ms = torch.broadcast_tensors(*ms)
-                ms = torch.stack(
-                    (torch.stack(ms[: self.K], -1), torch.stack(ms[self.K :], -1)), -2
-                )
-                # observed data
-                pyro.sample(
-                    "data",
-                    KSMOGN(
-                        heights,
-                        widths,
-                        xs,
-                        ys,
-                        target_locs,
-                        background,
-                        gain,
-                        self.data.offset.samples,
-                        self.data.offset.logits.to(self.dtype),
-                        self.data.P,
-                        ms,
-                        crosstalk,
-                        use_pykeops=self.use_pykeops,
-                    ),
-                    obs=obs,
-                )
+                            # append
+                            ms.append(m)
+                            heights.append(height)
+                            widths.append(width)
+                            xs.append(x)
+                            ys.append(y)
+
+                    heights = torch.stack(
+                        [
+                            torch.stack(heights[q * self.K : (1 + q) * self.K], -1)
+                            for q in range(self.Q)
+                        ],
+                        -2,
+                    )
+                    widths = torch.stack(
+                        [
+                            torch.stack(widths[q * self.K : (1 + q) * self.K], -1)
+                            for q in range(self.Q)
+                        ],
+                        -2,
+                    )
+                    xs = torch.stack(
+                        [
+                            torch.stack(xs[q * self.K : (1 + q) * self.K], -1)
+                            for q in range(self.Q)
+                        ],
+                        -2,
+                    )
+                    ys = torch.stack(
+                        [
+                            torch.stack(ys[q * self.Q : (1 + q) * self.K], -1)
+                            for q in range(self.Q)
+                        ],
+                        -2,
+                    )
+                    ms = torch.broadcast_tensors(*ms)
+                    ms = torch.stack(
+                        [
+                            torch.stack(ms[q * self.Q : (1 + q) * self.K], -1)
+                            for q in range(self.Q)
+                        ],
+                        -2,
+                    )
+                    # observed data
+                    pyro.sample(
+                        "data",
+                        KSMOGN(
+                            heights,
+                            widths,
+                            xs,
+                            ys,
+                            target_locs,
+                            background,
+                            gain,
+                            self.data.offset.samples,
+                            self.data.offset.logits.to(self.dtype),
+                            self.data.P,
+                            ms,
+                            alpha,
+                            use_pykeops=self.use_pykeops,
+                        ),
+                        obs=obs,
+                    )
 
     def guide(self):
         r"""
-        **Variational Distribution**
-
-        .. math::
-            \begin{aligned}
-                q(\phi \setminus \{z, \theta\}) =~&q(g) q(\sigma^{xy}) q(\pi) q(\lambda) \cdot \\
-                &\prod_{\mathsf{AOI}} \left[ q(\mu^b) q(\sigma^b) \prod_{\mathsf{frame}}
-                \left[ \vphantom{\prod_{F}} q(b) \prod_{\mathsf{spot}}
-                q(m) q(h | m) q(w | m) q(x | m) q(y | m) \right] \right]
-            \end{aligned}
+        Variational Distribution
         """
         # global parameters
         pyro.sample(
@@ -383,7 +279,7 @@ class Crosstalk(Model):
                 pyro.param("gain_beta"),
             ),
         )
-        pyro.sample("crosstalk", dist.Delta(pyro.param("crosstalk_loc")).to_event(2))
+        pyro.sample("alpha", dist.Delta(pyro.param("alpha_loc")).to_event(2))
         pyro.sample(
             "pi",
             dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")).to_event(1),
@@ -451,7 +347,7 @@ class Crosstalk(Model):
                     for kdx in range(self.K):
                         # sample spot presence m
                         m = pyro.sample(
-                            f"m_{kdx}_{qdx}",
+                            f"m_k{kdx}_q{qdx}",
                             dist.Bernoulli(
                                 Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, qdx]
                             ),
@@ -460,7 +356,7 @@ class Crosstalk(Model):
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
                             pyro.sample(
-                                f"height_{kdx}_{qdx}",
+                                f"height_k{kdx}_q{qdx}",
                                 dist.Gamma(
                                     Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
                                     * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, qdx],
@@ -468,7 +364,7 @@ class Crosstalk(Model):
                                 ),
                             )
                             pyro.sample(
-                                f"width_{kdx}_{qdx}",
+                                f"width_k{kdx}_q{qdx}",
                                 AffineBeta(
                                     Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, qdx],
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, qdx],
@@ -477,7 +373,7 @@ class Crosstalk(Model):
                                 ),
                             )
                             pyro.sample(
-                                f"x_{kdx}_{qdx}",
+                                f"x_k{kdx}_q{qdx}",
                                 AffineBeta(
                                     Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, qdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
@@ -486,7 +382,7 @@ class Crosstalk(Model):
                                 ),
                             )
                             pyro.sample(
-                                f"y_{kdx}_{qdx}",
+                                f"y_k{kdx}_q{qdx}",
                                 AffineBeta(
                                     Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, qdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
@@ -502,7 +398,7 @@ class Crosstalk(Model):
         device = self.device
         data = self.data
         pyro.param(
-            "crosstalk_loc",
+            "alpha_loc",
             lambda: torch.ones((self.Q, self.C), device=device) / self.C,
             constraint=constraints.simplex,
         )
@@ -554,7 +450,7 @@ class Crosstalk(Model):
         data_median = data.median[self.cdx].to(device)
         pyro.param(
             "background_mean_loc",
-            lambda:  (data_median - self.data.offset.mean).expand(data.Nt, 1, self.C),
+            lambda: (data_median - self.data.offset.mean).expand(data.Nt, 1, self.C),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -565,7 +461,9 @@ class Crosstalk(Model):
 
         pyro.param(
             "b_loc",
-            lambda:  (data_median - self.data.offset.mean).expand(data.Nt, data.F, self.C),
+            lambda: (data_median - self.data.offset.mean).expand(
+                data.Nt, data.F, self.C
+            ),
             constraint=constraints.positive,
         )
         pyro.param(

@@ -93,13 +93,12 @@ class KSMOGN(TorchDistribution):
         self.y = y
         self.target_locs = target_locs
         self.m = m
+        self.background = background[..., None, None]
         if alpha is not None:
             C = alpha.shape[-1]
-            self.background = background[..., None, None, None]
             self.gain = gain[..., None, None, None]
             self.alpha = alpha[..., None, None, None]
         else:
-            self.background = background[..., None, None]
             self.gain = gain[..., None, None]
             self.alpha = alpha
         self.rate = 1 / self.gain
@@ -120,17 +119,19 @@ class KSMOGN(TorchDistribution):
             batch_shape = torch.broadcast_shapes(batch_shape, m.shape)
 
         event_shape = torch.Size([P, P])
+        bg_shape = background.shape
+        target_shape = target_locs.shape[:-1]
         # remove K dim
         batch_shape = batch_shape[:-1]
         if alpha is not None:
             # remove Q dim
             batch_shape = batch_shape[:-1]
             # add C dim
-            batch_shape = batch_shape + (1,)
             event_shape = (C,) + event_shape
-        batch_shape = torch.broadcast_shapes(
-            batch_shape, background.shape, target_locs.shape[:-1]
-        )
+            # remove C dim
+            bg_shape = bg_shape[:-1]
+            target_shape = target_shape[:-1]
+        batch_shape = torch.broadcast_shapes(batch_shape, bg_shape, target_shape)
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     @lazy_property
@@ -224,4 +225,5 @@ class KSMOGN(TorchDistribution):
             )
             result = obs_logits + self.offset_logits + torch.log(mask)
             result = torch.logsumexp(result, -1)
-        return result.sum((-2, -1))
+        event_dims = tuple(-i for i in range(1, len(self.event_shape) + 1))
+        return result.sum(event_dims)
