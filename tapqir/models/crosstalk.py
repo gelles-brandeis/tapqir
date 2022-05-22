@@ -59,17 +59,7 @@ class Crosstalk(Model):
         super().__init__(S, K, Q, channels, device, dtype)
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
-        self.conv_params = [
-            "-ELBO",
-            "proximity_loc",
-            "gain_loc",
-            "lamda_loc_0",
-            "lamda_loc_1",
-        ]
-        # if S=1, C=2 => [[0, 0], [0, 1], [1, 0], [1, 1]]
-        self.z_matrix = torch.tensor(
-            list(itertools.product(range(1 + self.S), repeat=self.C)), dtype=torch.long
-        )
+        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
 
     def model(self):
         r"""
@@ -142,7 +132,7 @@ class Crosstalk(Model):
                     ms, heights, widths, xs, ys = [], [], [], [], []
                     is_ontarget = is_ontarget.squeeze(-1)
                     for qdx in range(self.Q):
-                        # sample hidden model state (1+S)
+                        # sample hidden model state (1+S,)
                         z_probs = Vindex(pi)[..., qdx, :, is_ontarget.long()]
                         z = pyro.sample(
                             f"z_q{qdx}",
@@ -422,7 +412,7 @@ class Crosstalk(Model):
         )
         pyro.param(
             "lamda_beta",
-            lambda: torch.full((self.C,), 100, device=device),
+            lambda: torch.full((self.Q,), 100, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -538,6 +528,15 @@ class Crosstalk(Model):
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
+        params = ["m", "x", "y"]
+        params = list(map(lambda x: [f"{x}_k{i}" for i in range(self.K)], params))
+        params = list(itertools.chain(*params))
+        params += ["z", "theta"]
+        params = list(map(lambda x: [f"{x}_q{i}" for i in range(self.Q)], params))
+        params = list(itertools.chain(*params))
+        theta_dims = tuple(i for i in range(0, self.Q * 2, 2))
+        z_dims = tuple(i for i in range(1, self.Q * 2, 2))
+        m_dims = tuple(i for i in range(self.Q * 2, self.Q * (self.K + 2)))
         for ndx in torch.split(torch.arange(N), nbatch_size):
             for fdx in torch.split(torch.arange(self.data.F), fbatch_size):
                 self.n = ndx
@@ -559,46 +558,28 @@ class Crosstalk(Model):
                 # 3 - m_0
                 # p(z, theta, phi)
                 logp = 0
-                for name in [
-                    "z",
-                    "theta_0",
-                    "theta_1",
-                    "m_0_0",
-                    "m_0_1",
-                    "m_1_0",
-                    "m_1_1",
-                    "x_0_0",
-                    "x_0_1",
-                    "x_1_0",
-                    "x_1_1",
-                    "y_0_0",
-                    "y_0_1",
-                    "y_1_0",
-                    "y_1_1",
-                ]:
+
+                for name in params:
                     logp = logp + model_tr.nodes[name]["unscaled_log_prob"]
                 # p(z, theta | phi) = p(z, theta, phi) - p(z, theta, phi).sum(z, theta)
-                logp = logp - logp.logsumexp((0, 1, 2))
-                expectation = (
-                    guide_tr.nodes["m_0_0"]["unscaled_log_prob"]
-                    + guide_tr.nodes["m_0_1"]["unscaled_log_prob"]
-                    + guide_tr.nodes["m_1_0"]["unscaled_log_prob"]
-                    + guide_tr.nodes["m_1_1"]["unscaled_log_prob"]
-                    + logp
-                )
+                logp = logp - logp.logsumexp(z_dims + theta_dims)
+                m_log_probs = [
+                    guide_tr.nodes[f"m_k{k}_q{q}"]["unscaled_log_prob"]
+                    for k in range(self.K)
+                    for q in range(self.Q)
+                ]
+                expectation = reduce(lambda x, y: x + y, m_log_probs) + logp
                 # average over m
-                result = expectation.logsumexp((3, 4, 5, 6))
+                result = expectation.logsumexp(m_dims)
                 # marginalize theta
-                z_logits = result.logsumexp((0, 1))
+                z_logits = result.logsumexp(theta_dims)
                 a = z_logits.exp().mean(-3)
-                z_probs[ndx[:, None], fdx, 0] = a[2] + a[3]
-                # z_logits = result.logsumexp((0, 2, 3))
-                z_probs[ndx[:, None], fdx, 1] = a[1] + a[3]
+                z_probs[ndx[:, None], fdx, 0] = a.sum(1)[1]
+                z_probs[ndx[:, None], fdx, 1] = a.sum(0)[1]
                 # marginalize z
-                theta_logits = result.logsumexp((0, 2))
-                theta_probs[:, ndx[:, None], fdx, 0] = theta_logits[1:].exp().mean(-3)
-                theta_logits = result.logsumexp((1, 2))
-                theta_probs[:, ndx[:, None], fdx, 1] = theta_logits[1:].exp().mean(-3)
+                b = result.logsumexp(z_dims)
+                theta_probs[:, ndx[:, None], fdx, 0] = b.logsumexp(1)[1:].exp().mean(-3)
+                theta_probs[:, ndx[:, None], fdx, 1] = b.logsumexp(0)[1:].exp().mean(-3)
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size

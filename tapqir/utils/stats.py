@@ -103,39 +103,37 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     # combine Q local params
     for param in list(ci_stats.keys()):
-        if param.endswith("_0"):
-            base_name = param.split("_")[:-1]
-            base_name = "_".join(base_name)
+        if param.endswith("_q0"):
+            base_name = param.split("_q")[0]
             ci_stats[base_name] = {}
             ci_stats[base_name]["Mean"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.Q)], dim=-1
+                [ci_stats[f"{base_name}_q{k}"]["Mean"] for k in range(model.Q)], dim=-1
             )
             ci_stats[base_name]["LL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.Q)], dim=-1
+                [ci_stats[f"{base_name}_q{k}"]["LL"] for k in range(model.Q)], dim=-1
             )
             ci_stats[base_name]["UL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.Q)], dim=-1
+                [ci_stats[f"{base_name}_q{k}"]["UL"] for k in range(model.Q)], dim=-1
             )
             for k in range(model.K):
-                del ci_stats[f"{base_name}_{k}"]
+                del ci_stats[f"{base_name}_q{k}"]
 
     # combine K local params
     for param in list(ci_stats.keys()):
-        if param.endswith("_0"):
-            base_name = param.split("_")[:-1]
-            base_name = "_".join(base_name)
+        if param.endswith("_k0"):
+            base_name = param.split("_k")[0]
             ci_stats[base_name] = {}
             ci_stats[base_name]["Mean"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.K)], dim=0
+                [ci_stats[f"{base_name}_k{k}"]["Mean"] for k in range(model.K)], dim=0
             )
             ci_stats[base_name]["LL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.K)], dim=0
+                [ci_stats[f"{base_name}_k{k}"]["LL"] for k in range(model.K)], dim=0
             )
             ci_stats[base_name]["UL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.K)], dim=0
+                [ci_stats[f"{base_name}_k{k}"]["UL"] for k in range(model.K)], dim=0
             )
             for k in range(model.K):
-                del ci_stats[f"{base_name}_{k}"]
+                del ci_stats[f"{base_name}_k{k}"]
 
     #  for param in global_params:
     #      if param == "pi":
