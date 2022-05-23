@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-crosstalk
-^^^^^^^^^
+mccosmos
+^^^^^^^^
 """
 
 import itertools
@@ -24,7 +24,7 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
-class Crosstalk(Model):
+class mccosmos(Model):
     r"""
     **Multi-Color Time-Independent Colocalization Model**
 
@@ -69,7 +69,8 @@ class Crosstalk(Model):
         gain = pyro.sample("gain", dist.HalfNormal(50))
         alpha = pyro.sample(
             "alpha",
-            dist.Dirichlet(torch.ones(self.Q, self.C)).to_event(1),
+            dist.Dirichlet(torch.tensor([[9., 1.], [1., 9.]])).to_event(1),
+            # dist.Dirichlet(torch.ones(self.Q, self.C)).to_event(1),
         )
         pi = pyro.sample(
             "pi",
