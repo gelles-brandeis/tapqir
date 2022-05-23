@@ -22,7 +22,7 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
-class Cosmos(Model):
+class cosmos(Model):
     r"""
     **Single-Color Time-Independent Colocalization Model**
 

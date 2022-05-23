@@ -18,7 +18,7 @@ from tqdm import tqdm_notebook
 from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
-from tapqir.main import fit, glimpse, log, main, show
+from tapqir.main import avail_models, fit, glimpse, log, main, show
 from tapqir.utils.dataset import save
 
 logger = logging.getLogger("tapqir")
@@ -28,6 +28,8 @@ plt.rcParams["keymap.zoom"].remove("o")
 plt.rcParams["keymap.home"].remove("h")
 plt.rcParams["keymap.yscale"].remove("l")
 plt.rcParams["keymap.xscale"].remove("k")
+
+avail_models = list(avail_models.__members__.keys())
 
 
 @singledispatch
@@ -392,7 +394,7 @@ def fitUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos"],
+            options=avail_models,
             style={"description_width": "initial"},
         ),
     )
@@ -481,7 +483,7 @@ def showUI(out, DEFAULTS):
         widgets.Dropdown(
             description="Tapqir model",
             value="cosmos",
-            options=["cosmos"],
+            options=avail_models,
             style={"description_width": "initial"},
         ),
     )
