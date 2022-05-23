@@ -239,7 +239,7 @@ class cosmos(Model):
                         specific = onehot_theta[..., 1 + kdx]
                         # spot presence
                         m = pyro.sample(
-                            f"m_{kdx}",
+                            f"m_k{kdx}",
                             dist.Bernoulli(
                                 Vindex(probs_m(lamda, self.K))[..., theta, kdx]
                             ),
@@ -247,11 +247,11 @@ class cosmos(Model):
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
                             height = pyro.sample(
-                                f"height_{kdx}",
+                                f"height_k{kdx}",
                                 dist.HalfNormal(self.height_std),
                             )
                             width = pyro.sample(
-                                f"width_{kdx}",
+                                f"width_k{kdx}",
                                 AffineBeta(
                                     1.5,
                                     2,
@@ -260,7 +260,7 @@ class cosmos(Model):
                                 ),
                             )
                             x = pyro.sample(
-                                f"x_{kdx}",
+                                f"x_k{kdx}",
                                 AffineBeta(
                                     0,
                                     Vindex(size)[..., specific],
@@ -269,7 +269,7 @@ class cosmos(Model):
                                 ),
                             )
                             y = pyro.sample(
-                                f"y_{kdx}",
+                                f"y_k{kdx}",
                                 AffineBeta(
                                     0,
                                     Vindex(size)[..., specific],
@@ -388,7 +388,7 @@ class cosmos(Model):
                     for kdx in spots:
                         # sample spot presence m
                         m = pyro.sample(
-                            f"m_{kdx}",
+                            f"m_k{kdx}",
                             dist.Bernoulli(
                                 Vindex(pyro.param("m_probs"))[kdx, ndx, fdx]
                             ),
@@ -397,7 +397,7 @@ class cosmos(Model):
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
                             pyro.sample(
-                                f"height_{kdx}",
+                                f"height_k{kdx}",
                                 dist.Gamma(
                                     Vindex(pyro.param("h_loc"))[kdx, ndx, fdx]
                                     * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
@@ -405,7 +405,7 @@ class cosmos(Model):
                                 ),
                             )
                             pyro.sample(
-                                f"width_{kdx}",
+                                f"width_k{kdx}",
                                 AffineBeta(
                                     Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
@@ -414,7 +414,7 @@ class cosmos(Model):
                                 ),
                             )
                             pyro.sample(
-                                f"x_{kdx}",
+                                f"x_k{kdx}",
                                 AffineBeta(
                                     Vindex(pyro.param("x_mean"))[kdx, ndx, fdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx],
@@ -423,7 +423,7 @@ class cosmos(Model):
                                 ),
                             )
                             pyro.sample(
-                                f"y_{kdx}",
+                                f"y_k{kdx}",
                                 AffineBeta(
                                     Vindex(pyro.param("y_mean"))[kdx, ndx, fdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx],
