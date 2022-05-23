@@ -21,10 +21,10 @@ from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
-from tapqir.models.cosmos import Cosmos
+from tapqir.models.cosmos import cosmos
 
 
-class HMM(Cosmos):
+class HMM(cosmos):
     r"""
     **Single-Color Hidden Markov Colocalization Model**
 

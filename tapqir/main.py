@@ -41,7 +41,7 @@ def format_link(link):
 
 
 # available models
-class Model(str, Enum):
+class avail_models(str, Enum):
     cosmos = "cosmos"
 
 
@@ -285,7 +285,9 @@ def glimpse(
 
 @app.command()
 def fit(
-    model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
+    model: avail_models = typer.Option(
+        "cosmos", help="Tapqir model", prompt="Tapqir model"
+    ),
     channels: List[int] = typer.Option(
         [0],
         help="Color-channel numbers to analyze",
@@ -450,7 +452,9 @@ def fit(
 
 @app.command()
 def stats(
-    model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
+    model: avail_models = typer.Option(
+        "cosmos", help="Tapqir model", prompt="Tapqir model"
+    ),
     channels: List[int] = typer.Option(
         [0],
         help="Color-channel numbers to analyze",
@@ -576,7 +580,9 @@ def config_axis(ax, label, f1, f2, ymin=None, ymax=None, xticklabels=False):
 
 @app.command()
 def show(
-    model: Model = typer.Option("cosmos", help="Tapqir model", prompt="Tapqir model"),
+    model: avail_models = typer.Option(
+        "cosmos", help="Tapqir model", prompt="Tapqir model"
+    ),
     channels: List[int] = typer.Option(
         [0],
         help="Color-channel numbers to analyze",
