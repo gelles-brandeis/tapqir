@@ -103,23 +103,15 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.nbatch_size = nbatch_size
     model.fbatch_size = fbatch_size
 
-
-    #  for param in global_params:
-    #      if param == "pi":
-    #          summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
-    #          summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
-    #          summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
-    #      elif param == "trans":
-    #          summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
-    #          summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
-    #          summary.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
-    #          summary.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
-    #          summary.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
-    #          summary.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
-    #      else:
-    #          summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
-    #          summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
-    #          summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+    for param in global_params:
+        if ci_stats[param]["Mean"].ndim == 0:
+            summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
+            summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
+            summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+        else:
+            summary.loc[param, "Mean"] = ci_stats[param]["Mean"].tolist()
+            summary.loc[param, "95% LL"] = ci_stats[param]["LL"].tolist()
+            summary.loc[param, "95% UL"] = ci_stats[param]["UL"].tolist()
     logger.info("- spot probabilities")
     ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
@@ -160,36 +152,35 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     model.params = ci_stats
 
-    #  logger.info("- SNR and Chi2-test")
-    #  # snr and chi2 test
-    #  snr = torch.zeros(model.K, model.data.Nt, model.data.F, device=torch.device("cpu"))
-    #  chi2 = torch.zeros(model.data.Nt, model.data.F, device=torch.device("cpu"))
-    #  for n in range(model.data.Nt):
-    #      snr[:, n], chi2[n] = snr_and_chi2(
-    #          model.data.images[n, :, model.cdx],
-    #          ci_stats["height"]["Mean"][:, n],
-    #          ci_stats["width"]["Mean"][:, n],
-    #          ci_stats["x"]["Mean"][:, n],
-    #          ci_stats["y"]["Mean"][:, n],
-    #          model.data.xy[n, :, model.cdx],
-    #          ci_stats["background"]["Mean"][n],
-    #          ci_stats["gain"]["Mean"],
-    #          model.data.offset.mean,
-    #          model.data.offset.var,
-    #          model.data.P,
-    #          ci_stats["theta_probs"][:, n],
-    #      )
-    #  snr_masked = snr[ci_stats["theta_probs"] > 0.5]
-    #  summary.loc["SNR", "Mean"] = snr_masked.mean().item()
-    #  ci_stats["chi2"] = {}
-    #  ci_stats["chi2"]["values"] = chi2
-    #  cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
-    #  ci_stats["chi2"]["vmin"] = -0.03 * cmax
-    #  ci_stats["chi2"]["vmax"] = 1.3 * cmax
+    logger.info("- SNR and Chi2-test")
+    # snr and chi2 test
+    snr = torch.zeros(model.K, model.data.Nt, model.data.F, device=torch.device("cpu"))
+    chi2 = torch.zeros(model.data.Nt, model.data.F, device=torch.device("cpu"))
+    for n in range(model.data.Nt):
+        snr[:, n], chi2[n] = snr_and_chi2(
+            model.data.images[n, :, model.cdx],
+            ci_stats["height"]["Mean"][:, n],
+            ci_stats["width"]["Mean"][:, n],
+            ci_stats["x"]["Mean"][:, n],
+            ci_stats["y"]["Mean"][:, n],
+            model.data.xy[n, :, model.cdx],
+            ci_stats["background"]["Mean"][n],
+            ci_stats["gain"]["Mean"],
+            model.data.offset.mean,
+            model.data.offset.var,
+            model.data.P,
+            ci_stats["theta_probs"][:, n],
+        )
+    snr_masked = snr[ci_stats["theta_probs"] > 0.5]
+    summary.loc["SNR", "Mean"] = snr_masked.mean().item()
+    ci_stats["chi2"] = {}
+    ci_stats["chi2"]["values"] = chi2
+    cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
+    ci_stats["chi2"]["vmin"] = -0.03 * cmax
+    ci_stats["chi2"]["vmax"] = 1.3 * cmax
 
     # classification statistics
-    # if model.data.labels is not None:
-    if False:
+    if model.data.labels is not None:
         pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
         true_labels = model.data.labels["z"][: model.data.N, :, model.cdx].ravel()
 

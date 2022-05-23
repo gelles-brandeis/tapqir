@@ -69,7 +69,7 @@ class mccosmos(Model):
         gain = pyro.sample("gain", dist.HalfNormal(50))
         alpha = pyro.sample(
             "alpha",
-            dist.Dirichlet(torch.tensor([[9., 1.], [1., 9.]])).to_event(1),
+            dist.Dirichlet(torch.tensor([[9.0, 1.0], [1.0, 9.0]])).to_event(1),
             # dist.Dirichlet(torch.ones(self.Q, self.C)).to_event(1),
         )
         pi = pyro.sample(
