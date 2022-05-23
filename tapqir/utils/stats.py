@@ -104,21 +104,14 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     model.fbatch_size = fbatch_size
 
     for param in global_params:
-        if param == "pi":
-            summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
-            summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
-            summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
-        elif param == "trans":
-            summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
-            summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
-            summary.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
-            summary.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
-            summary.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
-            summary.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
-        else:
+        if ci_stats[param]["Mean"].ndim == 0:
             summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+        else:
+            summary.loc[param, "Mean"] = ci_stats[param]["Mean"].tolist()
+            summary.loc[param, "95% LL"] = ci_stats[param]["LL"].tolist()
+            summary.loc[param, "95% UL"] = ci_stats[param]["UL"].tolist()
     logger.info("- spot probabilities")
     ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
