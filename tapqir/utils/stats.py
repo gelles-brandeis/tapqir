@@ -96,27 +96,12 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     fbatch_size = model.fbatch_size
     model.nbatch_size = None
     model.fbatch_size = None
-    with StatsMessenger(CI=CI) as ci_stats:
+    with StatsMessenger(
+        CI=CI, K=model.K, N=model.data.Nt, F=model.data.F, Q=model.Q
+    ) as ci_stats:
         model.guide()
     model.nbatch_size = nbatch_size
     model.fbatch_size = fbatch_size
-
-    # combine K local params
-    for param in list(ci_stats.keys()):
-        if param.endswith("_0"):
-            base_name = param.split("_")[0]
-            ci_stats[base_name] = {}
-            ci_stats[base_name]["Mean"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.K)], dim=0
-            )
-            ci_stats[base_name]["LL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.K)], dim=0
-            )
-            ci_stats[base_name]["UL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.K)], dim=0
-            )
-            for k in range(model.K):
-                del ci_stats[f"{base_name}_{k}"]
 
     for param in global_params:
         if param == "pi":
