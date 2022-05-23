@@ -6,7 +6,9 @@ cosmos
 ^^^^^^
 """
 
+import itertools
 import math
+from functools import reduce
 from typing import Union
 
 import torch
@@ -588,6 +590,13 @@ class cosmos(Model):
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
+        params = ["m", "x", "y"]
+        params = list(map(lambda x: [f"{x}_k{i}" for i in range(self.K)], params))
+        params = list(itertools.chain(*params))
+        params += ["z", "theta"]
+        theta_dims = tuple(i for i in range(0, self.Q * 2, 2))
+        z_dims = tuple(i for i in range(1, self.Q * 2, 2))
+        m_dims = tuple(i for i in range(self.Q * 2, self.Q * (self.K + 2)))
         for ndx in torch.split(torch.arange(N), nbatch_size):
             for fdx in torch.split(torch.arange(self.data.F), fbatch_size):
                 self.n = ndx
@@ -611,19 +620,19 @@ class cosmos(Model):
                 # 3 - m_0
                 # p(z, theta, phi)
                 logp = 0
-                for name in ["z", "theta", "m_0", "m_1", "x_0", "x_1", "y_0", "y_1"]:
+                for name in params:
                     logp = logp + model_tr.nodes[name]["unscaled_log_prob"]
                 # p(z, theta | phi) = p(z, theta, phi) - p(z, theta, phi).sum(z, theta)
-                logp = logp - logp.logsumexp((0, 1))
-                expectation = (
-                    guide_tr.nodes["m_0"]["unscaled_log_prob"]
-                    + guide_tr.nodes["m_1"]["unscaled_log_prob"]
-                    + logp
-                )
+                logp = logp - logp.logsumexp(z_dims + theta_dims)
+                m_log_probs = [
+                    guide_tr.nodes[f"m_k{k}"]["unscaled_log_prob"]
+                    for k in range(self.K)
+                ]
+                expectation = reduce(lambda x, y: x + y, m_log_probs) + logp
                 # average over m
-                result = expectation.logsumexp((2, 3))
+                result = expectation.logsumexp(m_dims)
                 # marginalize theta
-                z_logits = result.logsumexp(0)
+                z_logits = result.logsumexp(theta_dims)
                 z_probs[ndx[:, None], fdx] = z_logits[1].exp().mean(-3)
                 # marginalize z
                 theta_logits = result.logsumexp(1)
