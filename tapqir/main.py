@@ -76,6 +76,14 @@ def glimpse(
         help="AOI image size - number of pixels along the axis",
         prompt="AOI image size",
     ),
+    bin_size: int = typer.Option(
+        partial(get_default, "bin-size"),
+        "--bin-size",
+        min=1,
+        max=21,
+        help="Offset histogram bin size (odd number)",
+        prompt="Offset histogram bin size",
+    ),
     frame_range: bool = typer.Option(
         partial(get_default, "frame-range"),
         help="Specify frame range.",
@@ -185,6 +193,7 @@ def glimpse(
     # read parameter input values
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
+    DEFAULTS["bin-size"] = bin_size
     DEFAULTS["frame-range"] = frame_range
     DEFAULTS["frame-start"] = frame_start
     DEFAULTS["frame-end"] = frame_end
@@ -911,10 +920,10 @@ def main(
             DEFAULTS["proximity_rate"] = 1
             DEFAULTS["gain_std"] = 50
             # offset settings
-            DEFAULTS["offset_x"] = 10
-            DEFAULTS["offset_y"] = 10
-            DEFAULTS["offset_P"] = 30
-            DEFAULTS["bin_size"] = 1
+            DEFAULTS["offset-x"] = 10
+            DEFAULTS["offset-y"] = 10
+            DEFAULTS["offset-P"] = 30
+            DEFAULTS["bin-size"] = 1
             # save config file
             yaml.dump(
                 {key: value for key, value in DEFAULTS.items() if key != "cd"},

@@ -227,11 +227,22 @@ def glimpseUI(out, DEFAULTS):
     )
     layout.add_child(
         "P",
-        widgets.IntText(
+        widgets.BoundedIntText(
             value=DEFAULTS["P"],
             min=5,
             max=50,
             description="AOI image size",
+            style={"description_width": "initial"},
+        ),
+    )
+    layout.add_child(
+        "bin_size",
+        widgets.BoundedIntText(
+            value=DEFAULTS["bin-size"],
+            min=1,
+            max=21,
+            step=2,
+            description="Offset histogram bin size (odd number)",
             style={"description_width": "initial"},
         ),
     )
