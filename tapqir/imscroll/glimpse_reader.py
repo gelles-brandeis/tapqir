@@ -306,10 +306,10 @@ def read_glimpse(path, progress_bar, **kwargs):
     C = kwargs.pop("num-channels")
     name = kwargs.pop("dataset")
     channels = kwargs.pop("channels")
-    offset_x = kwargs.pop("offset_x")
-    offset_y = kwargs.pop("offset_y")
-    offset_P = kwargs.pop("offset_P")
-    bin_size = kwargs.pop("bin_size")
+    offset_x = kwargs.pop("offset-x")
+    offset_y = kwargs.pop("offset-y")
+    offset_P = kwargs.pop("offset-P")
+    bin_size = kwargs.pop("bin-size")
 
     offsets = defaultdict(int)
     offset_medians = []
