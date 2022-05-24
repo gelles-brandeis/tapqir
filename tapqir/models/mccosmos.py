@@ -575,12 +575,12 @@ class mccosmos(Model):
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
                 a = z_logits.exp().mean(-3)
-                z_probs[ndx[:, None], fdx, 0] = a.sum(1)[1]
-                z_probs[ndx[:, None], fdx, 1] = a.sum(0)[1]
+                z_probs[ndx[:, None], fdx, 0] = a.sum(0)[1]
+                z_probs[ndx[:, None], fdx, 1] = a.sum(1)[1]
                 # marginalize z
                 b = result.logsumexp(z_dims)
-                theta_probs[:, ndx[:, None], fdx, 0] = b.logsumexp(1)[1:].exp().mean(-3)
-                theta_probs[:, ndx[:, None], fdx, 1] = b.logsumexp(0)[1:].exp().mean(-3)
+                theta_probs[:, ndx[:, None], fdx, 0] = b.logsumexp(0)[1:].exp().mean(-3)
+                theta_probs[:, ndx[:, None], fdx, 1] = b.logsumexp(1)[1:].exp().mean(-3)
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size
