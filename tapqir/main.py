@@ -396,14 +396,7 @@ def fit(
     settings["dtype"] = "double"
     settings["use_pykeops"] = pykeops
     # priors settings
-    settings["background_mean_std"] = DEFAULTS["background_mean_std"]
-    settings["background_std_std"] = DEFAULTS["background_std_std"]
-    settings["lamda_rate"] = DEFAULTS["lamda_rate"]
-    settings["height_std"] = DEFAULTS["height_std"]
-    settings["width_min"] = DEFAULTS["width_min"]
-    settings["width_max"] = DEFAULTS["width_max"]
-    settings["proximity_rate"] = DEFAULTS["proximity_rate"]
-    settings["gain_std"] = DEFAULTS["gain_std"]
+    settings["priors"] = DEFAULTS["priors"]
 
     if overwrite:
         DEFAULTS["cuda"] = cuda
@@ -910,14 +903,15 @@ def main(
             DEFAULTS["cuda"] = True
             DEFAULTS["matlab"] = False
             # priors settings
-            DEFAULTS["background_mean_std"] = 1000
-            DEFAULTS["background_std_std"] = 100
-            DEFAULTS["lamda_rate"] = 1
-            DEFAULTS["height_std"] = 10000
-            DEFAULTS["width_min"] = 0.75
-            DEFAULTS["width_max"] = 2.25
-            DEFAULTS["proximity_rate"] = 1
-            DEFAULTS["gain_std"] = 50
+            DEFAULTS["priors"] = {}
+            DEFAULTS["priors"]["background_mean_std"] = 1000
+            DEFAULTS["priors"]["background_std_std"] = 100
+            DEFAULTS["priors"]["lamda_rate"] = 1
+            DEFAULTS["priors"]["height_std"] = 10000
+            DEFAULTS["priors"]["width_min"] = 0.75
+            DEFAULTS["priors"]["width_max"] = 2.25
+            DEFAULTS["priors"]["proximity_rate"] = 1
+            DEFAULTS["priors"]["gain_std"] = 50
             # offset settings
             DEFAULTS["offset-x"] = 10
             DEFAULTS["offset-y"] = 10

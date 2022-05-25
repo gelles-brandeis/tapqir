@@ -54,6 +54,7 @@ class Model:
         channels: Union[tuple, list] = (0,),
         device: str = "cpu",
         dtype: str = "double",
+        priors: dict = None,
     ):
         self.S = S
         self.K = K
@@ -66,6 +67,8 @@ class Model:
         self.full_name = f"{self.name}-channel{channels}"
         self.nbatch_size = None
         self.fbatch_size = None
+        # priors settings
+        self.priors = priors
         # for plotting
         self.n = None
         self.f = None
