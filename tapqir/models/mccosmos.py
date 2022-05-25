@@ -36,7 +36,7 @@ class mccosmos(Model):
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
     """
 
-    name = "crosstalk"
+    name = "mccosmos"
 
     def __init__(
         self,
@@ -69,7 +69,7 @@ class mccosmos(Model):
         gain = pyro.sample("gain", dist.HalfNormal(50))
         alpha = pyro.sample(
             "alpha",
-            dist.Dirichlet(torch.tensor([[9.0, 1.0], [1.0, 9.0]])).to_event(1),
+            dist.Dirichlet(torch.tensor([[10.0, 1.0], [1.0, 10.0]])).to_event(1),
             # dist.Dirichlet(torch.ones(self.Q, self.C)).to_event(1),
         )
         pi = pyro.sample(
@@ -270,7 +270,12 @@ class mccosmos(Model):
                 pyro.param("gain_beta"),
             ),
         )
-        pyro.sample("alpha", dist.Delta(pyro.param("alpha_loc")).to_event(2))
+        pyro.sample(
+            "alpha",
+            dist.Dirichlet(
+                pyro.param("alpha_mean") * pyro.param("alpha_size")
+            ).to_event(1),
+        )
         pyro.sample(
             "pi",
             dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")).to_event(1),
@@ -389,9 +394,15 @@ class mccosmos(Model):
         device = self.device
         data = self.data
         pyro.param(
-            "alpha_loc",
-            lambda: torch.ones((self.Q, self.C), device=device) / self.C,
+            "alpha_mean",
+            lambda: torch.ones((self.Q, self.C), device=device)
+            + torch.eye(self.Q, device=device) * 9,
             constraint=constraints.simplex,
+        )
+        pyro.param(
+            "alpha_size",
+            lambda: torch.full((self.Q, 1), 2, device=device),
+            constraint=constraints.positive,
         )
         pyro.param(
             "proximity_loc",

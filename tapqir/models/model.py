@@ -3,7 +3,7 @@
 
 import logging
 import random
-from collections import deque
+from collections import deque, defaultdict
 from pathlib import Path
 from typing import Union
 
@@ -183,7 +183,7 @@ class Model:
             pyro.clear_param_store()
             self.iter = 0
             self.converged = False
-            self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
+            self._rolling = defaultdict(lambda: deque([], maxlen=100))
             self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)
@@ -284,7 +284,7 @@ class Model:
                 "iter": self.iter,
                 "params": pyro.get_param_store().get_state(),
                 "optimizer": self.optim.get_state(),
-                "rolling": self._rolling,
+                "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
             },
             self.run_path / f"{self.full_name}-model.tpqr",

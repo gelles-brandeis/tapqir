@@ -43,7 +43,7 @@ def format_link(link):
 # available models
 class avail_models(str, Enum):
     cosmos = "cosmos"
-    mccosmos = "crosstalk"
+    mccosmos = "mccosmos"
 
 
 def get_default(key):
