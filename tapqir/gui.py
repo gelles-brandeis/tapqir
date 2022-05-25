@@ -465,14 +465,26 @@ def fitUI(out, DEFAULTS):
             style={"description_width": "initial"},
         ),
     )
+    priors = inputBox()
+    for name, value in DEFAULTS["priors"].items():
+        priors.add_child(
+            name,
+            widgets.FloatText(
+                value=value, description=name, style={"description_width": "initial"}
+            ),
+        )
+    layout.add_child("priors", widgets.Accordion(children=[priors]))
+    layout["priors"].set_title(0, "Priors")
     # Fit the data
     layout.add_child("fit", widgets.Button(description="Fit the data"))
     # Callbacks
-    layout["fit"].on_click(partial(fitCmd, layout=layout, out=out))
+    layout["fit"].on_click(partial(fitCmd, layout=layout, out=out, DEFAULTS=DEFAULTS))
     return layout
 
 
-def fitCmd(b, layout, out):
+def fitCmd(b, layout, out, DEFAULTS):
+    # read priors
+    DEFAULTS["priors"].update(layout["priors"].children[0].kwargs)
     with out:
         fit(
             **layout.kwargs,

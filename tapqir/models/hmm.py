@@ -49,17 +49,19 @@ class HMM(cosmos):
         dtype: str = "double",
         use_pykeops: bool = True,
         vectorized: bool = True,
-        background_mean_std: float = 1000,
-        background_std_std: float = 100,
-        lamda_rate: float = 1,
-        height_std: float = 10000,
-        width_min: float = 0.75,
-        width_max: float = 2.25,
-        proximity_rate: float = 1,
-        gain_std: float = 50,
+        priors: dict = {
+            "background_mean_std": 1000,
+            "background_std_std": 100,
+            "lamda_rate": 1,
+            "height_std": 10000,
+            "width_min": 0.75,
+            "width_max": 2.25,
+            "proximity_rate": 1,
+            "gain_std": 50,
+        },
     ):
         self.vectorized = vectorized
-        super().__init__(K, channels, device, dtype, use_pykeops)
+        super().__init__(K, channels, device, dtype, use_pykeops, priors)
         self._global_params = ["gain", "proximity", "lamda", "trans"]
 
     def model(self):
@@ -67,7 +69,7 @@ class HMM(cosmos):
         **Generative Model**
         """
         # global parameters
-        gain = pyro.sample("gain", dist.HalfNormal(50))
+        gain = pyro.sample("gain", dist.HalfNormal(self.priors["gain_std"]))
         init = pyro.sample(
             "init", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1))
         )
@@ -79,8 +81,10 @@ class HMM(cosmos):
             ),
         )
         trans = expand_offtarget(trans)
-        lamda = pyro.sample("lamda", dist.Exponential(1))
-        proximity = pyro.sample("proximity", dist.Exponential(1))
+        lamda = pyro.sample("lamda", dist.Exponential(self.priors["lamda_rate"]))
+        proximity = pyro.sample(
+            "proximity", dist.Exponential(self.priors["proximity_rate"])
+        )
         size = torch.stack(
             (
                 torch.full_like(proximity, 2.0),
@@ -109,8 +113,13 @@ class HMM(cosmos):
         with aois as ndx:
             ndx = ndx[:, None]
             # background mean and std
-            background_mean = pyro.sample("background_mean", dist.HalfNormal(1000))
-            background_std = pyro.sample("background_std", dist.HalfNormal(100))
+            background_mean = pyro.sample(
+                "background_mean",
+                dist.HalfNormal(self.priors["background_mean_std"]),
+            )
+            background_std = pyro.sample(
+                "background_std", dist.HalfNormal(self.priors["background_std_std"])
+            )
             z_prev = None
             for fdx in frames:
                 if self.vectorized:
@@ -160,15 +169,15 @@ class HMM(cosmos):
                         # sample spot variables
                         height = pyro.sample(
                             f"height_{kdx}_{fsx}",
-                            dist.HalfNormal(10000),
+                            dist.HalfNormal(self.priors["height_std"]),
                         )
                         width = pyro.sample(
                             f"width_{kdx}_{fsx}",
                             AffineBeta(
                                 1.5,
                                 2,
-                                0.75,
-                                2.25,
+                                self.priors["width_min"],
+                                self.priors["width_max"],
                             ),
                         )
                         x = pyro.sample(
