@@ -85,7 +85,7 @@ And specify the locations of input files for each color channel (only one color 
 * Target molecule locations file: ``/home/{your_username}/DatasetA_glimpse/green_DNA_locations.dat``
 * Off-target control locations file: ``/home/{your_username}/DatasetA_glimpse/green_nonDNA_locations.dat``
 
-See Advanced settings below to adjust offset parameters.
+See Advanced settings below for details on adjusting offset parameters.
 
 .. note::
 
@@ -144,7 +144,7 @@ Now the data is ready for fitting. Options that we will select:
 * Learning rate - use default (``0.005``).
 * Number of iterations - use default (``0``)
 
-See Advanced settings below to adjust prior parameters.
+See Advanced settings below for details on adjusting prior parameters.
 
 .. note::
    **About batch size**. Batch sizes should impact *training time* and *memory consumption*. Ideally,
