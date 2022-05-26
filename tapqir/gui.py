@@ -236,6 +236,30 @@ def glimpseUI(out, DEFAULTS):
         ),
     )
     layout.add_child(
+        "offset_x",
+        widgets.IntText(
+            value=DEFAULTS["offset-x"],
+            description="Offset region top-left corner (x-axis)",
+            style={"description_width": "initial"},
+        ),
+    )
+    layout.add_child(
+        "offset_y",
+        widgets.IntText(
+            value=DEFAULTS["offset-y"],
+            description="Offset region top-left corner (y-axis)",
+            style={"description_width": "initial"},
+        ),
+    )
+    layout.add_child(
+        "offset_P",
+        widgets.IntText(
+            value=DEFAULTS["offset-P"],
+            description="Offset region size",
+            style={"description_width": "initial"},
+        ),
+    )
+    layout.add_child(
         "bin_size",
         widgets.BoundedIntText(
             value=DEFAULTS["bin-size"],

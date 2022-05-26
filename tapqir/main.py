@@ -75,6 +75,27 @@ def glimpse(
         help="AOI image size - number of pixels along the axis",
         prompt="AOI image size",
     ),
+    offset_x: int = typer.Option(
+        partial(get_default, "offset-x"),
+        "--offset-x",
+        min=0,
+        help="x-axis position of the top-left corner of the offset region",
+        prompt="Offset region top-left corner (x-axis)",
+    ),
+    offset_y: int = typer.Option(
+        partial(get_default, "offset-y"),
+        "--offset-y",
+        min=0,
+        help="y-axis position of the top-left corner of the offset region",
+        prompt="Offset region top-left corner (y-axis)",
+    ),
+    offset_P: int = typer.Option(
+        partial(get_default, "offset-P"),
+        "--offset-P",
+        min=5,
+        help="Offset region size - number of pixels along the axis",
+        prompt="Offset region size",
+    ),
     bin_size: int = typer.Option(
         partial(get_default, "bin-size"),
         "--bin-size",
@@ -192,6 +213,9 @@ def glimpse(
     # read parameter input values
     DEFAULTS["dataset"] = dataset
     DEFAULTS["P"] = P
+    DEFAULTS["offset-P"] = offset_P
+    DEFAULTS["offset-x"] = offset_x
+    DEFAULTS["offset-y"] = offset_y
     DEFAULTS["bin-size"] = bin_size
     DEFAULTS["frame-range"] = frame_range
     DEFAULTS["frame-start"] = frame_start
