@@ -159,6 +159,8 @@ class GlimpseDataset:
         self.labels = labels
         self.name = kwargs["name"]
         self.c = c
+        self.offset_x = kwargs["offset-x"]
+        self.offset_y = kwargs["offset-y"]
 
     def __len__(self) -> int:
         return self.F
@@ -281,7 +283,7 @@ class GlimpseDataset:
             elif dtype == "offset":
                 ax.add_patch(
                     Rectangle(
-                        (10, 10),
+                        (self.offset_x, self.offset_y),
                         P,
                         P,
                         edgecolor="#CCBB44",
@@ -306,8 +308,6 @@ def read_glimpse(path, progress_bar, **kwargs):
     C = kwargs.pop("num-channels")
     name = kwargs.pop("dataset")
     channels = kwargs.pop("channels")
-    offset_x = kwargs.pop("offset-x")
-    offset_y = kwargs.pop("offset-y")
     offset_P = kwargs.pop("offset-P")
     bin_size = kwargs.pop("bin-size")
 
@@ -357,7 +357,8 @@ def read_glimpse(path, progress_bar, **kwargs):
             img = glimpse[frame]
 
             offset_img = img[
-                offset_y : offset_y + offset_P, offset_x : offset_x + offset_P
+                glimpse.offset_y : glimpse.offset_y + offset_P,
+                glimpse.offset_x : glimpse.offset_x + offset_P,
             ]
             offset_medians.append(np.median(offset_img))
             values, counts = np.unique(offset_img, return_counts=True)
