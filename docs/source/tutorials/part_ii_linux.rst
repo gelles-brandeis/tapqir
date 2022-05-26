@@ -85,6 +85,8 @@ And specify the locations of input files for each color channel (only one color 
 * Target molecule locations file: ``/home/{your_username}/DatasetA_glimpse/green_DNA_locations.dat``
 * Off-target control locations file: ``/home/{your_username}/DatasetA_glimpse/green_nonDNA_locations.dat``
 
+See Advanced settings below to adjust offset parameters.
+
 .. note::
 
    **About indexing**. In Python indexing starts with 0. We stick to this convention and index AOIs, frames, color channels,
@@ -141,6 +143,8 @@ Now the data is ready for fitting. Options that we will select:
 * Frame batch size - use default (``512``).
 * Learning rate - use default (``0.005``).
 * Number of iterations - use default (``0``)
+
+See Advanced settings below to adjust prior parameters.
 
 .. note::
    **About batch size**. Batch sizes should impact *training time* and *memory consumption*. Ideally,
@@ -236,13 +240,10 @@ keys or by left-clicking on the plot.
 Advanced settings
 -----------------
 
-Tapqir settings can be directly accessed and modified through the configuration file ``config.yaml`` under ``.tapqir``
-sub-folder of the working directory. It also contains additional options that are not available through the GUI.
-
 Offset
 ^^^^^^
 
-Offset data region (square) can be edited using three variables:
+Offset data region (yellow square) can be edited using three variables:
 
 * ``offset_x``: left corner of the square (default is 10 pixels)
 * ``offset_y``: top corner of the square (default is 10 pixels)
