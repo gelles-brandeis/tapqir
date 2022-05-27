@@ -43,6 +43,7 @@ def format_link(link):
 # available models
 class avail_models(str, Enum):
     cosmos = "cosmos"
+    mccosmos = "mccosmos"
 
 
 def get_default(key):
@@ -321,11 +322,6 @@ def fit(
     model: avail_models = typer.Option(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
-    channels: List[int] = typer.Option(
-        [0],
-        help="Color-channel numbers to analyze",
-        prompt="Channel numbers (space separated if multiple)",
-    ),
     cuda: bool = typer.Option(
         partial(get_default, "cuda"),
         "--cuda/--cpu",
@@ -415,7 +411,6 @@ def fit(
 
     settings = {}
     settings["K"] = k_max
-    settings["channels"] = channels
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
     settings["use_pykeops"] = pykeops
@@ -481,11 +476,6 @@ def stats(
     model: avail_models = typer.Option(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
-    channels: List[int] = typer.Option(
-        [0],
-        help="Color-channel numbers to analyze",
-        prompt="Channel numbers (space separated if multiple)",
-    ),
     cuda: bool = typer.Option(
         partial(get_default, "cuda"),
         "--cuda/--cpu",
@@ -538,7 +528,6 @@ def stats(
     backend = "funsor" if funsor else "pyro"
 
     settings = {}
-    settings["channels"] = channels
     settings["device"] = device
     settings["dtype"] = dtype
 

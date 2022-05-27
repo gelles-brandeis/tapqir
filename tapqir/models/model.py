@@ -3,7 +3,7 @@
 
 import logging
 import random
-from collections import deque
+from collections import deque, defaultdict
 from pathlib import Path
 from typing import Union
 
@@ -50,8 +50,7 @@ class Model:
         self,
         S: int = 1,
         K: int = 2,
-        Q: int = 1,
-        channels: Union[tuple, list] = (0,),
+        Q: int = None,
         device: str = "cpu",
         dtype: str = "double",
         priors: dict = None,
@@ -59,12 +58,6 @@ class Model:
         self.S = S
         self.K = K
         self.Q = Q
-        self.C = len(channels)
-        if self.C == 1:
-            channels = channels[0]
-        self.cdx = torch.as_tensor(channels)
-        self.channels = channels
-        self.full_name = f"{self.name}-channel{channels}"
         self.nbatch_size = None
         self.fbatch_size = None
         # priors settings
@@ -117,23 +110,25 @@ class Model:
 
         # load data
         self.data = load(self.path, self.device)
+        if self.Q is None:
+            self.Q = self.data.C
         logger.debug(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results
         if not data_only:
             try:
-                self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
+                self.params = torch.load(self.path / f"{self.name}-params.tpqr")
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "parameter", self.path / f"{self.full_name}-params.tpqr"
+                    "parameter", self.path / f"{self.name}-params.tpqr"
                 )
             try:
                 self.summary = pd.read_csv(
-                    self.path / f"{self.full_name}-summary.csv", index_col=0
+                    self.path / f"{self.name}-summary.csv", index_col=0
                 )
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "summary", self.path / f"{self.full_name}-summary.csv"
+                    "summary", self.path / f"{self.name}-summary.csv"
                 )
 
     def model(self):
@@ -186,7 +181,7 @@ class Model:
             pyro.clear_param_store()
             self.iter = 0
             self.converged = False
-            self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
+            self._rolling = defaultdict(lambda: deque([], maxlen=100))
             self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)
@@ -216,7 +211,7 @@ class Model:
         logger.debug("AOI batch size - {}".format(self.nbatch_size))
         logger.debug("Frame batch size - {}".format(self.fbatch_size))
 
-        with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
+        with SummaryWriter(log_dir=self.run_path / "logs" / self.name) as writer:
             for i in progress_bar(range(num_iter)):
                 try:
                     self.iter_loss = self.svi.step()
@@ -263,6 +258,9 @@ class Model:
         for name in self.conv_params:
             if name == "-ELBO":
                 self._rolling["-ELBO"].append(self.iter_loss)
+            elif pyro.param(name).ndim == 1:
+                for i in range(len(pyro.param(name))):
+                    self._rolling[f"{name}_{i}"].append(pyro.param(name)[i].item())
             else:
                 self._rolling[name].append(pyro.param(name).item())
 
@@ -284,10 +282,10 @@ class Model:
                 "iter": self.iter,
                 "params": pyro.get_param_store().get_state(),
                 "optimizer": self.optim.get_state(),
-                "rolling": self._rolling,
+                "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
             },
-            self.run_path / f"{self.full_name}-model.tpqr",
+            self.run_path / f"{self.name}-model.tpqr",
         )
 
         # save global paramters for tensorboard
@@ -339,7 +337,7 @@ class Model:
         """
         device = self.device
         path = Path(path) if path else self.run_path
-        model_path = path / f"{self.full_name}-model.tpqr"
+        model_path = path / f"{self.name}-model.tpqr"
         try:
             checkpoint = torch.load(model_path, map_location=device)
         except FileNotFoundError:

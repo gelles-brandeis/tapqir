@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from tapqir.models.cosmos import cosmos
+from tapqir.models.mccosmos import mccosmos
 from tapqir.models.hmm import HMM
 from tapqir.models.model import Model
 
@@ -9,10 +10,12 @@ __all__ = [
     "models",
     "Model",
     "cosmos",
+    "mccosmos",
     "HMM",
 ]
 
 models = {
     cosmos.name: cosmos,
+    mccosmos.name: mccosmos,
     HMM.name: HMM,
 }
