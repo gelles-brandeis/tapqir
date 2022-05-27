@@ -444,9 +444,9 @@ def fit(
     with pyro_backend(PYRO_BACKEND):
 
         logger.info("Fitting the data ...")
-        if DEFAULTS["num_channels"] == 1:
+        if DEFAULTS["num-channels"] == 1:
             assert model == "cosmos"
-        elif DEFAULTS["num_channels"] > 1:
+        elif DEFAULTS["num-channels"] > 1:
             assert model == "cosmos"
             model = "mccosmos"
         model = models[model](**settings)

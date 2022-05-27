@@ -60,7 +60,6 @@ class cosmos(Model):
         },
     ):
         super().__init__(K=K, device=device, dtype=dtype, priors=priors)
-        assert self.C == 1, "Please specify exactly one color channel"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
@@ -201,7 +200,7 @@ class cosmos(Model):
                 )
                 with frames as fdx:
                     # fetch data
-                    obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
+                    obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, 0)
                     # sample background intensity
                     background = pyro.sample(
                         "background",
@@ -496,7 +495,7 @@ class cosmos(Model):
             "background_mean_loc",
             lambda: torch.full(
                 (data.Nt, 1),
-                data.median[self.cdx] - self.data.offset.mean,
+                data.median - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,
@@ -511,7 +510,7 @@ class cosmos(Model):
             "b_loc",
             lambda: torch.full(
                 (data.Nt, data.F),
-                data.median[self.cdx] - self.data.offset.mean,
+                data.median - self.data.offset.mean,
                 device=device,
             ),
             constraint=constraints.positive,

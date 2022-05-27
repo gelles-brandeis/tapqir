@@ -127,7 +127,7 @@ class HMM(cosmos):
                 else:
                     fsx = fdx
                 # fetch data
-                obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
+                obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, 0)
                 # sample background intensity
                 background = pyro.sample(
                     f"background_{fsx}",
