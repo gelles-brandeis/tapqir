@@ -216,7 +216,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        param_path = path / f"{model.full_name}-params.tpqr"
+        param_path = path / f"{model.name}-params.tpqr"
         torch.save(ci_stats, param_path)
         logger.info(f"Parameters were saved in {param_path}")
         if save_matlab:
@@ -237,9 +237,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     continue
                 for stat, value in field.items():
                     ci_stats[param][stat] = np.asarray(value)
-            mat_path = path / f"{model.full_name}-params.mat"
+            mat_path = path / f"{model.name}-params.mat"
             savemat(mat_path, ci_stats)
             logger.info(f"Matlab parameters were saved in {mat_path}")
-        csv_path = path / f"{model.full_name}-summary.csv"
+        csv_path = path / f"{model.name}-summary.csv"
         summary.to_csv(csv_path)
         logger.info(f"Summary statistics were saved in {csv_path}")

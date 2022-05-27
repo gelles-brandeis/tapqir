@@ -9,7 +9,6 @@ mccosmos
 import itertools
 import math
 from functools import reduce
-from typing import Union
 
 import torch
 import torch.distributions.constraints as constraints
@@ -26,23 +25,16 @@ from tapqir.models.model import Model
 
 class mccosmos(Model):
     r"""
-    **Single-Color Time-Independent Colocalization Model**
+    **Multi-Color Time-Independent Colocalization Model**
 
-    **Reference**:
-
-    1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
-       Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
-       eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
-
-    :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param channels: Number of color channels.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
-    name = "mccosmos"
+    name = "cosmos"
 
     def __init__(
         self,
@@ -77,7 +69,12 @@ class mccosmos(Model):
             dist.Dirichlet(torch.ones((self.Q, self.S + 1)) / (self.S + 1)).to_event(1),
         )
         pi = expand_offtarget(pi)
-        lamda = pyro.sample("lamda", dist.Exponential(torch.full((self.Q,), self.priors["lamda_rate"])).to_event(1))
+        lamda = pyro.sample(
+            "lamda",
+            dist.Exponential(torch.full((self.Q,), self.priors["lamda_rate"])).to_event(
+                1
+            ),
+        )
         proximity = pyro.sample(
             "proximity", dist.Exponential(self.priors["proximity_rate"])
         )
@@ -239,7 +236,10 @@ class mccosmos(Model):
                 pyro.param("gain_beta"),
             ),
         )
-        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")).to_event(1))
+        pyro.sample(
+            "pi",
+            dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")).to_event(1),
+        )
         pyro.sample(
             "lamda",
             dist.Gamma(
@@ -421,7 +421,9 @@ class mccosmos(Model):
 
         pyro.param(
             "background_mean_loc",
-            lambda: (data.median.to(device) - data.offset.mean).expand(data.Nt, 1, data.C),
+            lambda: (data.median.to(device) - data.offset.mean).expand(
+                data.Nt, 1, data.C
+            ),
             constraint=constraints.positive,
         )
         pyro.param(

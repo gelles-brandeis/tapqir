@@ -3,7 +3,7 @@
 
 import logging
 import random
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Union
 
@@ -41,9 +41,10 @@ class Model:
 
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param channels: Number of color channels.
+    :param Q: Number of fluorescent dyes.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
     def __init__(

@@ -43,7 +43,6 @@ def format_link(link):
 # available models
 class avail_models(str, Enum):
     cosmos = "cosmos"
-    mccosmos = "mccosmos"
 
 
 def get_default(key):
@@ -445,6 +444,11 @@ def fit(
     with pyro_backend(PYRO_BACKEND):
 
         logger.info("Fitting the data ...")
+        if DEFAULTS["num_channels"] == 1:
+            assert model == "cosmos"
+        elif DEFAULTS["num_channels"] > 1:
+            assert model == "cosmos"
+            model = "mccosmos"
         model = models[model](**settings)
         try:
             model.load(cd)

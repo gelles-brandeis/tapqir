@@ -9,7 +9,6 @@ cosmos
 import itertools
 import math
 from functools import reduce
-from typing import Union
 
 import torch
 import torch.distributions.constraints as constraints
@@ -34,12 +33,11 @@ class cosmos(Model):
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
        eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
 
-    :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param channels: Number of color channels.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
     name = "cosmos"
@@ -47,7 +45,6 @@ class cosmos(Model):
     def __init__(
         self,
         K: int = 2,
-        channels: Union[tuple, list] = (0,),
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
@@ -62,8 +59,7 @@ class cosmos(Model):
             "gain_std": 50,
         },
     ):
-        S, Q = 1, 1
-        super().__init__(S, K, Q, channels, device, dtype, priors)
+        super().__init__(K=K, device=device, dtype=dtype, priors=priors)
         assert self.C == 1, "Please specify exactly one color channel"
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
