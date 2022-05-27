@@ -109,7 +109,9 @@ class CosmosDataset:
         """
         Number of pixels.
         """
-        return self.images.shape[-1]
+        Px, Py = self.images.shape[3], self.images.shape[4]
+        assert Px == Py
+        return Px
 
     @property
     def x(self) -> torch.Tensor:

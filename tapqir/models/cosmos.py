@@ -23,9 +23,15 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.model import Model
 
 
-class mccosmos(Model):
+class cosmos(Model):
     r"""
     **Multi-Color Time-Independent Colocalization Model**
+
+    **Reference**:
+
+    1. Ordabayev YA, Friedman LJ, Gelles J, Theobald DL.
+       Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
+       eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
 
     :param K: Maximum number of spots that can be present in a single image.
     :param device: Computation device (cpu or gpu).
@@ -61,6 +67,88 @@ class mccosmos(Model):
     def model(self):
         r"""
         **Generative Model**
+
+        Model parameters:
+
+        +-----------------+-----------+-------------------------------------+
+        | Parameter       | Shape     | Description                         |
+        +=================+===========+=====================================+
+        | |g| - :math:`g` | (1,)      | camera gain                         |
+        +-----------------+-----------+-------------------------------------+
+        | |sigma| - |prox|| (1,)      | proximity                           |
+        +-----------------+-----------+-------------------------------------+
+        | ``lamda`` - |ld|| (1,)      | average rate of target-nonspecific  |
+        |                 |           | binding                             |
+        +-----------------+-----------+-------------------------------------+
+        | ``pi`` - |pi|   | (1,)      | average binding probability of      |
+        |                 |           | target-specific binding             |
+        +-----------------+-----------+-------------------------------------+
+        | |bg| - |b|      | (N, F)    | background intensity                |
+        +-----------------+-----------+-------------------------------------+
+        | |z| - :math:`z` | (N, F)    | target-specific spot presence       |
+        +-----------------+-----------+-------------------------------------+
+        | |t| - |theta|   | (N, F)    | target-specific spot index          |
+        +-----------------+-----------+-------------------------------------+
+        | |m| - :math:`m` | (K, N, F) | spot presence indicator             |
+        +-----------------+-----------+-------------------------------------+
+        | |h| - :math:`h` | (K, N, F) | spot intensity                      |
+        +-----------------+-----------+-------------------------------------+
+        | |w| - :math:`w` | (K, N, F) | spot width                          |
+        +-----------------+-----------+-------------------------------------+
+        | |x| - :math:`x` | (K, N, F) | spot position on x-axis             |
+        +-----------------+-----------+-------------------------------------+
+        | |y| - :math:`y` | (K, N, F) | spot position on y-axis             |
+        +-----------------+-----------+-------------------------------------+
+        | |D| - :math:`D` | |shape|   | observed images                     |
+        +-----------------+-----------+-------------------------------------+
+
+        .. |ps| replace:: :math:`p(\mathsf{specific})`
+        .. |theta| replace:: :math:`\theta`
+        .. |prox| replace:: :math:`\sigma^{xy}`
+        .. |ld| replace:: :math:`\lambda`
+        .. |b| replace:: :math:`b`
+        .. |shape| replace:: (N, F, P, P)
+        .. |sigma| replace:: ``proximity``
+        .. |bg| replace:: ``background``
+        .. |h| replace:: ``height``
+        .. |w| replace:: ``width``
+        .. |D| replace:: ``data``
+        .. |m| replace:: ``m``
+        .. |z| replace:: ``z``
+        .. |t| replace:: ``theta``
+        .. |x| replace:: ``x``
+        .. |y| replace:: ``y``
+        .. |pi| replace:: :math:`\pi`
+        .. |g| replace:: ``gain``
+
+        Full joint distribution:
+
+        .. math::
+            \begin{aligned}
+                p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
+                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
+                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) p(z | \pi) p(\theta | z)
+                \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
+                &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
+                p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
+                \prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}} \sum_{\delta} p(\delta)
+                p(D | \mu^I, g, \delta) \right] \right]
+            \end{aligned}
+
+        :math:`z` and :math:`\theta` marginalized joint distribution:
+
+        .. math::
+
+            \begin{aligned}
+                \sum_{z, \theta} p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
+                \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}
+                \left[ \vphantom{\prod_{F}} p(b | \mu^b, \sigma^b) \sum_{z} p(z | \pi) \sum_{\theta} p(\theta | z)
+                \vphantom{\prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}}} \cdot \right. \right. \\
+                &\prod_{\mathsf{spot}} \left[ \vphantom{\prod_{F}} p(m | \theta, \lambda)
+                p(h) p(w) p(x | \sigma^{xy}, \theta) p(y | \sigma^{xy}, \theta) \right] \left. \left.
+                \prod_{\substack{\mathsf{pixelX} \\ \mathsf{pixelY}}} \sum_{\delta} p(\delta)
+                p(D | \mu^I, g, \delta) \right] \right]
+            \end{aligned}
         """
         # global parameters
         gain = pyro.sample("gain", dist.HalfNormal(self.priors["gain_std"]))
@@ -227,6 +315,14 @@ class mccosmos(Model):
     def guide(self):
         r"""
         **Variational Distribution**
+
+        .. math::
+            \begin{aligned}
+                q(\phi \setminus \{z, \theta\}) =~&q(g) q(\sigma^{xy}) q(\pi) q(\lambda) \cdot \\
+                &\prod_{\mathsf{AOI}} \left[ q(\mu^b) q(\sigma^b) \prod_{\mathsf{frame}}
+                \left[ \vphantom{\prod_{F}} q(b) \prod_{\mathsf{spot}}
+                q(m) q(h | m) q(w | m) q(x | m) q(y | m) \right] \right]
+            \end{aligned}
         """
         # global parameters
         pyro.sample(
