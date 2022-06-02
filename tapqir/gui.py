@@ -700,7 +700,6 @@ def showCmd(b, layout, out):
             labels=labels,
             fov_controls=fov_controls,
             exclude_aoi=exclude_aoi,
-            out=out,
         ),
         names="value",
     )
@@ -715,7 +714,6 @@ def showCmd(b, layout, out):
             zoom=zoom,
             targets=targets,
             fov=fov,
-            out=out,
         ),
         names="value",
     )
@@ -839,220 +837,215 @@ def updateParams(
     labels,
     fov_controls,
     exclude_aoi,
-    out,
 ):
-    with out:
-        n_old = n.old
-        n = get_value(n)
-        f1 = get_value(f1)
-        f2 = f1 + 15
-        color = (
-            [f"C{2+q}" for q in range(model.Q)]
-            if model.data.mask[n]
-            else ["C7"] * model.Q
-        )
+    n_old = n.old
+    n = get_value(n)
+    f1 = get_value(f1)
+    f2 = f1 + 15
+    color = (
+        [f"C{2+q}" for q in range(model.Q)] if model.data.mask[n] else ["C7"] * model.Q
+    )
 
-        exclude_aoi.value = not model.data.mask[n]
+    exclude_aoi.value = not model.data.mask[n]
 
-        frames = torch.arange(f1, f2)
-        img_ideal = (
-            model.data.offset.mean
-            + model.params["background"]["Mean"][n, frames, :, None, None]
-        )
-        gaussian = gaussian_spots(
-            model.params["height"]["Mean"][:, n, frames],
-            model.params["width"]["Mean"][:, n, frames],
-            model.params["x"]["Mean"][:, n, frames],
-            model.params["y"]["Mean"][:, n, frames],
-            model.data.xy[n, frames],
-            model.data.P,
-        )
-        img_ideal = img_ideal + gaussian.sum(-5)
-        for c in range(model.data.C):
-            for i, f in enumerate(range(f1, f2)):
-                ax[f"image_f{i}_c{c}"].set_title(rf"${f}$", fontsize=9)
-                item[f"image_f{i}_c{c}"].set_data(model.data.images[n, f, c].numpy())
-                item[f"ideal_f{i}_c{c}"].set_data(img_ideal[i, c].numpy())
-                if targets.value:
-                    item[f"target_f{i}_c{c}"].remove()
-                    item[f"target_f{i}_c{c}"] = ax[f"image_f{i}_c{c}"].scatter(
-                        model.data.x[n, f, c].item(),
-                        model.data.y[n, f, c].item(),
-                        c="C0",
-                        s=40,
-                        marker="+",
-                    )
+    frames = torch.arange(f1, f2)
+    img_ideal = (
+        model.data.offset.mean
+        + model.params["background"]["Mean"][n, frames, :, None, None]
+    )
+    gaussian = gaussian_spots(
+        model.params["height"]["Mean"][:, n, frames],
+        model.params["width"]["Mean"][:, n, frames],
+        model.params["x"]["Mean"][:, n, frames],
+        model.params["y"]["Mean"][:, n, frames],
+        model.data.xy[n, frames],
+        model.data.P,
+    )
+    img_ideal = img_ideal + gaussian.sum(-5)
+    for c in range(model.data.C):
+        for i, f in enumerate(range(f1, f2)):
+            ax[f"image_f{i}_c{c}"].set_title(rf"${f}$", fontsize=9)
+            item[f"image_f{i}_c{c}"].set_data(model.data.images[n, f, c].numpy())
+            item[f"ideal_f{i}_c{c}"].set_data(img_ideal[i, c].numpy())
+            if targets.value:
+                item[f"target_f{i}_c{c}"].remove()
+                item[f"target_f{i}_c{c}"] = ax[f"image_f{i}_c{c}"].scatter(
+                    model.data.x[n, f, c].item(),
+                    model.data.y[n, f, c].item(),
+                    c="C0",
+                    s=40,
+                    marker="+",
+                )
 
-        params = [
-            "p_specific",
+    params = [
+        "p_specific",
+        "z_map",
+        "height",
+        "width",
+        "x",
+        "y",
+        "background",
+        "chi2",
+    ]
+    if labels.value:
+        params += ["labels"]
+    for q in range(model.Q):
+        theta_mask = model.params["theta_probs"][:, n, :, q] > 0.5
+        j_mask = (model.params["m_probs"][:, n, :, q] > 0.5) & ~theta_mask
+        for p in params:
+            if p == "p_specific":
+                item[f"{p}_q{q}"].set_ydata(model.params[p][n, :, q])
+                item[f"{p}_q{q}"].set_color(color[q])
+            elif p in {"z_map"}.intersection(model.params.keys()):
+                item[f"{p}_q{q}"].set_ydata(model.params[p][n, :, q])
+            elif p == "labels":
+                item[p].set_ydata(model.data.labels["z"][n, :, q])
+            elif p in ["height", "width", "x", "y"]:
+                # target-nonspecific spots
+                if nonspecific.value:
+                    for k in range(model.K):
+                        f_mask = j_mask[k]
+                        mean = model.params[p]["Mean"][k, n, :, q] * f_mask
+                        ll = model.params[p]["LL"][k, n, :, q] * f_mask
+                        ul = model.params[p]["UL"][k, n, :, q] * f_mask
+                        item[f"{p}_nonspecific{k}_mean_q{q}"].remove()
+                        (item[f"{p}_nonspecific{k}_mean_q{q}"],) = ax[p].plot(
+                            torch.arange(0, model.data.F)[f_mask],
+                            mean[f_mask],
+                            "o",
+                            ms=2,
+                            lw=1,
+                            color=f"C{k}",
+                        )
+                        item[f"{p}_nonspecific{k}_fill_q{q}"].remove()
+                        item[f"{p}_nonspecific{k}_fill_q{q}"] = ax[p].fill_between(
+                            torch.arange(0, model.data.F),
+                            ll,
+                            ul,
+                            where=f_mask,
+                            alpha=0.3,
+                            color=f"C{k}",
+                        )
+                # target-specific spots
+                f_mask = theta_mask.sum(0).bool()
+                mean = (model.params[p]["Mean"][:, n, :, q] * theta_mask).sum(0)
+                ll = (model.params[p]["LL"][:, n, :, q] * theta_mask).sum(0)
+                ul = (model.params[p]["UL"][:, n, :, q] * theta_mask).sum(0)
+                item[f"{p}_specific_fill_q{q}"].remove()
+                item[f"{p}_specific_fill_q{q}"] = ax[p].fill_between(
+                    torch.arange(0, model.data.F),
+                    ll,
+                    ul,
+                    where=f_mask,
+                    alpha=0.3,
+                    color=color[q],
+                )
+                item[f"{p}_specific_mean_q{q}"].remove()
+                (item[f"{p}_specific_mean_q{q}"],) = ax[p].plot(
+                    torch.arange(0, model.data.F)
+                    if p == "height"
+                    else torch.arange(0, model.data.F)[f_mask],
+                    mean if p == "height" else mean[f_mask],
+                    "-" if p == "height" else "o",
+                    ms=2,
+                    color=color[q],
+                )
+
+    for c in range(model.data.C):
+        for p in params:
+            if p == "chi2":
+                item[f"{p}_c{c}"].set_ydata(model.params[p]["values"][n, :, c])
+            elif p == "background":
+                item[f"{p}_fill_c{c}"].remove()
+                item[f"{p}_fill_c{c}"] = ax[p].fill_between(
+                    torch.arange(0, model.data.F),
+                    model.params[p]["LL"][n, :, c],
+                    model.params[p]["UL"][n, :, c],
+                    alpha=0.3,
+                    color=color[c],
+                )
+                item[f"{p}_mean_c{c}"].set_ydata(model.params[p]["Mean"][n, :, c])
+
+    ax[f"glimpse_c0"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
+    n_old_dtype = "ontarget" if n_old < model.data.N else "offtarget"
+    n_old_visible = fov_controls[n_old_dtype].value
+    colors = {"ontarget": "#AA3377", "offtarget": "#CCBB44"}
+    for c in range(model.data.C):
+        item[f"aoi_n{n}_c{c}"].set_edgecolor(color[c])
+        item[f"aoi_n{n}_c{c}"].set(zorder=2, visible=True)
+        item[f"aoi_n{n_old}_c{c}"].set_edgecolor(colors[n_old_dtype])
+        item[f"aoi_n{n_old}_c{c}"].set(zorder=1, visible=n_old_visible)
+    fig.canvas.draw()
+
+
+def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov):
+    n = get_value(n)
+    f1 = get_value(f1)
+    f2 = f1 + 15
+
+    frames = torch.arange(f1, f2)
+    img_ideal = (
+        model.data.offset.mean
+        + model.params["background"]["Mean"][n, frames, :, None, None]
+    )
+    gaussian = gaussian_spots(
+        model.params["height"]["Mean"][:, n, frames],
+        model.params["width"]["Mean"][:, n, frames],
+        model.params["x"]["Mean"][:, n, frames],
+        model.params["y"]["Mean"][:, n, frames],
+        model.data.xy[n, frames],
+        model.data.P,
+    )
+    img_ideal = img_ideal + gaussian.sum(-5)
+    for c in range(model.data.C):
+        for i, f in enumerate(range(f1, f2)):
+            ax[f"image_f{i}_c{c}"].set_title(rf"${f}$", fontsize=9)
+            item[f"image_f{i}_c{c}"].set_data(model.data.images[n, f, c].numpy())
+            item[f"ideal_f{i}_c{c}"].set_data(img_ideal[i, c].numpy())
+            if targets.value:
+                item[f"target_f{i}_c{c}"].remove()
+                item[f"target_f{i}_c{c}"] = ax[f"image_f{i}_c{c}"].scatter(
+                    model.data.x[n, f, c].item(),
+                    model.data.y[n, f, c].item(),
+                    c="C0",
+                    s=40,
+                    marker="+",
+                )
+
+    if not zoom.value:
+        for key, a in ax.items():
+            if (
+                key.startswith("image")
+                or key.startswith("ideal")
+                or key.startswith("glimpse")
+            ):
+                continue
+            a.set_xlim(f1 - 0.5, f2 - 0.5)
+    else:
+        for p in [
             "z_map",
+            "p_specific",
             "height",
             "width",
             "x",
             "y",
             "background",
             "chi2",
-        ]
-        if labels.value:
-            params += ["labels"]
-        for q in range(model.Q):
-            theta_mask = model.params["theta_probs"][:, n, :, q] > 0.5
-            j_mask = (model.params["m_probs"][:, n, :, q] > 0.5) & ~theta_mask
-            for p in params:
-                if p == "p_specific":
-                    item[f"{p}_q{q}"].set_ydata(model.params[p][n, :, q])
-                    item[f"{p}_q{q}"].set_color(color[q])
-                elif p in {"z_map"}.intersection(model.params.keys()):
-                    item[f"{p}_q{q}"].set_ydata(model.params[p][n, :, q])
-                elif p == "labels":
-                    item[p].set_ydata(model.data.labels["z"][n, :, q])
-                elif p in ["height", "width", "x", "y"]:
-                    # target-nonspecific spots
-                    if nonspecific.value:
-                        for k in range(model.K):
-                            f_mask = j_mask[k]
-                            mean = model.params[p]["Mean"][k, n, :, q] * f_mask
-                            ll = model.params[p]["LL"][k, n, :, q] * f_mask
-                            ul = model.params[p]["UL"][k, n, :, q] * f_mask
-                            item[f"{p}_nonspecific{k}_mean_q{q}"].remove()
-                            (item[f"{p}_nonspecific{k}_mean_q{q}"],) = ax[p].plot(
-                                torch.arange(0, model.data.F)[f_mask],
-                                mean[f_mask],
-                                "o",
-                                ms=2,
-                                lw=1,
-                                color=f"C{k}",
-                            )
-                            item[f"{p}_nonspecific{k}_fill_q{q}"].remove()
-                            item[f"{p}_nonspecific{k}_fill_q{q}"] = ax[p].fill_between(
-                                torch.arange(0, model.data.F),
-                                ll,
-                                ul,
-                                where=f_mask,
-                                alpha=0.3,
-                                color=f"C{k}",
-                            )
-                    # target-specific spots
-                    f_mask = theta_mask.sum(0).bool()
-                    mean = (model.params[p]["Mean"][:, n, :, q] * theta_mask).sum(0)
-                    ll = (model.params[p]["LL"][:, n, :, q] * theta_mask).sum(0)
-                    ul = (model.params[p]["UL"][:, n, :, q] * theta_mask).sum(0)
-                    item[f"{p}_specific_fill_q{q}"].remove()
-                    item[f"{p}_specific_fill_q{q}"] = ax[p].fill_between(
-                        torch.arange(0, model.data.F),
-                        ll,
-                        ul,
-                        where=f_mask,
-                        alpha=0.3,
-                        color=color[q],
-                    )
-                    item[f"{p}_specific_mean_q{q}"].remove()
-                    (item[f"{p}_specific_mean_q{q}"],) = ax[p].plot(
-                        torch.arange(0, model.data.F)
-                        if p == "height"
-                        else torch.arange(0, model.data.F)[f_mask],
-                        mean if p == "height" else mean[f_mask],
-                        "-" if p == "height" else "o",
-                        ms=2,
-                        color=color[q],
-                    )
-
+        ]:
+            item[f"{p}_vspan"].remove()
+            item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
+    if fov is not None:
         for c in range(model.data.C):
-            for p in params:
-                if p == "chi2":
-                    item[f"{p}_c{c}"].set_ydata(model.params[p]["values"][n, :, c])
-                elif p == "background":
-                    item[f"{p}_fill_c{c}"].remove()
-                    item[f"{p}_fill_c{c}"] = ax[p].fill_between(
-                        torch.arange(0, model.data.F),
-                        model.params[p]["LL"][n, :, c],
-                        model.params[p]["UL"][n, :, c],
-                        alpha=0.3,
-                        color=color[c],
-                    )
-                    item[f"{p}_mean_c{c}"].set_ydata(model.params[p]["Mean"][n, :, c])
-
-        ax[f"glimpse_c0"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
-        n_old_dtype = "ontarget" if n_old < model.data.N else "offtarget"
-        n_old_visible = fov_controls[n_old_dtype].value
-        colors = {"ontarget": "#AA3377", "offtarget": "#CCBB44"}
-        for c in range(model.data.C):
-            item[f"aoi_n{n}_c{c}"].set_edgecolor(color[c])
-            item[f"aoi_n{n}_c{c}"].set(zorder=2, visible=True)
-            item[f"aoi_n{n_old}_c{c}"].set_edgecolor(colors[n_old_dtype])
-            item[f"aoi_n{n_old}_c{c}"].set(zorder=1, visible=n_old_visible)
-        fig.canvas.draw()
-
-
-def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov, out):
-    with out:
-        n = get_value(n)
-        f1 = get_value(f1)
-        f2 = f1 + 15
-
-        frames = torch.arange(f1, f2)
-        img_ideal = (
-            model.data.offset.mean
-            + model.params["background"]["Mean"][n, frames, :, None, None]
-        )
-        gaussian = gaussian_spots(
-            model.params["height"]["Mean"][:, n, frames],
-            model.params["width"]["Mean"][:, n, frames],
-            model.params["x"]["Mean"][:, n, frames],
-            model.params["y"]["Mean"][:, n, frames],
-            model.data.xy[n, frames],
-            model.data.P,
-        )
-        img_ideal = img_ideal + gaussian.sum(-5)
-        for c in range(model.data.C):
-            for i, f in enumerate(range(f1, f2)):
-                ax[f"image_f{i}_c{c}"].set_title(rf"${f}$", fontsize=9)
-                item[f"image_f{i}_c{c}"].set_data(model.data.images[n, f, c].numpy())
-                item[f"ideal_f{i}_c{c}"].set_data(img_ideal[i, c].numpy())
-                if targets.value:
-                    item[f"target_f{i}_c{c}"].remove()
-                    item[f"target_f{i}_c{c}"] = ax[f"image_f{i}_c{c}"].scatter(
-                        model.data.x[n, f, c].item(),
-                        model.data.y[n, f, c].item(),
-                        c="C0",
-                        s=40,
-                        marker="+",
-                    )
-
-        if not zoom.value:
-            for key, a in ax.items():
-                if (
-                    key.startswith("image")
-                    or key.startswith("ideal")
-                    or key.startswith("glimpse")
-                ):
-                    continue
-                a.set_xlim(f1 - 0.5, f2 - 0.5)
-        else:
-            for p in [
-                "z_map",
-                "p_specific",
-                "height",
-                "width",
-                "x",
-                "y",
-                "background",
-                "chi2",
-            ]:
-                item[f"{p}_vspan"].remove()
-                item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
-        if fov is not None:
-            for c in range(model.data.C):
-                fov.plot(
-                    fov.dtypes,
-                    model.data.P,
-                    n=n,
-                    f=f1,
-                    save=False,
-                    ax=ax[f"glimpse_c{c}"],
-                    item=item,
-                )
-        fig.canvas.draw()
+            fov.plot(
+                fov.dtypes,
+                model.data.P,
+                n=n,
+                f=f1,
+                save=False,
+                ax=ax[f"glimpse_c{c}"],
+                item=item,
+            )
+    fig.canvas.draw()
 
 
 def zoomOut(checked, f1, model, fig, item, ax):
