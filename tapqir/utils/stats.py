@@ -8,7 +8,6 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import torch
-from pyro.ops.indexing import Vindex
 from pyro.ops.stats import hpdi, quantile
 from sklearn.metrics import (
     confusion_matrix,

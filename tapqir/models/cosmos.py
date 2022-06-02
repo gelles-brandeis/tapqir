@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-mccosmos
+cosmos
 ^^^^^^
 """
 
@@ -124,6 +124,7 @@ class cosmos(Model):
         Full joint distribution:
 
         .. math::
+
             \begin{aligned}
                 p(D, \phi) =~&p(g) p(\sigma^{xy}) p(\pi) p(\lambda)
                 \prod_{\mathsf{AOI}} \left[ p(\mu^b) p(\sigma^b) \prod_{\mathsf{frame}}

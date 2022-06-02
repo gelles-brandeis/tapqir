@@ -9,7 +9,6 @@ from pathlib import Path
 
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
-import pandas as pd
 import torch
 from ipyevents import Event
 from ipyfilechooser import FileChooser
@@ -965,7 +964,7 @@ def updateParams(
                 )
                 item[f"{p}_mean_c{c}"].set_ydata(model.params[p]["Mean"][n, :, c])
 
-    ax[f"glimpse_c0"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
+    ax["glimpse_c0"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
     n_old_dtype = "ontarget" if n_old < model.data.N else "offtarget"
     n_old_visible = fov_controls[n_old_dtype].value
     colors = {"ontarget": "#AA3377", "offtarget": "#CCBB44"}

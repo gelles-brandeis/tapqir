@@ -55,7 +55,6 @@ class StatsMessenger(Messenger):
         elif len(args) == 2:
             base_name, k = args
             k = int(k)
-            # assert self.Q == 1
             if k == 0:
                 self.ci_stats[base_name] = {}
                 self.ci_stats[base_name]["LL"] = torch.zeros(
