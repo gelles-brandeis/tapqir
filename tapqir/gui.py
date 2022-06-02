@@ -735,7 +735,6 @@ def showCmd(b, layout, out):
             model=model,
             item=item,
             ax=ax,
-            out=out,
         ),
         names="value",
     )
@@ -1107,26 +1106,25 @@ def showLabels(checked, n, model, item, ax):
         item["labels"].remove()
 
 
-def showTargets(checked, n, f1, model, item, ax, out):
-    with out:
-        checked = get_value(checked)
-        n = get_value(n)
-        f1 = get_value(f1)
-        f2 = f1 + 15
-        if checked:
-            for c in range(model.data.C):
-                for i, f in enumerate(range(f1, f2)):
-                    item[f"target_f{i}_c{c}"] = ax[f"image_f{i}_c{c}"].scatter(
-                        model.data.x[n, f, c].item(),
-                        model.data.y[n, f, c].item(),
-                        c="C0",
-                        s=40,
-                        marker="+",
-                    )
-        else:
-            for c in range(model.data.C):
-                for i, f in enumerate(range(f1, f2)):
-                    item[f"target_f{i}_c{c}"].remove()
+def showTargets(checked, n, f1, model, item, ax):
+    checked = get_value(checked)
+    n = get_value(n)
+    f1 = get_value(f1)
+    f2 = f1 + 15
+    if checked:
+        for c in range(model.data.C):
+            for i, f in enumerate(range(f1, f2)):
+                item[f"target_f{i}_c{c}"] = ax[f"image_f{i}_c{c}"].scatter(
+                    model.data.x[n, f, c].item(),
+                    model.data.y[n, f, c].item(),
+                    c="C0",
+                    s=40,
+                    marker="+",
+                )
+    else:
+        for c in range(model.data.C):
+            for i, f in enumerate(range(f1, f2)):
+                item[f"target_f{i}_c{c}"].remove()
 
 
 def showNonspecific(checked, n, model, item, ax):
