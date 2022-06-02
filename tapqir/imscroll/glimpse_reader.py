@@ -235,12 +235,13 @@ class GlimpseDataset:
 
         frame = self.cumdrift.index[f]
         fov = self[frame]
+        c = self.c
         if "fov" in item:
-            item["fov"].set_data(fov)
+            item[f"fov_c{c}"].set_data(fov)
         else:
             vmin = np.percentile(fov, 1)
             vmax = np.percentile(fov, 99)
-            item["fov"] = ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
+            item[f"fov_c{c}"] = ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
 
         for dtype in dtypes:
             if dtype in ["ontarget", "offtarget"]:
@@ -264,10 +265,10 @@ class GlimpseDataset:
                         )
                         - 0.5
                     )
-                    if f"aoi_{i}" in item:
-                        item[f"aoi_{i}"].set_xy((x_pos, y_pos))
+                    if f"aoi_n{i}_c{c}" in item:
+                        item[f"aoi_n{i}_c{c}"].set_xy((x_pos, y_pos))
                     else:
-                        item[f"aoi_{i}"] = ax.add_patch(
+                        item[f"aoi_n{i}_c{c}"] = ax.add_patch(
                             Rectangle(
                                 (x_pos, y_pos),
                                 P,
@@ -278,8 +279,8 @@ class GlimpseDataset:
                             )
                         )
                     if n == i:
-                        item[f"aoi_{i}"].set_edgecolor("C2")
-                        item[f"aoi_{i}"].set(zorder=2)
+                        item[f"aoi_n{i}_c{c}"].set_edgecolor(f"C{2+c}")
+                        item[f"aoi_n{i}_c{c}"].set(zorder=2)
             elif dtype == "offset":
                 ax.add_patch(
                     Rectangle(

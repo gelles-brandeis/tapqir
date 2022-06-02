@@ -248,7 +248,7 @@ class cosmos(Model):
                         m = pyro.sample(
                             f"m_k{kdx}",
                             dist.Bernoulli(
-                                Vindex(probs_m(lamda, self.K))[..., theta, kdx]
+                                Vindex(probs_m(lamda, self.K))[..., cdx, theta, kdx]
                             ),
                         )
                         with handlers.mask(mask=m > 0):
@@ -596,8 +596,8 @@ class cosmos(Model):
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        z_probs = torch.zeros(self.data.Nt, self.data.F)
-        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F)
+        z_probs = torch.zeros(self.data.Nt, self.data.F, self.Q)
+        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F, self.Q)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
@@ -605,18 +605,19 @@ class cosmos(Model):
         params = list(map(lambda x: [f"{x}_k{i}" for i in range(self.K)], params))
         params = list(itertools.chain(*params))
         params += ["z", "theta"]
-        theta_dims = tuple(i for i in range(0, self.Q * 2, 2))
-        z_dims = tuple(i for i in range(1, self.Q * 2, 2))
-        m_dims = tuple(i for i in range(self.Q * 2, self.Q * (self.K + 2)))
+        theta_dims = tuple(i for i in range(0, 2, 2))
+        z_dims = tuple(i for i in range(1, 2, 2))
+        m_dims = tuple(i for i in range(2, self.K + 2))
         for ndx in torch.split(torch.arange(N), nbatch_size):
             for fdx in torch.split(torch.arange(self.data.F), fbatch_size):
                 self.n = ndx
                 self.f = fdx
                 self.nbatch_size = len(ndx)
                 self.fbatch_size = len(fdx)
+                qdx = torch.arange(self.Q)
                 with torch.no_grad(), pyro.plate(
-                    "particles", size=50, dim=-3
-                ), handlers.enum(first_available_dim=-4):
+                    "particles", size=50, dim=-4
+                ), handlers.enum(first_available_dim=-5):
                     guide_tr = handlers.trace(self.guide).get_trace()
                     model_tr = handlers.trace(
                         handlers.replay(
@@ -644,10 +645,14 @@ class cosmos(Model):
                 result = expectation.logsumexp(m_dims)
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
-                z_probs[ndx[:, None], fdx] = z_logits[1].exp().mean(-3)
+                z_probs[ndx[:, None, None], fdx[:, None], qdx] = (
+                    z_logits[1].exp().mean(-4)
+                )
                 # marginalize z
-                theta_logits = result.logsumexp(1)
-                theta_probs[:, ndx[:, None], fdx] = theta_logits[1:].exp().mean(-3)
+                theta_logits = result.logsumexp(z_dims)
+                theta_probs[:, ndx[:, None, None], fdx[:, None], qdx] = (
+                    theta_logits[1:].exp().mean(-4)
+                )
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size
