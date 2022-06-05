@@ -8,7 +8,6 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import torch
-from pyro.ops.indexing import Vindex
 from pyro.ops.stats import hpdi, quantile
 from sklearn.metrics import (
     confusion_matrix,
@@ -77,7 +76,7 @@ def snr_and_chi2(
     snr_result = signal / noise
 
     # chi2 test
-    img_ideal = background[..., None, None] + gaussians.sum(-4)
+    img_ideal = background[..., None, None] + gaussians.sum(-5)
     chi2_result = (data - img_ideal - offset_mean) ** 2 / img_ideal
 
     return snr_result, chi2_result.mean(dim=(-1, -2))
@@ -152,37 +151,39 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     model.params = ci_stats
 
-    #  logger.info("- SNR and Chi2-test")
-    #  # snr and chi2 test
-    #  snr = torch.zeros(model.K, model.data.Nt, model.data.F, device=torch.device("cpu"))
-    #  chi2 = torch.zeros(model.data.Nt, model.data.F, device=torch.device("cpu"))
-    #  for n in range(model.data.Nt):
-    #      snr[:, n], chi2[n] = snr_and_chi2(
-    #          model.data.images[n, :, model.cdx],
-    #          ci_stats["height"]["Mean"][:, n],
-    #          ci_stats["width"]["Mean"][:, n],
-    #          ci_stats["x"]["Mean"][:, n],
-    #          ci_stats["y"]["Mean"][:, n],
-    #          model.data.xy[n, :, model.cdx],
-    #          ci_stats["background"]["Mean"][n],
-    #          ci_stats["gain"]["Mean"],
-    #          model.data.offset.mean,
-    #          model.data.offset.var,
-    #          model.data.P,
-    #          ci_stats["theta_probs"][:, n],
-    #      )
-    #  snr_masked = snr[ci_stats["theta_probs"] > 0.5]
-    #  summary.loc["SNR", "Mean"] = snr_masked.mean().item()
-    #  ci_stats["chi2"] = {}
-    #  ci_stats["chi2"]["values"] = chi2
-    #  cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
-    #  ci_stats["chi2"]["vmin"] = -0.03 * cmax
-    #  ci_stats["chi2"]["vmax"] = 1.3 * cmax
+    logger.info("- SNR and Chi2-test")
+    # snr and chi2 test
+    snr = torch.zeros(
+        model.K, model.data.Nt, model.data.F, model.Q, device=torch.device("cpu")
+    )
+    chi2 = torch.zeros(model.data.Nt, model.data.F, model.Q, device=torch.device("cpu"))
+    for n in range(model.data.Nt):
+        snr[:, n], chi2[n] = snr_and_chi2(
+            model.data.images[n],
+            ci_stats["height"]["Mean"][:, n],
+            ci_stats["width"]["Mean"][:, n],
+            ci_stats["x"]["Mean"][:, n],
+            ci_stats["y"]["Mean"][:, n],
+            model.data.xy[n],
+            ci_stats["background"]["Mean"][n],
+            ci_stats["gain"]["Mean"],
+            model.data.offset.mean,
+            model.data.offset.var,
+            model.data.P,
+            ci_stats["theta_probs"][:, n],
+        )
+    snr_masked = snr[ci_stats["theta_probs"] > 0.5]
+    summary.loc["SNR", "Mean"] = snr_masked.mean().item()
+    ci_stats["chi2"] = {}
+    ci_stats["chi2"]["values"] = chi2
+    cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
+    ci_stats["chi2"]["vmin"] = -0.03 * cmax
+    ci_stats["chi2"]["vmax"] = 1.3 * cmax
 
     # classification statistics
     if model.data.labels is not None:
         pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
-        true_labels = model.data.labels["z"][: model.data.N, :, model.cdx].ravel()
+        true_labels = model.data.labels["z"][: model.data.N].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             summary.loc["MCC", "Mean"] = matthews_corrcoef(true_labels, pred_labels)
@@ -200,7 +201,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc["TP", "Mean"],
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
-        mask = torch.from_numpy(model.data.labels["z"][: model.data.N, :, model.cdx])
+        mask = torch.from_numpy(model.data.labels["z"][: model.data.N])
         samples = torch.masked_select(model.z_probs[model.data.is_ontarget].cpu(), mask)
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)
@@ -216,7 +217,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        param_path = path / f"{model.full_name}-params.tpqr"
+        param_path = path / f"{model.name}-params.tpqr"
         torch.save(ci_stats, param_path)
         logger.info(f"Parameters were saved in {param_path}")
         if save_matlab:
@@ -237,9 +238,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     continue
                 for stat, value in field.items():
                     ci_stats[param][stat] = np.asarray(value)
-            mat_path = path / f"{model.full_name}-params.mat"
+            mat_path = path / f"{model.name}-params.mat"
             savemat(mat_path, ci_stats)
             logger.info(f"Matlab parameters were saved in {mat_path}")
-        csv_path = path / f"{model.full_name}-summary.csv"
+        csv_path = path / f"{model.name}-summary.csv"
         summary.to_csv(csv_path)
         logger.info(f"Summary statistics were saved in {csv_path}")

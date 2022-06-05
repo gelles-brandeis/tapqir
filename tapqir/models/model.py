@@ -3,7 +3,7 @@
 
 import logging
 import random
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Union
 
@@ -41,31 +41,28 @@ class Model:
 
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param channels: Number of color channels.
+    :param Q: Number of fluorescent dyes.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
     def __init__(
         self,
         S: int = 1,
         K: int = 2,
-        Q: int = 1,
-        channels: Union[tuple, list] = (0,),
+        Q: int = None,
         device: str = "cpu",
         dtype: str = "double",
+        priors: dict = None,
     ):
         self.S = S
         self.K = K
-        self.Q = Q
-        self.C = len(channels)
-        if self.C == 1:
-            channels = channels[0]
-        self.cdx = torch.as_tensor(channels)
-        self.channels = channels
-        self.full_name = f"{self.name}-channel{channels}"
+        self._Q = Q
         self.nbatch_size = None
         self.fbatch_size = None
+        # priors settings
+        self.priors = priors
         # for plotting
         self.n = None
         self.f = None
@@ -101,6 +98,10 @@ class Model:
                 weights=self.data.offset.weights.to(self.device),
             )
 
+    @property
+    def Q(self):
+        return self._Q or self.data.C
+
     def load(self, path: Union[str, Path], data_only: bool = True) -> None:
         """
         Load data and optionally parameters from a specified path
@@ -119,18 +120,18 @@ class Model:
         # load fit results
         if not data_only:
             try:
-                self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
+                self.params = torch.load(self.path / f"{self.name}-params.tpqr")
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "parameter", self.path / f"{self.full_name}-params.tpqr"
+                    "parameter", self.path / f"{self.name}-params.tpqr"
                 )
             try:
                 self.summary = pd.read_csv(
-                    self.path / f"{self.full_name}-summary.csv", index_col=0
+                    self.path / f"{self.name}-summary.csv", index_col=0
                 )
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "summary", self.path / f"{self.full_name}-summary.csv"
+                    "summary", self.path / f"{self.name}-summary.csv"
                 )
 
     def model(self):
@@ -213,7 +214,7 @@ class Model:
         logger.debug("AOI batch size - {}".format(self.nbatch_size))
         logger.debug("Frame batch size - {}".format(self.fbatch_size))
 
-        with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
+        with SummaryWriter(log_dir=self.run_path / "logs" / self.name) as writer:
             for i in progress_bar(range(num_iter)):
                 try:
                     self.iter_loss = self.svi.step()
@@ -287,7 +288,7 @@ class Model:
                 "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
             },
-            self.run_path / f"{self.full_name}-model.tpqr",
+            self.run_path / f"{self.name}-model.tpqr",
         )
 
         # save global paramters for tensorboard
@@ -339,7 +340,7 @@ class Model:
         """
         device = self.device
         path = Path(path) if path else self.run_path
-        model_path = path / f"{self.full_name}-model.tpqr"
+        model_path = path / f"{self.name}-model.tpqr"
         try:
             checkpoint = torch.load(model_path, map_location=device)
         except FileNotFoundError:

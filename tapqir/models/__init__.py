@@ -15,7 +15,7 @@ __all__ = [
 ]
 
 models = {
-    cosmos.name: cosmos,
-    mccosmos.name: mccosmos,
+    cosmos.__name__: cosmos,
+    mccosmos.__name__: mccosmos,
     HMM.name: HMM,
 }

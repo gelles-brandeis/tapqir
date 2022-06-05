@@ -159,6 +159,8 @@ class GlimpseDataset:
         self.labels = labels
         self.name = kwargs["name"]
         self.c = c
+        self.offset_x = kwargs["offset-x"]
+        self.offset_y = kwargs["offset-y"]
 
     def __len__(self) -> int:
         return self.F
@@ -233,12 +235,13 @@ class GlimpseDataset:
 
         frame = self.cumdrift.index[f]
         fov = self[frame]
+        c = self.c
         if "fov" in item:
-            item["fov"].set_data(fov)
+            item[f"fov_c{c}"].set_data(fov)
         else:
             vmin = np.percentile(fov, 1)
             vmax = np.percentile(fov, 99)
-            item["fov"] = ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
+            item[f"fov_c{c}"] = ax.imshow(fov, vmin=vmin, vmax=vmax, cmap="gray")
 
         for dtype in dtypes:
             if dtype in ["ontarget", "offtarget"]:
@@ -262,10 +265,10 @@ class GlimpseDataset:
                         )
                         - 0.5
                     )
-                    if f"aoi_{i}" in item:
-                        item[f"aoi_{i}"].set_xy((x_pos, y_pos))
+                    if f"aoi_n{i}_c{c}" in item:
+                        item[f"aoi_n{i}_c{c}"].set_xy((x_pos, y_pos))
                     else:
-                        item[f"aoi_{i}"] = ax.add_patch(
+                        item[f"aoi_n{i}_c{c}"] = ax.add_patch(
                             Rectangle(
                                 (x_pos, y_pos),
                                 P,
@@ -276,12 +279,12 @@ class GlimpseDataset:
                             )
                         )
                     if n == i:
-                        item[f"aoi_{i}"].set_edgecolor("C2")
-                        item[f"aoi_{i}"].set(zorder=2)
+                        item[f"aoi_n{i}_c{c}"].set_edgecolor(f"C{2+c}")
+                        item[f"aoi_n{i}_c{c}"].set(zorder=2)
             elif dtype == "offset":
                 ax.add_patch(
                     Rectangle(
-                        (10, 10),
+                        (self.offset_x, self.offset_y),
                         P,
                         P,
                         edgecolor="#CCBB44",
@@ -306,8 +309,6 @@ def read_glimpse(path, progress_bar, **kwargs):
     C = kwargs.pop("num-channels")
     name = kwargs.pop("dataset")
     channels = kwargs.pop("channels")
-    offset_x = kwargs.pop("offset-x")
-    offset_y = kwargs.pop("offset-y")
     offset_P = kwargs.pop("offset-P")
     bin_size = kwargs.pop("bin-size")
 
@@ -357,7 +358,8 @@ def read_glimpse(path, progress_bar, **kwargs):
             img = glimpse[frame]
 
             offset_img = img[
-                offset_y : offset_y + offset_P, offset_x : offset_x + offset_P
+                glimpse.offset_y : glimpse.offset_y + offset_P,
+                glimpse.offset_x : glimpse.offset_x + offset_P,
             ]
             offset_medians.append(np.median(offset_img))
             values, counts = np.unique(offset_img, return_counts=True)
