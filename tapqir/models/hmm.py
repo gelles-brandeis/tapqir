@@ -71,7 +71,7 @@ class HMM(cosmos):
         gain = pyro.sample("gain", dist.HalfNormal(self.priors["gain_std"]))
         init = pyro.sample(
             "init",
-            dist.Dirichlet(torch.ones(self.Q, self.S + 1) / (self.S + 1)).to_event(1),
+            dist.Dirichlet(torch.ones((self.Q, self.S + 1)) / (self.S + 1)).to_event(1),
         )
         init = expand_offtarget(init)
         trans = pyro.sample(
