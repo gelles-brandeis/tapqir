@@ -58,7 +58,7 @@ class Model:
     ):
         self.S = S
         self.K = K
-        self.Q = Q
+        self._Q = Q
         self.nbatch_size = None
         self.fbatch_size = None
         # priors settings
@@ -98,6 +98,10 @@ class Model:
                 weights=self.data.offset.weights.to(self.device),
             )
 
+    @property
+    def Q(self):
+        return self._Q or self.data.C
+
     def load(self, path: Union[str, Path], data_only: bool = True) -> None:
         """
         Load data and optionally parameters from a specified path
@@ -111,8 +115,6 @@ class Model:
 
         # load data
         self.data = load(self.path, self.device)
-        if self.Q is None:
-            self.Q = self.data.C
         logger.debug(f"Loaded data from {self.path / 'data.tpqr'}")
 
         # load fit results

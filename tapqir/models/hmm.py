@@ -47,14 +47,14 @@ class HMM(cosmos):
         use_pykeops: bool = True,
         vectorized: bool = True,
         priors: dict = {
-            "background_mean_std": 1000,
-            "background_std_std": 100,
-            "lamda_rate": 1,
-            "height_std": 10000,
+            "background_mean_std": 1000.0,
+            "background_std_std": 100.0,
+            "lamda_rate": 1.0,
+            "height_std": 10000.0,
             "width_min": 0.75,
             "width_max": 2.25,
-            "proximity_rate": 1,
-            "gain_std": 50,
+            "proximity_rate": 1.0,
+            "gain_std": 50.0,
         },
     ):
         self.vectorized = vectorized
@@ -137,9 +137,9 @@ class HMM(cosmos):
                 for fdx in frames:
                     if self.vectorized:
                         fsx, fdx = fdx
+                        fdx = fdx[:, None]
                     else:
                         fsx = fdx
-                    fdx = fdx[:, None]
                     # fetch data
                     obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, cdx)
                     # sample background intensity
@@ -321,9 +321,9 @@ class HMM(cosmos):
                 for fdx in frames:
                     if self.vectorized:
                         fsx, fdx = fdx
+                        fdx = fdx[:, None]
                     else:
                         fsx = fdx
-                    fdx = fdx[:, None]
                     # sample background intensity
                     pyro.sample(
                         f"background_f{fsx}",

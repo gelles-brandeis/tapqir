@@ -49,14 +49,14 @@ class cosmos(Model):
         dtype: str = "double",
         use_pykeops: bool = True,
         priors: dict = {
-            "background_mean_std": 1000,
-            "background_std_std": 100,
-            "lamda_rate": 1,
-            "height_std": 10000,
+            "background_mean_std": 1000.0,
+            "background_std_std": 100.0,
+            "lamda_rate": 1.0,
+            "height_std": 10000.0,
             "width_min": 0.75,
             "width_max": 2.25,
-            "proximity_rate": 1,
-            "gain_std": 50,
+            "proximity_rate": 1.0,
+            "gain_std": 50.0,
         },
     ):
         super().__init__(K=K, device=device, dtype=dtype, priors=priors)
