@@ -9,7 +9,6 @@ cosmos
 import itertools
 import math
 from functools import reduce
-from typing import Union
 
 import torch
 import torch.distributions.constraints as constraints
@@ -26,7 +25,7 @@ from tapqir.models.model import Model
 
 class cosmos(Model):
     r"""
-    **Single-Color Time-Independent Colocalization Model**
+    **Multi-Color Time-Independent Colocalization Model**
 
     **Reference**:
 
@@ -34,12 +33,11 @@ class cosmos(Model):
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
        eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
 
-    :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param channels: Number of color channels.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
     name = "cosmos"
@@ -47,24 +45,21 @@ class cosmos(Model):
     def __init__(
         self,
         K: int = 2,
-        channels: Union[tuple, list] = (0,),
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
         priors: dict = {
-            "background_mean_std": 1000,
-            "background_std_std": 100,
-            "lamda_rate": 1,
-            "height_std": 10000,
+            "background_mean_std": 1000.0,
+            "background_std_std": 100.0,
+            "lamda_rate": 1.0,
+            "height_std": 10000.0,
             "width_min": 0.75,
             "width_max": 2.25,
-            "proximity_rate": 1,
-            "gain_std": 50,
+            "proximity_rate": 1.0,
+            "gain_std": 50.0,
         },
     ):
-        S, Q = 1, 1
-        super().__init__(S, K, Q, channels, device, dtype, priors)
-        assert self.C == 1, "Please specify exactly one color channel"
+        super().__init__(K=K, device=device, dtype=dtype, priors=priors)
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
@@ -158,9 +153,17 @@ class cosmos(Model):
         """
         # global parameters
         gain = pyro.sample("gain", dist.HalfNormal(self.priors["gain_std"]))
-        pi = pyro.sample("pi", dist.Dirichlet(torch.ones(self.S + 1) / (self.S + 1)))
+        pi = pyro.sample(
+            "pi",
+            dist.Dirichlet(torch.ones((self.Q, self.S + 1)) / (self.S + 1)).to_event(1),
+        )
         pi = expand_offtarget(pi)
-        lamda = pyro.sample("lamda", dist.Exponential(self.priors["lamda_rate"]))
+        lamda = pyro.sample(
+            "lamda",
+            dist.Exponential(torch.full((self.Q,), self.priors["lamda_rate"])).to_event(
+                1
+            ),
+        )
         proximity = pyro.sample(
             "proximity", dist.Exponential(self.priors["proximity_rate"])
         )
@@ -180,7 +183,7 @@ class cosmos(Model):
             self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
-            dim=-2,
+            dim=-3,
         )
         # time frames
         frames = pyro.plate(
@@ -188,11 +191,17 @@ class cosmos(Model):
             self.data.F,
             subsample=self.f,
             subsample_size=self.fbatch_size,
+            dim=-2,
+        )
+        # color channels
+        channels = pyro.plate(
+            "channels",
+            self.data.C,
             dim=-1,
         )
 
-        with aois as ndx:
-            ndx = ndx[:, None]
+        with channels as cdx, aois as ndx:
+            ndx = ndx[:, None, None]
             mask = Vindex(self.data.mask)[ndx].to(self.device)
             with handlers.mask(mask=mask):
                 # background mean and std
@@ -204,8 +213,9 @@ class cosmos(Model):
                     "background_std", dist.HalfNormal(self.priors["background_std_std"])
                 )
                 with frames as fdx:
+                    fdx = fdx[:, None]
                     # fetch data
-                    obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, self.cdx)
+                    obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, cdx)
                     # sample background intensity
                     background = pyro.sample(
                         "background",
@@ -218,7 +228,7 @@ class cosmos(Model):
                     # sample hidden model state (1+S,)
                     z = pyro.sample(
                         "z",
-                        dist.Categorical(Vindex(pi)[..., :, is_ontarget.long()]),
+                        dist.Categorical(Vindex(pi)[..., cdx, :, is_ontarget.long()]),
                         infer={"enumerate": "parallel"},
                     )
                     theta = pyro.sample(
@@ -239,7 +249,7 @@ class cosmos(Model):
                         m = pyro.sample(
                             f"m_k{kdx}",
                             dist.Bernoulli(
-                                Vindex(probs_m(lamda, self.K))[..., theta, kdx]
+                                Vindex(probs_m(lamda, self.K))[..., cdx, theta, kdx]
                             ),
                         )
                         with handlers.mask(mask=m > 0):
@@ -323,13 +333,16 @@ class cosmos(Model):
                 pyro.param("gain_beta"),
             ),
         )
-        pyro.sample("pi", dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")))
+        pyro.sample(
+            "pi",
+            dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")).to_event(1),
+        )
         pyro.sample(
             "lamda",
             dist.Gamma(
                 pyro.param("lamda_loc") * pyro.param("lamda_beta"),
                 pyro.param("lamda_beta"),
-            ),
+            ).to_event(1),
         )
         pyro.sample(
             "proximity",
@@ -349,7 +362,7 @@ class cosmos(Model):
             self.data.Nt,
             subsample=self.n,
             subsample_size=self.nbatch_size,
-            dim=-2,
+            dim=-3,
         )
         # time frames
         frames = pyro.plate(
@@ -357,29 +370,36 @@ class cosmos(Model):
             self.data.F,
             subsample=self.f,
             subsample_size=self.fbatch_size,
+            dim=-2,
+        )
+        # color channels
+        channels = pyro.plate(
+            "channels",
+            self.data.C,
             dim=-1,
         )
 
-        with aois as ndx:
-            ndx = ndx[:, None]
+        with channels as cdx, aois as ndx:
+            ndx = ndx[:, None, None]
             mask = Vindex(self.data.mask)[ndx].to(self.device)
             with handlers.mask(mask=mask):
                 pyro.sample(
                     "background_mean",
-                    dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0]),
+                    dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0, cdx]),
                 )
                 pyro.sample(
                     "background_std",
-                    dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0]),
+                    dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0, cdx]),
                 )
                 with frames as fdx:
+                    fdx = fdx[:, None]
                     # sample background intensity
                     pyro.sample(
                         "background",
                         dist.Gamma(
-                            Vindex(pyro.param("b_loc"))[ndx, fdx]
-                            * Vindex(pyro.param("b_beta"))[ndx, fdx],
-                            Vindex(pyro.param("b_beta"))[ndx, fdx],
+                            Vindex(pyro.param("b_loc"))[ndx, fdx, cdx]
+                            * Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
+                            Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
                         ),
                     )
 
@@ -388,7 +408,7 @@ class cosmos(Model):
                         m = pyro.sample(
                             f"m_k{kdx}",
                             dist.Bernoulli(
-                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx]
+                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
                             ),
                             infer={"enumerate": "parallel"},
                         )
@@ -397,16 +417,16 @@ class cosmos(Model):
                             pyro.sample(
                                 f"height_k{kdx}",
                                 dist.Gamma(
-                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx]
-                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
-                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
+                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
                                 ),
                             )
                             pyro.sample(
                                 f"width_k{kdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
-                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
                                     0.75,
                                     2.25,
                                 ),
@@ -414,8 +434,8 @@ class cosmos(Model):
                             pyro.sample(
                                 f"x_k{kdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
@@ -423,8 +443,8 @@ class cosmos(Model):
                             pyro.sample(
                                 f"y_k{kdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, cdx],
+                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
@@ -439,17 +459,17 @@ class cosmos(Model):
 
         pyro.param(
             "pi_mean",
-            lambda: torch.ones(self.S + 1, device=device),
+            lambda: torch.ones((self.Q, self.S + 1), device=device),
             constraint=constraints.simplex,
         )
         pyro.param(
             "pi_size",
-            lambda: torch.tensor(2, device=device),
+            lambda: torch.full((self.Q, 1), 2, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "m_probs",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.5, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
             constraint=constraints.unit_interval,
         )
 
@@ -477,12 +497,12 @@ class cosmos(Model):
         )
         pyro.param(
             "lamda_loc",
-            lambda: torch.tensor(0.5, device=device),
+            lambda: torch.full((self.Q,), 0.5, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "lamda_beta",
-            lambda: torch.tensor(100, device=device),
+            lambda: torch.full((self.Q,), 100, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -498,46 +518,42 @@ class cosmos(Model):
 
         pyro.param(
             "background_mean_loc",
-            lambda: torch.full(
-                (data.Nt, 1),
-                data.median[self.cdx] - self.data.offset.mean,
-                device=device,
+            lambda: (data.median.to(device) - data.offset.mean).expand(
+                data.Nt, 1, data.C
             ),
             constraint=constraints.positive,
         )
         pyro.param(
             "background_std_loc",
-            lambda: torch.ones(data.Nt, 1, device=device),
+            lambda: torch.ones(data.Nt, 1, data.C, device=device),
             constraint=constraints.positive,
         )
 
         pyro.param(
             "b_loc",
-            lambda: torch.full(
-                (data.Nt, data.F),
-                data.median[self.cdx] - self.data.offset.mean,
-                device=device,
+            lambda: (data.median.to(device) - self.data.offset.mean).expand(
+                data.Nt, data.F, data.C
             ),
             constraint=constraints.positive,
         )
         pyro.param(
             "b_beta",
-            lambda: torch.ones(data.Nt, data.F, device=device),
+            lambda: torch.ones(data.Nt, data.F, data.C, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_loc",
-            lambda: torch.full((self.K, data.Nt, data.F), 2000, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "h_beta",
-            lambda: torch.full((self.K, data.Nt, data.F), 0.001, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.001, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
             "w_mean",
-            lambda: torch.full((self.K, data.Nt, data.F), 1.5, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 1.5, device=device),
             constraint=constraints.interval(
                 0.75 + torch.finfo(self.dtype).eps,
                 2.25 - torch.finfo(self.dtype).eps,
@@ -545,12 +561,12 @@ class cosmos(Model):
         )
         pyro.param(
             "w_size",
-            lambda: torch.full((self.K, data.Nt, data.F), 100, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
         pyro.param(
             "x_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -558,7 +574,7 @@ class cosmos(Model):
         )
         pyro.param(
             "y_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
             constraint=constraints.interval(
                 -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
                 (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
@@ -566,7 +582,7 @@ class cosmos(Model):
         )
         pyro.param(
             "size",
-            lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
 
@@ -576,13 +592,13 @@ class cosmos(Model):
         discrete sample sites, and - local parallel sampling over any sample site in the guide.
         """
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
-            max_plate_nesting=2, ignore_jit_warnings=True
+            max_plate_nesting=3, ignore_jit_warnings=True
         )
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        z_probs = torch.zeros(self.data.Nt, self.data.F)
-        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F)
+        z_probs = torch.zeros(self.data.Nt, self.data.F, self.Q)
+        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F, self.Q)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
         N = sum(self.data.is_ontarget)
@@ -590,18 +606,19 @@ class cosmos(Model):
         params = list(map(lambda x: [f"{x}_k{i}" for i in range(self.K)], params))
         params = list(itertools.chain(*params))
         params += ["z", "theta"]
-        theta_dims = tuple(i for i in range(0, self.Q * 2, 2))
-        z_dims = tuple(i for i in range(1, self.Q * 2, 2))
-        m_dims = tuple(i for i in range(self.Q * 2, self.Q * (self.K + 2)))
+        theta_dims = tuple(i for i in range(0, 2, 2))
+        z_dims = tuple(i for i in range(1, 2, 2))
+        m_dims = tuple(i for i in range(2, self.K + 2))
         for ndx in torch.split(torch.arange(N), nbatch_size):
             for fdx in torch.split(torch.arange(self.data.F), fbatch_size):
                 self.n = ndx
                 self.f = fdx
                 self.nbatch_size = len(ndx)
                 self.fbatch_size = len(fdx)
+                qdx = torch.arange(self.Q)
                 with torch.no_grad(), pyro.plate(
-                    "particles", size=50, dim=-3
-                ), handlers.enum(first_available_dim=-4):
+                    "particles", size=50, dim=-4
+                ), handlers.enum(first_available_dim=-5):
                     guide_tr = handlers.trace(self.guide).get_trace()
                     model_tr = handlers.trace(
                         handlers.replay(
@@ -629,10 +646,14 @@ class cosmos(Model):
                 result = expectation.logsumexp(m_dims)
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
-                z_probs[ndx[:, None], fdx] = z_logits[1].exp().mean(-3)
+                z_probs[ndx[:, None, None], fdx[:, None], qdx] = (
+                    z_logits[1].exp().mean(-4)
+                )
                 # marginalize z
-                theta_logits = result.logsumexp(1)
-                theta_probs[:, ndx[:, None], fdx] = theta_logits[1:].exp().mean(-3)
+                theta_logits = result.logsumexp(z_dims)
+                theta_probs[:, ndx[:, None, None], fdx[:, None], qdx] = (
+                    theta_logits[1:].exp().mean(-4)
+                )
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size

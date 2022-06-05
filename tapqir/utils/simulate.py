@@ -33,6 +33,7 @@ def simulate(
 
     pyro.set_rng_seed(seed)
     pyro.clear_param_store()
+    Q = C
 
     # samples
     samples = {}
@@ -41,11 +42,11 @@ def simulate(
     samples["proximity"] = torch.full((1, 1), params["proximity"])
 
     if "pi" in params:
-        samples["pi"] = torch.tensor([[1 - params["pi"], params["pi"]]])
-        samples["background"] = torch.full((1, N, 1), params["background"])
+        samples["pi"] = torch.tensor([[1 - params["pi"], params["pi"]]]).expand(1, Q, 2)
+        samples["background"] = torch.full((1, N, 1, C), params["background"])
         for k in range(model.K):
-            samples[f"width_{k}"] = torch.full((1, N, F), params["width"])
-            samples[f"height_{k}"] = torch.full((1, N, F), params["height"])
+            samples[f"width_k{k}"] = torch.full((1, N, F, Q), params["width"])
+            samples[f"height_k{k}"] = torch.full((1, N, F, Q), params["height"])
     else:
         # kinetic simulations
         samples["init"] = torch.tensor(
@@ -55,7 +56,7 @@ def simulate(
                     params["kon"] / (params["kon"] + params["koff"]),
                 ]
             ]
-        )
+        ).expand(1, Q, 2)
         samples["trans"] = torch.tensor(
             [
                 [
@@ -63,12 +64,14 @@ def simulate(
                     [params["koff"], 1 - params["koff"]],
                 ]
             ]
-        )
+        ).expand(1, Q, 2, 2)
         for f in range(F):
-            samples[f"background_{f}"] = torch.full((1, N, 1), params["background"])
+            samples[f"background_f{f}"] = torch.full((1, N, 1, C), params["background"])
             for k in range(model.K):
-                samples[f"width_{k}_{f}"] = torch.full((1, N, 1), params["width"])
-                samples[f"height_{k}_{f}"] = torch.full((1, N, 1), params["height"])
+                samples[f"width_k{k}_f{f}"] = torch.full((1, N, 1, Q), params["width"])
+                samples[f"height_k{k}_f{f}"] = torch.full(
+                    (1, N, 1, Q), params["height"]
+                )
 
     offset = torch.full((3,), params["offset"])
     target_locs = torch.full((N, F, 1, 2), (P - 1) / 2)
@@ -91,17 +94,17 @@ def simulate(
     )
     samples = predictive()
     data = torch.zeros(N, F, C, P, P)
-    labels = np.zeros((N // 2, F, 1), dtype=[("aoi", int), ("frame", int), ("z", bool)])
+    labels = np.zeros((N // 2, F, Q), dtype=[("aoi", int), ("frame", int), ("z", bool)])
     labels["aoi"] = np.arange(N // 2).reshape(-1, 1, 1)
     labels["frame"] = np.arange(F).reshape(-1, 1)
     if "pi" in params:
-        data[:, :, 0] = samples["data"][0].data.floor()
-        labels["z"][:, :, 0] = samples["theta"][0][: N // 2].cpu() > 0
+        data[:, :, :] = samples["data"][0].data.floor()
+        labels["z"][:, :, :] = samples["theta"][0][: N // 2].cpu() > 0
     else:
         # kinetic simulations
         for f in range(F):
-            data[:, f : f + 1, 0] = samples[f"data_{f}"][0].data.floor()
-            labels["z"][:, f : f + 1, 0] = samples[f"theta_{f}"][0][: N // 2].cpu() > 0
+            data[:, f : f + 1, :] = samples[f"data_f{f}"][0].data.floor()
+            labels["z"][:, f : f + 1, :] = samples[f"theta_f{f}"][0][: N // 2].cpu() > 0
 
     return CosmosDataset(
         data.cpu(),

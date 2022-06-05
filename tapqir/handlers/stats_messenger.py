@@ -55,17 +55,16 @@ class StatsMessenger(Messenger):
         elif len(args) == 2:
             base_name, k = args
             k = int(k)
-            assert self.Q == 1
             if k == 0:
                 self.ci_stats[base_name] = {}
                 self.ci_stats[base_name]["LL"] = torch.zeros(
-                    self.K, self.N, self.F, device=torch.device("cpu")
+                    self.K, self.N, self.F, self.Q, device=torch.device("cpu")
                 )
                 self.ci_stats[base_name]["UL"] = torch.zeros(
-                    self.K, self.N, self.F, device=torch.device("cpu")
+                    self.K, self.N, self.F, self.Q, device=torch.device("cpu")
                 )
                 self.ci_stats[base_name]["Mean"] = torch.zeros(
-                    self.K, self.N, self.F, device=torch.device("cpu")
+                    self.K, self.N, self.F, self.Q, device=torch.device("cpu")
                 )
             self.ci_stats[base_name]["LL"][k] = torch.as_tensor(
                 LL, device=torch.device("cpu")

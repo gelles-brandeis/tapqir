@@ -321,11 +321,6 @@ def fit(
     model: avail_models = typer.Option(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
-    channels: List[int] = typer.Option(
-        [0],
-        help="Color-channel numbers to analyze",
-        prompt="Channel numbers (space separated if multiple)",
-    ),
     cuda: bool = typer.Option(
         partial(get_default, "cuda"),
         "--cuda/--cpu",
@@ -415,7 +410,6 @@ def fit(
 
     settings = {}
     settings["K"] = k_max
-    settings["channels"] = channels
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
     settings["use_pykeops"] = pykeops
@@ -481,11 +475,6 @@ def stats(
     model: avail_models = typer.Option(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
-    channels: List[int] = typer.Option(
-        [0],
-        help="Color-channel numbers to analyze",
-        prompt="Channel numbers (space separated if multiple)",
-    ),
     cuda: bool = typer.Option(
         partial(get_default, "cuda"),
         "--cuda/--cpu",
@@ -538,7 +527,6 @@ def stats(
     backend = "funsor" if funsor else "pyro"
 
     settings = {}
-    settings["channels"] = channels
     settings["device"] = device
     settings["dtype"] = dtype
 
@@ -609,11 +597,6 @@ def show(
     model: avail_models = typer.Option(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
-    channels: List[int] = typer.Option(
-        [0],
-        help="Color-channel numbers to analyze",
-        prompt="Channel numbers (space separated if multiple)",
-    ),
     n: int = typer.Option(0, help="n", prompt="n"),
     f1: Optional[int] = None,
     f2: Optional[int] = None,
@@ -628,7 +611,7 @@ def show(
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
-    model = models[model](1, 2, channels, "cpu", "float")
+    model = models[model](device="cpu", dtype="float")
     try:
         model.load(cd, data_only=False)
     except TapqirFileNotFoundError as err:
@@ -638,25 +621,24 @@ def show(
         f1 = 0
     if f2 is None:
         f2 = f1 + 15
-    c = model.cdx
-    color = "C2" if model.data.mask[n] else "C7"
 
     width, dpi = 6.25, 100
-    height = 10 if show_fov else 6.25
+    s = 2 * model.data.C
+    height = 4.45 + (1.875 + 0.9) * s if show_fov else 4.45 + 0.9 * s
     fig = plt.figure(figsize=(width, height), dpi=dpi)
     gs = fig.add_gridspec(
-        nrows=10,
+        nrows=8 + s,
         ncols=15,
         top=0.96,
         bottom=0.39 if show_fov else 0.02,
         left=0.1,
         right=0.98,
         hspace=0.1,
-        height_ratios=[0.9, 0.9, 1, 1, 1, 1, 1, 1, 1, 1],
+        height_ratios=[0.9] * s + [1, 1, 1, 1, 1, 1, 1, 1],
     )
     if show_fov:
         gs2 = fig.add_gridspec(
-            nrows=1,
+            nrows=model.data.C,
             ncols=1,
             top=0.32,
             bottom=0.02,
@@ -669,58 +651,44 @@ def show(
     frames = torch.arange(f1, f2)
     img_ideal = (
         model.data.offset.mean
-        + model.params["background"]["Mean"][n, frames, None, None]
+        + model.params["background"]["Mean"][n, frames, :, None, None]
     )
     gaussian = gaussian_spots(
         model.params["height"]["Mean"][:, n, frames],
         model.params["width"]["Mean"][:, n, frames],
         model.params["x"]["Mean"][:, n, frames],
         model.params["y"]["Mean"][:, n, frames],
-        model.data.xy[n, frames, c],
+        model.data.xy[n, frames],
         model.data.P,
     )
-    img_ideal = img_ideal + gaussian.sum(-4)
-    for f in range(15):
-        ax[f"image_{f}"] = fig.add_subplot(gs[0, f])
-        item[f"image_{f}"] = ax[f"image_{f}"].imshow(
-            model.data.images[n, f, c].numpy(),
-            vmin=model.data.vmin[model.cdx] - 50,
-            vmax=model.data.vmax[model.cdx] + 50,
-            cmap="gray",
-        )
-        ax[f"image_{f}"].set_title(rf"${f}$", fontsize=9)
-        ax[f"image_{f}"].axis("off")
-        ax[f"ideal_{f}"] = fig.add_subplot(gs[1, f])
-        item[f"ideal_{f}"] = ax[f"ideal_{f}"].imshow(
-            img_ideal[f].numpy(),
-            vmin=model.data.vmin[model.cdx] - 50,
-            vmax=model.data.vmax[model.cdx] + 50,
-            cmap="gray",
-        )
-        ax[f"ideal_{f}"].axis("off")
+    img_ideal = img_ideal + gaussian.sum(-5)
+    for c in range(model.data.C):
+        for f in range(15):
+            ax[f"image_f{f}_c{c}"] = fig.add_subplot(gs[0 + c * 2, f])
+            item[f"image_f{f}_c{c}"] = ax[f"image_f{f}_c{c}"].imshow(
+                model.data.images[n, f, c].numpy(),
+                vmin=model.data.vmin[c] - 20,
+                vmax=model.data.vmax[c] + 30,
+                cmap="gray",
+            )
+            if c == 0:
+                ax[f"image_f{f}_c{c}"].set_title(rf"${f}$", fontsize=9)
+            ax[f"image_f{f}_c{c}"].axis("off")
+            ax[f"ideal_f{f}_c{c}"] = fig.add_subplot(gs[1 + c * 2, f])
+            item[f"ideal_f{f}_c{c}"] = ax[f"ideal_f{f}_c{c}"].imshow(
+                img_ideal[f, c].numpy(),
+                vmin=model.data.vmin[c] - 20,
+                vmax=model.data.vmax[c] + 30,
+                cmap="gray",
+            )
+            ax[f"ideal_f{f}_c{c}"].axis("off")
 
-    ax["z_map"] = fig.add_subplot(gs[2, :])
+    ax["z_map"] = fig.add_subplot(gs[s, :])
     config_axis(ax["z_map"], r"$z$", f1, f2, -0.1, model.S + 0.1)
-    (item["z_map"],) = ax["z_map"].plot(
-        torch.arange(0, model.data.F),
-        model.params["z_map"][n],
-        "-",
-        lw=1,
-        color="k",
-    )
-
-    ax["p_specific"] = fig.add_subplot(gs[3, :])
+    ax["p_specific"] = fig.add_subplot(gs[s + 1, :])
     config_axis(ax["p_specific"], r"$p(\mathsf{specific})$", f1, f2, -0.1, 1.1)
-    (item["p_specific"],) = ax["p_specific"].plot(
-        torch.arange(0, model.data.F),
-        model.params["p_specific"][n],
-        "o-",
-        ms=3,
-        lw=1,
-        color=color,
-    )
 
-    ax["height"] = fig.add_subplot(gs[4, :])
+    ax["height"] = fig.add_subplot(gs[s + 2, :])
     config_axis(
         ax["height"],
         r"$h$",
@@ -730,7 +698,7 @@ def show(
         model.params["height"]["vmax"],
     )
 
-    ax["width"] = fig.add_subplot(gs[5, :])
+    ax["width"] = fig.add_subplot(gs[s + 3, :])
     config_axis(
         ax["width"],
         r"$w$",
@@ -740,17 +708,17 @@ def show(
         model.params["width"]["vmax"],
     )
 
-    ax["x"] = fig.add_subplot(gs[6, :])
+    ax["x"] = fig.add_subplot(gs[s + 4, :])
     config_axis(
         ax["x"], r"$x$", f1, f2, model.params["x"]["vmin"], model.params["x"]["vmax"]
     )
 
-    ax["y"] = fig.add_subplot(gs[7, :])
+    ax["y"] = fig.add_subplot(gs[s + 5, :])
     config_axis(
         ax["y"], r"$y$", f1, f2, model.params["y"]["vmin"], model.params["y"]["vmax"]
     )
 
-    ax["background"] = fig.add_subplot(gs[8, :])
+    ax["background"] = fig.add_subplot(gs[s + 6, :])
     config_axis(
         ax["background"],
         r"$b$",
@@ -760,7 +728,7 @@ def show(
         model.params["background"]["vmax"],
     )
 
-    ax["chi2"] = fig.add_subplot(gs[9, :])
+    ax["chi2"] = fig.add_subplot(gs[s + 7, :])
     config_axis(
         ax["chi2"],
         r"$\chi^2 \mathsf{test}$",
@@ -772,91 +740,113 @@ def show(
     )
     ax["chi2"].set_xlabel("Time (frame)")
 
-    theta_mask = model.params["theta_probs"][:, n] > 0.5
-    j_mask = (model.params["m_probs"][:, n] > 0.5) & ~theta_mask
-    for p in ["height", "width", "x", "y"]:
-        # target-nonspecific spots
-        for k in range(model.K):
-            f_mask = j_mask[k]
-            mean = model.params[p]["Mean"][k, n] * f_mask
-            ll = model.params[p]["LL"][k, n] * f_mask
-            ul = model.params[p]["UL"][k, n] * f_mask
-            (item[f"{p}_nonspecific{k}_mean"],) = ax[p].plot(
-                torch.arange(0, model.data.F)[f_mask],
-                mean[f_mask],
-                "o",
+    color = (
+        [f"C{2+q}" for q in range(model.Q)] if model.data.mask[n] else ["C7"] * model.Q
+    )
+    for q in range(model.Q):
+        (item[f"z_map_q{q}"],) = ax["z_map"].plot(
+            torch.arange(0, model.data.F),
+            model.params["z_map"][n, :, q],
+            "-",
+            lw=1,
+            color=color[q],
+        )
+
+        (item[f"p_specific_q{q}"],) = ax["p_specific"].plot(
+            torch.arange(0, model.data.F),
+            model.params["p_specific"][n, :, q],
+            "o-",
+            ms=3,
+            lw=1,
+            color=color[q],
+        )
+        theta_mask = model.params["theta_probs"][:, n, :, q] > 0.5
+        j_mask = (model.params["m_probs"][:, n, :, q] > 0.5) & ~theta_mask
+        for p in ["height", "width", "x", "y"]:
+            # target-nonspecific spots
+            for k in range(model.K):
+                f_mask = j_mask[k]
+                mean = model.params[p]["Mean"][k, n, :, q] * f_mask
+                ll = model.params[p]["LL"][k, n, :, q] * f_mask
+                ul = model.params[p]["UL"][k, n, :, q] * f_mask
+                (item[f"{p}_nonspecific{k}_mean_q{q}"],) = ax[p].plot(
+                    torch.arange(0, model.data.F)[f_mask],
+                    mean[f_mask],
+                    "o",
+                    ms=2,
+                    lw=1,
+                    color=f"C{k}",
+                )
+                item[f"{p}_nonspecific{k}_fill_q{q}"] = ax[p].fill_between(
+                    torch.arange(0, model.data.F),
+                    ll,
+                    ul,
+                    where=f_mask,
+                    alpha=0.3,
+                    color=f"C{k}",
+                )
+            # target-specific spots
+            f_mask = theta_mask.sum(0).bool()
+            mean = (model.params[p]["Mean"][:, n, :, q] * theta_mask).sum(0)
+            ll = (model.params[p]["LL"][:, n, :, q] * theta_mask).sum(0)
+            ul = (model.params[p]["UL"][:, n, :, q] * theta_mask).sum(0)
+            (item[f"{p}_specific_mean_q{q}"],) = ax[p].plot(
+                torch.arange(0, model.data.F)
+                if p == "height"
+                else torch.arange(0, model.data.F)[f_mask],
+                mean if p == "height" else mean[f_mask],
+                "-" if p == "height" else "o",
                 ms=2,
-                lw=1,
-                color=f"C{k}",
+                color=color[q],
             )
-            item[f"{p}_nonspecific{k}_fill"] = ax[p].fill_between(
+            item[f"{p}_specific_fill_q{q}"] = ax[p].fill_between(
                 torch.arange(0, model.data.F),
                 ll,
                 ul,
                 where=f_mask,
                 alpha=0.3,
-                color=f"C{k}",
+                color=color[q],
             )
-        # target-specific spots
-        f_mask = theta_mask.sum(0).bool()
-        mean = (model.params[p]["Mean"][:, n] * theta_mask).sum(0)
-        ll = (model.params[p]["LL"][:, n] * theta_mask).sum(0)
-        ul = (model.params[p]["UL"][:, n] * theta_mask).sum(0)
-        (item[f"{p}_specific_mean"],) = ax[p].plot(
-            torch.arange(0, model.data.F)
-            if p == "height"
-            else torch.arange(0, model.data.F)[f_mask],
-            mean if p == "height" else mean[f_mask],
-            "-" if p == "height" else "o",
-            ms=2,
-            color=color,
-        )
-        item[f"{p}_specific_fill"] = ax[p].fill_between(
+    for c in range(model.data.C):
+        (item[f"background_mean_c{c}"],) = ax["background"].plot(
             torch.arange(0, model.data.F),
-            ll,
-            ul,
-            where=f_mask,
-            alpha=0.3,
-            color=color,
+            model.params["background"]["Mean"][n, :, c],
+            "o-",
+            ms=3,
+            lw=1,
+            color=color[c],
         )
-    (item["background_mean"],) = ax["background"].plot(
-        torch.arange(0, model.data.F),
-        model.params["background"]["Mean"][n],
-        "o-",
-        ms=3,
-        lw=1,
-        color="k",
-    )
-    item["background_fill"] = ax["background"].fill_between(
-        torch.arange(0, model.data.F),
-        model.params["background"]["LL"][n],
-        model.params["background"]["UL"][n],
-        alpha=0.3,
-        color="k",
-    )
+        item[f"background_fill_c{c}"] = ax["background"].fill_between(
+            torch.arange(0, model.data.F),
+            model.params["background"]["LL"][n, :, c],
+            model.params["background"]["UL"][n, :, c],
+            alpha=0.3,
+            color=color[c],
+        )
 
-    (item["chi2"],) = ax["chi2"].plot(
-        torch.arange(0, model.data.F),
-        model.params["chi2"]["values"][n],
-        "-",
-        lw=1,
-        color="k",
-    )
+        (item[f"chi2_c{c}"],) = ax["chi2"].plot(
+            torch.arange(0, model.data.F),
+            model.params["chi2"]["values"][n, :, c],
+            "-",
+            lw=1,
+            color=color[c],
+        )
 
     if show_fov:
-        ax["glimpse"] = fig.add_subplot(gs2[0])
         P = DEFAULTS.pop("P")
         channels = DEFAULTS.pop("channels")
-        fov = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
-        fov.plot(
-            fov.dtypes,
-            P,
-            n=0,
-            f=0,
-            save=False,
-            ax=ax["glimpse"],
-            item=item,
-        )
+        for c in range(model.data.C):
+            ax[f"glimpse_c{c}"] = fig.add_subplot(gs2[c])
+            fov = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
+            fov.plot(
+                fov.dtypes,
+                P,
+                n=0,
+                f=0,
+                save=False,
+                ax=ax[f"glimpse_c{c}"],
+                item=item,
+            )
     else:
         fov = None
 
