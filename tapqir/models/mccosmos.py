@@ -9,7 +9,6 @@ mccosmos
 import itertools
 import math
 from functools import reduce
-from typing import Union
 
 import torch
 import torch.distributions.constraints as constraints
@@ -21,19 +20,19 @@ from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
-from tapqir.models.model import Model
+from tapqir.models.cosmos import cosmos
 
 
-class mccosmos(Model):
+class mccosmos(cosmos):
     r"""
     **Multi-Color Time-Independent Colocalization Model**
 
     :param K: Maximum number of spots that can be present in a single image.
     :param Q: Number of fluorescent dyes.
-    :param channels: Number of color channels.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
     name = "mccosmos"
@@ -42,31 +41,29 @@ class mccosmos(Model):
         self,
         K: int = 2,
         Q: int = 2,
-        channels: Union[tuple, list] = (0,),
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
-        background_mean_std: float = 1000,
-        background_std_std: float = 100,
-        lamda_rate: float = 1,
-        height_std: float = 10000,
-        width_min: float = 0.75,
-        width_max: float = 2.25,
-        proximity_rate: float = 1,
-        gain_std: float = 50,
+        priors: dict = {
+            "background_mean_std": 1000.0,
+            "background_std_std": 100.0,
+            "lamda_rate": 1.0,
+            "height_std": 10000.0,
+            "width_min": 0.75,
+            "width_max": 2.25,
+            "proximity_rate": 1.0,
+            "gain_std": 50.0,
+        },
     ):
-        S = 1
-        super().__init__(S, K, Q, channels, device, dtype)
-        self._global_params = ["gain", "proximity", "lamda", "pi"]
-        self.use_pykeops = use_pykeops
-        self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        super().__init__(K=K, Q=Q, device=device, dtype=dtype, priors=priors)
+        self._global_params = ["gain", "proximity", "lamda", "pi", "alpha"]
 
     def model(self):
         r"""
         Generative Model
         """
         # global parameters
-        gain = pyro.sample("gain", dist.HalfNormal(50))
+        gain = pyro.sample("gain", dist.HalfNormal(self.priors["gain_std"]))
         alpha = pyro.sample(
             "alpha",
             dist.Dirichlet(torch.tensor([[10.0, 1.0], [1.0, 10.0]])).to_event(1),
@@ -77,8 +74,15 @@ class mccosmos(Model):
             dist.Dirichlet(torch.ones((self.Q, self.S + 1)) / (self.S + 1)).to_event(1),
         )
         pi = expand_offtarget(pi)
-        lamda = pyro.sample("lamda", dist.Exponential(torch.ones(self.Q)).to_event(1))
-        proximity = pyro.sample("proximity", dist.Exponential(1))
+        lamda = pyro.sample(
+            "lamda",
+            dist.Exponential(torch.full((self.Q,), self.priors["lamda_rate"])).to_event(
+                1
+            ),
+        )
+        proximity = pyro.sample(
+            "proximity", dist.Exponential(self.priors["proximity_rate"])
+        )
         size = torch.stack(
             (
                 torch.full_like(proximity, 2.0),
@@ -111,15 +115,20 @@ class mccosmos(Model):
                 # background mean and std
                 background_mean = pyro.sample(
                     "background_mean",
-                    dist.HalfNormal(1000).expand((self.C,)).to_event(1),
+                    dist.HalfNormal(self.priors["background_mean_std"])
+                    .expand((self.data.C,))
+                    .to_event(1),
                 )
                 background_std = pyro.sample(
-                    "background_std", dist.HalfNormal(100).expand((self.C,)).to_event(1)
+                    "background_std",
+                    dist.HalfNormal(self.priors["background_std_std"])
+                    .expand((self.data.C,))
+                    .to_event(1),
                 )
                 with frames as fdx:
                     # fetch data
                     obs, target_locs, is_ontarget = self.data.fetch(
-                        ndx.unsqueeze(-1), fdx.unsqueeze(-1), self.cdx
+                        ndx.unsqueeze(-1), fdx.unsqueeze(-1), torch.arange(self.data.C)
                     )
                     # sample background intensity
                     background = pyro.sample(
@@ -395,36 +404,13 @@ class mccosmos(Model):
         data = self.data
         pyro.param(
             "alpha_mean",
-            lambda: torch.ones((self.Q, self.C), device=device)
+            lambda: torch.ones((self.Q, self.data.C), device=device)
             + torch.eye(self.Q, device=device) * 9,
             constraint=constraints.simplex,
         )
         pyro.param(
             "alpha_size",
             lambda: torch.full((self.Q, 1), 2, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "proximity_loc",
-            lambda: torch.tensor(0.5, device=device),
-            constraint=constraints.interval(
-                0,
-                (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "proximity_size",
-            lambda: torch.tensor(100, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            "lamda_loc",
-            lambda: torch.full((self.Q,), 0.5, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "lamda_beta",
-            lambda: torch.full((self.Q,), 100, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -437,92 +423,13 @@ class mccosmos(Model):
             lambda: torch.full((self.Q, 1), 2, device=device),
             constraint=constraints.positive,
         )
-
-        pyro.param(
-            "gain_loc",
-            lambda: torch.tensor(5, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "gain_beta",
-            lambda: torch.tensor(100, device=device),
-            constraint=constraints.positive,
-        )
-
-        data_median = data.median[self.cdx].to(device)
-        pyro.param(
-            "background_mean_loc",
-            lambda: (data_median - self.data.offset.mean).expand(data.Nt, 1, self.C),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "background_std_loc",
-            lambda: torch.ones(data.Nt, 1, self.C, device=device),
-            constraint=constraints.positive,
-        )
-
-        pyro.param(
-            "b_loc",
-            lambda: (data_median - self.data.offset.mean).expand(
-                data.Nt, data.F, self.C
-            ),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "b_beta",
-            lambda: torch.ones(data.Nt, data.F, self.C, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "h_loc",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "h_beta",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.001, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "w_mean",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 1.5, device=device),
-            constraint=constraints.interval(
-                0.75 + torch.finfo(self.dtype).eps,
-                2.25 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "w_size",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 100, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            "x_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "y_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "size",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
-
         pyro.param(
             "m_probs",
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
             constraint=constraints.unit_interval,
         )
+
+        self._init_parameters()
 
     def TraceELBO(self, jit=False):
         """

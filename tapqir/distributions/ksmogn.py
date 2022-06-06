@@ -162,7 +162,7 @@ class KSMOGN(TorchDistribution):
     def rsample(self, sample_shape=torch.Size()):
         odx = (
             Categorical(logits=self.offset_logits)
-            .expand(self.batch_shape + (self.P, self.P))
+            .expand(self.batch_shape + self.event_shape)
             .sample()
         )
         offset = self.offset_samples[odx]
