@@ -1,3 +1,4 @@
+# Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
@@ -209,31 +210,31 @@ class Model(nn.Module):
 
         with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
             for i in progress_bar(range(num_iter)):
-                try:
-                    self.iter_loss = self.svi.step()
-                    # save a checkpoint every 200 iterations
-                    if not self.iter % 200:
-                        self.save_checkpoint(writer)
-                        if use_crit and self.converged:
-                            logger.info(f"Iteration #{self.iter} model converged.")
-                            break
-                    self.iter += 1
-                except ValueError:
-                    # load last checkpoint
-                    self.init(
-                        lr=self.lr,
-                        nbatch_size=self.nbatch_size,
-                        fbatch_size=self.fbatch_size,
-                    )
-                    # change rng seed
-                    new_seed = random.randint(0, 100)
-                    pyro.set_rng_seed(new_seed)
-                    logger.debug(
-                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
-                    )
-                except RuntimeError as err:
-                    assert err.args[0].startswith("CUDA out of memory")
-                    raise CudaOutOfMemoryError()
+                #  try:
+                self.iter_loss = self.svi.step()
+                # save a checkpoint every 200 iterations
+                if not self.iter % 200:
+                    self.save_checkpoint(writer)
+                    if use_crit and self.converged:
+                        logger.info(f"Iteration #{self.iter} model converged.")
+                        break
+                self.iter += 1
+                #  except ValueError:
+                #      # load last checkpoint
+                #      self.init(
+                #          lr=self.lr,
+                #          nbatch_size=self.nbatch_size,
+                #          fbatch_size=self.fbatch_size,
+                #      )
+                #      # change rng seed
+                #      new_seed = random.randint(0, 100)
+                #      pyro.set_rng_seed(new_seed)
+                #      logger.debug(
+                #          f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                #      )
+                #  except RuntimeError as err:
+                #      assert err.args[0].startswith("CUDA out of memory")
+                #      raise CudaOutOfMemoryError()
             else:
                 logger.warning(f"Iteration #{self.iter} model has not converged.")
 
@@ -270,6 +271,10 @@ class Model(nn.Module):
                 self.converged = True
 
         # save the model state
+        torch.save(
+            self.state_dict(),
+            self.run_path / f"{self.full_name}-nn.tpqr",
+        )
         torch.save(
             {
                 "iter": self.iter,
@@ -331,6 +336,7 @@ class Model(nn.Module):
         device = self.device
         path = Path(path) if path else self.run_path
         model_path = path / f"{self.full_name}-model.tpqr"
+        nn_path = path / f"{self.full_name}-nn.tpqr"
         try:
             checkpoint = torch.load(model_path, map_location=device)
         except FileNotFoundError:
@@ -338,6 +344,7 @@ class Model(nn.Module):
 
         pyro.clear_param_store()
         pyro.get_param_store().set_state(checkpoint["params"])
+        self.load_state_dict(torch.load(nn_path))
         if not param_only:
             self.converged = checkpoint["convergence_status"]
             self._rolling = checkpoint["rolling"]
@@ -356,9 +363,9 @@ class Model(nn.Module):
         :param CI: credible region.
         :param save_matlab: Save output in Matlab format as well.
         """
-        try:
-            save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
-        except RuntimeError as err:
-            assert err.args[0].startswith("CUDA out of memory")
-            raise CudaOutOfMemoryError()
+        # try:
+        save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
+        #  except RuntimeError as err:
+        #      assert err.args[0].startswith("CUDA out of memory")
+        #      raise CudaOutOfMemoryError()
         logger.debug("Computing stats: Successful.")

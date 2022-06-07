@@ -32,7 +32,7 @@ class StatsMessenger(Messenger):
         self.ci_stats[name]["UL"] = torch.as_tensor(UL, device=torch.device("cpu"))
         self.ci_stats[name]["Mean"] = msg["fn"].mean.detach().cpu()
         msg["stop"] = True
-        msg["done"] = True
+        #  msg["done"] = True
 
     def __enter__(self):
         super().__enter__()
