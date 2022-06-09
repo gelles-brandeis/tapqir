@@ -3,19 +3,19 @@
 
 from tapqir.models.cosmos import cosmos
 from tapqir.models.hmm import HMM
-from tapqir.models.mccosmos import mccosmos
+from tapqir.models.crosstalk import crosstalk
 from tapqir.models.model import Model
 
 __all__ = [
     "models",
     "Model",
     "cosmos",
-    "mccosmos",
+    "crosstalk",
     "HMM",
 ]
 
 models = {
     cosmos.__name__: cosmos,
-    mccosmos.__name__: mccosmos,
+    crosstalk.__name__: crosstalk,
     HMM.name: HMM,
 }
