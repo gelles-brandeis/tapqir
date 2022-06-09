@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-mccosmos
-^^^^^^^^
+crosstalk
+^^^^^^^^^
 """
 
 import itertools
@@ -23,9 +23,9 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.cosmos import cosmos
 
 
-class mccosmos(cosmos):
+class crosstalk(cosmos):
     r"""
-    **Multi-Color Time-Independent Colocalization Model**
+    **Multi-Color Time-Independent Colocalization Model with Cross-Talk**
 
     :param K: Maximum number of spots that can be present in a single image.
     :param Q: Number of fluorescent dyes.
@@ -35,7 +35,7 @@ class mccosmos(cosmos):
     :param priors: Dictionary of parameters of prior distributions.
     """
 
-    name = "mccosmos"
+    name = "crosstalk"
 
     def __init__(
         self,
@@ -66,8 +66,9 @@ class mccosmos(cosmos):
         gain = pyro.sample("gain", dist.HalfNormal(self.priors["gain_std"]))
         alpha = pyro.sample(
             "alpha",
-            dist.Dirichlet(torch.tensor([[10.0, 1.0], [1.0, 10.0]])).to_event(1),
-            # dist.Dirichlet(torch.ones(self.Q, self.C)).to_event(1),
+            dist.Dirichlet(
+                torch.ones((self.Q, self.data.C)) + torch.eye(self.Q) * 9
+            ).to_event(1),
         )
         pi = pyro.sample(
             "pi",
