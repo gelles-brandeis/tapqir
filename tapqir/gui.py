@@ -1133,7 +1133,7 @@ def showNonspecific(checked, n, model, item, ax):
         if checked:
             # target-nonspecific spots
             for q in range(model.Q):
-                theta_mask = model.params["theta_probs"][:, n, :q] > 0.5
+                theta_mask = model.params["theta_probs"][:, n, :, q] > 0.5
                 j_mask = (model.params["m_probs"][:, n, :, q] > 0.5) & ~theta_mask
                 for k in range(model.K):
                     f_mask = j_mask[k]
