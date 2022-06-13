@@ -3,7 +3,7 @@
 
 import logging
 import random
-from collections import deque
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Union
 
@@ -42,24 +42,28 @@ class Model(nn.Module):
 
     :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param channels: Number of color channels.
+    :param Q: Number of fluorescent dyes.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
     def __init__(
         self,
         S: int = 1,
         K: int = 2,
-        channels: Union[tuple, list] = (0,),
+        Q: int = None,
         device: str = "cpu",
         dtype: str = "double",
+        priors: dict = None,
     ):
         self.S = S
         self.K = K
-        self.channels = channels
+        self._Q = Q
         self.nbatch_size = None
         self.fbatch_size = None
+        # priors settings
+        self.priors = priors
         # for plotting
         self.n = None
         self.f = None
@@ -96,6 +100,10 @@ class Model(nn.Module):
                 weights=self.data.offset.weights.to(self.device),
             )
 
+    @property
+    def Q(self):
+        return self._Q or self.data.C
+
     def load(self, path: Union[str, Path], data_only: bool = True) -> None:
         """
         Load data and optionally parameters from a specified path
@@ -114,18 +122,18 @@ class Model(nn.Module):
         # load fit results
         if not data_only:
             try:
-                self.params = torch.load(self.path / f"{self.full_name}-params.tpqr")
+                self.params = torch.load(self.path / f"{self.name}-params.tpqr")
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "parameter", self.path / f"{self.full_name}-params.tpqr"
+                    "parameter", self.path / f"{self.name}-params.tpqr"
                 )
             try:
                 self.summary = pd.read_csv(
-                    self.path / f"{self.full_name}-summary.csv", index_col=0
+                    self.path / f"{self.name}-summary.csv", index_col=0
                 )
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "summary", self.path / f"{self.full_name}-summary.csv"
+                    "summary", self.path / f"{self.name}-summary.csv"
                 )
 
     def model(self):
@@ -178,7 +186,7 @@ class Model(nn.Module):
             pyro.clear_param_store()
             self.iter = 0
             self.converged = False
-            self._rolling = {p: deque([], maxlen=100) for p in self.conv_params}
+            self._rolling = defaultdict(lambda: deque([], maxlen=100))
             self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)
@@ -208,33 +216,33 @@ class Model(nn.Module):
         logger.debug("AOI batch size - {}".format(self.nbatch_size))
         logger.debug("Frame batch size - {}".format(self.fbatch_size))
 
-        with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
+        with SummaryWriter(log_dir=self.run_path / "logs" / self.name) as writer:
             for i in progress_bar(range(num_iter)):
-                try:
-                    self.iter_loss = self.svi.step()
-                    # save a checkpoint every 200 iterations
-                    if not self.iter % 200:
-                        self.save_checkpoint(writer)
-                        if use_crit and self.converged:
-                            logger.info(f"Iteration #{self.iter} model converged.")
-                            break
-                    self.iter += 1
-                except ValueError:
-                    # load last checkpoint
-                    self.init(
-                        lr=self.lr,
-                        nbatch_size=self.nbatch_size,
-                        fbatch_size=self.fbatch_size,
-                    )
-                    # change rng seed
-                    new_seed = random.randint(0, 100)
-                    pyro.set_rng_seed(new_seed)
-                    logger.debug(
-                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
-                    )
-                except RuntimeError as err:
-                    assert err.args[0].startswith("CUDA out of memory")
-                    raise CudaOutOfMemoryError()
+                # try:
+                self.iter_loss = self.svi.step()
+                # save a checkpoint every 200 iterations
+                if not self.iter % 200:
+                    self.save_checkpoint(writer)
+                    if use_crit and self.converged:
+                        logger.info(f"Iteration #{self.iter} model converged.")
+                        break
+                self.iter += 1
+                #  except ValueError:
+                #      # load last checkpoint
+                #      self.init(
+                #          lr=self.lr,
+                #          nbatch_size=self.nbatch_size,
+                #          fbatch_size=self.fbatch_size,
+                #      )
+                #      # change rng seed
+                #      new_seed = random.randint(0, 100)
+                #      pyro.set_rng_seed(new_seed)
+                #      logger.debug(
+                #          f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                #      )
+                #  except RuntimeError as err:
+                #      assert err.args[0].startswith("CUDA out of memory")
+                #      raise CudaOutOfMemoryError()
             else:
                 logger.warning(f"Iteration #{self.iter} model has not converged.")
 
@@ -255,6 +263,9 @@ class Model(nn.Module):
         for name in self.conv_params:
             if name == "-ELBO":
                 self._rolling["-ELBO"].append(self.iter_loss)
+            elif pyro.param(name).ndim == 1:
+                for i in range(len(pyro.param(name))):
+                    self._rolling[f"{name}_{i}"].append(pyro.param(name)[i].item())
             else:
                 self._rolling[name].append(pyro.param(name).item())
 
@@ -271,19 +282,20 @@ class Model(nn.Module):
                 self.converged = True
 
         # save the model state
-        torch.save(
-            self.state_dict(),
-            self.run_path / f"{self.full_name}-nn.tpqr",
-        )
+        if self.name == "cosmosvae":
+            torch.save(
+                self.state_dict(),
+                self.run_path / f"{self.name}-nn.tpqr",
+            )
         torch.save(
             {
                 "iter": self.iter,
                 "params": pyro.get_param_store().get_state(),
                 "optimizer": self.optim.get_state(),
-                "rolling": self._rolling,
+                "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
             },
-            self.run_path / f"{self.full_name}-model.tpqr",
+            self.run_path / f"{self.name}-model.tpqr",
         )
 
         # save global paramters for tensorboard
@@ -335,8 +347,7 @@ class Model(nn.Module):
         """
         device = self.device
         path = Path(path) if path else self.run_path
-        model_path = path / f"{self.full_name}-model.tpqr"
-        nn_path = path / f"{self.full_name}-nn.tpqr"
+        model_path = path / f"{self.name}-model.tpqr"
         try:
             checkpoint = torch.load(model_path, map_location=device)
         except FileNotFoundError:
@@ -344,7 +355,9 @@ class Model(nn.Module):
 
         pyro.clear_param_store()
         pyro.get_param_store().set_state(checkpoint["params"])
-        self.load_state_dict(torch.load(nn_path))
+        if self.name == "cosmosvae":
+            nn_path = path / f"{self.name}-nn.tpqr"
+            self.load_state_dict(torch.load(nn_path))
         if not param_only:
             self.converged = checkpoint["convergence_status"]
             self._rolling = checkpoint["rolling"]

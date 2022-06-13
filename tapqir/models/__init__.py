@@ -1,21 +1,24 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
-from tapqir.models.cosmos import Cosmos
-from tapqir.models.cosmosvae import CosmosVAE
+from tapqir.models.cosmosvae import cosmosvae
+from tapqir.models.cosmos import cosmos
+from tapqir.models.crosstalk import crosstalk
 from tapqir.models.hmm import HMM
 from tapqir.models.model import Model
 
 __all__ = [
     "models",
     "Model",
-    "Cosmos",
-    "CosmosVAE",
+    "cosmosvae",
+    "cosmos",
+    "crosstalk",
     "HMM",
 ]
 
 models = {
-    Cosmos.name: Cosmos,
-    CosmosVAE.name: CosmosVAE,
+    cosmosvae.__name__: cosmosvae,
+    cosmos.__name__: cosmos,
+    crosstalk.__name__: crosstalk,
     HMM.name: HMM,
 }

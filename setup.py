@@ -68,6 +68,7 @@ setuptools.setup(
         "ipywidgets",
         "matplotlib",
         "pandas",
+        "protobuf>=3.9,<3.20",
         "pykeops>=2.0",
         "pyro-ppl==1.8.0",
         "pyyaml>=6.0",

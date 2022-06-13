@@ -6,7 +6,7 @@ import torch
 from typer.testing import CliRunner
 
 from tapqir.main import app
-from tapqir.models import HMM, Cosmos
+from tapqir.models import HMM, cosmos
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
@@ -17,10 +17,10 @@ requires_cuda = pytest.mark.skipif(
 runner = CliRunner()
 
 
-@pytest.fixture(params=[Cosmos, HMM])
+@pytest.fixture(params=[cosmos, HMM])
 def dataset_path(request, tmp_path):
     params = {}
-    if request.param == Cosmos:
+    if request.param == cosmos:
         model = request.param()
         params["pi"] = 0.15
     elif request.param == HMM:

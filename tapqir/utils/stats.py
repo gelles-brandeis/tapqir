@@ -8,7 +8,6 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import torch
-from pyro.ops.indexing import Vindex
 from pyro.ops.stats import hpdi, quantile
 from sklearn.metrics import (
     confusion_matrix,
@@ -77,7 +76,7 @@ def snr_and_chi2(
     snr_result = signal / noise
 
     # chi2 test
-    img_ideal = background[..., None, None] + gaussians.sum(-4)
+    img_ideal = background[..., None, None] + gaussians.sum(-5)
     chi2_result = (data - img_ideal - offset_mean) ** 2 / img_ideal
 
     return snr_result, chi2_result.mean(dim=(-1, -2))
@@ -96,44 +95,22 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     fbatch_size = model.fbatch_size
     model.nbatch_size = None
     model.fbatch_size = None
-    with StatsMessenger(CI=CI) as ci_stats:
+    with StatsMessenger(
+        CI=CI, K=model.K, N=model.data.Nt, F=model.data.F, Q=model.Q
+    ) as ci_stats:
         model.guide()
     model.nbatch_size = nbatch_size
     model.fbatch_size = fbatch_size
 
-    # combine K local params
-    for param in list(ci_stats.keys()):
-        if param.endswith("_0"):
-            base_name = param.split("_")[0]
-            ci_stats[base_name] = {}
-            ci_stats[base_name]["Mean"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["Mean"] for k in range(model.K)], dim=0
-            )
-            ci_stats[base_name]["LL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["LL"] for k in range(model.K)], dim=0
-            )
-            ci_stats[base_name]["UL"] = torch.stack(
-                [ci_stats[f"{base_name}_{k}"]["UL"] for k in range(model.K)], dim=0
-            )
-            for k in range(model.K):
-                del ci_stats[f"{base_name}_{k}"]
-
     for param in global_params:
-        if param == "pi":
-            summary.loc[param, "Mean"] = ci_stats[param]["Mean"][1].item()
-            summary.loc[param, "95% LL"] = ci_stats[param]["LL"][1].item()
-            summary.loc[param, "95% UL"] = ci_stats[param]["UL"][1].item()
-        elif param == "trans":
-            summary.loc["kon", "Mean"] = ci_stats[param]["Mean"][0, 1].item()
-            summary.loc["kon", "95% LL"] = ci_stats[param]["LL"][0, 1].item()
-            summary.loc["kon", "95% UL"] = ci_stats[param]["UL"][0, 1].item()
-            summary.loc["koff", "Mean"] = ci_stats[param]["Mean"][1, 0].item()
-            summary.loc["koff", "95% LL"] = ci_stats[param]["LL"][1, 0].item()
-            summary.loc["koff", "95% UL"] = ci_stats[param]["UL"][1, 0].item()
-        else:
+        if ci_stats[param]["Mean"].ndim == 0:
             summary.loc[param, "Mean"] = ci_stats[param]["Mean"].item()
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].item()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].item()
+        else:
+            summary.loc[param, "Mean"] = ci_stats[param]["Mean"].tolist()
+            summary.loc[param, "95% LL"] = ci_stats[param]["LL"].tolist()
+            summary.loc[param, "95% UL"] = ci_stats[param]["UL"].tolist()
     logger.info("- spot probabilities")
     ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
@@ -177,25 +154,27 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     # intensity of target-specific spots
     theta_mask = torch.argmax(ci_stats["theta_probs"], dim=0)
-    h_specific = Vindex(ci_stats["height"]["Mean"])[
-        theta_mask, torch.arange(model.data.Nt)[:, None], torch.arange(model.data.F)
-    ]
-    ci_stats["h_specific"] = h_specific * (ci_stats["z_map"] > 0).long()
+    #  h_specific = Vindex(ci_stats["height"]["Mean"])[
+    #      theta_mask, torch.arange(model.data.Nt)[:, None], torch.arange(model.data.F)
+    #  ]
+    #  ci_stats["h_specific"] = h_specific * (ci_stats["z_map"] > 0).long()
 
     model.params = ci_stats
 
     logger.info("- SNR and Chi2-test")
     # snr and chi2 test
-    snr = torch.zeros(model.K, model.data.Nt, model.data.F, device=torch.device("cpu"))
-    chi2 = torch.zeros(model.data.Nt, model.data.F, device=torch.device("cpu"))
+    snr = torch.zeros(
+        model.K, model.data.Nt, model.data.F, model.Q, device=torch.device("cpu")
+    )
+    chi2 = torch.zeros(model.data.Nt, model.data.F, model.Q, device=torch.device("cpu"))
     for n in range(model.data.Nt):
         snr[:, n], chi2[n] = snr_and_chi2(
-            model.data.images[n, :, model.cdx],
+            model.data.images[n],
             ci_stats["height"]["Mean"][:, n],
             ci_stats["width"]["Mean"][:, n],
             ci_stats["x"]["Mean"][:, n],
             ci_stats["y"]["Mean"][:, n],
-            model.data.xy[n, :, model.cdx],
+            model.data.xy[n],
             ci_stats["background"]["Mean"][n],
             ci_stats["gain"]["Mean"],
             model.data.offset.mean,
@@ -214,7 +193,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     # classification statistics
     if model.data.labels is not None:
         pred_labels = model.z_map[model.data.is_ontarget].cpu().numpy().ravel()
-        true_labels = model.data.labels["z"][: model.data.N, :, model.cdx].ravel()
+        true_labels = model.data.labels["z"][: model.data.N].ravel()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             summary.loc["MCC", "Mean"] = matthews_corrcoef(true_labels, pred_labels)
@@ -232,7 +211,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc["TP", "Mean"],
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
-        mask = torch.from_numpy(model.data.labels["z"][: model.data.N, :, model.cdx])
+        mask = torch.from_numpy(model.data.labels["z"][: model.data.N]) > 0
         samples = torch.masked_select(model.z_probs[model.data.is_ontarget].cpu(), mask)
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)
@@ -248,7 +227,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        param_path = path / f"{model.full_name}-params.tpqr"
+        param_path = path / f"{model.name}-params.tpqr"
         torch.save(ci_stats, param_path)
         logger.info(f"Parameters were saved in {param_path}")
         if save_matlab:
@@ -269,9 +248,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     continue
                 for stat, value in field.items():
                     ci_stats[param][stat] = np.asarray(value)
-            mat_path = path / f"{model.full_name}-params.mat"
+            mat_path = path / f"{model.name}-params.mat"
             savemat(mat_path, ci_stats)
             logger.info(f"Matlab parameters were saved in {mat_path}")
-        csv_path = path / f"{model.full_name}-summary.csv"
+        csv_path = path / f"{model.name}-summary.csv"
         summary.to_csv(csv_path)
         logger.info(f"Summary statistics were saved in {csv_path}")

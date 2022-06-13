@@ -58,10 +58,12 @@ class KSMOGN(TorchDistribution):
     :param gain: Camera gain.
     :param offset_samples: Offset samples from the empirical distribution.
     :param offset_logits: Offset log weights corresponding to the offset samples.
+    :param int P: Number of pixels along the axis.
     :param m: Spot presence indicator. Should be broadcastable
         to ``batch_shape + (K,)``.
+    :param alpha: Signal cross-talk coefficient matrix. Should be broadcastable
+        to ``(Q, C)``.
     :param bool use_pykeops: Use pykeops as backend to marginalize out offset.
-    :param int P: Number of pixels along the axis.
     """
 
     arg_constraints = {}
@@ -80,6 +82,7 @@ class KSMOGN(TorchDistribution):
         offset_logits: torch.Tensor,
         P: int,
         m: torch.Tensor = None,
+        alpha: torch.Tensor = None,
         use_pykeops: bool = True,
         validate_args=None,
     ):
@@ -89,11 +92,17 @@ class KSMOGN(TorchDistribution):
         self.x = x
         self.y = y
         self.target_locs = target_locs
-        self.background = background
-        self.gain = gain
         self.m = m
+        self.background = background[..., None, None]
+        if alpha is not None:
+            C = alpha.shape[-1]
+            self.gain = gain[..., None, None, None]
+            self.alpha = alpha[..., None, None, None]
+        else:
+            self.gain = gain[..., None, None]
+            self.alpha = alpha
+        self.rate = 1 / self.gain
 
-        self.rate = 1 / gain[..., None, None]
         self.offset_samples = offset_samples
         self.offset_logits = offset_logits
         self.P = P
@@ -108,10 +117,21 @@ class KSMOGN(TorchDistribution):
         )
         if m is not None:
             batch_shape = torch.broadcast_shapes(batch_shape, m.shape)
-        batch_shape = torch.broadcast_shapes(
-            batch_shape[:-1], background.shape, target_locs.shape[:-1]
-        )
+
         event_shape = torch.Size([P, P])
+        bg_shape = background.shape
+        target_shape = target_locs.shape[:-1]
+        # remove K dim
+        batch_shape = batch_shape[:-1]
+        if alpha is not None:
+            # remove Q dim
+            batch_shape = batch_shape[:-1]
+            # add C dim
+            event_shape = (C,) + event_shape
+            # remove C dim
+            bg_shape = bg_shape[:-1]
+            target_shape = target_shape[:-1]
+        batch_shape = torch.broadcast_shapes(batch_shape, bg_shape, target_shape)
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     @lazy_property
@@ -128,16 +148,21 @@ class KSMOGN(TorchDistribution):
 
     @lazy_property
     def image(self):
-        return self.background[..., None, None] + self.gaussians.sum(-3)
+        gaussians = self.gaussians
+        if self.alpha is not None:
+            # sum over the signal from multiple fluorescent dyes
+            gaussians = (gaussians.unsqueeze(-4) * self.alpha).sum(-5)
+        # sum the background and all the spots
+        return self.background + gaussians.sum(-3)
 
     @lazy_property
     def concentration(self):
-        return self.image / self.gain[..., None, None]
+        return self.image / self.gain
 
     def rsample(self, sample_shape=torch.Size()):
         odx = (
             Categorical(logits=self.offset_logits)
-            .expand(self.batch_shape + (self.P, self.P))
+            .expand(self.batch_shape + self.event_shape)
             .sample()
         )
         offset = self.offset_samples[odx]
@@ -200,4 +225,5 @@ class KSMOGN(TorchDistribution):
             )
             result = obs_logits + self.offset_logits + torch.log(mask)
             result = torch.logsumexp(result, -1)
-        return result.sum((-2, -1))
+        event_dims = tuple(-i for i in range(1, len(self.event_shape) + 1))
+        return result.sum(event_dims)
