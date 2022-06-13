@@ -1,8 +1,8 @@
 # Copyright Contributors to the Tapqir project.
 # SPDX-License-Identifier: Apache-2.0
 
-from tapqir.models.cosmosvae import cosmosvae
 from tapqir.models.cosmos import cosmos
+from tapqir.models.cosmosvae import cosmosvae
 from tapqir.models.crosstalk import crosstalk
 from tapqir.models.hmm import HMM
 from tapqir.models.model import Model

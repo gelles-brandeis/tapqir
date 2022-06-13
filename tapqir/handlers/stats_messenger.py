@@ -96,7 +96,7 @@ class StatsMessenger(Messenger):
             )
             self.ci_stats[base_name]["Mean"][k, :, :, q] = msg["fn"].mean.detach().cpu()
         msg["stop"] = True
-        #  msg["done"] = True
+        # msg["done"] = True
 
     def __enter__(self):
         super().__enter__()

@@ -2,20 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import math
-from typing import Union
 
 import torch
 import torch.distributions.constraints as constraints
 import torch.nn as nn
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
-from pyroapi import handlers, infer, pyro
+from pyroapi import handlers, pyro
 from torch.distributions import transforms
-from torch.distributions.utils import lazy_property
-from torch.nn.functional import one_hot
 
-from tapqir.distributions import KSMOGN, AffineBeta
-from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
+from tapqir.distributions import AffineBeta
 from tapqir.models.cosmos import cosmos
 
 
@@ -82,7 +78,9 @@ class Predict(nn.Module):
 
 class cosmosvae(cosmos):
     r"""
-    **Single-Color Time-Independent Colocalization Model**
+    *EXPERIMENTAL*
+
+    **Amortized Multi-Color Time-Independent Colocalization Model**
 
     **Reference**:
 
@@ -90,12 +88,11 @@ class cosmosvae(cosmos):
        Bayesian machine learning analysis of single-molecule fluorescence colocalization images.
        eLife. 2022 March. doi: `10.7554/eLife.73860 <https://doi.org/10.7554/eLife.73860>`_.
 
-    :param S: Number of distinct molecular states for the binder molecules.
     :param K: Maximum number of spots that can be present in a single image.
-    :param channels: Number of color channels.
     :param device: Computation device (cpu or gpu).
     :param dtype: Floating point precision.
     :param use_pykeops: Use pykeops as backend to marginalize out offset.
+    :param priors: Dictionary of parameters of prior distributions.
     """
 
     name = "cosmosvae"
