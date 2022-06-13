@@ -801,7 +801,7 @@ def updateParams(
         model.data.xy[n, frames, c],
         model.data.P,
     )
-    img_ideal = img_ideal + gaussian.sum(-4) *  model.params["background"]["Mean"][n, frames, None, None]
+    img_ideal = img_ideal + gaussian.sum(-4)
     for i, f in enumerate(range(f1, f2)):
         ax[f"image_{i}"].set_title(rf"${f}$", fontsize=9)
         item[f"image_{i}"].set_data(model.data.images[n, f, c].numpy())

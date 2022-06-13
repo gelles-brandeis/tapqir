@@ -210,31 +210,31 @@ class Model(nn.Module):
 
         with SummaryWriter(log_dir=self.run_path / "logs" / self.full_name) as writer:
             for i in progress_bar(range(num_iter)):
-                #  try:
-                self.iter_loss = self.svi.step()
-                # save a checkpoint every 200 iterations
-                if not self.iter % 200:
-                    self.save_checkpoint(writer)
-                    if use_crit and self.converged:
-                        logger.info(f"Iteration #{self.iter} model converged.")
-                        break
-                self.iter += 1
-                #  except ValueError:
-                #      # load last checkpoint
-                #      self.init(
-                #          lr=self.lr,
-                #          nbatch_size=self.nbatch_size,
-                #          fbatch_size=self.fbatch_size,
-                #      )
-                #      # change rng seed
-                #      new_seed = random.randint(0, 100)
-                #      pyro.set_rng_seed(new_seed)
-                #      logger.debug(
-                #          f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
-                #      )
-                #  except RuntimeError as err:
-                #      assert err.args[0].startswith("CUDA out of memory")
-                #      raise CudaOutOfMemoryError()
+                try:
+                    self.iter_loss = self.svi.step()
+                    # save a checkpoint every 200 iterations
+                    if not self.iter % 200:
+                        self.save_checkpoint(writer)
+                        if use_crit and self.converged:
+                            logger.info(f"Iteration #{self.iter} model converged.")
+                            break
+                    self.iter += 1
+                except ValueError:
+                    # load last checkpoint
+                    self.init(
+                        lr=self.lr,
+                        nbatch_size=self.nbatch_size,
+                        fbatch_size=self.fbatch_size,
+                    )
+                    # change rng seed
+                    new_seed = random.randint(0, 100)
+                    pyro.set_rng_seed(new_seed)
+                    logger.debug(
+                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                    )
+                except RuntimeError as err:
+                    assert err.args[0].startswith("CUDA out of memory")
+                    raise CudaOutOfMemoryError()
             else:
                 logger.warning(f"Iteration #{self.iter} model has not converged.")
 

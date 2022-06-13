@@ -90,9 +90,7 @@ class MLP(nn.Module):
 # Takes the guide RNN hidden state to parameters of the guide
 # distributions over z_where and z_pres.
 class Predict(nn.Module):
-    def __init__(
-        self, input_size, h_sizes, non_linear_layer
-    ):
+    def __init__(self, input_size, h_sizes, non_linear_layer):
         super().__init__()
         #  self.z_pres_size = z_pres_size
         #  self.z_where_size = z_where_size
@@ -115,7 +113,8 @@ class Predict(nn.Module):
         y_loc = transforms.ComposeTransform(
             [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
         )(y)
-        # breakpoint()
+        #  x_loc = torch.clamp(x, min=loc, max=loc+scale)
+        #  y_loc = torch.clamp(y, min=loc, max=loc+scale)
         return x_loc, y_loc
         # return z_pres_p, z_where_loc, z_where_scale
 
@@ -169,7 +168,7 @@ class CosmosVAE(Model):
         self.background_mean_std = background_mean_std
         self.background_std_std = background_std_std
         self.lamda_rate = lamda_rate
-        self.height_std = 100
+        self.height_std = height_std
         self.width_min = width_min
         self.width_max = width_max
         self.proximity_rate = proximity_rate
@@ -180,12 +179,10 @@ class CosmosVAE(Model):
         rnn_hidden_size = 256
         self.rnn = nn.LSTMCell(rnn_input_size, rnn_hidden_size)
         # self.encoder = Encoder(2, 400)
-        non_linearity="ReLU"
+        non_linearity = "ReLU"
         nl = getattr(nn, non_linearity)
         predict_net = [200]
-        self.predict = Predict(
-            rnn_hidden_size, predict_net, nl
-        )
+        self.predict = Predict(rnn_hidden_size, predict_net, nl)
 
         # Create parameters.
         self.h_init = nn.Parameter(torch.zeros(1, rnn_hidden_size))
@@ -315,7 +312,7 @@ class CosmosVAE(Model):
                             )
 
                         # append
-                        height = height * background
+                        # height = height * background
                         ms.append(m)
                         heights.append(height)
                         widths.append(width)
@@ -424,13 +421,16 @@ class CosmosVAE(Model):
                     #  h_loc, x_loc, y_loc = self.encoder(
                     #      (obs - self.data.offset.mean) / background[..., None, None] - 1
                     #  )
-                    data = (obs - self.data.offset.mean) / background[..., None, None] - 1
+                    # data = (obs - self.data.offset.mean) / background[..., None, None] - 1
+                    data = (obs - 90 - 150) / 150
                     #  batch_shape = data.shape[:-2]
                     #  shape = batch_shape + (196,)
-                    nbatch_size = data.shape[0]
-                    fbatch_size = data.shape[1]
+                    shape = background.shape
+                    #  nbatch_size = data.shape[0]
+                    #  fbatch_size = data.shape[1]
+                    data = data.expand(shape + (14, 14))
                     data = data.reshape(-1, 196)
-                    n = data.shape[0]
+                    n = torch.numel(background)
 
                     state = {
                         "h": self.h_init.expand(n, -1),
@@ -440,19 +440,11 @@ class CosmosVAE(Model):
                     }
                     for kdx in spots:
                         # state = self.guide_step(kdx, ndx, fdx, state, data)
-                        rnn_input = torch.cat(
-                            (data, state["x"], state["y"]), -1
-                        )
+                        rnn_input = torch.cat((data, state["x"], state["y"]), -1)
                         h, c = self.rnn(rnn_input, (state["h"], state["c"]))
                         x_loc, y_loc = self.predict(h)
-                        state = {
-                            "h": h,
-                            "c": c,
-                            "x": x_loc.unsqueeze(-1),
-                            "y": y_loc.unsqueeze(-1),
-                        }
-                        x_loc = x_loc.reshape(nbatch_size, fbatch_size)
-                        y_loc = y_loc.reshape(nbatch_size, fbatch_size)
+                        x_loc = x_loc.reshape(shape)
+                        y_loc = y_loc.reshape(shape)
                         # sample spot presence m
                         m = pyro.sample(
                             f"m_{kdx}",
@@ -471,17 +463,19 @@ class CosmosVAE(Model):
                                     * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
                                     Vindex(pyro.param("h_beta"))[kdx, ndx, fdx],
                                 ),
+                                # dist.Delta(torch.tensor(3000.0)),
                             )
                             pyro.sample(
                                 f"width_{kdx}",
-                                AffineBeta(
-                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
-                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
-                                    0.75,
-                                    2.25,
-                                ),
+                                #  AffineBeta(
+                                #      Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
+                                #      Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
+                                #      0.75,
+                                #      2.25,
+                                #  ),
+                                dist.Delta(torch.tensor(1.4)),
                             )
-                            pyro.sample(
+                            x = pyro.sample(
                                 f"x_{kdx}",
                                 AffineBeta(
                                     x_loc,
@@ -491,7 +485,7 @@ class CosmosVAE(Model):
                                     (self.data.P + 1) / 2,
                                 ),
                             )
-                            pyro.sample(
+                            y = pyro.sample(
                                 f"y_{kdx}",
                                 AffineBeta(
                                     y_loc,
@@ -502,6 +496,12 @@ class CosmosVAE(Model):
                                     (self.data.P + 1) / 2,
                                 ),
                             )
+                            state = {
+                                "h": h,
+                                "c": c,
+                                "x": x.reshape(-1, 1),
+                                "y": y.reshape(-1, 1),
+                            }
 
     def init_parameters(self):
         """

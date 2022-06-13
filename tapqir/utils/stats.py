@@ -147,6 +147,16 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         hmax = np.percentile(ci_stats["height"]["Mean"][theta_mask], 99)
     else:
         hmax = 1
+    ci_stats["width"] = {}
+    ci_stats["width"]["Mean"] = torch.full(
+        (model.K, model.data.Nt, model.data.F), 1.4, device=torch.device("cpu")
+    )
+    ci_stats["width"]["UL"] = torch.full(
+        (model.K, model.data.Nt, model.data.F), 1.4, device=torch.device("cpu")
+    )
+    ci_stats["width"]["LL"] = torch.full(
+        (model.K, model.data.Nt, model.data.F), 1.4, device=torch.device("cpu")
+    )
     ci_stats["height"]["vmin"] = -0.03 * hmax
     ci_stats["height"]["vmax"] = 1.3 * hmax
     ci_stats["width"]["vmin"] = 0.5
