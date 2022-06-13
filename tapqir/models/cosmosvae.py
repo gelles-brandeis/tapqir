@@ -95,16 +95,22 @@ class Predict(nn.Module):
         #  self.z_pres_size = z_pres_size
         #  self.z_where_size = z_where_size
         # output_size = z_pres_size + 2 * z_where_size
-        output_size = 2
+        output_size = 3
         self.mlp = MLP(input_size, h_sizes + [output_size], non_linear_layer)
 
     def forward(self, h):
         out = self.mlp(h)
         # z_pres_p = torch.sigmoid(out[:, 0 : self.z_pres_size])
-        x = out[:, 0]
-        y = out[:, 1]
+        w = out[:, 0]
+        x = out[:, 1]
+        y = out[:, 2]
         #  z_where_loc = out[:, self.z_pres_size : self.z_pres_size + self.z_where_size]
         #  z_where_scale = softplus(out[:, (self.z_pres_size + self.z_where_size) :])
+        w_min = 0.75 + torch.finfo(x.dtype).eps
+        w_scale = 1.5 - 2 * torch.finfo(x.dtype).eps
+        w_mean = transforms.ComposeTransform(
+            [transforms.SigmoidTransform(), transforms.AffineTransform(w_min, w_scale)]
+        )(w)
         loc = -(14 + 1) / 2 + torch.finfo(x.dtype).eps
         scale = (14 + 1) - 2 * torch.finfo(x.dtype).eps
         x_loc = transforms.ComposeTransform(
@@ -115,7 +121,7 @@ class Predict(nn.Module):
         )(y)
         #  x_loc = torch.clamp(x, min=loc, max=loc+scale)
         #  y_loc = torch.clamp(y, min=loc, max=loc+scale)
-        return x_loc, y_loc
+        return w_mean, x_loc, y_loc
         # return z_pres_p, z_where_loc, z_where_scale
 
 
@@ -175,7 +181,7 @@ class CosmosVAE(Model):
         self.gain_std = gain_std
 
         # AIR
-        rnn_input_size = 14 * 14 + 2
+        rnn_input_size = 14 * 14 + 3
         rnn_hidden_size = 256
         self.rnn = nn.LSTMCell(rnn_input_size, rnn_hidden_size)
         # self.encoder = Encoder(2, 400)
@@ -187,6 +193,7 @@ class CosmosVAE(Model):
         # Create parameters.
         self.h_init = nn.Parameter(torch.zeros(1, rnn_hidden_size))
         self.c_init = nn.Parameter(torch.zeros(1, rnn_hidden_size))
+        self.w_init = nn.Parameter(torch.zeros(1, 1))
         self.x_init = nn.Parameter(torch.zeros(1, 1))
         self.y_init = nn.Parameter(torch.zeros(1, 1))
 
@@ -435,14 +442,18 @@ class CosmosVAE(Model):
                     state = {
                         "h": self.h_init.expand(n, -1),
                         "c": self.c_init.expand(n, -1),
+                        "w": self.w_init.expand(n, -1),
                         "x": self.x_init.expand(n, -1),
                         "y": self.y_init.expand(n, -1),
                     }
                     for kdx in spots:
                         # state = self.guide_step(kdx, ndx, fdx, state, data)
-                        rnn_input = torch.cat((data, state["x"], state["y"]), -1)
+                        rnn_input = torch.cat(
+                            (data, state["w"], state["x"], state["y"]), -1
+                        )
                         h, c = self.rnn(rnn_input, (state["h"], state["c"]))
-                        x_loc, y_loc = self.predict(h)
+                        w_mean, x_loc, y_loc = self.predict(h)
+                        w_mean = w_mean.reshape(shape)
                         x_loc = x_loc.reshape(shape)
                         y_loc = y_loc.reshape(shape)
                         # sample spot presence m
@@ -465,15 +476,16 @@ class CosmosVAE(Model):
                                 ),
                                 # dist.Delta(torch.tensor(3000.0)),
                             )
-                            pyro.sample(
+                            w = pyro.sample(
                                 f"width_{kdx}",
-                                #  AffineBeta(
-                                #      Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
-                                #      Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
-                                #      0.75,
-                                #      2.25,
-                                #  ),
-                                dist.Delta(torch.tensor(1.4)),
+                                AffineBeta(
+                                    w_mean,
+                                    # Vindex(pyro.param("w_mean"))[kdx, ndx, fdx],
+                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx],
+                                    0.75,
+                                    2.25,
+                                ),
+                                # dist.Delta(torch.tensor(1.4)),
                             )
                             x = pyro.sample(
                                 f"x_{kdx}",
@@ -499,6 +511,7 @@ class CosmosVAE(Model):
                             state = {
                                 "h": h,
                                 "c": c,
+                                "w": w.reshape(-1, 1),
                                 "x": x.reshape(-1, 1),
                                 "y": y.reshape(-1, 1),
                             }
@@ -608,35 +621,35 @@ class CosmosVAE(Model):
             lambda: torch.full((self.K, data.Nt, data.F), 0.001, device=device),
             constraint=constraints.positive,
         )
-        pyro.param(
-            "w_mean",
-            lambda: torch.full((self.K, data.Nt, data.F), 1.5, device=device),
-            constraint=constraints.interval(
-                0.75 + torch.finfo(self.dtype).eps,
-                2.25 - torch.finfo(self.dtype).eps,
-            ),
-        )
+        #  pyro.param(
+        #      "w_mean",
+        #      lambda: torch.full((self.K, data.Nt, data.F), 1.5, device=device),
+        #      constraint=constraints.interval(
+        #          0.75 + torch.finfo(self.dtype).eps,
+        #          2.25 - torch.finfo(self.dtype).eps,
+        #      ),
+        #  )
         pyro.param(
             "w_size",
             lambda: torch.full((self.K, data.Nt, data.F), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
-        pyro.param(
-            "x_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "y_mean",
-            lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
-            constraint=constraints.interval(
-                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-            ),
-        )
+        #  pyro.param(
+        #      "x_mean",
+        #      lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
+        #      constraint=constraints.interval(
+        #          -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+        #          (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+        #      ),
+        #  )
+        #  pyro.param(
+        #      "y_mean",
+        #      lambda: torch.zeros(self.K, data.Nt, data.F, device=device),
+        #      constraint=constraints.interval(
+        #          -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+        #          (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+        #      ),
+        #  )
         pyro.param(
             "size",
             lambda: torch.full((self.K, data.Nt, data.F), 200, device=device),
