@@ -282,7 +282,7 @@ class Model(nn.Module):
                 self.converged = True
 
         # save the model state
-        if self.name == "cosmosvae":
+        if self.name.startswith("cosmosnn"):
             torch.save(
                 self.state_dict(),
                 self.run_path / f"{self.name}-nn.tpqr",
@@ -355,7 +355,7 @@ class Model(nn.Module):
 
         pyro.clear_param_store()
         pyro.get_param_store().set_state(checkpoint["params"])
-        if self.name == "cosmosvae":
+        if self.name.startswith("cosmosnn"):
             nn_path = path / f"{self.name}-nn.tpqr"
             self.load_state_dict(torch.load(nn_path))
         if not param_only:

@@ -33,15 +33,28 @@ class StatsMessenger(Messenger):
     def _pyro_sample(self, msg):
         if (
             type(msg["fn"]).__name__ == "_Subsample"
-            or msg["infer"].get("enumerate", None) == "parallel"
+            # or msg["infer"].get("enumerate", None) == "parallel"
         ):
             return
         name = msg["name"]
+        args = re.split("_k|_q", name)
+        if name.startswith("m"):
+            base_name, k = args
+            k = int(k)
+            if k == 0:
+                self.ci_stats["m_probs"] = {}
+                self.ci_stats["m_probs"] = torch.zeros(
+                    self.K, self.N, self.F, self.Q, device=torch.device("cpu")
+                )
+            self.ci_stats["m_probs"][k] = torch.as_tensor(
+                msg["fn"].probs, device=torch.device("cpu")
+            )
+            msg["stop"] = True
+            return
         scipy_dist = torch_to_scipy_dist(msg["fn"])
         if scipy_dist is None:
             return
         LL, UL = scipy_dist.interval(alpha=self.CI)
-        args = re.split("_k|_q", name)
         if len(args) == 1:
             (base_name,) = args
             self.ci_stats[base_name] = {}

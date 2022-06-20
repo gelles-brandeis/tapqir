@@ -46,37 +46,39 @@ class MLP(nn.Module):
 class Predict(nn.Module):
     def __init__(self, input_size, h_sizes, non_linear_layer):
         super().__init__()
-        #  self.z_pres_size = z_pres_size
-        #  self.z_where_size = z_where_size
-        # output_size = z_pres_size + 2 * z_where_size
-        output_size = 3
+        output_size = 8
         self.mlp = MLP(input_size, h_sizes + [output_size], non_linear_layer)
 
     def forward(self, h):
         out = self.mlp(h)
-        # z_pres_p = torch.sigmoid(out[:, 0 : self.z_pres_size])
-        w = out[:, 0]
-        x = out[:, 1]
-        y = out[:, 2]
-        #  z_where_loc = out[:, self.z_pres_size : self.z_pres_size + self.z_where_size]
-        #  z_where_scale = softplus(out[:, (self.z_pres_size + self.z_where_size) :])
-        w_min = 0.75 + torch.finfo(x.dtype).eps
-        w_scale = 1.5 - 2 * torch.finfo(x.dtype).eps
+        eps = torch.finfo(out.dtype).eps
+        loc = -(14 + 1) / 2 + eps
+        scale = (14 + 1) - 2 * eps
+        w_min = 0.75 + eps
+        w_scale = 1.5 - 2 * eps
+        # params
+        m_probs = transforms.SigmoidTransform()(out[:, 0])
+        h_loc = transforms.ExpTransform()(out[:, 1])
+        h_beta = transforms.ExpTransform()(out[:, 2])
         w_mean = transforms.ComposeTransform(
             [transforms.SigmoidTransform(), transforms.AffineTransform(w_min, w_scale)]
-        )(w)
-        loc = -(14 + 1) / 2 + torch.finfo(x.dtype).eps
-        scale = (14 + 1) - 2 * torch.finfo(x.dtype).eps
-        x_loc = transforms.ComposeTransform(
+        )(out[:, 3])
+        w_size = transforms.ComposeTransform(
+            [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
+        )(out[:, 4])
+        x_mean = transforms.ComposeTransform(
             [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
-        )(x)
-        y_loc = transforms.ComposeTransform(
+        )(out[:, 5])
+        y_mean = transforms.ComposeTransform(
             [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
-        )(y)
-        return w_mean, x_loc, y_loc
+        )(out[:, 6])
+        size = transforms.ComposeTransform(
+            [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
+        )(out[:, 7])
+        return m_probs, h_loc, h_beta, w_mean, w_size, x_mean, y_mean, size
 
 
-class cosmosvae(cosmos):
+class cosmosnn(cosmos):
     r"""
     *EXPERIMENTAL*
 
@@ -95,7 +97,7 @@ class cosmosvae(cosmos):
     :param priors: Dictionary of parameters of prior distributions.
     """
 
-    name = "cosmosvae"
+    name = "cosmosnn0"
 
     def __init__(
         self,
@@ -121,7 +123,7 @@ class cosmosvae(cosmos):
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
 
         # AIR
-        p = 3
+        p = 4
         rnn_input_size = 14 * 14 + p
         rnn_hidden_size = 256
         self.rnn = nn.LSTMCell(rnn_input_size, rnn_hidden_size)
@@ -133,6 +135,7 @@ class cosmosvae(cosmos):
         # Create parameters.
         self.h_init = nn.Parameter(torch.zeros(1, rnn_hidden_size))
         self.c_init = nn.Parameter(torch.zeros(1, rnn_hidden_size))
+        self.height_init = nn.Parameter(torch.zeros(1, 1))
         self.width_init = nn.Parameter(torch.zeros(1, 1))
         self.x_init = nn.Parameter(torch.zeros(1, 1))
         self.y_init = nn.Parameter(torch.zeros(1, 1))
@@ -143,6 +146,7 @@ class cosmosvae(cosmos):
         pyro.module("rnn", self.rnn)
         pyro.param("h_init", self.h_init)
         pyro.param("c_init", self.c_init)
+        pyro.param("height_init", self.height_init)
         pyro.param("width_init", self.width_init)
         pyro.param("x_init", self.x_init)
         pyro.param("y_init", self.y_init)
@@ -227,7 +231,8 @@ class cosmosvae(cosmos):
                     # fetch data
                     obs, _, __ = self.data.fetch(ndx, fdx, cdx)
                     # data = (obs - self.data.offset.mean) / background[..., None, None] - 1
-                    data = (obs - 90 - 150) / 150
+                    data = (obs - 90 - 150) / 100
+                    # data = (obs - self.data.offset.mean - background[..., None, None]) / 100
                     shape = background.shape
                     data = data.expand(shape + (14, 14))
                     data = data.reshape(-1, 196)
@@ -236,51 +241,71 @@ class cosmosvae(cosmos):
                     state = {
                         "h": self.h_init.expand(n, -1),
                         "c": self.c_init.expand(n, -1),
-                        "w": self.width_init.expand(n, -1),
+                        "height": self.height_init.expand(n, -1),
+                        "width": self.width_init.expand(n, -1),
                         "x": self.x_init.expand(n, -1),
                         "y": self.y_init.expand(n, -1),
                     }
                     for kdx in spots:
                         # state = self.guide_step(kdx, ndx, fdx, state, data)
                         rnn_input = torch.cat(
-                            (data, state["w"], state["x"], state["y"]), -1
+                            (
+                                data,
+                                state["height"],
+                                state["width"],
+                                state["x"],
+                                state["y"],
+                            ),
+                            -1,
                         )
                         h, c = self.rnn(rnn_input, (state["h"], state["c"]))
-                        w_mean, x_loc, y_loc = self.predict(h)
+                        m_probs, h_loc, h_beta, w_mean, w_size, x_mean, y_mean, size = self.predict(h)
+                        m_probs = m_probs.reshape(shape)
+                        h_loc = h_loc.reshape(shape)
+                        h_beta = h_beta.reshape(shape)
                         w_mean = w_mean.reshape(shape)
-                        x_loc = x_loc.reshape(shape)
-                        y_loc = y_loc.reshape(shape)
+                        w_size = w_size.reshape(shape)
+                        x_mean = x_mean.reshape(shape)
+                        y_mean = y_mean.reshape(shape)
+                        size = size.reshape(shape)
                         # sample spot presence m
                         m = pyro.sample(
                             f"m_k{kdx}",
                             dist.Bernoulli(
+                                # m_probs
                                 Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
                             ),
                             infer={"enumerate": "parallel"},
                         )
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
-                            pyro.sample(
+                            height = pyro.sample(
                                 f"height_k{kdx}",
+                                #  dist.Gamma(
+                                #      h_loc * h_beta,
+                                #      h_beta
+                                #  ),
                                 dist.Gamma(
                                     Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
                                     * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
                                 ),
                             )
-                            w = pyro.sample(
+                            width = pyro.sample(
                                 f"width_k{kdx}",
                                 AffineBeta(
                                     w_mean,
+                                    # w_size,
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
                                     0.75,
-                                    2.25,
+                                    2.25
                                 ),
                             )
                             x = pyro.sample(
                                 f"x_k{kdx}",
                                 AffineBeta(
-                                    x_loc,
+                                    x_mean,
+                                    # size,
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
@@ -289,7 +314,8 @@ class cosmosvae(cosmos):
                             y = pyro.sample(
                                 f"y_k{kdx}",
                                 AffineBeta(
-                                    y_loc,
+                                    y_mean,
+                                    # size,
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
@@ -298,7 +324,8 @@ class cosmosvae(cosmos):
                             state = {
                                 "h": h,
                                 "c": c,
-                                "w": w.reshape(-1, 1),
+                                "height": height.reshape(-1, 1),
+                                "width": width.reshape(-1, 1),
                                 "x": x.reshape(-1, 1),
                                 "y": y.reshape(-1, 1),
                             }
@@ -414,3 +441,11 @@ class cosmosvae(cosmos):
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
+
+    #  @property
+    #  def m_probs(self) -> torch.Tensor:
+    #      r"""
+    #      Posterior spot presence probability :math:`q(m=1)`.
+    #      """
+    #      return torch.ones(self.K, self.data.Nt, self.data.F, self.Q)
+    #      # return pyro.param("m_probs").data
