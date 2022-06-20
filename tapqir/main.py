@@ -44,6 +44,7 @@ def format_link(link):
 class avail_models(str, Enum):
     cosmos = "cosmos"
     crosstalk = "crosstalk"
+    hmm = "cosmos+hmm"
 
 
 def get_default(key):
@@ -431,6 +432,8 @@ def fit(
             )
 
     backend = "funsor" if funsor else "pyro"
+    if model == "cosmos+hmm":
+        backend = "funsor"
     if backend == "pyro":
         PYRO_BACKEND = "pyro"
     elif backend == "funsor":

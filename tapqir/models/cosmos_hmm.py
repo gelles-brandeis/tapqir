@@ -23,7 +23,7 @@ from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.models.cosmos import cosmos
 
 
-class HMM(cosmos):
+class hmm(cosmos):
     r"""
     **Multi-Color Hidden Markov Colocalization Model**
 
@@ -37,7 +37,7 @@ class HMM(cosmos):
     :param priors: Dictionary of parameters of prior distributions.
     """
 
-    name = "hmm"
+    name = "cosmos+hmm"
 
     def __init__(
         self,
@@ -490,11 +490,11 @@ class HMM(cosmos):
             sum_terms.append(logits)
         # handle root case
         sum_term = sum_terms.pop()
-        left_term = HMM._contraction_identity(sum_term)
+        left_term = hmm._contraction_identity(sum_term)
         # down sweep
         while sum_terms:
             sum_term = sum_terms.pop()
-            new_left_term = HMM._contraction_identity(sum_term)
+            new_left_term = hmm._contraction_identity(sum_term)
             time = sum_term.size(-3)
             even_time = time // 2 * 2
             if time > even_time:
