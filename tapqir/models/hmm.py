@@ -137,7 +137,8 @@ class hmm(cosmos):
                 for fdx in frames:
                     if self.vectorized:
                         fsx, fdx = fdx
-                        fdx = fdx[:, None]
+                        fdx = torch.as_tensor(fdx)
+                        fdx = fdx.unsqueeze(-1)
                     else:
                         fsx = fdx
                     # fetch data
@@ -321,7 +322,8 @@ class hmm(cosmos):
                 for fdx in frames:
                     if self.vectorized:
                         fsx, fdx = fdx
-                        fdx = fdx[:, None]
+                        fdx = torch.as_tensor(fdx)
+                        fdx = fdx.unsqueeze(-1)
                     else:
                         fsx = fdx
                     # sample background intensity
