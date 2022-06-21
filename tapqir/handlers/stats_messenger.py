@@ -21,6 +21,7 @@ class StatsMessenger(Messenger):
         N: int = None,
         F: int = None,
         Q: int = None,
+        C: int = None,
     ):
         super().__init__()
         self.CI = CI
@@ -29,6 +30,7 @@ class StatsMessenger(Messenger):
         self.N = N
         self.F = F
         self.Q = Q
+        self.C = C
 
     def _pyro_sample(self, msg):
         if (
@@ -41,8 +43,8 @@ class StatsMessenger(Messenger):
         if scipy_dist is None:
             return
         LL, UL = scipy_dist.interval(alpha=self.CI)
-        args = re.split("_k|_q", name)
-        if len(args) == 1:
+        args = re.split("_k|_q|_f", name)
+        if re.fullmatch("[a-z]+", name):
             (base_name,) = args
             self.ci_stats[base_name] = {}
             self.ci_stats[base_name]["LL"] = torch.as_tensor(
@@ -52,7 +54,7 @@ class StatsMessenger(Messenger):
                 UL, device=torch.device("cpu")
             )
             self.ci_stats[base_name]["Mean"] = msg["fn"].mean.detach().cpu()
-        elif len(args) == 2:
+        elif re.fullmatch("[a-z]+_k[0-9]", name):
             base_name, k = args
             k = int(k)
             if k == 0:
@@ -73,7 +75,7 @@ class StatsMessenger(Messenger):
                 UL, device=torch.device("cpu")
             )
             self.ci_stats[base_name]["Mean"][k] = msg["fn"].mean.detach().cpu()
-        elif len(args) == 3:
+        elif re.fullmatch("[a-z]+_k[0-9]_q[0-9]", name):
             base_name, k, q = args
             k, q = int(k), int(q)
             assert self.Q > 1
@@ -95,8 +97,33 @@ class StatsMessenger(Messenger):
                 UL, device=torch.device("cpu")
             )
             self.ci_stats[base_name]["Mean"][k, :, :, q] = msg["fn"].mean.detach().cpu()
+        elif re.fullmatch("[a-z]+_f[0-9]+", name):
+            base_name, f = args
+            breakpoint()
+            f = int(f)
+            if f == 0:
+                self.ci_stats[base_name] = {}
+                self.ci_stats[base_name]["LL"] = torch.zeros(
+                    self.N, self.F, self.C, device=torch.device("cpu")
+                )
+                self.ci_stats[base_name]["UL"] = torch.zeros(
+                    self.N, self.F, self.C, device=torch.device("cpu")
+                )
+                self.ci_stats[base_name]["Mean"] = torch.zeros(
+                    self.N, self.F, self.C, device=torch.device("cpu")
+                )
+            #  self.ci_stats[base_name]["LL"][k] = torch.as_tensor(
+            #      LL, device=torch.device("cpu")
+            #  )
+            #  self.ci_stats[base_name]["UL"][k] = torch.as_tensor(
+            #      UL, device=torch.device("cpu")
+            #  )
+            #  self.ci_stats[base_name]["Mean"][k] = msg["fn"].mean.detach().cpu()
+        else:
+            breakpoint()
+            pass
         msg["stop"] = True
-        msg["done"] = True
+        # msg["done"] = True
 
     def __enter__(self):
         super().__enter__()
