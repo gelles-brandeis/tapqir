@@ -64,6 +64,17 @@ class cosmos(Model):
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
+        self.ci_params = [
+            "gain",
+            "pi",
+            "lamda",
+            "proximity",
+            "background",
+            "height",
+            "width",
+            "x",
+            "y",
+        ]
 
     def model(self):
         r"""
@@ -428,8 +439,8 @@ class cosmos(Model):
                                 AffineBeta(
                                     Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
-                                    0.75,
-                                    2.25,
+                                    self.priors["width_min"],
+                                    self.priors["width_max"],
                                 ),
                             )
                             pyro.sample(

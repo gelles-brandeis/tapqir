@@ -3,7 +3,7 @@
 
 from tapqir.models.cosmos import cosmos
 from tapqir.models.crosstalk import crosstalk
-from tapqir.models.hmm import HMM
+from tapqir.models.hmm import hmm
 from tapqir.models.model import Model
 
 __all__ = [
@@ -11,11 +11,11 @@ __all__ = [
     "Model",
     "cosmos",
     "crosstalk",
-    "HMM",
+    "hmm",
 ]
 
 models = {
-    cosmos.__name__: cosmos,
-    crosstalk.__name__: crosstalk,
-    HMM.name: HMM,
+    cosmos.name: cosmos,
+    crosstalk.name: crosstalk,
+    hmm.name: hmm,
 }
