@@ -385,8 +385,8 @@ class hmm(cosmos):
                                 AffineBeta(
                                     Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
-                                    0.75,
-                                    2.25,
+                                    self.priors["width_min"],
+                                    self.priors["width_max"],
                                 ),
                             )
                             pyro.sample(

@@ -433,7 +433,7 @@ def fit(
 
     backend = "funsor" if funsor else "pyro"
     if model == "cosmos+hmm":
-        backend = "funsor"
+        backend = "funsor"  # hmm requires funsor backend
     if backend == "pyro":
         PYRO_BACKEND = "pyro"
     elif backend == "funsor":
