@@ -305,18 +305,30 @@ def glimpseUI(out, DEFAULTS):
         ),
     )
     layout.add_child(
+        "num_lasers",
+        widgets.BoundedIntText(
+            value=DEFAULTS["num-lasers"],
+            min=1,
+            max=4,
+            step=1,
+            description="Number of excitation lasers",
+            style={"description_width": "initial"},
+        ),
+    )
+    layout.add_child(
         "num_channels",
         widgets.BoundedIntText(
             value=DEFAULTS["num-channels"],
             min=1,
             max=4,
             step=1,
-            description="Number of color channels",
+            description="Number of emission channels",
             style={"description_width": "initial"},
         ),
     )
     layout.add_child("channels", widgets.Tab())
     channelUI(
+        layout["num_lasers"].value,
         layout["num_channels"].value,
         layout["channels"],
         layout["use_offtarget"],
@@ -324,9 +336,22 @@ def glimpseUI(out, DEFAULTS):
     )
     layout.add_child("extract_aois", widgets.Button(description="Extract AOIs"))
     # Callbacks
-    layout["num_channels"].observe(
+    layout["num_lasers"].observe(
         partial(
             channelUI,
+            C=layout["num_channels"],
+            channelTabs=layout["channels"],
+            useOfftarget=layout["use_offtarget"],
+            DEFAULTS=DEFAULTS,
+        ),
+        names="value",
+    )
+    layout["num_channels"].observe(
+        partial(
+            lambda C, L, channelTabs, useOfftarget, DEFAULTS: channelUI(
+                L, C, channelTabs, useOfftarget, DEFAULTS
+            ),
+            L=layout["num_lasers"],
             channelTabs=layout["channels"],
             useOfftarget=layout["use_offtarget"],
             DEFAULTS=DEFAULTS,
@@ -362,13 +387,15 @@ def glimpseCmd(b, layout, out):
     out.clear_output(wait=True)
 
 
-def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
+def channelUI(L, C, channelTabs, useOfftarget, DEFAULTS):
+    L = get_value(L)
     C = get_value(C)
-    currentC = len(channelTabs.children)
-    for c in range(max(currentC, C)):
-        if c < C and c < currentC:
-            continue
-        elif c < C and c >= currentC:
+    # currentC = len(channelTabs.children)
+    for ldx in range(L):
+        for cdx in range(C):
+            c = ldx * C + cdx
+            #  if c < currentC:
+            #      continue
             if len(DEFAULTS["channels"]) < c + 1:
                 DEFAULTS["channels"].append(defaultdict(lambda: None))
             layout = inputBox()
@@ -417,8 +444,8 @@ def channelUI(C, channelTabs, useOfftarget, DEFAULTS):
                 )
                 layout["offtarget_aoiinfo"]._apply_selection()
             channelTabs.children = channelTabs.children + (layout,)
-        channelTabs.set_title(c, f"Channel #{c}")
-    channelTabs.children = channelTabs.children[:C]
+            channelTabs.set_title(c, f"Laser #{ldx} Channel #{cdx}")
+    channelTabs.children = channelTabs.children[: C * L]
 
 
 def fitUI(out, DEFAULTS):

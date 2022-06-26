@@ -52,7 +52,7 @@ class GlimpseDataset:
     :param ontarget-labels: Path to the on-target label intervals file.
     """
 
-    def __init__(self, c=0, **kwargs):
+    def __init__(self, l=0, c=0, **kwargs):
         dtypes = ["ontarget"]
         if kwargs["use-offtarget"]:
             dtypes.append("offtarget")
@@ -158,6 +158,7 @@ class GlimpseDataset:
         self.cumdrift = drift_df
         self.labels = labels
         self.name = kwargs["name"]
+        self.l = l
         self.c = c
         self.offset_x = kwargs["offset-x"]
         self.offset_y = kwargs["offset-y"]
@@ -306,6 +307,7 @@ def read_glimpse(path, progress_bar, **kwargs):
     Preprocess glimpse files.
     """
     P = kwargs.pop("P")
+    L = kwargs.pop("num-lasers")
     C = kwargs.pop("num-channels")
     name = kwargs.pop("dataset")
     channels = kwargs.pop("channels")
@@ -320,81 +322,95 @@ def read_glimpse(path, progress_bar, **kwargs):
     labels = defaultdict(list)
     time1 = []
     ttb = []
-    for c in range(C):
-        logger.info(f"Channel #{c} ({channels[c]['name']})")
-        glimpse = GlimpseDataset(**kwargs, **channels[c], c=c)
+    for ldx in range(L):
+        for cdx in range(C):
+            c = ldx * C + cdx
+            logger.info(f"Laser #{ldx} Channel #{cdx} ({channels[c]['name']})")
+            glimpse = GlimpseDataset(**kwargs, **channels[c], l=ldx, c=cdx)
 
-        raw_target_xy = {}
-        colors = {}
-        colors["ontarget"] = "#AA3377"
-        colors["offtarget"] = "#CCBB44"
-        time1.append(float(glimpse.header["time1"]))
-        ttb.append(glimpse.cumdrift["ttb"].values)
-        for dtype in glimpse.dtypes:
-            N = len(glimpse.aoiinfo[dtype])
-            F = len(glimpse.cumdrift)
-            raw_target_xy[dtype] = (
-                np.expand_dims(glimpse.aoiinfo[dtype][["x", "y"]].values, axis=1)
-                + glimpse.cumdrift[["dx", "dy"]].values
-            )
-            target_xy[dtype].append(np.zeros((N, F, 2)))
-            data[dtype].append(
-                np.zeros(
-                    (N, F, P, P),
-                    dtype="int",
-                )
-            )
-            labels[dtype].append(glimpse.labels[dtype])
-
-            title = f"{dtype} locations for channel {c}"
-            glimpse.plot((dtype,), P, path=path, save=True, item={}, title=title)
-
-        # plot offset in raw FOV images
-        title = f"{dtype} locations for channel {c}"
-        glimpse.plot(("offset",), offset_P, path=path, save=True, item={}, title=title)
-
-        # loop through each frame
-        for f, frame in enumerate(progress_bar(glimpse.cumdrift.index)):
-            img = glimpse[frame]
-
-            offset_img = img[
-                glimpse.offset_y : glimpse.offset_y + offset_P,
-                glimpse.offset_x : glimpse.offset_x + offset_P,
-            ]
-            offset_medians.append(np.median(offset_img))
-            values, counts = np.unique(offset_img, return_counts=True)
-            for value, count in zip(values, counts):
-                offsets[value] += count
+            raw_target_xy = {}
+            colors = {}
+            colors["ontarget"] = "#AA3377"
+            colors["offtarget"] = "#CCBB44"
+            time1.append(float(glimpse.header["time1"]))
+            ttb.append(glimpse.cumdrift["ttb"].values)
             for dtype in glimpse.dtypes:
-                # loop through each aoi
-                for n, aoi in enumerate(glimpse.aoiinfo[dtype].index):
-                    shiftx = round(raw_target_xy[dtype][n, f, 0] - 0.5 * (P - 1))
-                    shifty = round(raw_target_xy[dtype][n, f, 1] - 0.5 * (P - 1))
-                    data[dtype][c][n, f, :, :] += img[
-                        shifty : shifty + P, shiftx : shiftx + P
-                    ]
-                    target_xy[dtype][c][n, f, 0] = (
-                        raw_target_xy[dtype][n, f, 0] - shiftx
+                N = len(glimpse.aoiinfo[dtype])
+                F = len(glimpse.cumdrift)
+                raw_target_xy[dtype] = (
+                    np.expand_dims(glimpse.aoiinfo[dtype][["x", "y"]].values, axis=1)
+                    + glimpse.cumdrift[["dx", "dy"]].values
+                )
+                target_xy[dtype].append(np.zeros((N, F, 2)))
+                data[dtype].append(
+                    np.zeros(
+                        (N, F, P, P),
+                        dtype="int",
                     )
-                    target_xy[dtype][c][n, f, 1] = (
-                        raw_target_xy[dtype][n, f, 1] - shifty
-                    )
+                )
+                labels[dtype].append(glimpse.labels[dtype])
 
-        # assert that target positions are within central pixel
-        for dtype in glimpse.dtypes:
-            assert (target_xy[dtype][c] > 0.5 * P - 1).all()
-            assert (target_xy[dtype][c] < 0.5 * P).all()
+                title = f"{dtype} locations for laser {ldx} channel {cdx}"
+                glimpse.plot((dtype,), P, path=path, save=True, item={}, title=title)
+
+            # plot offset in raw FOV images
+            title = f"{dtype} locations for laser {ldx} channel {cdx}"
+            glimpse.plot(
+                ("offset",), offset_P, path=path, save=True, item={}, title=title
+            )
+
+            # loop through each frame
+            for f, frame in enumerate(progress_bar(glimpse.cumdrift.index)):
+                img = glimpse[frame]
+
+                offset_img = img[
+                    glimpse.offset_y : glimpse.offset_y + offset_P,
+                    glimpse.offset_x : glimpse.offset_x + offset_P,
+                ]
+                offset_medians.append(np.median(offset_img))
+                values, counts = np.unique(offset_img, return_counts=True)
+                for value, count in zip(values, counts):
+                    offsets[value] += count
+                for dtype in glimpse.dtypes:
+                    # loop through each aoi
+                    for n, aoi in enumerate(glimpse.aoiinfo[dtype].index):
+                        shiftx = round(raw_target_xy[dtype][n, f, 0] - 0.5 * (P - 1))
+                        shifty = round(raw_target_xy[dtype][n, f, 1] - 0.5 * (P - 1))
+                        data[dtype][c][n, f, :, :] += img[
+                            shifty : shifty + P, shiftx : shiftx + P
+                        ]
+                        target_xy[dtype][c][n, f, 0] = (
+                            raw_target_xy[dtype][n, f, 0] - shiftx
+                        )
+                        target_xy[dtype][c][n, f, 1] = (
+                            raw_target_xy[dtype][n, f, 1] - shifty
+                        )
+
+            # assert that target positions are within central pixel
+            for dtype in glimpse.dtypes:
+                assert (target_xy[dtype][c] > 0.5 * P - 1).all()
+                assert (target_xy[dtype][c] < 0.5 * P).all()
 
     logger.info("Processing extracted AOIs ...")
     min_data = np.inf
     for dtype in data.keys():
         # concatenate color channels
-        data[dtype] = np.stack(data[dtype], -3)
-        target_xy[dtype] = np.stack(target_xy[dtype], -2)
+        data[dtype] = [
+            np.stack(data[dtype][ldx * C : (1 + ldx) * C], -3) for ldx in range(L)
+        ]
+        target_xy[dtype] = [
+            np.stack(target_xy[dtype][ldx * C : (1 + ldx) * C], -2) for ldx in range(L)
+        ]
+        # concatenate excitation lasers
+        data[dtype] = np.stack(data[dtype], -4)
+        target_xy[dtype] = np.stack(target_xy[dtype], -3)
         min_data = min(min_data, data[dtype].min())
         if any(label is None for label in labels[dtype]):
             labels[dtype] = None
         else:
+            labels[dtype] = [
+                np.stack(labels[dtype][ldx * C : (1 + ldx) * C], -2) for ldx in range(L)
+            ]
             labels[dtype] = np.stack(labels[dtype], -1)
         # convert data to torch tensor
         data[dtype] = torch.tensor(data[dtype])
@@ -464,7 +480,8 @@ def read_glimpse(path, progress_bar, **kwargs):
         f"Dataset: N={dataset.N} on-target AOIs, "
         f"Nc={dataset.Nc} off-target AOIs, "
         f"F={dataset.F} frames, "
-        f"C={dataset.C} channels, "
+        f"L={dataset.L} excitation lasers, "
+        f"C={dataset.C} emission channels, "
         f"Px={dataset.P} pixels, "
         f"Py={dataset.P} pixels"
     )

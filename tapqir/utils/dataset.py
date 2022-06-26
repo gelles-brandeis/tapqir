@@ -98,18 +98,25 @@ class CosmosDataset:
         return self.images.shape[1]
 
     @property
-    def C(self) -> int:
+    def L(self) -> int:
         """
-        Number of color-channels.
+        Number of excitation lasers.
         """
         return self.images.shape[2]
+
+    @property
+    def C(self) -> int:
+        """
+        Number of emission channels.
+        """
+        return self.images.shape[3]
 
     @property
     def P(self) -> int:
         """
         Number of pixels.
         """
-        Px, Py = self.images.shape[3], self.images.shape[4]
+        Px, Py = self.images.shape[4], self.images.shape[5]
         assert Px == Py
         return Px
 
@@ -133,10 +140,10 @@ class CosmosDataset:
             [torch.median(self.images[..., c, :, :]) for c in range(self.C)]
         )
 
-    def fetch(self, ndx, fdx, cdx):
+    def fetch(self, ndx, fdx, ldx, cdx):
         return (
-            Vindex(self.images)[ndx, fdx, cdx].to(self.device),
-            Vindex(self.xy)[ndx, fdx, cdx].to(self.device),
+            Vindex(self.images)[ndx, fdx, ldx, cdx].to(self.device),
+            Vindex(self.xy)[ndx, fdx, ldx, cdx].to(self.device),
             Vindex(self.is_ontarget)[ndx].to(self.device),
         )
 

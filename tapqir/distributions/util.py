@@ -20,6 +20,7 @@ def gaussian_spots(
     target_locs: torch.Tensor,
     P: int,
     m: torch.Tensor = None,
+    alpha: torch.Tensor = None,
 ) -> torch.Tensor:
     r"""
     Calculates ideal shape of the 2D-Gaussian spots given spot parameters
@@ -48,7 +49,9 @@ def gaussian_spots(
     ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
 
     # Ideal 2D gaussian spots
-    spot_locs = target_locs + torch.stack((x, y), -1)
+    # spot_locs = target_locs + torch.stack((x, y), -1)
+    breakpoint()
+    spot_locs = torch.stack((x, y), -1)
     scale = width[..., None, None, None]
     loc = spot_locs[..., None, None, :]
     var = scale**2

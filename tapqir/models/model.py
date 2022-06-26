@@ -216,31 +216,31 @@ class Model:
 
         with SummaryWriter(log_dir=self.run_path / "logs" / self.name) as writer:
             for i in progress_bar(range(num_iter)):
-                try:
-                    self.iter_loss = self.svi.step()
-                    # save a checkpoint every 200 iterations
-                    if not self.iter % 200:
-                        self.save_checkpoint(writer)
-                        if use_crit and self.converged:
-                            logger.info(f"Iteration #{self.iter} model converged.")
-                            break
-                    self.iter += 1
-                except ValueError:
-                    # load last checkpoint
-                    self.init(
-                        lr=self.lr,
-                        nbatch_size=self.nbatch_size,
-                        fbatch_size=self.fbatch_size,
-                    )
-                    # change rng seed
-                    new_seed = random.randint(0, 100)
-                    pyro.set_rng_seed(new_seed)
-                    logger.debug(
-                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
-                    )
-                except RuntimeError as err:
-                    assert err.args[0].startswith("CUDA out of memory")
-                    raise CudaOutOfMemoryError()
+                # try:
+                self.iter_loss = self.svi.step()
+                # save a checkpoint every 200 iterations
+                if not self.iter % 200:
+                    self.save_checkpoint(writer)
+                    if use_crit and self.converged:
+                        logger.info(f"Iteration #{self.iter} model converged.")
+                        break
+                self.iter += 1
+                #  except ValueError:
+                #      # load last checkpoint
+                #      self.init(
+                #          lr=self.lr,
+                #          nbatch_size=self.nbatch_size,
+                #          fbatch_size=self.fbatch_size,
+                #      )
+                #      # change rng seed
+                #      new_seed = random.randint(0, 100)
+                #      pyro.set_rng_seed(new_seed)
+                #      logger.debug(
+                #          f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                #      )
+                #  except RuntimeError as err:
+                #      assert err.args[0].startswith("CUDA out of memory")
+                #      raise CudaOutOfMemoryError()
             else:
                 logger.warning(f"Iteration #{self.iter} model has not converged.")
 
@@ -264,20 +264,26 @@ class Model:
             elif pyro.param(name).ndim == 1:
                 for i in range(len(pyro.param(name))):
                     self._rolling[f"{name}_{i}"].append(pyro.param(name)[i].item())
+            elif pyro.param(name).ndim == 2:
+                for i in range(pyro.param(name).shape[0]):
+                    for j in range(pyro.param(name).shape[1]):
+                        self._rolling[f"{name}_{i}_{j}"].append(
+                            pyro.param(name)[i, j].item()
+                        )
             else:
                 self._rolling[name].append(pyro.param(name).item())
 
         # check convergence status
         self.converged = False
-        if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
-            crit = all(
-                torch.tensor(self._rolling[p]).std()
-                / torch.tensor(self._rolling[p])[-50:].std()
-                < 1.05
-                for p in self.conv_params
-            )
-            if crit:
-                self.converged = True
+        #  if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
+        #      crit = all(
+        #          torch.tensor(self._rolling[p]).std()
+        #          / torch.tensor(self._rolling[p])[-50:].std()
+        #          < 1.05
+        #          for p in self.conv_params
+        #      )
+        #      if crit:
+        #          self.converged = True
 
         # save the model state
         torch.save(

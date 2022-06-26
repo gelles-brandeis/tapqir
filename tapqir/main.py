@@ -129,13 +129,21 @@ def glimpse(
         help="Use off-target AOI locations.",
         prompt="Use off-target AOI locations?",
     ),
+    num_lasers: int = typer.Option(
+        partial(get_default, "num-lasers"),
+        "--num-lasers",
+        "-L",
+        min=1,
+        help="Number of excitation lasers",
+        prompt="Number of excitation lasers",
+    ),
     num_channels: int = typer.Option(
         partial(get_default, "num-channels"),
         "--num-channels",
         "-C",
         min=1,
-        help="Number of color channels",
-        prompt="Number of color channels",
+        help="Number of emission channels",
+        prompt="Number of emission channels",
     ),
     name: Optional[List[str]] = typer.Option(None),
     glimpse_folder: Optional[List[Path]] = typer.Option(
@@ -223,6 +231,7 @@ def glimpse(
     DEFAULTS["frame-start"] = frame_start
     DEFAULTS["frame-end"] = frame_end
     DEFAULTS["use-offtarget"] = use_offtarget
+    DEFAULTS["num-lasers"] = num_lasers
     DEFAULTS["num-channels"] = num_channels
     DEFAULTS["labels"] = labels
 
@@ -277,27 +286,31 @@ def glimpse(
         exists=True, file_okay=True, dir_okay=False, resolve_path=True
     )
 
-    for c in range(num_channels):
-        if len(DEFAULTS["channels"]) < c + 1:
-            DEFAULTS["channels"].append({})
-        if not no_input:
-            typer.echo(f"\nINPUTS FOR CHANNEL #{c}\n")
-        for param_name in param_names:
-            if param_name == "offtarget-aoiinfo" and not use_offtarget:
-                continue
-            if c >= len(param_flag[param_name]):
-                if not no_input:
-                    DEFAULTS["channels"][c][param_name] = typer.prompt(
-                        param_prompt[param_name],
-                        default=DEFAULTS["channels"][c][param_name],
-                        type=param_type[param_name],
-                    )
-            else:
-                DEFAULTS["channels"][c][param_name] = param_flag[param_name][c]
+    for l in range(num_lasers):
+        for c in range(num_channels):
+            i = l * num_channels + c
+            if len(DEFAULTS["channels"]) < i + 1:
+                DEFAULTS["channels"].append({})
+            if not no_input:
+                typer.echo(f"\nINPUTS FOR LASER #{l}, CHANNEL #{c}\n")
+            for param_name in param_names:
+                if param_name == "offtarget-aoiinfo" and not use_offtarget:
+                    continue
+                if i >= len(param_flag[param_name]):
+                    if not no_input:
+                        DEFAULTS["channels"][i][param_name] = typer.prompt(
+                            param_prompt[param_name],
+                            default=DEFAULTS["channels"][i][param_name],
+                            type=param_type[param_name],
+                        )
+                else:
+                    DEFAULTS["channels"][i][param_name] = param_flag[param_name][i]
 
     DEFAULTS = dict(DEFAULTS)
-    for c in range(num_channels):
-        DEFAULTS["channels"][c] = dict(DEFAULTS["channels"][c])
+    for l in range(num_lasers):
+        for c in range(num_channels):
+            i = l * num_channels + c
+            DEFAULTS["channels"][i] = dict(DEFAULTS["channels"][i])
 
     if overwrite:
         with open(cd / ".tapqir" / "config.yaml", "w") as cfg_file:
@@ -456,11 +469,11 @@ def fit(
             return 1
 
         model.init(learning_rate, nbatch_size, fbatch_size)
-        try:
-            model.run(num_iter, progress_bar=progress_bar)
-        except CudaOutOfMemoryError:
-            logger.exception("Failed to fit the data")
-            return 1
+        # try:
+        model.run(num_iter, progress_bar=progress_bar)
+        #  except CudaOutOfMemoryError:
+        #      logger.exception("Failed to fit the data")
+        #      return 1
         logger.info("Fitting the data: Done")
 
         logger.info("Computing stats ...")
@@ -917,6 +930,7 @@ def main(
             DEFAULTS["nbatch-size"] = 10
             DEFAULTS["fbatch-size"] = 512
             DEFAULTS["learning-rate"] = 0.005
+            DEFAULTS["num-lasers"] = 1
             DEFAULTS["num-channels"] = 1
             DEFAULTS["cuda"] = True
             DEFAULTS["matlab"] = False

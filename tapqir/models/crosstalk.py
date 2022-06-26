@@ -40,7 +40,7 @@ class crosstalk(cosmos):
     def __init__(
         self,
         K: int = 2,
-        Q: int = 2,
+        Q: int = 3,
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
@@ -67,8 +67,14 @@ class crosstalk(cosmos):
         alpha = pyro.sample(
             "alpha",
             dist.Dirichlet(
-                torch.ones((self.Q, self.data.C)) + torch.eye(self.Q) * 9
-            ).to_event(1),
+                torch.tensor(
+                    [
+                        [[19.0, 1.0], [10.0, 10.0], [1.0, 1.0]],
+                        [[1.0, 1.0], [1.0, 1.0], [1.0, 19.0]],
+                    ]
+                )
+                # torch.ones((self.Q, self.data.C)) + torch.eye(self.Q) * 9
+            ).to_event(2),
         )
         pi = pyro.sample(
             "pi",
@@ -112,32 +118,34 @@ class crosstalk(cosmos):
         with aois as ndx:
             ndx = ndx[:, None]
             mask = Vindex(self.data.mask)[ndx].to(self.device)
+            ndx = ndx[..., None, None]
+            ldx = torch.arange(self.data.L).unsqueeze(-1)
+            cdx = torch.arange(self.data.C)
             with handlers.mask(mask=mask):
                 # background mean and std
                 background_mean = pyro.sample(
                     "background_mean",
                     dist.HalfNormal(self.priors["background_mean_std"])
-                    .expand((self.data.C,))
-                    .to_event(1),
+                    .expand([self.data.L, self.data.C])
+                    .to_event(2),
                 )
                 background_std = pyro.sample(
                     "background_std",
                     dist.HalfNormal(self.priors["background_std_std"])
-                    .expand((self.data.C,))
-                    .to_event(1),
+                    .expand([self.data.L, self.data.C])
+                    .to_event(2),
                 )
                 with frames as fdx:
+                    fdx = fdx[:, None, None]
                     # fetch data
-                    obs, target_locs, is_ontarget = self.data.fetch(
-                        ndx.unsqueeze(-1), fdx.unsqueeze(-1), torch.arange(self.data.C)
-                    )
+                    obs, target_locs, is_ontarget = self.data.fetch(ndx, fdx, ldx, cdx)
                     # sample background intensity
                     background = pyro.sample(
                         "background",
                         dist.Gamma(
                             (background_mean / background_std) ** 2,
                             background_mean / background_std**2,
-                        ).to_event(1),
+                        ).to_event(2),
                     )
 
                     ms, heights, widths, xs, ys = [], [], [], [], []
@@ -171,19 +179,24 @@ class crosstalk(cosmos):
                                 ),
                             )
                             with handlers.mask(mask=m > 0):
+                                # breakpoint()
                                 # sample spot variables
                                 height = pyro.sample(
                                     f"height_k{kdx}_q{qdx}",
-                                    dist.HalfNormal(10000),
+                                    dist.HalfNormal(self.priors["height_std"])
+                                    .expand([self.data.L])
+                                    .to_event(1),
                                 )
                                 width = pyro.sample(
                                     f"width_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         1.5,
                                         2,
-                                        0.75,
-                                        2.25,
-                                    ),
+                                        self.priors["width_min"],
+                                        self.priors["width_max"],
+                                    )
+                                    .expand([self.data.L])
+                                    .to_event(1),
                                 )
                                 x = pyro.sample(
                                     f"x_k{kdx}_q{qdx}",
@@ -205,11 +218,11 @@ class crosstalk(cosmos):
                                 )
 
                             # append
-                            ms.append(m)
+                            ms.append(m.unsqueeze(-1))
                             heights.append(height)
                             widths.append(width)
-                            xs.append(x)
-                            ys.append(y)
+                            xs.append(x.unsqueeze(-1))
+                            ys.append(y.unsqueeze(-1))
 
                     heights = torch.stack(
                         [
@@ -234,7 +247,7 @@ class crosstalk(cosmos):
                     )
                     ys = torch.stack(
                         [
-                            torch.stack(ys[q * self.Q : (1 + q) * self.K], -1)
+                            torch.stack(ys[q * self.K : (1 + q) * self.K], -1)
                             for q in range(self.Q)
                         ],
                         -2,
@@ -242,7 +255,7 @@ class crosstalk(cosmos):
                     ms = torch.broadcast_tensors(*ms)
                     ms = torch.stack(
                         [
-                            torch.stack(ms[q * self.Q : (1 + q) * self.K], -1)
+                            torch.stack(ms[q * self.K : (1 + q) * self.K], -1)
                             for q in range(self.Q)
                         ],
                         -2,
@@ -284,7 +297,7 @@ class crosstalk(cosmos):
             "alpha",
             dist.Dirichlet(
                 pyro.param("alpha_mean") * pyro.param("alpha_size")
-            ).to_event(1),
+            ).to_event(2),
         )
         pyro.sample(
             "pi",
@@ -326,76 +339,96 @@ class crosstalk(cosmos):
 
         with aois as ndx:
             ndx = ndx[:, None]
-            pyro.sample(
-                "background_mean",
-                dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0]).to_event(
-                    1
-                ),
-            )
-            pyro.sample(
-                "background_std",
-                dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0]).to_event(
-                    1
-                ),
-            )
-            with frames as fdx:
-                # sample background intensity
+            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            ndx1 = ndx[..., None]
+            ndx2 = ndx[..., None, None]
+            ldx = torch.arange(self.data.L).unsqueeze(-1)
+            cdx = torch.arange(self.data.C)
+            with handlers.mask(mask=mask):
                 pyro.sample(
-                    "background",
-                    dist.Gamma(
-                        Vindex(pyro.param("b_loc"))[ndx, fdx]
-                        * Vindex(pyro.param("b_beta"))[ndx, fdx],
-                        Vindex(pyro.param("b_beta"))[ndx, fdx],
-                    ).to_event(1),
+                    "background_mean",
+                    dist.Delta(
+                        Vindex(pyro.param("background_mean_loc"))[ndx2, 0, ldx, cdx]
+                    ).to_event(2),
                 )
+                pyro.sample(
+                    "background_std",
+                    dist.Delta(
+                        Vindex(pyro.param("background_std_loc"))[ndx2, 0, ldx, cdx]
+                    ).to_event(2),
+                )
+                with frames as fdx:
+                    fdx1 = fdx[:, None]
+                    fdx2 = fdx[:, None, None]
+                    # sample background intensity
+                    pyro.sample(
+                        "background",
+                        dist.Gamma(
+                            Vindex(pyro.param("b_loc"))[ndx2, fdx2, ldx, cdx]
+                            * Vindex(pyro.param("b_beta"))[ndx2, fdx2, ldx, cdx],
+                            Vindex(pyro.param("b_beta"))[ndx2, fdx2, ldx, cdx],
+                        ).to_event(2),
+                    )
 
-                for qdx in range(self.Q):
-                    for kdx in range(self.K):
-                        # sample spot presence m
-                        m = pyro.sample(
-                            f"m_k{kdx}_q{qdx}",
-                            dist.Bernoulli(
-                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, qdx]
-                            ),
-                            infer={"enumerate": "parallel"},
-                        )
-                        with handlers.mask(mask=m > 0):
-                            # sample spot variables
-                            pyro.sample(
-                                f"height_k{kdx}_q{qdx}",
-                                dist.Gamma(
-                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
-                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, qdx],
+                    for qdx in range(self.Q):
+                        for kdx in range(self.K):
+                            # sample spot presence m
+                            m = pyro.sample(
+                                f"m_k{kdx}_q{qdx}",
+                                dist.Bernoulli(
+                                    Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, qdx]
                                 ),
+                                infer={"enumerate": "parallel"},
                             )
-                            pyro.sample(
-                                f"width_k{kdx}_q{qdx}",
-                                AffineBeta(
-                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx, qdx],
-                                    0.75,
-                                    2.25,
-                                ),
-                            )
-                            pyro.sample(
-                                f"x_k{kdx}_q{qdx}",
-                                AffineBeta(
-                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
-                                    -(self.data.P + 1) / 2,
-                                    (self.data.P + 1) / 2,
-                                ),
-                            )
-                            pyro.sample(
-                                f"y_k{kdx}_q{qdx}",
-                                AffineBeta(
-                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
-                                    -(self.data.P + 1) / 2,
-                                    (self.data.P + 1) / 2,
-                                ),
-                            )
+                            with handlers.mask(mask=m > 0):
+                                # sample spot variables
+                                height = pyro.sample(
+                                    f"height_k{kdx}_q{qdx}",
+                                    dist.Gamma(
+                                        Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
+                                        * Vindex(pyro.param("h_beta"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("h_beta"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                    ).to_event(1),
+                                )
+                                width = pyro.sample(
+                                    f"width_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        Vindex(pyro.param("w_mean"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("w_size"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        0.75,
+                                        2.25,
+                                    ).to_event(1),
+                                )
+                                x = pyro.sample(
+                                    f"x_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        Vindex(pyro.param("x_mean"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
+                                        -(self.data.P + 1) / 2,
+                                        (self.data.P + 1) / 2,
+                                    ),
+                                )
+                                y = pyro.sample(
+                                    f"y_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        Vindex(pyro.param("y_mean"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
+                                        -(self.data.P + 1) / 2,
+                                        (self.data.P + 1) / 2,
+                                    ),
+                                )
 
     def init_parameters(self):
         """
@@ -405,13 +438,19 @@ class crosstalk(cosmos):
         data = self.data
         pyro.param(
             "alpha_mean",
-            lambda: torch.ones((self.Q, self.data.C), device=device)
-            + torch.eye(self.Q, device=device) * 9,
+            #  lambda: torch.ones((self.Q, self.data.C), device=device)
+            #  + torch.eye(self.Q, device=device) * 9,
+            lambda: torch.tensor(
+                [
+                    [[0.9, 0.1], [0.5, 0.5], [0.5, 0.5]],
+                    [[0.5, 0.5], [0.5, 0.5], [0.1, 0.5]],
+                ]
+            ),
             constraint=constraints.simplex,
         )
         pyro.param(
             "alpha_size",
-            lambda: torch.full((self.Q, 1), 2, device=device),
+            lambda: torch.full((data.L, self.Q, 1), 20, device=device),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -431,6 +470,125 @@ class crosstalk(cosmos):
         )
 
         self._init_parameters()
+
+    def _init_parameters(self):
+        """
+        Parameters shared between different models.
+        """
+        device = self.device
+        data = self.data
+
+        pyro.param(
+            "proximity_loc",
+            lambda: torch.tensor(0.5, device=device),
+            constraint=constraints.interval(
+                0,
+                (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            "proximity_size",
+            lambda: torch.tensor(100, device=device),
+            constraint=constraints.greater_than(2.0),
+        )
+        pyro.param(
+            "lamda_loc",
+            lambda: torch.full((self.Q,), 0.5, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "lamda_beta",
+            lambda: torch.full((self.Q,), 100, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "gain_loc",
+            lambda: torch.tensor(5, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "gain_beta",
+            lambda: torch.tensor(100, device=device),
+            constraint=constraints.positive,
+        )
+
+        pyro.param(
+            "background_mean_loc",
+            lambda: (data.median.to(device) - data.offset.mean).expand(
+                data.Nt, 1, data.L, data.C
+            ),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "background_std_loc",
+            lambda: torch.ones(data.Nt, 1, data.L, data.C, device=device),
+            constraint=constraints.positive,
+        )
+
+        pyro.param(
+            "b_loc",
+            lambda: (data.median.to(device) - self.data.offset.mean).expand(
+                data.Nt, data.F, data.L, data.C
+            ),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "b_beta",
+            lambda: torch.ones(data.Nt, data.F, data.L, data.C, device=device),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "h_loc",
+            lambda: torch.full(
+                (self.K, data.Nt, data.F, self.Q, data.L), 2000, device=device
+            ),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "h_beta",
+            lambda: torch.full(
+                (self.K, data.Nt, data.F, self.Q, data.L), 0.001, device=device
+            ),
+            constraint=constraints.positive,
+        )
+        pyro.param(
+            "w_mean",
+            lambda: torch.full(
+                (self.K, data.Nt, data.F, self.Q, data.L), 1.5, device=device
+            ),
+            constraint=constraints.interval(
+                0.75 + torch.finfo(self.dtype).eps,
+                2.25 - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            "w_size",
+            lambda: torch.full(
+                (self.K, data.Nt, data.F, self.Q, data.L), 100, device=device
+            ),
+            constraint=constraints.greater_than(2.0),
+        )
+        pyro.param(
+            "x_mean",
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
+            constraint=constraints.interval(
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            "y_mean",
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
+            constraint=constraints.interval(
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            "size",
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
+            constraint=constraints.greater_than(2.0),
+        )
 
     def TraceELBO(self, jit=False):
         """

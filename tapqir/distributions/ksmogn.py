@@ -95,8 +95,9 @@ class KSMOGN(TorchDistribution):
         self.m = m
         self.background = background[..., None, None]
         if alpha is not None:
+            L = alpha.shape[-3]
             C = alpha.shape[-1]
-            self.gain = gain[..., None, None, None]
+            self.gain = gain[..., None, None, None, None]
             self.alpha = alpha[..., None, None, None]
         else:
             self.gain = gain[..., None, None]
@@ -124,14 +125,14 @@ class KSMOGN(TorchDistribution):
         # remove K dim
         batch_shape = batch_shape[:-1]
         if alpha is not None:
-            # remove Q dim
-            batch_shape = batch_shape[:-1]
-            # add C dim
-            event_shape = (C,) + event_shape
+            # remove Q and L dim
+            batch_shape = batch_shape[:-2]
+            # add L and C dim
+            event_shape = (L, C) + event_shape
             # remove C dim
             bg_shape = bg_shape[:-1]
             target_shape = target_shape[:-1]
-        batch_shape = torch.broadcast_shapes(batch_shape, bg_shape, target_shape)
+        #  batch_shape = torch.broadcast_shapes(batch_shape, bg_shape, target_shape)
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     @lazy_property
@@ -144,6 +145,7 @@ class KSMOGN(TorchDistribution):
             self.target_locs.unsqueeze(-2),
             self.P,
             self.m,
+            self.alpha,
         )
 
     @lazy_property

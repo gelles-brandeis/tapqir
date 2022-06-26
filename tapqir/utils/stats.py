@@ -146,34 +146,34 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     model.params = ci_stats
 
-    logger.info("- SNR and Chi2-test")
-    # snr and chi2 test
-    snr = torch.zeros(
-        model.K, model.data.Nt, model.data.F, model.Q, device=torch.device("cpu")
-    )
-    chi2 = torch.zeros(model.data.Nt, model.data.F, model.Q, device=torch.device("cpu"))
-    for n in range(model.data.Nt):
-        snr[:, n], chi2[n] = snr_and_chi2(
-            model.data.images[n],
-            ci_stats["height"]["Mean"][:, n],
-            ci_stats["width"]["Mean"][:, n],
-            ci_stats["x"]["Mean"][:, n],
-            ci_stats["y"]["Mean"][:, n],
-            model.data.xy[n],
-            ci_stats["background"]["Mean"][n],
-            ci_stats["gain"]["Mean"],
-            model.data.offset.mean,
-            model.data.offset.var,
-            model.data.P,
-            ci_stats["theta_probs"][:, n],
-        )
-    snr_masked = snr[ci_stats["theta_probs"] > 0.5]
-    summary.loc["SNR", "Mean"] = snr_masked.mean().item()
-    ci_stats["chi2"] = {}
-    ci_stats["chi2"]["values"] = chi2
-    cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
-    ci_stats["chi2"]["vmin"] = -0.03 * cmax
-    ci_stats["chi2"]["vmax"] = 1.3 * cmax
+    #  logger.info("- SNR and Chi2-test")
+    #  # snr and chi2 test
+    #  snr = torch.zeros(
+    #      model.K, model.data.Nt, model.data.F, model.Q, device=torch.device("cpu")
+    #  )
+    #  chi2 = torch.zeros(model.data.Nt, model.data.F, model.Q, device=torch.device("cpu"))
+    #  for n in range(model.data.Nt):
+    #      snr[:, n], chi2[n] = snr_and_chi2(
+    #          model.data.images[n],
+    #          ci_stats["height"]["Mean"][:, n],
+    #          ci_stats["width"]["Mean"][:, n],
+    #          ci_stats["x"]["Mean"][:, n],
+    #          ci_stats["y"]["Mean"][:, n],
+    #          model.data.xy[n],
+    #          ci_stats["background"]["Mean"][n],
+    #          ci_stats["gain"]["Mean"],
+    #          model.data.offset.mean,
+    #          model.data.offset.var,
+    #          model.data.P,
+    #          ci_stats["theta_probs"][:, n],
+    #      )
+    #  snr_masked = snr[ci_stats["theta_probs"] > 0.5]
+    #  summary.loc["SNR", "Mean"] = snr_masked.mean().item()
+    #  ci_stats["chi2"] = {}
+    #  ci_stats["chi2"]["values"] = chi2
+    #  cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
+    #  ci_stats["chi2"]["vmin"] = -0.03 * cmax
+    #  ci_stats["chi2"]["vmax"] = 1.3 * cmax
 
     # classification statistics
     if model.data.labels is not None:
