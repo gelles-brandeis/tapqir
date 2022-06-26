@@ -87,20 +87,28 @@ class KSMOGN(TorchDistribution):
         validate_args=None,
     ):
 
-        self.height = height
-        self.width = width
+        # shapes for cosmos and crosstalk models
+        self.height = height  # (N, F, C, K) or (N, F, Q, K)
+        self.width = width  # (N, F, C, K) or (N, F, Q, K)
         self.x = x
         self.y = y
-        self.target_locs = target_locs
-        self.m = m
-        self.background = background[..., None, None]
+        self.target_locs = target_locs  # (N, F, C, 2)
+        self.m = m  # (N, F, C, K) or (N, F, Q, K)
+        self.background = background[..., None, None]  # (N, F, C, P, P)
         if alpha is not None:
             C = alpha.shape[-1]
-            self.gain = gain[..., None, None, None]
-            self.alpha = alpha[..., None, None, None]
+            self.gain = gain[..., None, None, None]  # (1, K, P, P)
+            # self.alpha = alpha[..., None, None, None]  # (Q, C, K, P, P)
+            self.height = (
+                self.height.unsqueeze(-2) * alpha[..., None]
+            )  # (N, F, Q, C, K)
+            self.width = self.width.unsqueeze(-2)  # (N, F, Q, 1, K)
+            self.x = self.x.unsqueeze(-2)  # (N, F, Q, 1, K)
+            self.y = self.y.unsqueeze(-2)  # (N, F, Q, 1, K)
+            self.m = self.m.unsqueeze(-2)  # (N, F, Q, 1, K)
         else:
-            self.gain = gain[..., None, None]
-            self.alpha = alpha
+            self.gain = gain[..., None, None]  # (1, P, P)
+            self.alpha = alpha  # None
         self.rate = 1 / self.gain
 
         self.offset_samples = offset_samples
@@ -114,44 +122,48 @@ class KSMOGN(TorchDistribution):
         # calculate batch shape
         batch_shape = torch.broadcast_shapes(
             height.shape, width.shape, x.shape, y.shape
-        )
+        )  # (N, F, C, K) or (N, F, Q, K)
         if m is not None:
-            batch_shape = torch.broadcast_shapes(batch_shape, m.shape)
+            batch_shape = torch.broadcast_shapes(
+                batch_shape, m.shape
+            )  # (N, F, C, K) or (N, F, Q, K)
 
-        event_shape = torch.Size([P, P])
-        bg_shape = background.shape
-        target_shape = target_locs.shape[:-1]
+        event_shape = torch.Size([P, P])  # (P, P)
+        bg_shape = background.shape  # (N, F, C)
+        target_shape = target_locs.shape[:-1]  # (N, F, C)
         # remove K dim
-        batch_shape = batch_shape[:-1]
+        batch_shape = batch_shape[:-1]  # (N, F, C) or (N, F, Q)
         if alpha is not None:
             # remove Q dim
-            batch_shape = batch_shape[:-1]
+            batch_shape = batch_shape[:-1]  # (N, F)
             # add C dim
-            event_shape = (C,) + event_shape
+            event_shape = (C,) + event_shape  # (C, P, P)
             # remove C dim
-            bg_shape = bg_shape[:-1]
-            target_shape = target_shape[:-1]
-        batch_shape = torch.broadcast_shapes(batch_shape, bg_shape, target_shape)
+            bg_shape = bg_shape[:-1]  # (N, F)
+            target_shape = target_shape[:-1]  # (N, F)
+        batch_shape = torch.broadcast_shapes(
+            batch_shape, bg_shape, target_shape
+        )  # (N, F, C) or (N, F)
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     @lazy_property
     def gaussians(self):
         return gaussian_spots(
-            self.height,
-            self.width,
-            self.x,
-            self.y,
-            self.target_locs.unsqueeze(-2),
+            self.height,  # (N, F, C, K) or (N, F, Q, 1, K)
+            self.width,  # (N, F, C, K) or (N, F, Q, 1, K)
+            self.x,  # (N, F, C, K) or (N, F, Q, 1, K)
+            self.y,  # (N, F, C, K) or (N, F, Q, 1, K)
+            self.target_locs.unsqueeze(-2),  # (N, F, C, 1, 2) or (N, F, 1, C, 1, 2)
             self.P,
             self.m,
         )
 
     @lazy_property
     def image(self):
-        gaussians = self.gaussians
+        gaussians = self.gaussians  # (N, F, C, K, P, P) or (N, F, Q, C, K, P, P)
         if self.alpha is not None:
             # sum over the signal from multiple fluorescent dyes
-            gaussians = (gaussians.unsqueeze(-4) * self.alpha).sum(-5)
+            gaussians = gaussians.sum(-5)
         # sum the background and all the spots
         return self.background + gaussians.sum(-3)
 
