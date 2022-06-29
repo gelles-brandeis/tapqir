@@ -6,8 +6,6 @@ KSMOGN
 ^^^^^^
 """
 
-from typing import Union
-
 import pykeops
 import torch
 from pykeops.torch import Genred
