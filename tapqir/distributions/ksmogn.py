@@ -77,7 +77,7 @@ class KSMOGN(TorchDistribution):
         y: torch.Tensor,
         target_locs: torch.Tensor,
         background: torch.Tensor,
-        gain: Union[float, torch.Tensor],
+        gain: torch.Tensor,
         offset_samples: torch.Tensor,
         offset_logits: torch.Tensor,
         P: int,
@@ -98,7 +98,6 @@ class KSMOGN(TorchDistribution):
         if alpha is not None:
             C = alpha.shape[-1]
             self.gain = gain[..., None, None, None]  # (1, K, P, P)
-            # self.alpha = alpha[..., None, None, None]  # (Q, C, K, P, P)
             self.height = (
                 self.height.unsqueeze(-2) * alpha[..., None]
             )  # (N, F, Q, C, K)
