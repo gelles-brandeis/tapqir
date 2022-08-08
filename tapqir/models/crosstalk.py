@@ -27,6 +27,8 @@ class crosstalk(cosmos):
     r"""
     **Multi-Color Time-Independent Colocalization Model with Cross-Talk**
 
+    EXPERIMENTAL
+
     :param K: Maximum number of spots that can be present in a single image.
     :param Q: Number of fluorescent dyes.
     :param device: Computation device (cpu or gpu).
@@ -179,7 +181,6 @@ class crosstalk(cosmos):
                                 ),
                             )
                             with handlers.mask(mask=m > 0):
-                                # breakpoint()
                                 # sample spot variables
                                 height = pyro.sample(
                                     f"height_k{kdx}_q{qdx}",
@@ -340,34 +341,56 @@ class crosstalk(cosmos):
         with aois as ndx:
             ndx = ndx[:, None]
             mask = Vindex(self.data.mask)[ndx].to(self.device)
+<<<<<<< HEAD
             ndx1 = ndx[..., None]
             ndx2 = ndx[..., None, None]
             ldx = torch.arange(self.data.L).unsqueeze(-1)
             cdx = torch.arange(self.data.C)
+=======
+>>>>>>> latest
             with handlers.mask(mask=mask):
                 pyro.sample(
                     "background_mean",
                     dist.Delta(
+<<<<<<< HEAD
                         Vindex(pyro.param("background_mean_loc"))[ndx2, 0, ldx, cdx]
                     ).to_event(2),
+=======
+                        Vindex(pyro.param("background_mean_loc"))[ndx, 0]
+                    ).to_event(1),
+>>>>>>> latest
                 )
                 pyro.sample(
                     "background_std",
                     dist.Delta(
+<<<<<<< HEAD
                         Vindex(pyro.param("background_std_loc"))[ndx2, 0, ldx, cdx]
                     ).to_event(2),
                 )
                 with frames as fdx:
                     fdx1 = fdx[:, None]
                     fdx2 = fdx[:, None, None]
+=======
+                        Vindex(pyro.param("background_std_loc"))[ndx, 0]
+                    ).to_event(1),
+                )
+                with frames as fdx:
+>>>>>>> latest
                     # sample background intensity
                     pyro.sample(
                         "background",
                         dist.Gamma(
+<<<<<<< HEAD
                             Vindex(pyro.param("b_loc"))[ndx2, fdx2, ldx, cdx]
                             * Vindex(pyro.param("b_beta"))[ndx2, fdx2, ldx, cdx],
                             Vindex(pyro.param("b_beta"))[ndx2, fdx2, ldx, cdx],
                         ).to_event(2),
+=======
+                            Vindex(pyro.param("b_loc"))[ndx, fdx]
+                            * Vindex(pyro.param("b_beta"))[ndx, fdx],
+                            Vindex(pyro.param("b_beta"))[ndx, fdx],
+                        ).to_event(1),
+>>>>>>> latest
                     )
 
                     for qdx in range(self.Q):
@@ -382,7 +405,11 @@ class crosstalk(cosmos):
                             )
                             with handlers.mask(mask=m > 0):
                                 # sample spot variables
+<<<<<<< HEAD
                                 height = pyro.sample(
+=======
+                                pyro.sample(
+>>>>>>> latest
                                     f"height_k{kdx}_q{qdx}",
                                     dist.Gamma(
                                         Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
@@ -392,9 +419,15 @@ class crosstalk(cosmos):
                                         Vindex(pyro.param("h_beta"))[
                                             kdx, ndx, fdx, qdx
                                         ],
+<<<<<<< HEAD
                                     ).to_event(1),
                                 )
                                 width = pyro.sample(
+=======
+                                    ),
+                                )
+                                pyro.sample(
+>>>>>>> latest
                                     f"width_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         Vindex(pyro.param("w_mean"))[
@@ -403,11 +436,19 @@ class crosstalk(cosmos):
                                         Vindex(pyro.param("w_size"))[
                                             kdx, ndx, fdx, qdx
                                         ],
+<<<<<<< HEAD
                                         0.75,
                                         2.25,
                                     ).to_event(1),
                                 )
                                 x = pyro.sample(
+=======
+                                        self.priors["width_min"],
+                                        self.priors["width_max"],
+                                    ),
+                                )
+                                pyro.sample(
+>>>>>>> latest
                                     f"x_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         Vindex(pyro.param("x_mean"))[
@@ -418,7 +459,11 @@ class crosstalk(cosmos):
                                         (self.data.P + 1) / 2,
                                     ),
                                 )
+<<<<<<< HEAD
                                 y = pyro.sample(
+=======
+                                pyro.sample(
+>>>>>>> latest
                                     f"y_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         Vindex(pyro.param("y_mean"))[

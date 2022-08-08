@@ -114,8 +114,6 @@ class inputBox(widgets.VBox):
                     result[k] = [get_value(c[k]) for c in v["widget"].children]
                 continue
             result[name] = get_value(v["widget"])
-            if name == "channels":  # FIXME
-                result[name] = [int(result[name])]
         return result
 
 
@@ -457,15 +455,6 @@ def fitUI(out, DEFAULTS):
             description="Tapqir model",
             value="cosmos",
             options=avail_models,
-            style={"description_width": "initial"},
-        ),
-    )
-    layout.add_child(
-        "channels",
-        widgets.Dropdown(
-            description="Channel numbers",
-            value="0",
-            options=[str(c) for c in range(DEFAULTS["num-channels"])],
             style={"description_width": "initial"},
         ),
     )

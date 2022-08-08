@@ -13,11 +13,11 @@ import torch
 
 
 def gaussian_spots(
-    height: torch.Tensor,
-    width: torch.Tensor,
-    x: torch.Tensor,
-    y: torch.Tensor,
-    target_locs: torch.Tensor,
+    height: torch.Tensor,  # (N, F, C, K) or (N, F, Q, 1, K)
+    width: torch.Tensor,  # (N, F, C, K) or (N, F, Q, 1, K)
+    x: torch.Tensor,  # (N, F, C, K) or (N, F, Q, 1, K)
+    y: torch.Tensor,  # (N, F, C, K) or (N, F, Q, 1, K)
+    target_locs: torch.Tensor,  # (N, F, C, K, 2) or (N, F, 1, C, K, 2)
     P: int,
     m: torch.Tensor = None,
     alpha: torch.Tensor = None,
@@ -49,8 +49,7 @@ def gaussian_spots(
     ij_pixel = torch.stack((i_pixel, j_pixel), dim=-1)
 
     # Ideal 2D gaussian spots
-    # spot_locs = target_locs + torch.stack((x, y), -1)
-    breakpoint()
+    spot_locs = target_locs + torch.stack((x, y), -1)
     spot_locs = torch.stack((x, y), -1)
     scale = width[..., None, None, None]
     loc = spot_locs[..., None, None, :]
@@ -61,7 +60,7 @@ def gaussian_spots(
             - scale.log()
             - math.log(math.sqrt(2 * math.pi))
         ).sum(-1)
-    )
+    )  # (N, F, L, C, K, P, P) or (N, F, L, Q, C, K, P, P)
     if m is not None:
         height = m * height
     return height[..., None, None] * normalized_gaussian
