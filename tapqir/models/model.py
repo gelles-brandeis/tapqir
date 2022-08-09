@@ -275,15 +275,13 @@ class Model:
 
         # check convergence status
         self.converged = False
-        #  if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
-        #      crit = all(
-        #          torch.tensor(self._rolling[p]).std()
-        #          / torch.tensor(self._rolling[p])[-50:].std()
-        #          < 1.05
-        #          for p in self.conv_params
-        #      )
-        #      if crit:
-        #          self.converged = True
+        if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
+            crit = all(
+                torch.tensor(value).std() / torch.tensor(value)[-50:].std() < 1.05
+                for value in self._rolling.values()
+            )
+            if crit:
+                self.converged = True
 
         # save the model state
         torch.save(
