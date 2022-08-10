@@ -90,7 +90,7 @@ class KSMOGN(TorchDistribution):
         self.width = width  # (N, F, C, K) or (N, F, Q, K)
         self.x = x
         self.y = y
-        self.target_locs = target_locs  # (N, F, C, 2)
+        self.target_locs = target_locs  # (N, F, C, 1, 2)
         self.m = m  # (N, F, C, K) or (N, F, Q, K)
         self.background = background[..., None, None]  # (N, F, C, P, P)
         if alpha is not None:
@@ -103,9 +103,10 @@ class KSMOGN(TorchDistribution):
             self.x = self.x.unsqueeze(-2)  # (N, F, Q, 1, K)
             self.y = self.y.unsqueeze(-2)  # (N, F, Q, 1, K)
             self.m = self.m.unsqueeze(-2)  # (N, F, Q, 1, K)
+            self.target_locs = self.target_locs.unsqueeze(-3)  # (N, F, 1, C, 1, 2)
         else:
             self.gain = gain[..., None, None]  # (1, P, P)
-            self.alpha = alpha  # None
+        self.alpha = alpha
         self.rate = 1 / self.gain
 
         self.offset_samples = offset_samples
