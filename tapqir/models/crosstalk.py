@@ -59,6 +59,18 @@ class crosstalk(cosmos):
     ):
         super().__init__(K=K, Q=Q, device=device, dtype=dtype, priors=priors)
         self._global_params = ["gain", "proximity", "lamda", "pi", "alpha"]
+        self.ci_params = [
+            "alpha",
+            "gain",
+            "pi",
+            "lamda",
+            "proximity",
+            "background",
+            "height",
+            "width",
+            "x",
+            "y",
+        ]
 
     def model(self):
         r"""
