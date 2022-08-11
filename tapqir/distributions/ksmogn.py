@@ -88,25 +88,23 @@ class KSMOGN(TorchDistribution):
         # shapes for cosmos and crosstalk models
         self.height = height  # (N, F, L, C, K) or (N, F, L, Q, K)
         self.width = width  # (N, F, L, C, K) or (N, F, L, Q, K)
-        self.x = x  # (N, F, L, C, K) or (N, F, 1, Q, K)
-        self.y = y  # (N, F, L, C, K) or (N, F, 1, Q, K)
+        self.x = x  # (N, F, L, C, K) or (N, F, Q, K)
+        self.y = y  # (N, F, L, C, K) or (N, F, Q, K)
         self.target_locs = target_locs  # (N, F, L, C, 2)
-        self.m = m  # (N, F, L, C, K) or (N, F, 1, Q, K)
+        self.m = m  # (N, F, L, C, K) or (N, F, Q, K)
         self.background = background[..., None, None]  # (N, F, L, C, P, P)
         if alpha is not None:
             L = alpha.shape[-3]
             C = alpha.shape[-1]
-            self.gain = gain[..., None, None, None, None]
-            self.alpha = alpha[..., None, None, None]
             self.gain = gain[..., None, None, None]  # (1, K, P, P)
             self.height = (
                 self.height.unsqueeze(-2) * alpha[..., None]
-            )  # (N, F, Q, C, K)
-            self.width = self.width.unsqueeze(-2)  # (N, F, Q, 1, K)
-            self.x = self.x.unsqueeze(-2)  # (N, F, Q, 1, K)
-            self.y = self.y.unsqueeze(-2)  # (N, F, Q, 1, K)
-            self.m = self.m.unsqueeze(-2)  # (N, F, Q, 1, K)
-            self.target_locs = self.target_locs.unsqueeze(-3)  # (N, F, 1, C, 2)
+            )  # (N, F, L, Q, C, K)
+            self.width = self.width.unsqueeze(-2)  # (N, F, L, Q, 1, K)
+            self.x = self.x.unsqueeze((-2, -4))  # (N, F, 1, Q, 1, K)
+            self.y = self.y.unsqueeze((-2, -4))  # (N, F, 1, Q, 1, K)
+            self.m = self.m.unsqueeze((-2, -4))  # (N, F, 1, Q, 1, K)
+            self.target_locs = self.target_locs.unsqueeze(-3)  # (N, F, L, 1, C, 2)
         else:
             self.gain = gain[..., None, None]  # (1, P, P)
         self.alpha = alpha
@@ -123,19 +121,18 @@ class KSMOGN(TorchDistribution):
         # calculate batch shape
         batch_shape = torch.broadcast_shapes(
             height.shape, width.shape, x.shape, y.shape
-        )  # (N, F, L, C, K) or (N, F, L, Q, K)
+        )  # (N, F, L, C, K) or (N, F, L, Q, C, K)
         if m is not None:
             batch_shape = torch.broadcast_shapes(
                 batch_shape, m.shape
-            )  # (N, F, L, C, K) or (N, F, L, Q, K)
+            )  # (N, F, L, C, K) or (N, F, L, Q, C, K)
 
         event_shape = torch.Size([P, P])  # (P, P)
         bg_shape = background.shape  # (N, F, L, C)
-        target_shape = target_locs.shape[:-1]  # (N, F, L, C)
+        target_shape = target_locs.shape[:-1]  # (N, F, L, 1, C)
         # remove K dim
-        batch_shape = batch_shape[:-1]  # (N, F, L, C) or (N, F, L, Q)
+        batch_shape = batch_shape[:-1]  # (N, F, L, C) or (N, F, L, Q, C)
         if alpha is not None:
-<<<<<<< HEAD
             # remove Q and L dim
             batch_shape = batch_shape[:-2]
             # add L and C dim
