@@ -26,7 +26,7 @@ def dataset_path(request, tmp_path):
     elif request.param == crosstalk:
         model = request.param()
         params["pi"] = 0.15
-        params["alpha"] = [[1.0, 0.0], [0.1, 0.9]]
+        params["alpha"] = [[1.0]]
     elif request.param == hmm:
         model = request.param(vectorized=False)
         params["kon"] = 0.2
