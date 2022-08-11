@@ -106,7 +106,6 @@ class KSMOGN(TorchDistribution):
             self.target_locs = self.target_locs.unsqueeze(-3)  # (N, F, 1, C, 2)
         else:
             self.gain = gain[..., None, None]  # (1, P, P)
-        breakpoint()
         self.alpha = alpha
         self.rate = 1 / self.gain
 
