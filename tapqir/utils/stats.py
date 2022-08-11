@@ -249,6 +249,8 @@ def compute_ci(model, ci_params, CI):
                 pyro.param("gain_loc") * pyro.param("gain_beta"),
                 pyro.param("gain_beta"),
             )
+        elif param == "alpha":
+            fn = dist.Dirichlet(pyro.param("alpha_mean") * pyro.param("alpha_size"))
         elif param == "pi":
             fn = dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size"))
         elif param == "init":
