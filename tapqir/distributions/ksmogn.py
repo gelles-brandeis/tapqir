@@ -96,7 +96,7 @@ class KSMOGN(TorchDistribution):
         if alpha is not None:
             L = alpha.shape[-3]
             C = alpha.shape[-1]
-            self.gain = gain[..., None, None, None]  # (1, K, P, P)
+            self.gain = gain[..., None, None, None, None]  # (1, L, C, P, P)
             self.height = (
                 self.height.unsqueeze(-2) * alpha[..., None]
             )  # (N, F, L, Q, C, K)
@@ -121,38 +121,28 @@ class KSMOGN(TorchDistribution):
         # calculate batch shape
         batch_shape = torch.broadcast_shapes(
             height.shape, width.shape, x.shape, y.shape
-        )  # (N, F, L, C, K) or (N, F, L, Q, C, K)
+        )  # (N, F, L, C, K) or (N, F, L, Q, K)
         if m is not None:
             batch_shape = torch.broadcast_shapes(
                 batch_shape, m.shape
-            )  # (N, F, L, C, K) or (N, F, L, Q, C, K)
+            )  # (N, F, L, C, K) or (N, F, L, Q, K)
 
         event_shape = torch.Size([P, P])  # (P, P)
         bg_shape = background.shape  # (N, F, L, C)
-        target_shape = target_locs.shape[:-1]  # (N, F, L, 1, C)
+        target_shape = target_locs.shape[:-1]  # (N, F, L, C)
         # remove K dim
-        batch_shape = batch_shape[:-1]  # (N, F, L, C) or (N, F, L, Q, C)
+        batch_shape = batch_shape[:-1]  # (N, F, L, C) or (N, F, L, Q)
         if alpha is not None:
             # remove Q and L dim
-            batch_shape = batch_shape[:-2]
+            batch_shape = batch_shape[:-2]  # (N, F)
             # add L and C dim
-            event_shape = (L, C) + event_shape
+            event_shape = (L, C) + event_shape  # (L, C, P, P)
             # remove C dim
-            bg_shape = bg_shape[:-1]
-            target_shape = target_shape[:-1]
-        #  batch_shape = torch.broadcast_shapes(batch_shape, bg_shape, target_shape)
-=======
-            # remove Q dim
-            batch_shape = batch_shape[:-1]  # (N, F)
-            # add C dim
-            event_shape = (C,) + event_shape  # (C, P, P)
-            # remove C dim
-            bg_shape = bg_shape[:-1]  # (N, F)
-            target_shape = target_shape[:-1]  # (N, F)
+            bg_shape = bg_shape[:-2]  # (N, F)
+            target_shape = target_shape[:-2]  # (N, F)
         batch_shape = torch.broadcast_shapes(
             batch_shape, bg_shape, target_shape
-        )  # (N, F, C) or (N, F)
->>>>>>> latest
+        )  # (N, F, L, C) or (N, F)
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     @lazy_property
@@ -160,8 +150,8 @@ class KSMOGN(TorchDistribution):
         return gaussian_spots(
             self.height,  # (N, F, L, C, K) or (N, F, L, Q, 1, K)
             self.width,  # (N, F, L, C, K) or (N, F, L, Q, 1, K)
-            self.x,  # (N, F, L, C, K) or (N, F, L, Q, 1, K)
-            self.y,  # (N, F, L, C, K) or (N, F, L, Q, 1, K)
+            self.x,  # (N, F, L, C, K) or (N, F, 1, Q, 1, K)
+            self.y,  # (N, F, L, C, K) or (N, F, 1, Q, 1, K)
             self.target_locs.unsqueeze(-2),  # (N, F, L, C, 1, 2) or (N, F, L, C, 1, 2)
             self.P,
             self.m,

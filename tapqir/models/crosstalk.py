@@ -42,11 +42,7 @@ class crosstalk(cosmos):
     def __init__(
         self,
         K: int = 2,
-<<<<<<< HEAD
         Q: int = 3,
-=======
-        Q: int = None,
->>>>>>> latest
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
@@ -409,15 +405,9 @@ class crosstalk(cosmos):
                                         Vindex(pyro.param("h_beta"))[
                                             kdx, ndx, fdx, qdx
                                         ],
-<<<<<<< HEAD
                                     ).to_event(1),
                                 )
-                                width = pyro.sample(
-=======
-                                    ),
-                                )
                                 pyro.sample(
->>>>>>> latest
                                     f"width_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         Vindex(pyro.param("w_mean"))[
@@ -426,19 +416,11 @@ class crosstalk(cosmos):
                                         Vindex(pyro.param("w_size"))[
                                             kdx, ndx, fdx, qdx
                                         ],
-<<<<<<< HEAD
-                                        0.75,
-                                        2.25,
-                                    ).to_event(1),
-                                )
-                                x = pyro.sample(
-=======
                                         self.priors["width_min"],
                                         self.priors["width_max"],
-                                    ),
+                                    ).to_event(1),
                                 )
                                 pyro.sample(
->>>>>>> latest
                                     f"x_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         Vindex(pyro.param("x_mean"))[
