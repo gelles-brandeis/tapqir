@@ -289,7 +289,7 @@ class Model:
             self.run_path / f"{self.name}-model.tpqr",
         )
 
-        # save global paramters for tensorboard
+        # save global parameters for tensorboard
         writer.add_scalar("-ELBO", self.iter_loss, self.iter)
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:

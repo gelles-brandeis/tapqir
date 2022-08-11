@@ -42,7 +42,7 @@ class crosstalk(cosmos):
     def __init__(
         self,
         K: int = 2,
-        Q: int = 2,
+        Q: int = None,
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
@@ -522,12 +522,18 @@ class crosstalk(cosmos):
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
                 a = z_logits.exp().mean(-3)
-                z_probs[ndx[:, None], fdx, 0] = a.sum(0)[1]
-                z_probs[ndx[:, None], fdx, 1] = a.sum(1)[1]
+                for q in range(self.Q):
+                    sum_dims = tuple(i for i in range(self.Q) if i != q)
+                    if sum_dims:
+                        a = a.sum(sum_dims)
+                    z_probs[ndx[:, None], fdx, q] = a[1]
                 # marginalize z
                 b = result.logsumexp(z_dims)
-                theta_probs[:, ndx[:, None], fdx, 0] = b.logsumexp(0)[1:].exp().mean(-3)
-                theta_probs[:, ndx[:, None], fdx, 1] = b.logsumexp(1)[1:].exp().mean(-3)
+                for q in range(self.Q):
+                    sum_dims = tuple(i for i in range(self.Q) if i != q)
+                    if sum_dims:
+                        b = b.logsumexp(sum_dims)
+                    theta_probs[:, ndx[:, None], fdx, q] = b[1:].exp().mean(-3)
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size
