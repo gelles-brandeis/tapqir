@@ -231,11 +231,11 @@ class crosstalk(cosmos):
                                 )
 
                             # append
-                            ms.append(m.unsqueeze(-1))
+                            ms.append(m)
                             heights.append(height)
                             widths.append(width)
-                            xs.append(x.unsqueeze(-1))
-                            ys.append(y.unsqueeze(-1))
+                            xs.append(x)
+                            ys.append(y)
 
                     heights = torch.stack(
                         [

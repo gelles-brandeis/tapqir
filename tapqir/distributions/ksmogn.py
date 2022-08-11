@@ -101,9 +101,9 @@ class KSMOGN(TorchDistribution):
                 self.height.unsqueeze(-2) * alpha[..., None]
             )  # (N, F, L, Q, C, K)
             self.width = self.width.unsqueeze(-2)  # (N, F, L, Q, 1, K)
-            self.x = self.x.unsqueeze((-2, -4))  # (N, F, 1, Q, 1, K)
-            self.y = self.y.unsqueeze((-2, -4))  # (N, F, 1, Q, 1, K)
-            self.m = self.m.unsqueeze((-2, -4))  # (N, F, 1, Q, 1, K)
+            self.x = self.x.unsqueeze(-2).unsqueeze(-4)  # (N, F, 1, Q, 1, K)
+            self.y = self.y.unsqueeze(-2).unsqueeze(-4)  # (N, F, 1, Q, 1, K)
+            self.m = self.m.unsqueeze(-2).unsqueeze(-4)  # (N, F, 1, Q, 1, K)
             self.target_locs = self.target_locs.unsqueeze(-3)  # (N, F, L, 1, C, 2)
         else:
             self.gain = gain[..., None, None]  # (1, P, P)
@@ -120,11 +120,11 @@ class KSMOGN(TorchDistribution):
 
         # calculate batch shape
         batch_shape = torch.broadcast_shapes(
-            height.shape, width.shape, x.shape, y.shape
+            height.shape, width.shape, x.unsqueeze(-3).shape, y.unsqueeze(-3).shape
         )  # (N, F, L, C, K) or (N, F, L, Q, K)
         if m is not None:
             batch_shape = torch.broadcast_shapes(
-                batch_shape, m.shape
+                batch_shape, m.unsqueeze(-3).shape
             )  # (N, F, L, C, K) or (N, F, L, Q, K)
 
         event_shape = torch.Size([P, P])  # (P, P)
