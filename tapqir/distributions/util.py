@@ -17,7 +17,7 @@ def gaussian_spots(
     width: torch.Tensor,  # (N, F, C, K) or (N, F, Q, 1, K)
     x: torch.Tensor,  # (N, F, C, K) or (N, F, Q, 1, K)
     y: torch.Tensor,  # (N, F, C, K) or (N, F, Q, 1, K)
-    target_locs: torch.Tensor,  # (N, F, C, K, 2) or (N, F, 1, C, K, 2)
+    target_locs: torch.Tensor,  # (N, F, C, 1, 2) or (N, F, 1, C, 1, 2)
     P: int,
     m: torch.Tensor = None,
     alpha: torch.Tensor = None,

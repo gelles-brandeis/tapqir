@@ -42,7 +42,11 @@ class crosstalk(cosmos):
     def __init__(
         self,
         K: int = 2,
+<<<<<<< HEAD
         Q: int = 3,
+=======
+        Q: int = None,
+>>>>>>> latest
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
@@ -59,6 +63,18 @@ class crosstalk(cosmos):
     ):
         super().__init__(K=K, Q=Q, device=device, dtype=dtype, priors=priors)
         self._global_params = ["gain", "proximity", "lamda", "pi", "alpha"]
+        self.ci_params = [
+            "alpha",
+            "gain",
+            "pi",
+            "lamda",
+            "proximity",
+            "background",
+            "height",
+            "width",
+            "x",
+            "y",
+        ]
 
     def model(self):
         r"""
@@ -341,56 +357,34 @@ class crosstalk(cosmos):
         with aois as ndx:
             ndx = ndx[:, None]
             mask = Vindex(self.data.mask)[ndx].to(self.device)
-<<<<<<< HEAD
             ndx1 = ndx[..., None]
             ndx2 = ndx[..., None, None]
             ldx = torch.arange(self.data.L).unsqueeze(-1)
             cdx = torch.arange(self.data.C)
-=======
->>>>>>> latest
             with handlers.mask(mask=mask):
                 pyro.sample(
                     "background_mean",
                     dist.Delta(
-<<<<<<< HEAD
                         Vindex(pyro.param("background_mean_loc"))[ndx2, 0, ldx, cdx]
                     ).to_event(2),
-=======
-                        Vindex(pyro.param("background_mean_loc"))[ndx, 0]
-                    ).to_event(1),
->>>>>>> latest
                 )
                 pyro.sample(
                     "background_std",
                     dist.Delta(
-<<<<<<< HEAD
                         Vindex(pyro.param("background_std_loc"))[ndx2, 0, ldx, cdx]
                     ).to_event(2),
                 )
                 with frames as fdx:
                     fdx1 = fdx[:, None]
                     fdx2 = fdx[:, None, None]
-=======
-                        Vindex(pyro.param("background_std_loc"))[ndx, 0]
-                    ).to_event(1),
-                )
-                with frames as fdx:
->>>>>>> latest
                     # sample background intensity
                     pyro.sample(
                         "background",
                         dist.Gamma(
-<<<<<<< HEAD
                             Vindex(pyro.param("b_loc"))[ndx2, fdx2, ldx, cdx]
                             * Vindex(pyro.param("b_beta"))[ndx2, fdx2, ldx, cdx],
                             Vindex(pyro.param("b_beta"))[ndx2, fdx2, ldx, cdx],
                         ).to_event(2),
-=======
-                            Vindex(pyro.param("b_loc"))[ndx, fdx]
-                            * Vindex(pyro.param("b_beta"))[ndx, fdx],
-                            Vindex(pyro.param("b_beta"))[ndx, fdx],
-                        ).to_event(1),
->>>>>>> latest
                     )
 
                     for qdx in range(self.Q):
@@ -405,11 +399,7 @@ class crosstalk(cosmos):
                             )
                             with handlers.mask(mask=m > 0):
                                 # sample spot variables
-<<<<<<< HEAD
-                                height = pyro.sample(
-=======
                                 pyro.sample(
->>>>>>> latest
                                     f"height_k{kdx}_q{qdx}",
                                     dist.Gamma(
                                         Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
@@ -459,11 +449,7 @@ class crosstalk(cosmos):
                                         (self.data.P + 1) / 2,
                                     ),
                                 )
-<<<<<<< HEAD
-                                y = pyro.sample(
-=======
                                 pyro.sample(
->>>>>>> latest
                                     f"y_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         Vindex(pyro.param("y_mean"))[
@@ -697,12 +683,18 @@ class crosstalk(cosmos):
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
                 a = z_logits.exp().mean(-3)
-                z_probs[ndx[:, None], fdx, 0] = a.sum(0)[1]
-                z_probs[ndx[:, None], fdx, 1] = a.sum(1)[1]
+                for q in range(self.Q):
+                    sum_dims = tuple(i for i in range(self.Q) if i != q)
+                    if sum_dims:
+                        a = a.sum(sum_dims)
+                    z_probs[ndx[:, None], fdx, q] = a[1]
                 # marginalize z
                 b = result.logsumexp(z_dims)
-                theta_probs[:, ndx[:, None], fdx, 0] = b.logsumexp(0)[1:].exp().mean(-3)
-                theta_probs[:, ndx[:, None], fdx, 1] = b.logsumexp(1)[1:].exp().mean(-3)
+                for q in range(self.Q):
+                    sum_dims = tuple(i for i in range(self.Q) if i != q)
+                    if sum_dims:
+                        b = b.logsumexp(sum_dims)
+                    theta_probs[:, ndx[:, None], fdx, q] = b[1:].exp().mean(-3)
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size
