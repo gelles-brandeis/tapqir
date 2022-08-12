@@ -29,7 +29,7 @@ plt.rcParams["keymap.home"].remove("h")
 plt.rcParams["keymap.yscale"].remove("l")
 plt.rcParams["keymap.xscale"].remove("k")
 
-avail_models = list(avail_models.__members__.keys())
+avail_models = [e.value for e in avail_models]
 
 
 @singledispatch
