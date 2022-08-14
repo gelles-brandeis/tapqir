@@ -56,27 +56,23 @@ We have tested Tapqir installation on Ubuntu 20.04 and Arch Linux distributions.
 
    Summary of `CUDA installation instructions <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu-installation>`_::
 
-    $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+    $ sudo apt-key del 7fa2af80
 
    .. code-block::
 
-    $ sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+    $ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb
 
    .. code-block::
 
-    $ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+    $ sudo dpkg -i cuda-keyring_1.0-1_all.deb
 
    .. code-block::
 
-    $ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+    $ sudo apt-get update
 
    .. code-block::
 
-    $ sudo apt update
-
-   .. code-block::
-
-    $ sudo apt install cuda
+    $ sudo apt-get install cuda
 
    Reboot the system::
 
