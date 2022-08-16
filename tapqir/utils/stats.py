@@ -111,7 +111,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
     ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()
-    ci_stats["p_specific"] = ci_stats["z_probs"]
+    ci_stats["p_specific"] = ci_stats["theta_probs"].sum(0)
 
     # calculate vmin/vmax
     theta_mask = ci_stats["theta_probs"] > 0.5
