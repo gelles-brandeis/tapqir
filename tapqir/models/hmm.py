@@ -576,10 +576,10 @@ class hmm(cosmos):
                     ]
                     logp[fsx] = logp[fsx](**{f"z_f{fsx}": z_map})
                     # compute log_measure q for given z_map
-                    log_measure = guide_tr.nodes[f"m_k0_f{fsx}"]["funsor"][
-                        "log_measure"
-                    ]
-                    +guide_tr.nodes[f"m_k1_f{fsx}"]["funsor"]["log_measure"]
+                    log_measure = (
+                        guide_tr.nodes[f"m_k0_f{fsx}"]["funsor"]["log_measure"]
+                        + guide_tr.nodes[f"m_k1_f{fsx}"]["funsor"]["log_measure"]
+                    )
                     log_measure = log_measure(**{f"z_f{fsx}": z_map})
                 else:
                     # substitute MAP values of z into p(z=z_map, theta, phi)
@@ -594,10 +594,10 @@ class hmm(cosmos):
                         **{f"z_f{fsx}": z_map, f"z_f{fsx_prev}": z_map_prev}
                     )
                     # compute log_measure q for given z_map
-                    log_measure = guide_tr.nodes[f"m_k0_f{fsx}"]["funsor"][
-                        "log_measure"
-                    ]
-                    +guide_tr.nodes[f"m_k1_f{fsx}"]["funsor"]["log_measure"]
+                    log_measure = (
+                        guide_tr.nodes[f"m_k0_f{fsx}"]["funsor"]["log_measure"]
+                        + guide_tr.nodes[f"m_k1_f{fsx}"]["funsor"]["log_measure"]
+                    )
                     log_measure = log_measure(
                         **{f"z_f{fsx}": z_map, f"z_f{fsx_prev}": z_map_prev}
                     )
