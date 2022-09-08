@@ -479,25 +479,26 @@ class hmm(cosmos):
     @staticmethod
     def _sequential_logmatmulexp(logits: torch.Tensor) -> torch.Tensor:
         """
-        For a tensor ``x`` whose time dimension is -3, computes::
-            x[..., 0, :, :] @ x[..., 1, :, :] @ ... @ x[..., T-1, :, :]
+        For a tensor ``x`` whose time dimension is -4, computes::
+            x[..., 0, :, :, :] @ x[..., 1, :, :, :] @ ... @ x[..., T-1, :, :, :]
         but does so numerically stably in log space.
         """
-        batch_shape = logits.shape[:-3]
+        batch_shape = logits.shape[:-4]
         state_dim = logits.size(-1)
+        c_dim = logits.size(-3)
         sum_terms = []
         # up sweep
-        while logits.size(-3) > 1:
-            time = logits.size(-3)
+        while logits.size(-4) > 1:
+            time = logits.size(-4)
             even_time = time // 2 * 2
-            even_part = logits[..., :even_time, :, :]
+            even_part = logits[..., :even_time, :, :, :]
             x_y = even_part.reshape(
-                batch_shape + (even_time // 2, 2, state_dim, state_dim)
+                batch_shape + (even_time // 2, 2, c_dim, state_dim, state_dim)
             )
-            x, y = x_y.unbind(-3)
+            x, y = x_y.unbind(-4)
             contracted = _logmatmulexp(x, y)
             if time > even_time:
-                contracted = torch.cat((contracted, logits[..., -1:, :, :]), dim=-3)
+                contracted = torch.cat((contracted, logits[..., -1:, :, :, :]), dim=-4)
             sum_terms.append(logits)
             logits = contracted
         else:
@@ -509,18 +510,18 @@ class hmm(cosmos):
         while sum_terms:
             sum_term = sum_terms.pop()
             new_left_term = hmm._contraction_identity(sum_term)
-            time = sum_term.size(-3)
+            time = sum_term.size(-4)
             even_time = time // 2 * 2
             if time > even_time:
-                new_left_term[..., time - 1 : time, :, :] = left_term[
-                    ..., even_time // 2 : even_time // 2 + 1, :, :
+                new_left_term[..., time - 1 : time, :, :, :] = left_term[
+                    ..., even_time // 2 : even_time // 2 + 1, :, :, :
                 ]
-                left_term = left_term[..., : even_time // 2, :, :]
+                left_term = left_term[..., : even_time // 2, :, :, :]
 
-            left_sum = sum_term[..., :even_time:2, :, :]
+            left_sum = sum_term[..., :even_time:2, :, :, :]
             left_sum_and_term = _logmatmulexp(left_term, left_sum)
-            new_left_term[..., :even_time:2, :, :] = left_term
-            new_left_term[..., 1:even_time:2, :, :] = left_sum_and_term
+            new_left_term[..., :even_time:2, :, :, :] = left_term
+            new_left_term[..., 1:even_time:2, :, :, :] = left_sum_and_term
             left_term = new_left_term
         else:
             alphas = _logmatmulexp(left_term, sum_term)
@@ -528,11 +529,12 @@ class hmm(cosmos):
 
     @staticmethod
     def _contraction_identity(logits: torch.Tensor) -> torch.Tensor:
-        batch_shape = logits.shape[:-2]
+        batch_shape = logits.shape[:-3]
         state_dim = logits.size(-1)
+        c_dim = logits.size(-3)
         result = torch.eye(state_dim).log()
-        result = result.reshape((1,) * len(batch_shape) + (state_dim, state_dim))
-        result = result.repeat(batch_shape + (1, 1))
+        result = result.reshape((1,) * len(batch_shape) + (1, state_dim, state_dim))
+        result = result.repeat(batch_shape + (c_dim, 1, 1))
         return result
 
     @lazy_property
