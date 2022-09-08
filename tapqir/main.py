@@ -396,7 +396,9 @@ def fit(
 
     Available models:
 
-    * cosmos: single-color time-independent co-localization model.\n
+    * cosmos: multi-color time-independent co-localization model.\n
+    * cosmos+hmm: multi-color hidden markov co-localization model.\n
+    * crosstalk: multi-color time-independent co-localization model with cross-talk.\n
     """
     global DEFAULTS
     cd = DEFAULTS["cd"]
@@ -874,7 +876,12 @@ def log():
 
 @app.command()
 def subset():
+    """
+    Create a new dataset from the subset of AOIs indicated in `aoi_subset.txt` file.
+    """
     from tapqir.utils.dataset import CosmosDataset, load, save
+
+    logger = logging.getLogger("tapqir")
 
     global DEFAULTS
     path = Path(DEFAULTS["cd"])
@@ -903,6 +910,7 @@ def subset():
         name=data.name,
     )
     save(subset_data, subset_path)
+    logger.info("Created a new data file at `subset/data.tpqr`")
 
 
 @app.callback()
