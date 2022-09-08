@@ -872,6 +872,39 @@ def log():
         pydoc.pager(f.read())
 
 
+@app.command()
+def subset():
+    from tapqir.utils.dataset import CosmosDataset, load, save
+
+    global DEFAULTS
+    path = Path(DEFAULTS["cd"])
+    subset_path = path / "subset"
+    if not subset_path.is_dir():
+        # initialize directory
+        subset_path.mkdir()
+
+    # load data
+    data = load(path, torch.device("cpu"))
+    with open("aoi_subset.txt", "r") as f:
+        line = f.readline().rstrip("\n")
+        idx = [int(i.strip()) for i in line.split(",")]
+
+    subset_data = CosmosDataset(
+        images=data.images[idx],
+        xy=data.xy[idx],
+        is_ontarget=data.is_ontarget[idx],
+        mask=data.mask[idx],
+        labels=data.labels,
+        offset_samples=data.offset.samples,
+        offset_weights=data.offset.weights,
+        device=torch.device("cpu"),
+        time1=data.time1,
+        ttb=data.ttb,
+        name=data.name,
+    )
+    save(subset_data, subset_path)
+
+
 @app.callback()
 def main(
     cd: Path = typer.Option(
