@@ -396,7 +396,9 @@ def fit(
 
     Available models:
 
-    * cosmos: single-color time-independent co-localization model.\n
+    * cosmos: multi-color time-independent co-localization model.\n
+    * cosmos+hmm: multi-color hidden markov co-localization model.\n
+    * crosstalk: multi-color time-independent co-localization model with cross-talk.\n
     """
     global DEFAULTS
     cd = DEFAULTS["cd"]
@@ -870,6 +872,45 @@ def log():
     log_file = cd / ".tapqir" / "loginfo"
     with open(log_file, "r") as f:
         pydoc.pager(f.read())
+
+
+@app.command()
+def subset():
+    """
+    Create a new dataset from the subset of AOIs indicated in `aoi_subset.txt` file.
+    """
+    from tapqir.utils.dataset import CosmosDataset, load, save
+
+    logger = logging.getLogger("tapqir")
+
+    global DEFAULTS
+    path = Path(DEFAULTS["cd"])
+    subset_path = path / "subset"
+    if not subset_path.is_dir():
+        # initialize directory
+        subset_path.mkdir()
+
+    # load data
+    data = load(path, torch.device("cpu"))
+    with open("aoi_subset.txt", "r") as f:
+        line = f.readline().rstrip("\n")
+        idx = [int(i.strip()) for i in line.split(",")]
+
+    subset_data = CosmosDataset(
+        images=data.images[idx],
+        xy=data.xy[idx],
+        is_ontarget=data.is_ontarget[idx],
+        mask=data.mask[idx],
+        labels=data.labels,
+        offset_samples=data.offset.samples,
+        offset_weights=data.offset.weights,
+        device=torch.device("cpu"),
+        time1=data.time1,
+        ttb=data.ttb,
+        name=data.name,
+    )
+    save(subset_data, subset_path)
+    logger.info("Created a new data file at `subset/data.tpqr`")
 
 
 @app.callback()
