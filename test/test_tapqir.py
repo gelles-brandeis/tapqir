@@ -50,7 +50,7 @@ def dataset_path(request, tmp_path):
     return tmp_path
 
 
-@pytest.mark.parametrize("model", ["cosmos", "crosstalk"])
+@pytest.mark.parametrize("model", ["cosmos", "crosstalk", "cosmos+hmm"])
 def test_commands_cpu(dataset_path, model):
 
     commands = [
