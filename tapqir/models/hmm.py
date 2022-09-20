@@ -20,6 +20,8 @@ from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
+from tapqir.handlers import vectorized_markov
+from tapqir.infer.elbo import TraceMarkovEnum_ELBO
 from tapqir.models.cosmos import cosmos
 
 
@@ -122,7 +124,7 @@ class hmm(cosmos):
         )
         # time frames
         frames = (
-            pyro.vectorized_markov(name="frames", size=self.data.F, dim=-2)
+            vectorized_markov(name="frames", size=self.data.F, dim=-2)
             if self.vectorized
             else pyro.markov(range(self.data.F))
         )
@@ -307,7 +309,7 @@ class hmm(cosmos):
         )
         # time frames
         frames = (
-            pyro.vectorized_markov(name="frames", size=self.data.F, dim=-2)
+            vectorized_markov(name="frames", size=self.data.F, dim=-2)
             if self.vectorized
             else pyro.markov(range(self.data.F))
         )
@@ -469,9 +471,7 @@ class hmm(cosmos):
         discrete sample sites, and - local parallel sampling over any sample site in the guide.
         """
         if self.vectorized:
-            return (
-                infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO
-            )(max_plate_nesting=3, ignore_jit_warnings=True)
+            return (TraceMarkovEnum_ELBO)(max_plate_nesting=3, ignore_jit_warnings=True)
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=3, ignore_jit_warnings=True
         )
