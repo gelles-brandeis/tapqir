@@ -70,7 +70,7 @@ setuptools.setup(
         "pandas",
         "protobuf>=3.9,<3.20",
         "pykeops>=2.0",
-        "pyro-ppl @ git+https://github.com/ordabayevy/pyro-ppl.git@tapqir",
+        "pyro-ppl @ git+https://github.com/ordabayevy/pyro.git@tapqir",
         "pyyaml>=6.0",
         "scikit-learn",
         "scipy",
