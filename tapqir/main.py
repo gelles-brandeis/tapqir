@@ -528,15 +528,13 @@ def stats(
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
-    dtype = "double"
-    device = "cuda" if cuda else "cpu"
-    backend = "funsor" if funsor else "pyro"
-
     settings = {}
-    settings["device"] = device
-    settings["dtype"] = dtype
+    settings["device"] = "cuda" if cuda else "cpu"
+    settings["dtype"] = "double"
 
-    # pyro backend
+    backend = "funsor" if funsor else "pyro"
+    if model == "cosmos+hmm":
+        backend = "funsor"  # hmm requires funsor backend
     if backend == "pyro":
         PYRO_BACKEND = "pyro"
     elif backend == "funsor":
