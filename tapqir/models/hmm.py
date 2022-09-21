@@ -21,6 +21,7 @@ from torch.nn.functional import one_hot
 from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
 from tapqir.handlers import vectorized_markov
+from tapqir.hanlders import trace
 from tapqir.infer.elbo import TraceMarkovEnum_ELBO
 from tapqir.models.cosmos import cosmos
 
@@ -548,8 +549,8 @@ class hmm(cosmos):
             with torch.no_grad(), pyro.plate(
                 "particles", size=5, dim=-4
             ), handlers.enum(first_available_dim=-5):
-                guide_tr = handlers.trace(self.guide).get_trace()
-                model_tr = handlers.trace(
+                guide_tr = trace()(self.guide).get_trace()
+                model_tr = trace()(
                     handlers.replay(self.model, trace=guide_tr)
                 ).get_trace()
             model_tr.compute_log_prob()
