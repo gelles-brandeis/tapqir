@@ -20,8 +20,7 @@ from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
-from tapqir.handlers import vectorized_markov
-from tapqir.hanlders import trace
+from tapqir.handlers import trace, vectorized_markov
 from tapqir.infer.elbo import TraceMarkovEnum_ELBO
 from tapqir.models.cosmos import cosmos
 
