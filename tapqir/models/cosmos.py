@@ -659,9 +659,7 @@ class cosmos(Model):
                 result = expectation.logsumexp(m_dims)
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
-                z_probs[ndx[:, None, None], fdx[:, None], qdx] = (
-                    z_logits.exp().mean(-4)
-                )
+                z_probs[ndx[:, None, None], fdx[:, None], qdx] = z_logits.exp().mean(-4)
                 # marginalize z
                 theta_logits = result.logsumexp(z_dims)
                 theta_probs[:, ndx[:, None, None], fdx[:, None], qdx] = (
