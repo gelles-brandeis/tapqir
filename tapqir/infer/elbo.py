@@ -6,9 +6,11 @@ from functools import reduce
 
 import funsor
 from pyro.contrib.funsor import to_data
-from pyro.contrib.funsor.handlers import enum, plate, replay, trace
+from pyro.contrib.funsor.handlers import enum, plate, replay
 from pyro.contrib.funsor.infer.elbo import ELBO
 from pyro.contrib.funsor.infer.traceenum_elbo import terms_from_trace
+
+from tapqir.handlers import trace
 
 from .sum_product import compute_expectations
 
@@ -24,8 +26,8 @@ class TraceMarkovEnum_ELBO(ELBO):
             if self.max_plate_nesting
             else None
         ):
-            guide_tr = trace(guide).get_trace(*args, **kwargs)
-            model_tr = trace(replay(model, trace=guide_tr)).get_trace(*args, **kwargs)
+            guide_tr = trace()(guide).get_trace(*args, **kwargs)
+            model_tr = trace()(replay(model, trace=guide_tr)).get_trace(*args, **kwargs)
 
         # extract from traces all metadata that we will need to compute the elbo
         guide_terms = terms_from_trace(guide_tr)
