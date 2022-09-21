@@ -1068,6 +1068,115 @@ def ttfb(
         plt.savefig(f"ttfb_fit{c}.png", dpi=600)
 
 
+@app.command()
+def dwelltime(
+    model: avail_models = typer.Option(
+        "cosmos", help="Tapqir model", prompt="Tapqir model"
+    ),
+    K: int = typer.Option(3, "-K", help="Number of exponentials"),
+):
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import pyro
+    import torch
+
+    from tapqir.models import models
+    from tapqir.utils.imscroll import (
+        bound_dwell_times,
+        count_intervals,
+        unbound_dwell_times,
+    )
+    from tapqir.utils.mle_analysis import exp_guide, exp_model, train
+
+    logger = logging.getLogger("tapqir")
+
+    mpl.rc("text", usetex=True)
+    mpl.rcParams["font.family"] = "sans-serif"
+    mpl.rcParams.update({"font.size": 8})
+
+    global DEFAULTS
+    cd = DEFAULTS["cd"]
+
+    model = models[model](device="cpu", dtype="float")
+    try:
+        model.load(cd, data_only=False)
+    except TapqirFileNotFoundError as err:
+        logger.exception(f"Failed to load {err.name} file")
+        return 1
+    for c in range(model.data.C):
+        intervals = count_intervals(model.params["z_map"][:, :, c])
+
+        bound_dt = bound_dwell_times(intervals)
+        pyro.clear_param_store()
+        train(
+            exp_model,
+            exp_guide,
+            lr=5e-3,
+            n_steps=10000,
+            jit=False,
+            data=torch.as_tensor(bound_dt),
+            K=K,
+        )
+
+        results = pd.DataFrame(columns=["MLE"])
+        A, k = {}, {}
+        for i in range(K):
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
+            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
+        results.to_csv(f"koff{c}.csv")
+
+        fig, ax = plt.subplots()
+        # ax.hist(bound_dt, bins=100, density=True, log=True)
+        ax.hist(bound_dt, bins=100, density=True)
+        t = torch.arange(bound_dt.max())
+        y = 0
+        for i in range(K):
+            y += A[i] * k[i] * torch.exp(-k[i] * t)
+            ax.plot(A[i] * k[i] * torch.exp(-k[i] * t), "k--")
+        ax.plot(y, "k-")
+        ax.set_xlabel("Time interval (frame)")
+        ax.set_ylabel("Density")
+        ax.set_title(f"Bound dwell times channel {c}")
+        # ax.set_ylim(1e-4, 1e-1)
+        # plt.yscale("log")
+        plt.savefig(f"bound_dwell_times{c}.png", dpi=600)
+
+        unbound_dt = unbound_dwell_times(intervals)
+        pyro.clear_param_store()
+        train(
+            exp_model,
+            exp_guide,
+            lr=5e-3,
+            n_steps=10000,
+            jit=False,
+            data=torch.as_tensor(unbound_dt),
+            K=K,
+        )
+
+        results = pd.DataFrame(columns=["MLE"])
+        A, k = {}, {}
+        for i in range(K):
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
+            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
+        results.to_csv(f"kon{c}.csv")
+        fig, ax = plt.subplots()
+        # ax.hist(unbound_dt, bins=100, density=True, log=True)
+        ax.hist(unbound_dt, bins=100, density=True)
+        t = torch.arange(unbound_dt.max())
+        y = 0
+        for i in range(K):
+            y += A[i] * k[i] * torch.exp(-k[i] * t)
+            ax.plot(A[i] * k[i] * torch.exp(-k[i] * t), "k--")
+        ax.plot(y, "k-")
+        ax.set_xlabel("Time interval (frame)")
+        ax.set_ylabel("Density")
+        ax.set_title(f"Unbound dwell times channel {c}")
+        # ax.set_ylim(1e-4, 1e-1)
+        # plt.yscale("log")
+        plt.savefig(f"unbound_dwell_times{c}.png", dpi=600)
+
+
 @app.callback()
 def main(
     cd: Path = typer.Option(
