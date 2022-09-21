@@ -96,16 +96,17 @@ def ttfb_guide(data, control, Tmax):
     pass  # MLE
 
 
-def double_exp_model(data):
-    k1 = pyro.param("k1", lambda: torch.tensor(0.01), constraint=constraints.positive)
-    k2 = pyro.param("k2", lambda: torch.tensor(0.05), constraint=constraints.positive)
-    A = pyro.param("A", lambda: torch.tensor(0.5), constraint=constraints.unit_interval)
-    k = torch.stack([k1, k2])
+def exp_model(data, K):
+    with pyro.plate("components", K):
+        k = pyro.param(
+            "k", lambda: torch.logspace(-K + 1, 0, K), constraint=constraints.positive
+        )
+    A = pyro.param("A", lambda: torch.ones(K), constraint=constraints.simplex)
 
     with pyro.plate("data", len(data)):
-        m = pyro.sample("m", dist.Bernoulli(A), infer={"enumerate": "parallel"})
+        m = pyro.sample("m", dist.Categorical(A), infer={"enumerate": "parallel"})
         pyro.sample("obs", dist.Exponential(k[m.long()]), obs=data)
 
 
-def double_exp_guide(data):
+def exp_guide(data, K):
     pass  # MLE
