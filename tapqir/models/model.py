@@ -49,7 +49,7 @@ class Model:
 
     def __init__(
         self,
-        S: int = 1,
+        S: int = 3,
         K: int = 2,
         Q: int = None,
         device: str = "cpu",

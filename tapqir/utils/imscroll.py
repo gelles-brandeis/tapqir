@@ -36,6 +36,7 @@ def count_intervals(labels):
 
 @count_intervals.register(np.ndarray)
 def _(labels):
+    z = labels
     labels = labels.astype("bool")
     start_condition = (
         np.concatenate((~labels[:, 0:1], labels[:, :-1]), axis=1) != labels
@@ -56,6 +57,7 @@ def _(labels):
     assert all(start_aoi == stop_aoi)
 
     low_or_high = np.where(abs(start_type) > abs(stop_type), start_type, stop_type)
+    z_type = z[start_aoi, start_frame]
 
     result = pd.DataFrame(
         data={
@@ -64,6 +66,7 @@ def _(labels):
             "stop_frame": stop_frame,
             "dwell_time": stop_frame + 1 - start_frame,
             "low_or_high": low_or_high,
+            "z": z_type,
         }
     )
     return result
@@ -71,6 +74,7 @@ def _(labels):
 
 @count_intervals.register(torch.Tensor)
 def _(labels):
+    z = labels
     labels = labels.bool()
     start_condition = torch.cat((~labels[:, 0:1], labels[:, :-1]), dim=1) != labels
     start_aoi, start_frame = torch.nonzero(start_condition, as_tuple=True)
@@ -89,6 +93,7 @@ def _(labels):
     assert all(start_aoi == stop_aoi)
 
     low_or_high = torch.where(abs(start_type) > abs(stop_type), start_type, stop_type)
+    z_type = z[start_aoi, start_frame]
 
     result = pd.DataFrame(
         data={
@@ -97,6 +102,7 @@ def _(labels):
             "stop_frame": stop_frame,
             "dwell_time": stop_frame + 1 - start_frame,
             "low_or_high": low_or_high,
+            "z": z_type,
         }
     )
     return result
