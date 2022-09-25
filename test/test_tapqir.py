@@ -6,7 +6,7 @@ import torch
 from typer.testing import CliRunner
 
 from tapqir.main import app
-from tapqir.models import HMM, cosmos
+from tapqir.models import cosmos, crosstalk, hmm
 from tapqir.utils.dataset import save
 from tapqir.utils.simulate import simulate
 
@@ -17,13 +17,17 @@ requires_cuda = pytest.mark.skipif(
 runner = CliRunner()
 
 
-@pytest.fixture(params=[cosmos, HMM])
+@pytest.fixture(params=[cosmos, crosstalk, hmm])
 def dataset_path(request, tmp_path):
     params = {}
     if request.param == cosmos:
         model = request.param()
         params["pi"] = 0.15
-    elif request.param == HMM:
+    elif request.param == crosstalk:
+        model = request.param()
+        params["pi"] = 0.15
+        params["alpha"] = [[1.0]]
+    elif request.param == hmm:
         model = request.param(vectorized=False)
         params["kon"] = 0.2
         params["koff"] = 0.2
@@ -46,7 +50,8 @@ def dataset_path(request, tmp_path):
     return tmp_path
 
 
-def test_commands_cpu(dataset_path):
+@pytest.mark.parametrize("model", ["cosmos", "crosstalk", "cosmos+hmm"])
+def test_commands_cpu(dataset_path, model):
 
     commands = [
         [
@@ -54,7 +59,7 @@ def test_commands_cpu(dataset_path):
             dataset_path,
             "fit",
             "--model",
-            "cosmos",
+            model,
             "--learning-rate",
             "0.005",
             "--nbatch-size",
@@ -71,7 +76,7 @@ def test_commands_cpu(dataset_path):
             dataset_path,
             "stats",
             "--model",
-            "cosmos",
+            model,
             "--nbatch-size",
             "2",
             "--fbatch-size",
@@ -88,14 +93,15 @@ def test_commands_cpu(dataset_path):
 
 
 @requires_cuda
-def test_commands_cuda(dataset_path):
+@pytest.mark.parametrize("model", ["cosmos", "crosstalk", "cosmos+hmm"])
+def test_commands_cuda(dataset_path, model):
     commands = [
         [
             "--cd",
             dataset_path,
             "fit",
             "--model",
-            "cosmos",
+            model,
             "--learning-rate",
             "0.005",
             "--cuda",

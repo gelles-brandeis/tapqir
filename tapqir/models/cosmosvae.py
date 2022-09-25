@@ -259,7 +259,16 @@ class cosmosnn(cosmos):
                             -1,
                         )
                         h, c = self.rnn(rnn_input, (state["h"], state["c"]))
-                        m_probs, h_loc, h_beta, w_mean, w_size, x_mean, y_mean, size = self.predict(h)
+                        (
+                            m_probs,
+                            h_loc,
+                            h_beta,
+                            w_mean,
+                            w_size,
+                            x_mean,
+                            y_mean,
+                            size,
+                        ) = self.predict(h)
                         m_probs = m_probs.reshape(shape)
                         h_loc = h_loc.reshape(shape)
                         h_beta = h_beta.reshape(shape)
@@ -298,7 +307,7 @@ class cosmosnn(cosmos):
                                     # w_size,
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
                                     0.75,
-                                    2.25
+                                    2.25,
                                 ),
                             )
                             x = pyro.sample(

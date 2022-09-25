@@ -32,7 +32,8 @@ class StatsMessenger(Messenger):
 
     def _pyro_sample(self, msg):
         if (
-            type(msg["fn"]).__name__ == "_Subsample"
+            type(msg["fn"]).__name__
+            == "_Subsample"
             # or msg["infer"].get("enumerate", None) == "parallel"
         ):
             return

@@ -29,7 +29,7 @@ plt.rcParams["keymap.home"].remove("h")
 plt.rcParams["keymap.yscale"].remove("l")
 plt.rcParams["keymap.xscale"].remove("k")
 
-avail_models = list(avail_models.__members__.keys())
+avail_models = [e.value for e in avail_models]
 
 
 @singledispatch
@@ -114,8 +114,6 @@ class inputBox(widgets.VBox):
                     result[k] = [get_value(c[k]) for c in v["widget"].children]
                 continue
             result[name] = get_value(v["widget"])
-            if name == "channels":  # FIXME
-                result[name] = [int(result[name])]
         return result
 
 
@@ -434,15 +432,6 @@ def fitUI(out, DEFAULTS):
         ),
     )
     layout.add_child(
-        "channels",
-        widgets.Dropdown(
-            description="Channel numbers",
-            value="0",
-            options=[str(c) for c in range(DEFAULTS["num-channels"])],
-            style={"description_width": "initial"},
-        ),
-    )
-    layout.add_child(
         "cuda",
         widgets.Checkbox(
             value=DEFAULTS["cuda"],
@@ -699,6 +688,7 @@ def showCmd(b, layout, out):
             labels=labels,
             fov_controls=fov_controls,
             exclude_aoi=exclude_aoi,
+            show_fov=layout["show_fov"],
         ),
         names="value",
     )
@@ -742,7 +732,9 @@ def showCmd(b, layout, out):
         names="value",
     )
     exclude_aoi.observe(
-        partial(excludeAOI, n=n_counter, model=model, item=item),
+        partial(
+            excludeAOI, n=n_counter, model=model, item=item, show_fov=layout["show_fov"]
+        ),
         names="value",
     )
     fov_controls["save_data"].on_click(
@@ -835,6 +827,7 @@ def updateParams(
     labels,
     fov_controls,
     exclude_aoi,
+    show_fov,
 ):
     n_old = n.old
     n = get_value(n)
@@ -964,15 +957,16 @@ def updateParams(
                 )
                 item[f"{p}_mean_c{c}"].set_ydata(model.params[p]["Mean"][n, :, c])
 
-    ax["glimpse_c0"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
-    n_old_dtype = "ontarget" if n_old < model.data.N else "offtarget"
-    n_old_visible = fov_controls[n_old_dtype].value
-    colors = {"ontarget": "#AA3377", "offtarget": "#CCBB44"}
-    for c in range(model.data.C):
-        item[f"aoi_n{n}_c{c}"].set_edgecolor(color[c])
-        item[f"aoi_n{n}_c{c}"].set(zorder=2, visible=True)
-        item[f"aoi_n{n_old}_c{c}"].set_edgecolor(colors[n_old_dtype])
-        item[f"aoi_n{n_old}_c{c}"].set(zorder=1, visible=n_old_visible)
+    if get_value(show_fov):
+        ax["glimpse_c0"].set_title(rf"AOI ${n}$, Frame ${f1}$", fontsize=9)
+        n_old_dtype = "ontarget" if n_old < model.data.N else "offtarget"
+        n_old_visible = fov_controls[n_old_dtype].value
+        colors = {"ontarget": "#AA3377", "offtarget": "#CCBB44"}
+        for c in range(model.data.C):
+            item[f"aoi_n{n}_c{c}"].set_edgecolor(color[c])
+            item[f"aoi_n{n}_c{c}"].set(zorder=2, visible=True)
+            item[f"aoi_n{n_old}_c{c}"].set_edgecolor(colors[n_old_dtype])
+            item[f"aoi_n{n_old}_c{c}"].set(zorder=1, visible=n_old_visible)
     fig.canvas.draw()
 
 
@@ -1163,12 +1157,13 @@ def showNonspecific(checked, n, model, item, ax):
                     item[f"{p}_nonspecific{k}_mean_q{q}"].remove()
 
 
-def excludeAOI(checked, n, model, item):
+def excludeAOI(checked, n, model, item, show_fov):
     checked = get_value(checked)
     n = get_value(n)
     model.data.mask[n] = not checked
     color = [f"C{2+q}" for q in range(model.Q)] if not checked else ["C7"] * model.Q
     for q in range(model.Q):
+        item[f"z_map_q{q}"].set_color(color[q])
         item[f"p_specific_q{q}"].set_color(color[q])
         item[f"height_specific_mean_q{q}"].set_color(color[q])
         item[f"height_specific_fill_q{q}"].set_color(color[q])
@@ -1178,8 +1173,9 @@ def excludeAOI(checked, n, model, item):
         item[f"x_specific_fill_q{q}"].set_color(color[q])
         item[f"y_specific_mean_q{q}"].set_color(color[q])
         item[f"y_specific_fill_q{q}"].set_color(color[q])
-    for c in range(model.data.C):
-        item[f"aoi_n{n}_c{c}"].set_edgecolor(color[c])
+    if get_value(show_fov):
+        for c in range(model.data.C):
+            item[f"aoi_n{n}_c{c}"].set_edgecolor(color[c])
 
 
 def logUI(out):

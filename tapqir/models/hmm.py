@@ -20,10 +20,12 @@ from torch.nn.functional import one_hot
 
 from tapqir.distributions import KSMOGN, AffineBeta
 from tapqir.distributions.util import expand_offtarget, probs_m, probs_theta
+from tapqir.handlers import trace, vectorized_markov
+from tapqir.infer.elbo import TraceMarkovEnum_ELBO
 from tapqir.models.cosmos import cosmos
 
 
-class HMM(cosmos):
+class hmm(cosmos):
     r"""
     **Multi-Color Hidden Markov Colocalization Model**
 
@@ -37,7 +39,7 @@ class HMM(cosmos):
     :param priors: Dictionary of parameters of prior distributions.
     """
 
-    name = "hmm"
+    name = "cosmos+hmm"
 
     def __init__(
         self,
@@ -62,6 +64,18 @@ class HMM(cosmos):
             K=K, device=device, dtype=dtype, use_pykeops=use_pykeops, priors=priors
         )
         self._global_params = ["gain", "proximity", "lamda", "trans"]
+        self.ci_params = [
+            "gain",
+            "init",
+            "trans",
+            "lamda",
+            "proximity",
+            "background",
+            "height",
+            "width",
+            "x",
+            "y",
+        ]
 
     def model(self):
         """
@@ -110,7 +124,7 @@ class HMM(cosmos):
         )
         # time frames
         frames = (
-            pyro.vectorized_markov(name="frames", size=self.data.F, dim=-2)
+            vectorized_markov(name="frames", size=self.data.F, dim=-2)
             if self.vectorized
             else pyro.markov(range(self.data.F))
         )
@@ -137,7 +151,8 @@ class HMM(cosmos):
                 for fdx in frames:
                     if self.vectorized:
                         fsx, fdx = fdx
-                        fdx = fdx[:, None]
+                        fdx = torch.as_tensor(fdx)
+                        fdx = fdx.unsqueeze(-1)
                     else:
                         fsx = fdx
                     # fetch data
@@ -155,7 +170,7 @@ class HMM(cosmos):
                     z_probs = (
                         Vindex(init)[..., cdx, :, is_ontarget.long()]
                         if z_prev is None
-                        else Vindex(trans)[..., z_prev, :, is_ontarget.long()]
+                        else Vindex(trans)[..., cdx, z_prev, :, is_ontarget.long()]
                     )
                     z_curr = pyro.sample(f"z_f{fsx}", dist.Categorical(z_probs))
 
@@ -294,7 +309,7 @@ class HMM(cosmos):
         )
         # time frames
         frames = (
-            pyro.vectorized_markov(name="frames", size=self.data.F, dim=-2)
+            vectorized_markov(name="frames", size=self.data.F, dim=-2)
             if self.vectorized
             else pyro.markov(range(self.data.F))
         )
@@ -321,7 +336,8 @@ class HMM(cosmos):
                 for fdx in frames:
                     if self.vectorized:
                         fsx, fdx = fdx
-                        fdx = fdx[:, None]
+                        fdx = torch.as_tensor(fdx)
+                        fdx = fdx.unsqueeze(-1)
                     else:
                         fsx = fdx
                     # sample background intensity
@@ -371,8 +387,8 @@ class HMM(cosmos):
                                 AffineBeta(
                                     Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
-                                    0.75,
-                                    2.25,
+                                    self.priors["width_min"],
+                                    self.priors["width_max"],
                                 ),
                             )
                             pyro.sample(
@@ -455,9 +471,7 @@ class HMM(cosmos):
         discrete sample sites, and - local parallel sampling over any sample site in the guide.
         """
         if self.vectorized:
-            return (
-                infer.JitTraceMarkovEnum_ELBO if jit else infer.TraceMarkovEnum_ELBO
-            )(max_plate_nesting=3, ignore_jit_warnings=True)
+            return (TraceMarkovEnum_ELBO)(max_plate_nesting=3, ignore_jit_warnings=True)
         return (infer.JitTraceEnum_ELBO if jit else infer.TraceEnum_ELBO)(
             max_plate_nesting=3, ignore_jit_warnings=True
         )
@@ -465,48 +479,49 @@ class HMM(cosmos):
     @staticmethod
     def _sequential_logmatmulexp(logits: torch.Tensor) -> torch.Tensor:
         """
-        For a tensor ``x`` whose time dimension is -3, computes::
-            x[..., 0, :, :] @ x[..., 1, :, :] @ ... @ x[..., T-1, :, :]
+        For a tensor ``x`` whose time dimension is -4, computes::
+            x[..., 0, :, :, :] @ x[..., 1, :, :, :] @ ... @ x[..., T-1, :, :, :]
         but does so numerically stably in log space.
         """
-        batch_shape = logits.shape[:-3]
+        batch_shape = logits.shape[:-4]
         state_dim = logits.size(-1)
+        c_dim = logits.size(-3)
         sum_terms = []
         # up sweep
-        while logits.size(-3) > 1:
-            time = logits.size(-3)
+        while logits.size(-4) > 1:
+            time = logits.size(-4)
             even_time = time // 2 * 2
-            even_part = logits[..., :even_time, :, :]
+            even_part = logits[..., :even_time, :, :, :]
             x_y = even_part.reshape(
-                batch_shape + (even_time // 2, 2, state_dim, state_dim)
+                batch_shape + (even_time // 2, 2, c_dim, state_dim, state_dim)
             )
-            x, y = x_y.unbind(-3)
+            x, y = x_y.unbind(-4)
             contracted = _logmatmulexp(x, y)
             if time > even_time:
-                contracted = torch.cat((contracted, logits[..., -1:, :, :]), dim=-3)
+                contracted = torch.cat((contracted, logits[..., -1:, :, :, :]), dim=-4)
             sum_terms.append(logits)
             logits = contracted
         else:
             sum_terms.append(logits)
         # handle root case
         sum_term = sum_terms.pop()
-        left_term = HMM._contraction_identity(sum_term)
+        left_term = hmm._contraction_identity(sum_term)
         # down sweep
         while sum_terms:
             sum_term = sum_terms.pop()
-            new_left_term = HMM._contraction_identity(sum_term)
-            time = sum_term.size(-3)
+            new_left_term = hmm._contraction_identity(sum_term)
+            time = sum_term.size(-4)
             even_time = time // 2 * 2
             if time > even_time:
-                new_left_term[..., time - 1 : time, :, :] = left_term[
-                    ..., even_time // 2 : even_time // 2 + 1, :, :
+                new_left_term[..., time - 1 : time, :, :, :] = left_term[
+                    ..., even_time // 2 : even_time // 2 + 1, :, :, :
                 ]
-                left_term = left_term[..., : even_time // 2, :, :]
+                left_term = left_term[..., : even_time // 2, :, :, :]
 
-            left_sum = sum_term[..., :even_time:2, :, :]
+            left_sum = sum_term[..., :even_time:2, :, :, :]
             left_sum_and_term = _logmatmulexp(left_term, left_sum)
-            new_left_term[..., :even_time:2, :, :] = left_term
-            new_left_term[..., 1:even_time:2, :, :] = left_sum_and_term
+            new_left_term[..., :even_time:2, :, :, :] = left_term
+            new_left_term[..., 1:even_time:2, :, :, :] = left_sum_and_term
             left_term = new_left_term
         else:
             alphas = _logmatmulexp(left_term, sum_term)
@@ -514,26 +529,27 @@ class HMM(cosmos):
 
     @staticmethod
     def _contraction_identity(logits: torch.Tensor) -> torch.Tensor:
-        batch_shape = logits.shape[:-2]
+        batch_shape = logits.shape[:-3]
         state_dim = logits.size(-1)
+        c_dim = logits.size(-3)
         result = torch.eye(state_dim).log()
-        result = result.reshape((1,) * len(batch_shape) + (state_dim, state_dim))
-        result = result.repeat(batch_shape + (1, 1))
+        result = result.reshape((1,) * len(batch_shape) + (1, state_dim, state_dim))
+        result = result.repeat(batch_shape + (c_dim, 1, 1))
         return result
 
     @lazy_property
     def compute_probs(self) -> torch.Tensor:
-        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F)
+        theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F, self.Q)
         nbatch_size = self.nbatch_size
         N = sum(self.data.is_ontarget)
         for ndx in torch.split(torch.arange(N), nbatch_size):
             self.n = ndx
             self.nbatch_size = len(ndx)
             with torch.no_grad(), pyro.plate(
-                "particles", size=5, dim=-3
-            ), handlers.enum(first_available_dim=-4):
-                guide_tr = handlers.trace(self.guide).get_trace()
-                model_tr = handlers.trace(
+                "particles", size=5, dim=-4
+            ), handlers.enum(first_available_dim=-5):
+                guide_tr = trace()(self.guide).get_trace()
+                model_tr = trace()(
                     handlers.replay(self.model, trace=guide_tr)
                 ).get_trace()
             model_tr.compute_log_prob()
@@ -544,47 +560,64 @@ class HMM(cosmos):
             for fsx in ("0", f"slice(1, {self.data.F}, None)"):
                 logp[fsx] = 0
                 # collect log_prob terms p(z, theta, phi)
-                for name in ["z", "theta", "m_0", "m_1", "x_0", "x_1", "y_0", "y_1"]:
-                    logp[fsx] += model_tr.nodes[f"{name}_{fsx}"]["funsor"]["log_prob"]
+                for name in [
+                    "z",
+                    "theta",
+                    "m_k0",
+                    "m_k1",
+                    "x_k0",
+                    "x_k1",
+                    "y_k0",
+                    "y_k1",
+                ]:
+                    logp[fsx] += model_tr.nodes[f"{name}_f{fsx}"]["funsor"]["log_prob"]
                 if fsx == "0":
                     # substitute MAP values of z into p(z=z_map, theta, phi)
-                    z_map = funsor.Tensor(self.z_map[ndx, 0].long(), dtype=2)["aois"]
-                    logp[fsx] = logp[fsx](**{f"z_{fsx}": z_map})
+                    z_map = funsor.Tensor(self.z_map[ndx, 0].long(), dtype=2)[
+                        "aois", "channels"
+                    ]
+                    logp[fsx] = logp[fsx](**{f"z_f{fsx}": z_map})
                     # compute log_measure q for given z_map
-                    log_measure = guide_tr.nodes[f"m_0_{fsx}"]["funsor"]["log_measure"]
-                    +guide_tr.nodes[f"m_1_{fsx}"]["funsor"]["log_measure"]
-                    log_measure = log_measure(**{f"z_{fsx}": z_map})
+                    log_measure = (
+                        guide_tr.nodes[f"m_k0_f{fsx}"]["funsor"]["log_measure"]
+                        + guide_tr.nodes[f"m_k1_f{fsx}"]["funsor"]["log_measure"]
+                    )
+                    log_measure = log_measure(**{f"z_f{fsx}": z_map})
                 else:
                     # substitute MAP values of z into p(z=z_map, theta, phi)
                     z_map = funsor.Tensor(self.z_map[ndx, 1:].long(), dtype=2)[
-                        "aois", "frames"
+                        "aois", "frames", "channels"
                     ]
                     z_map_prev = funsor.Tensor(self.z_map[ndx, :-1].long(), dtype=2)[
-                        "aois", "frames"
+                        "aois", "frames", "channels"
                     ]
                     fsx_prev = f"slice(0, {self.data.F-1}, None)"
                     logp[fsx] = logp[fsx](
-                        **{f"z_{fsx}": z_map, f"z_{fsx_prev}": z_map_prev}
+                        **{f"z_f{fsx}": z_map, f"z_f{fsx_prev}": z_map_prev}
                     )
                     # compute log_measure q for given z_map
-                    log_measure = guide_tr.nodes[f"m_0_{fsx}"]["funsor"]["log_measure"]
-                    +guide_tr.nodes[f"m_1_{fsx}"]["funsor"]["log_measure"]
+                    log_measure = (
+                        guide_tr.nodes[f"m_k0_f{fsx}"]["funsor"]["log_measure"]
+                        + guide_tr.nodes[f"m_k1_f{fsx}"]["funsor"]["log_measure"]
+                    )
                     log_measure = log_measure(
-                        **{f"z_{fsx}": z_map, f"z_{fsx_prev}": z_map_prev}
+                        **{f"z_f{fsx}": z_map, f"z_f{fsx_prev}": z_map_prev}
                     )
                 # compute p(z_map, theta | phi) = p(z_map, theta, phi) - p(z_map, phi)
                 logp[fsx] = logp[fsx] - logp[fsx].reduce(
-                    funsor.ops.logaddexp, f"theta_{fsx}"
+                    funsor.ops.logaddexp, f"theta_f{fsx}"
                 )
                 # average over m in p * q
                 result[fsx] = (logp[fsx] + log_measure).reduce(
-                    funsor.ops.logaddexp, frozenset({f"m_0_{fsx}", f"m_1_{fsx}"})
+                    funsor.ops.logaddexp, frozenset({f"m_k0_f{fsx}", f"m_k1_f{fsx}"})
                 )
                 # average over particles
                 result[fsx] = result[fsx].exp().reduce(funsor.ops.mean, "particles")
-            theta_probs[:, ndx, 0] = result["0"].data[:, 1:].permute(1, 0)
+            theta_probs[:, ndx, 0] = result["0"].data[..., 1:].permute(2, 0, 1)
             theta_probs[:, ndx, 1:] = (
-                result[f"slice(1, {self.data.F}, None)"].data[..., 1:].permute(2, 0, 1)
+                result[f"slice(1, {self.data.F}, None)"]
+                .data[..., 1:]
+                .permute(3, 0, 1, 2)
             )
         self.n = None
         self.nbatch_size = nbatch_size
@@ -617,6 +650,6 @@ class HMM(cosmos):
         r"""
         Posterior spot presence probability :math:`q(m=1, z=z_\mathsf{MAP})`.
         """
-        return Vindex(torch.permute(pyro.param("m_probs").data, (1, 2, 3, 0)))[
+        return Vindex(torch.permute(pyro.param("m_probs").data, (1, 2, 3, 4, 0)))[
             ..., self.z_map.long()
         ]

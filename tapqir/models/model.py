@@ -273,10 +273,8 @@ class Model(nn.Module):
         self.converged = False
         if len(self._rolling["-ELBO"]) == self._rolling["-ELBO"].maxlen:
             crit = all(
-                torch.tensor(self._rolling[p]).std()
-                / torch.tensor(self._rolling[p])[-50:].std()
-                < 1.05
-                for p in self.conv_params
+                torch.tensor(value).std() / torch.tensor(value)[-50:].std() < 1.05
+                for value in self._rolling.values()
             )
             if crit:
                 self.converged = True
@@ -298,7 +296,7 @@ class Model(nn.Module):
             self.run_path / f"{self.name}-model.tpqr",
         )
 
-        # save global paramters for tensorboard
+        # save global parameters for tensorboard
         writer.add_scalar("-ELBO", self.iter_loss, self.iter)
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:

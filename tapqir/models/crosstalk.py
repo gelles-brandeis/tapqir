@@ -27,6 +27,8 @@ class crosstalk(cosmos):
     r"""
     **Multi-Color Time-Independent Colocalization Model with Cross-Talk**
 
+    EXPERIMENTAL
+
     :param K: Maximum number of spots that can be present in a single image.
     :param Q: Number of fluorescent dyes.
     :param device: Computation device (cpu or gpu).
@@ -40,7 +42,7 @@ class crosstalk(cosmos):
     def __init__(
         self,
         K: int = 2,
-        Q: int = 2,
+        Q: int = None,
         device: str = "cpu",
         dtype: str = "double",
         use_pykeops: bool = True,
@@ -57,6 +59,18 @@ class crosstalk(cosmos):
     ):
         super().__init__(K=K, Q=Q, device=device, dtype=dtype, priors=priors)
         self._global_params = ["gain", "proximity", "lamda", "pi", "alpha"]
+        self.ci_params = [
+            "alpha",
+            "gain",
+            "pi",
+            "lamda",
+            "proximity",
+            "background",
+            "height",
+            "width",
+            "x",
+            "y",
+        ]
 
     def model(self):
         r"""
@@ -174,15 +188,15 @@ class crosstalk(cosmos):
                                 # sample spot variables
                                 height = pyro.sample(
                                     f"height_k{kdx}_q{qdx}",
-                                    dist.HalfNormal(10000),
+                                    dist.HalfNormal(self.priors["height_std"]),
                                 )
                                 width = pyro.sample(
                                     f"width_k{kdx}_q{qdx}",
                                     AffineBeta(
                                         1.5,
                                         2,
-                                        0.75,
-                                        2.25,
+                                        self.priors["width_min"],
+                                        self.priors["width_max"],
                                     ),
                                 )
                                 x = pyro.sample(
@@ -326,76 +340,90 @@ class crosstalk(cosmos):
 
         with aois as ndx:
             ndx = ndx[:, None]
-            pyro.sample(
-                "background_mean",
-                dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0]).to_event(
-                    1
-                ),
-            )
-            pyro.sample(
-                "background_std",
-                dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0]).to_event(
-                    1
-                ),
-            )
-            with frames as fdx:
-                # sample background intensity
+            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            with handlers.mask(mask=mask):
                 pyro.sample(
-                    "background",
-                    dist.Gamma(
-                        Vindex(pyro.param("b_loc"))[ndx, fdx]
-                        * Vindex(pyro.param("b_beta"))[ndx, fdx],
-                        Vindex(pyro.param("b_beta"))[ndx, fdx],
+                    "background_mean",
+                    dist.Delta(
+                        Vindex(pyro.param("background_mean_loc"))[ndx, 0]
                     ).to_event(1),
                 )
+                pyro.sample(
+                    "background_std",
+                    dist.Delta(
+                        Vindex(pyro.param("background_std_loc"))[ndx, 0]
+                    ).to_event(1),
+                )
+                with frames as fdx:
+                    # sample background intensity
+                    pyro.sample(
+                        "background",
+                        dist.Gamma(
+                            Vindex(pyro.param("b_loc"))[ndx, fdx]
+                            * Vindex(pyro.param("b_beta"))[ndx, fdx],
+                            Vindex(pyro.param("b_beta"))[ndx, fdx],
+                        ).to_event(1),
+                    )
 
-                for qdx in range(self.Q):
-                    for kdx in range(self.K):
-                        # sample spot presence m
-                        m = pyro.sample(
-                            f"m_k{kdx}_q{qdx}",
-                            dist.Bernoulli(
-                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, qdx]
-                            ),
-                            infer={"enumerate": "parallel"},
-                        )
-                        with handlers.mask(mask=m > 0):
-                            # sample spot variables
-                            pyro.sample(
-                                f"height_k{kdx}_q{qdx}",
-                                dist.Gamma(
-                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
-                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, qdx],
+                    for qdx in range(self.Q):
+                        for kdx in range(self.K):
+                            # sample spot presence m
+                            m = pyro.sample(
+                                f"m_k{kdx}_q{qdx}",
+                                dist.Bernoulli(
+                                    Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, qdx]
                                 ),
+                                infer={"enumerate": "parallel"},
                             )
-                            pyro.sample(
-                                f"width_k{kdx}_q{qdx}",
-                                AffineBeta(
-                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx, qdx],
-                                    0.75,
-                                    2.25,
-                                ),
-                            )
-                            pyro.sample(
-                                f"x_k{kdx}_q{qdx}",
-                                AffineBeta(
-                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
-                                    -(self.data.P + 1) / 2,
-                                    (self.data.P + 1) / 2,
-                                ),
-                            )
-                            pyro.sample(
-                                f"y_k{kdx}_q{qdx}",
-                                AffineBeta(
-                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, qdx],
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
-                                    -(self.data.P + 1) / 2,
-                                    (self.data.P + 1) / 2,
-                                ),
-                            )
+                            with handlers.mask(mask=m > 0):
+                                # sample spot variables
+                                pyro.sample(
+                                    f"height_k{kdx}_q{qdx}",
+                                    dist.Gamma(
+                                        Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, qdx]
+                                        * Vindex(pyro.param("h_beta"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("h_beta"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                    ),
+                                )
+                                pyro.sample(
+                                    f"width_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        Vindex(pyro.param("w_mean"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("w_size"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        self.priors["width_min"],
+                                        self.priors["width_max"],
+                                    ),
+                                )
+                                pyro.sample(
+                                    f"x_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        Vindex(pyro.param("x_mean"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
+                                        -(self.data.P + 1) / 2,
+                                        (self.data.P + 1) / 2,
+                                    ),
+                                )
+                                pyro.sample(
+                                    f"y_k{kdx}_q{qdx}",
+                                    AffineBeta(
+                                        Vindex(pyro.param("y_mean"))[
+                                            kdx, ndx, fdx, qdx
+                                        ],
+                                        Vindex(pyro.param("size"))[kdx, ndx, fdx, qdx],
+                                        -(self.data.P + 1) / 2,
+                                        (self.data.P + 1) / 2,
+                                    ),
+                                )
 
     def init_parameters(self):
         """
@@ -494,12 +522,18 @@ class crosstalk(cosmos):
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
                 a = z_logits.exp().mean(-3)
-                z_probs[ndx[:, None], fdx, 0] = a.sum(0)[1]
-                z_probs[ndx[:, None], fdx, 1] = a.sum(1)[1]
+                for q in range(self.Q):
+                    sum_dims = tuple(i for i in range(self.Q) if i != q)
+                    if sum_dims:
+                        a = a.sum(sum_dims)
+                    z_probs[ndx[:, None], fdx, q] = a[1]
                 # marginalize z
                 b = result.logsumexp(z_dims)
-                theta_probs[:, ndx[:, None], fdx, 0] = b.logsumexp(0)[1:].exp().mean(-3)
-                theta_probs[:, ndx[:, None], fdx, 1] = b.logsumexp(1)[1:].exp().mean(-3)
+                for q in range(self.Q):
+                    sum_dims = tuple(i for i in range(self.Q) if i != q)
+                    if sum_dims:
+                        b = b.logsumexp(sum_dims)
+                    theta_probs[:, ndx[:, None], fdx, q] = b[1:].exp().mean(-3)
         self.n = None
         self.f = None
         self.nbatch_size = nbatch_size
