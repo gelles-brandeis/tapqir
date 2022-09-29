@@ -682,7 +682,7 @@ class cosmos(Model):
     @property
     def theta_probs(self) -> torch.Tensor:
         r"""
-        Posterior target-specific spot probability :math:`q(\theta = k)`.
+        Posterior target-specific spot probability :math:`q(\theta = k)` for :math:`k \in \{1, \dots, K\}`.
         """
         return self.compute_probs[1]
 
