@@ -573,7 +573,7 @@ class hmm(cosmos):
                     logp[fsx] += model_tr.nodes[f"{name}_f{fsx}"]["funsor"]["log_prob"]
                 if fsx == "0":
                     # substitute MAP values of z into p(z=z_map, theta, phi)
-                    z_map = funsor.Tensor(self.z_map[ndx, 0].long(), dtype=2)[
+                    z_map = funsor.Tensor(self.z_map[ndx, 0].long(), dtype=self.S + 1)[
                         "aois", "channels"
                     ]
                     logp[fsx] = logp[fsx](**{f"z_f{fsx}": z_map})
@@ -585,12 +585,12 @@ class hmm(cosmos):
                     log_measure = log_measure(**{f"z_f{fsx}": z_map})
                 else:
                     # substitute MAP values of z into p(z=z_map, theta, phi)
-                    z_map = funsor.Tensor(self.z_map[ndx, 1:].long(), dtype=2)[
+                    z_map = funsor.Tensor(self.z_map[ndx, 1:].long(), dtype=self.S + 1)[
                         "aois", "frames", "channels"
                     ]
-                    z_map_prev = funsor.Tensor(self.z_map[ndx, :-1].long(), dtype=2)[
-                        "aois", "frames", "channels"
-                    ]
+                    z_map_prev = funsor.Tensor(
+                        self.z_map[ndx, :-1].long(), dtype=self.S + 1
+                    )["aois", "frames", "channels"]
                     fsx_prev = f"slice(0, {self.data.F-1}, None)"
                     logp[fsx] = logp[fsx](
                         **{f"z_f{fsx}": z_map, f"z_f{fsx_prev}": z_map_prev}
@@ -629,7 +629,7 @@ class hmm(cosmos):
         Probability of there being a target-specific spot :math:`p(z=1)`
         """
         result = self._sequential_logmatmulexp(pyro.param("z_trans").data.log())
-        return result[..., 0, 1].exp()
+        return result[..., 0, :].exp()
 
     @property
     def theta_probs(self) -> torch.Tensor:
