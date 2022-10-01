@@ -1130,7 +1130,7 @@ def dwelltime(
         # ax.hist(bound_dt, bins=100, density=True, log=True)
         # ax.hist(bound_dt, bins=100, alpha=0.4)
         for i in range(3):
-            bdt = bound_dwell_times(intervals.mask(intervals["z"] == i+1))
+            bdt = bound_dwell_times(intervals.mask(intervals["z"] == i + 1))
             ax.hist(bdt, bins=100, alpha=0.4)
         #  t = torch.arange(bound_dt.max())
         #  y = 0
@@ -1168,7 +1168,7 @@ def dwelltime(
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
         # ax.hist(unbound_dt, bins=100, density=True)
         for i in range(3):
-            udt = unbound_dwell_times(intervals.mask(intervals["z"] == i+1))
+            udt = unbound_dwell_times(intervals.mask(intervals["z"] == i + 1))
             ax.hist(udt, bins=100, alpha=0.4)
         #  t = torch.arange(unbound_dt.max())
         #  y = 0
