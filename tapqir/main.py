@@ -44,7 +44,7 @@ def format_link(link):
 class avail_models(str, Enum):
     cosmos = "cosmos"
     crosstalk = "crosstalk"
-    hmm = "cosmos+hmm3"
+    hmm = "cosmos+hmm"
 
 
 def get_default(key):
@@ -1129,9 +1129,6 @@ def dwelltime(
         fig, ax = plt.subplots()
         # ax.hist(bound_dt, bins=100, density=True, log=True)
         ax.hist(bound_dt, bins=100, density=True)
-        for i in range(3):
-            bdt = bound_dwell_times(intervals.mask(intervals["z"] == i + 1))
-            ax.hist(bdt, bins=100, alpha=0.4)
         t = torch.arange(bound_dt.max())
         y = 0
         for i in range(K):
@@ -1163,7 +1160,6 @@ def dwelltime(
             results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
             results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
         results.to_csv(f"kon{c}.csv")
-
         fig, ax = plt.subplots()
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
         ax.hist(unbound_dt, bins=100, density=True)
