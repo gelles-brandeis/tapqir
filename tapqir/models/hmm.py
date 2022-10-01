@@ -39,7 +39,7 @@ class hmm(cosmos):
     :param priors: Dictionary of parameters of prior distributions.
     """
 
-    name = "cosmos+hmm3"
+    name = "cosmos+hmm"
 
     def __init__(
         self,
@@ -91,15 +91,7 @@ class hmm(cosmos):
         trans = pyro.sample(
             "trans",
             dist.Dirichlet(
-                # torch.ones(self.Q, self.S + 1, self.S + 1) / (self.S + 1)
-                torch.tensor(
-                    [
-                        [1.0, 1.0, 1.0, 1.0],
-                        [1.0, 1.0, 1e-5, 1e-5],
-                        [1.0, 1e-5, 1.0, 1e-5],
-                        [1.0, 1e-5, 1e-5, 1.0],
-                    ]
-                ).expand([2, 4, 4])
+                torch.ones(self.Q, self.S + 1, self.S + 1) / (self.S + 1)
             ).to_event(2),
         )
         trans = expand_offtarget(trans)

@@ -1108,36 +1108,36 @@ def dwelltime(
         intervals = count_intervals(model.params["z_map"][:, :, c])
 
         bound_dt = bound_dwell_times(intervals)
-        #  pyro.clear_param_store()
-        #  train(
-        #      exp_model,
-        #      exp_guide,
-        #      lr=5e-3,
-        #      n_steps=10000,
-        #      jit=False,
-        #      data=torch.as_tensor(bound_dt),
-        #      K=K,
-        #  )
-        #
-        #  results = pd.DataFrame(columns=["MLE"])
-        #  A, k = {}, {}
-        #  for i in range(K):
-        #      results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
-        #      results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
-        #  results.to_csv(f"koff{c}.csv")
+        pyro.clear_param_store()
+        train(
+            exp_model,
+            exp_guide,
+            lr=5e-3,
+            n_steps=10000,
+            jit=False,
+            data=torch.as_tensor(bound_dt),
+            K=K,
+        )
+
+        results = pd.DataFrame(columns=["MLE"])
+        A, k = {}, {}
+        for i in range(K):
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
+            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
+        results.to_csv(f"koff{c}.csv")
 
         fig, ax = plt.subplots()
         # ax.hist(bound_dt, bins=100, density=True, log=True)
-        # ax.hist(bound_dt, bins=100, alpha=0.4)
+        ax.hist(bound_dt, bins=100, density=True)
         for i in range(3):
             bdt = bound_dwell_times(intervals.mask(intervals["z"] == i + 1))
             ax.hist(bdt, bins=100, alpha=0.4)
-        #  t = torch.arange(bound_dt.max())
-        #  y = 0
-        #  for i in range(K):
-        #      y += A[i] * k[i] * torch.exp(-k[i] * t)
-        #      ax.plot(A[i] * k[i] * torch.exp(-k[i] * t), "k--")
-        #  ax.plot(y, "k-")
+        t = torch.arange(bound_dt.max())
+        y = 0
+        for i in range(K):
+            y += A[i] * k[i] * torch.exp(-k[i] * t)
+            ax.plot(A[i] * k[i] * torch.exp(-k[i] * t), "k--")
+        ax.plot(y, "k-")
         ax.set_xlabel("Time interval (frame)")
         ax.set_ylabel("Density")
         ax.set_title(f"Bound dwell times channel {c}")
@@ -1146,36 +1146,33 @@ def dwelltime(
         plt.savefig(f"bound_dwell_times{c}.png", dpi=600)
 
         unbound_dt = unbound_dwell_times(intervals)
-        #  pyro.clear_param_store()
-        #  train(
-        #      exp_model,
-        #      exp_guide,
-        #      lr=5e-3,
-        #      n_steps=10000,
-        #      jit=False,
-        #      data=torch.as_tensor(unbound_dt),
-        #      K=K,
-        #  )
-        #
-        #  results = pd.DataFrame(columns=["MLE"])
-        #  A, k = {}, {}
-        #  for i in range(K):
-        #      results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
-        #      results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
-        #  results.to_csv(f"kon{c}.csv")
+        pyro.clear_param_store()
+        train(
+            exp_model,
+            exp_guide,
+            lr=5e-3,
+            n_steps=10000,
+            jit=False,
+            data=torch.as_tensor(unbound_dt),
+            K=K,
+        )
+
+        results = pd.DataFrame(columns=["MLE"])
+        A, k = {}, {}
+        for i in range(K):
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
+            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
+        results.to_csv(f"kon{c}.csv")
 
         fig, ax = plt.subplots()
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
-        # ax.hist(unbound_dt, bins=100, density=True)
-        for i in range(3):
-            udt = unbound_dwell_times(intervals.mask(intervals["z"] == i + 1))
-            ax.hist(udt, bins=100, alpha=0.4)
-        #  t = torch.arange(unbound_dt.max())
-        #  y = 0
-        #  for i in range(K):
-        #      y += A[i] * k[i] * torch.exp(-k[i] * t)
-        #      ax.plot(A[i] * k[i] * torch.exp(-k[i] * t), "k--")
-        #  ax.plot(y, "k-")
+        ax.hist(unbound_dt, bins=100, density=True)
+        t = torch.arange(unbound_dt.max())
+        y = 0
+        for i in range(K):
+            y += A[i] * k[i] * torch.exp(-k[i] * t)
+            ax.plot(A[i] * k[i] * torch.exp(-k[i] * t), "k--")
+        ax.plot(y, "k-")
         ax.set_xlabel("Time interval (frame)")
         ax.set_ylabel("Density")
         ax.set_title(f"Unbound dwell times channel {c}")
