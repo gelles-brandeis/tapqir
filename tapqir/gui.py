@@ -18,7 +18,7 @@ from tqdm import tqdm_notebook
 from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
-from tapqir.main import avail_models, fit, glimpse, log, main, show
+from tapqir.main import avail_models, dwelltime, fit, glimpse, log, main, show, ttfb
 from tapqir.utils.dataset import save
 
 logger = logging.getLogger("tapqir")
@@ -186,12 +186,13 @@ def cdCmd(path, DEFAULTS, layout):
             widgets.Label(value="Disabled in Colab"),
             widgets.Label(value="Disabled in Colab"),
         )
-    tab.children = tab.children + (logUI(out),)
+    tab.children = tab.children + (postUI(out), logUI(out))
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
     tab.set_title(2, "View results")
     tab.set_title(3, "Tensorboard")
-    tab.set_title(4, "View logs")
+    tab.set_title(4, "Post analysis")
+    tab.set_title(5, "View logs")
 
     if tensorboard is not None:
         with tensorboard:
@@ -1202,6 +1203,72 @@ def logCmd(b, layout, logView, out):
     with out:
         logger.info("Loading logs: Done")
     logView.clear_output(wait=True)
+    out.clear_output(wait=True)
+
+
+def postUI(out):
+    layout = inputBox()
+    layout.add_child("post", widgets.Tab())
+    # Time-to-first binding analysis
+    ttfb_layout = inputBox()
+    ttfb_layout.add_child(
+        "model",
+        widgets.Dropdown(
+            description="Tapqir model",
+            value="cosmos",
+            options=avail_models,
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child(
+        "ttfb", widgets.Button(description="Time-to-first binding analysis")
+    )
+    ttfb_layout["ttfb"].on_click(partial(ttfbCmd, layout=ttfb_layout, out=out))
+    # Dwell time analysis
+    dt_layout = inputBox()
+    dt_layout.add_child(
+        "model",
+        widgets.Dropdown(
+            description="Tapqir model",
+            value="cosmos",
+            options=avail_models,
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child(
+        "K",
+        widgets.BoundedIntText(
+            value=1,
+            min=1,
+            max=6,
+            description="Number of exponentials",
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child("dwelltime", widgets.Button(description="Dwell-time analysis"))
+    dt_layout["dwelltime"].on_click(partial(dtCmd, layout=dt_layout, out=out))
+    # Layout
+    layout["post"].children = (ttfb_layout, dt_layout)
+    layout["post"].set_title(0, "Time-to-first binding")
+    layout["post"].set_title(1, "Dwell-time")
+    return layout
+
+
+def ttfbCmd(b, layout, out):
+    layout.toggle_hide(names=("ttfb",))
+    with out:
+        logger.info("Time-to-first binding analysis ...")
+        ttfb(**layout.kwargs)
+        logger.info("Time-to-first binding analysis: Done")
+    out.clear_output(wait=True)
+
+
+def dtCmd(b, layout, out):
+    layout.toggle_hide(names=("dwelltime",))
+    with out:
+        logger.info("Dwell-time analysis ...")
+        dwelltime(**layout.kwargs)
+        logger.info("Dwell-time analysis: Done")
     out.clear_output(wait=True)
 
 
