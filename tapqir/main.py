@@ -962,7 +962,10 @@ def ttfb(
         ax.set_xlabel("Time (frame)")
         ax.set_ylabel("AOI")
         ax.set_title(f"Channel {c}")
-        plt.savefig(f"ttfb_rastergram{c}.png", dpi=600)
+        plt.savefig(cd / f"ttfb_rastergram{c}.png", dpi=600)
+        logger.info(
+            f"Saved probabilistic rastergram for channel {c} in ttfb_rastergram{c}.png file"
+        )
 
         fig, ax = plt.subplots()
         # prepare data
@@ -981,7 +984,7 @@ def ttfb(
             ttfb_model,
             ttfb_guide,
             lr=5e-3,
-            n_steps=15000,
+            n_steps=1500,
             data=data.cuda(),
             control=None,
             Tmax=Tmax,
@@ -1004,7 +1007,8 @@ def ttfb(
         results.loc["Af", "Mean"] = pyro.param("Af").mean().item()
         ll, ul = hpdi(pyro.param("Af").data.squeeze(), 0.95, dim=0)
         results.loc["Af", "95% LL"], results.loc["Af", "95% UL"] = ll.item(), ul.item()
-        results.to_csv(f"ttfb{c}.csv")
+        results.to_csv(cd / f"ttfb{c}.csv")
+        logger.info(f"Saved fit parameters for channel {c} in ttfb{c}.csv file")
 
         # use cuda
         torch.set_default_tensor_type(torch.FloatTensor)
@@ -1065,7 +1069,8 @@ def ttfb(
         ax.set_title(f"Channel {c}")
         ax.set_ylim(-0.05, 1.05)
 
-        plt.savefig(f"ttfb_fit{c}.png", dpi=600)
+        plt.savefig(cd / f"ttfb_fit{c}.png", dpi=600)
+        logger.info(f"Saved data plots for channel {c} in ttfb_fit{c}.png file")
 
 
 @app.command()
