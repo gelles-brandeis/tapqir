@@ -984,7 +984,7 @@ def ttfb(
             ttfb_model,
             ttfb_guide,
             lr=5e-3,
-            n_steps=1500,
+            n_steps=15000,
             data=data.cuda(),
             control=None,
             Tmax=Tmax,
@@ -1129,7 +1129,8 @@ def dwelltime(
         for i in range(K):
             results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
             results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
-        results.to_csv(f"koff{c}.csv")
+        results.to_csv(cd / f"koff{c}.csv")
+        logger.info(f"Saved off-rate parameters for channel {c} in koff{c}.csv file")
 
         fig, ax = plt.subplots()
         # ax.hist(bound_dt, bins=100, density=True, log=True)
@@ -1145,7 +1146,10 @@ def dwelltime(
         ax.set_title(f"Bound dwell times channel {c}")
         # ax.set_ylim(1e-4, 1e-1)
         # plt.yscale("log")
-        plt.savefig(f"bound_dwell_times{c}.png", dpi=600)
+        plt.savefig(cd / f"bound_dwell_times{c}.png", dpi=600)
+        logger.info(
+            f"Saved bound dwell-time histograms for channel {c} in bound_dwell_times{c}.png file"
+        )
 
         unbound_dt = unbound_dwell_times(intervals)
         pyro.clear_param_store()
@@ -1164,7 +1168,8 @@ def dwelltime(
         for i in range(K):
             results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
             results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
-        results.to_csv(f"kon{c}.csv")
+        results.to_csv(cd / f"kon{c}.csv")
+        logger.info(f"Saved on-rate parameters for channel {c} in kon{c}.csv file")
         fig, ax = plt.subplots()
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
         ax.hist(unbound_dt, bins=100, density=True)
@@ -1179,7 +1184,10 @@ def dwelltime(
         ax.set_title(f"Unbound dwell times channel {c}")
         # ax.set_ylim(1e-4, 1e-1)
         # plt.yscale("log")
-        plt.savefig(f"unbound_dwell_times{c}.png", dpi=600)
+        plt.savefig(cd / f"unbound_dwell_times{c}.png", dpi=600)
+        logger.info(
+            f"Saved unbound dwell-time histograms for channel {c} in unbound_dwell_times{c}.png file"
+        )
 
 
 @app.callback()
