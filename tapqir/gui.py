@@ -186,7 +186,7 @@ def cdCmd(path, DEFAULTS, layout):
             widgets.Label(value="Disabled in Colab"),
             widgets.Label(value="Disabled in Colab"),
         )
-    tab.children = tab.children + (postUI(out, DEFAULTS), logUI(out))
+    tab.children = tab.children + (postUI(out), logUI(out))
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
     tab.set_title(2, "View results")
@@ -1206,7 +1206,7 @@ def logCmd(b, layout, logView, out):
     out.clear_output(wait=True)
 
 
-def postUI(out, DEFAULTS):
+def postUI(out):
     layout = inputBox()
     layout.add_child("post", widgets.Tab())
     # Time-to-first binding analysis
@@ -1240,7 +1240,7 @@ def postUI(out, DEFAULTS):
         widgets.BoundedIntText(
             value=1,
             min=1,
-            max=5,
+            max=6,
             description="Number of exponentials",
             style={"description_width": "initial"},
         ),
