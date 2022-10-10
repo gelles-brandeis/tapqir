@@ -916,6 +916,12 @@ def ttfb(
     model: avail_models = typer.Option(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
+    binary: bool = typer.Option(
+        False,
+        "--binary/--probabilistic",
+        help="Plot a binary or probabilistic rastergram",
+        prompt="Plot a binary rastergram?",
+    ),
 ):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
@@ -945,16 +951,18 @@ def ttfb(
         logger.exception(f"Failed to load {err.name} file")
         return 1
 
+    z = model.params["p_specific"] > 0.5 if binary else model.params["p_specific"]
+    r_type = "binary" if binary else "probabilistic"
     for c in range(model.data.C):
         # sorted on-target
-        ttfb = time_to_first_binding(model.params["z_map"][: model.data.N, :, c])
+        ttfb = time_to_first_binding(z[: model.data.N, :, c])
         # sort ttfb
         sdx = torch.argsort(ttfb, descending=True)
 
         fig, ax = plt.subplots()
         norm = mpl.colors.Normalize(vmin=0, vmax=1)
         ax.imshow(
-            model.params["z_probs"][: model.data.N, :, c][sdx],
+            z[: model.data.N, :, c][sdx],
             norm=norm,
             aspect="equal",
             interpolation="none",
@@ -964,17 +972,17 @@ def ttfb(
         ax.set_title(f"Channel {c}")
         plt.savefig(cd / f"ttfb_rastergram{c}.png", dpi=600)
         logger.info(
-            f"Saved probabilistic rastergram for channel {c} in ttfb_rastergram{c}.png file"
+            f"Saved a {r_type} rastergram for channel #{c} in ttfb_rastergram{c}.png file"
         )
 
         fig, ax = plt.subplots()
         # prepare data
         Tmax = model.data.F
         torch.manual_seed(0)
-        z = dist.Bernoulli(model.params["z_probs"][: model.data.N, :, c]).sample(
-            (2000,)
-        )
-        data = time_to_first_binding(z)
+        z_samples = dist.Bernoulli(
+            model.params["z_probs"][: model.data.N, :, c]
+        ).sample((2000,))
+        data = time_to_first_binding(z_samples)
 
         # use cuda
         torch.set_default_tensor_type(torch.cuda.FloatTensor)

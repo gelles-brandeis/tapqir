@@ -27,3 +27,12 @@ Distributions
 
 .. automodule:: tapqir.distributions.util
    :members:
+
+Utility functions
+-----------------
+
+.. automodule:: tapqir.utils.dataset
+   :members:
+
+.. automodule:: tapqir.utils.imscroll
+   :members:
