@@ -947,12 +947,14 @@ def ttfb(
     model = models[model](device="cpu", dtype="float")
     try:
         model.load(cd, data_only=False)
+        model.load_checkpoint(param_only=True)
     except TapqirFileNotFoundError as err:
         logger.exception(f"Failed to load {err.name} file")
         return 1
 
     z = model.params["p_specific"] > 0.5 if binary else model.params["p_specific"]
     r_type = "binary" if binary else "probabilistic"
+    z_samples = model.z_sample(num_samples=2000)
     for c in range(model.data.C):
         # sorted on-target
         ttfb = time_to_first_binding(z[: model.data.N, :, c])
@@ -979,10 +981,11 @@ def ttfb(
         # prepare data
         Tmax = model.data.F
         torch.manual_seed(0)
-        z_samples = dist.Bernoulli(
-            model.params["z_probs"][: model.data.N, :, c]
-        ).sample((2000,))
-        data = time_to_first_binding(z_samples)
+        z_samples = model.z_sample(num_samples=2000)
+        #  z_samples = dist.Bernoulli(
+        #      model.params["z_probs"][: model.data.N, :, c]
+        #  ).sample((2000,))
+        data = time_to_first_binding(z_samples[..., c])
 
         # use cuda
         torch.set_default_tensor_type(torch.cuda.FloatTensor)

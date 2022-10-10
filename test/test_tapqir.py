@@ -85,6 +85,14 @@ def test_commands_cpu(dataset_path, model):
             "--matlab",
             "--no-input",
         ],
+        [
+            "--cd",
+            dataset_path,
+            "ttfb",
+            "--model",
+            model,
+            "--binary",
+        ],
     ]
 
     for command in commands:
