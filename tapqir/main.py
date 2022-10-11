@@ -922,6 +922,20 @@ def ttfb(
         help="Plot a binary or probabilistic rastergram",
         prompt="Plot a binary rastergram?",
     ),
+    num_samples: int = typer.Option(
+        2000,
+        "--num-samples",
+        "-n",
+        help="Number of posterior samples",
+        prompt="Number of posterior samples",
+    ),
+    num_iter: int = typer.Option(
+        15000,
+        "--num-iter",
+        "-it",
+        help="Number of iterations",
+        prompt="Number of iterations",
+    ),
 ):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
@@ -953,7 +967,7 @@ def ttfb(
 
     z = model.params["p_specific"] > 0.5 if binary else model.params["p_specific"]
     r_type = "binary" if binary else "probabilistic"
-    z_samples = model.z_sample(num_samples=2000)
+    z_samples = model.z_sample(num_samples=num_samples)
     for c in range(model.data.C):
         # sorted on-target
         ttfb = time_to_first_binding(z[: model.data.N, :, c])
@@ -980,7 +994,6 @@ def ttfb(
         # prepare data
         Tmax = model.data.F
         torch.manual_seed(0)
-        z_samples = model.z_sample(num_samples=2000)
         data = time_to_first_binding(z_samples[..., c])
 
         # use cuda
@@ -991,7 +1004,7 @@ def ttfb(
             ttfb_model,
             ttfb_guide,
             lr=5e-3,
-            n_steps=15000,
+            n_steps=num_iter,
             data=data.cuda(),
             control=None,
             Tmax=Tmax,
