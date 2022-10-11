@@ -922,13 +922,26 @@ def ttfb(
         help="Plot a binary or probabilistic rastergram",
         prompt="Plot a binary rastergram?",
     ),
+    num_samples: int = typer.Option(
+        2000,
+        "--num-samples",
+        "-n",
+        help="Number of posterior samples",
+        prompt="Number of posterior samples",
+    ),
+    num_iter: int = typer.Option(
+        15000,
+        "--num-iter",
+        "-it",
+        help="Number of iterations",
+        prompt="Number of iterations",
+    ),
 ):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import pandas as pd
     import pyro
     import torch
-    from pyro import distributions as dist
     from pyro.ops.stats import hpdi
 
     from tapqir.models import models
@@ -947,12 +960,14 @@ def ttfb(
     model = models[model](device="cpu", dtype="float")
     try:
         model.load(cd, data_only=False)
+        model.load_checkpoint(param_only=True)
     except TapqirFileNotFoundError as err:
         logger.exception(f"Failed to load {err.name} file")
         return 1
 
     z = model.params["p_specific"] > 0.5 if binary else model.params["p_specific"]
     r_type = "binary" if binary else "probabilistic"
+    z_samples = model.z_sample(num_samples=num_samples)
     for c in range(model.data.C):
         # sorted on-target
         ttfb = time_to_first_binding(z[: model.data.N, :, c])
@@ -979,10 +994,7 @@ def ttfb(
         # prepare data
         Tmax = model.data.F
         torch.manual_seed(0)
-        z_samples = dist.Bernoulli(
-            model.params["z_probs"][: model.data.N, :, c]
-        ).sample((2000,))
-        data = time_to_first_binding(z_samples)
+        data = time_to_first_binding(z_samples[..., c])
 
         # use cuda
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
@@ -992,7 +1004,7 @@ def ttfb(
             ttfb_model,
             ttfb_guide,
             lr=5e-3,
-            n_steps=15000,
+            n_steps=num_iter,
             data=data.cuda(),
             control=None,
             Tmax=Tmax,

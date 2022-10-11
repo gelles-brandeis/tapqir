@@ -11,7 +11,7 @@ import math
 import funsor
 import torch
 import torch.distributions.constraints as constraints
-from pyro.distributions.hmm import _logmatmulexp
+from pyro.distributions.hmm import _logmatmulexp, _sequential_index
 from pyro.ops.indexing import Vindex
 from pyroapi import distributions as dist
 from pyroapi import handlers, infer, pyro
@@ -653,3 +653,16 @@ class hmm(cosmos):
         return Vindex(torch.permute(pyro.param("m_probs").data, (1, 2, 3, 4, 0)))[
             ..., self.z_map.long()
         ]
+
+    def z_sample(self, num_samples):
+        init_probs = pyro.param("z_trans").data[: self.data.N, 0, :, 0]
+        init_probs = init_probs.expand((num_samples,) + init_probs.shape)
+        x = dist.Categorical(init_probs).sample()
+        trans_probs = (
+            pyro.param("z_trans").data[: self.data.N, 1:].permute(0, 2, 1, 3, 4)
+        )
+        trans_probs = trans_probs.expand((num_samples,) + trans_probs.shape)
+        xs = dist.Categorical(trans_probs).sample()
+        xs = _sequential_index(xs)
+        x = Vindex(xs)[..., :, x]
+        return x.permute(0, 1, 3, 2)
