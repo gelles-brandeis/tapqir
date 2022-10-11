@@ -706,4 +706,6 @@ class cosmos(Model):
         return torch.argmax(self.z_probs, dim=-1)
 
     def z_sample(self, num_samples):
-        return dist.Categorical(self.params["z_probs"][: self.data.N]).sample((2000,))
+        return dist.Categorical(self.params["z_probs"][: self.data.N]).sample(
+            (num_samples,)
+        )

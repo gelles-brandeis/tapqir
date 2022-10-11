@@ -658,7 +658,9 @@ class hmm(cosmos):
         init_probs = pyro.param("z_trans").data[: self.data.N, 0, :, 0]
         init_probs = init_probs.expand((num_samples,) + init_probs.shape)
         x = dist.Categorical(init_probs).sample()
-        trans_probs = pyro.param("z_trans").data[: self.data.N, 1:].permute(0, 2, 1, 3, 4)
+        trans_probs = (
+            pyro.param("z_trans").data[: self.data.N, 1:].permute(0, 2, 1, 3, 4)
+        )
         trans_probs = trans_probs.expand((num_samples,) + trans_probs.shape)
         xs = dist.Categorical(trans_probs).sample()
         xs = _sequential_index(xs)

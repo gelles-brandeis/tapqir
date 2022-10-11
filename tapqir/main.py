@@ -928,7 +928,6 @@ def ttfb(
     import pandas as pd
     import pyro
     import torch
-    from pyro import distributions as dist
     from pyro.ops.stats import hpdi
 
     from tapqir.models import models
@@ -982,9 +981,6 @@ def ttfb(
         Tmax = model.data.F
         torch.manual_seed(0)
         z_samples = model.z_sample(num_samples=2000)
-        #  z_samples = dist.Bernoulli(
-        #      model.params["z_probs"][: model.data.N, :, c]
-        #  ).sample((2000,))
         data = time_to_first_binding(z_samples[..., c])
 
         # use cuda
