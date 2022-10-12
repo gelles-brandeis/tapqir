@@ -1221,8 +1221,30 @@ def postUI(out):
         ),
     )
     ttfb_layout.add_child(
-        "ttfb", widgets.Button(description="Time-to-first binding analysis")
+        "binary",
+        widgets.Checkbox(
+            value=False,
+            description="Plot a binary rastergram?",
+            style={"description_width": "initial"},
+        ),
     )
+    ttfb_layout.add_child(
+        "num_samples",
+        widgets.IntText(
+            value=2000,
+            description="Number of posterior samples",
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child(
+        "num_iter",
+        widgets.IntText(
+            value=15000,
+            description="Number of iterations",
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child("ttfb", widgets.Button(description="Analyze"))
     ttfb_layout["ttfb"].on_click(partial(ttfbCmd, layout=ttfb_layout, out=out))
     # Dwell time analysis
     dt_layout = inputBox()
@@ -1245,7 +1267,7 @@ def postUI(out):
             style={"description_width": "initial"},
         ),
     )
-    dt_layout.add_child("dwelltime", widgets.Button(description="Dwell-time analysis"))
+    dt_layout.add_child("dwelltime", widgets.Button(description="Analyze"))
     dt_layout["dwelltime"].on_click(partial(dtCmd, layout=dt_layout, out=out))
     # Layout
     layout["post"].children = (ttfb_layout, dt_layout)
