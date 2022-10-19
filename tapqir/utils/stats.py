@@ -128,7 +128,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         ax.set_xlabel("Time (frame)")
         ax.set_ylabel("AOI")
         ax.set_title(f"Channel {c}")
-        plt.savefig(path / f"rastergram{c}.png", dpi=600)
+        # plt.savefig(path / f"rastergram{c}.png", dpi=600)
         logger.info(
             f"Saved a probabilistic rastergram for channel #{c} in rastergram{c}.png file"
         )
