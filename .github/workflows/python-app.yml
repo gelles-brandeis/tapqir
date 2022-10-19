@@ -17,6 +17,8 @@ jobs:
       matrix:
         python-version: ['3.7', '3.8']
 
+    env:
+      DISPLAY: ':99.0'
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
@@ -25,6 +27,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        sudo apt install -y xvfb x11-utils libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 xdotool
         python -m pip install --upgrade pip
         pip install .[test]
     - name: Lint and test with pytest

@@ -6,8 +6,8 @@ import math
 from pathlib import Path
 from typing import Tuple
 
-#  import matplotlib as mpl
-#  import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyro
@@ -117,18 +117,18 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     for c in range(model.data.C):
 
-        #  fig, ax = plt.subplots()
-        #  norm = mpl.colors.Normalize(vmin=0, vmax=1)
-        #  ax.imshow(
-        #      ci_stats["p_specific"][: model.data.N, :, c],
-        #      norm=norm,
-        #      aspect="equal",
-        #      interpolation="none",
-        #  )
-        #  ax.set_xlabel("Time (frame)")
-        #  ax.set_ylabel("AOI")
-        #  ax.set_title(f"Channel {c}")
-        # plt.savefig(path / f"rastergram{c}.png", dpi=600)
+        fig, ax = plt.subplots()
+        norm = mpl.colors.Normalize(vmin=0, vmax=1)
+        ax.imshow(
+            ci_stats["p_specific"][: model.data.N, :, c],
+            norm=norm,
+            aspect="equal",
+            interpolation="none",
+        )
+        ax.set_xlabel("Time (frame)")
+        ax.set_ylabel("AOI")
+        ax.set_title(f"Channel {c}")
+        plt.savefig(path / f"rastergram{c}.png", dpi=600)
         logger.info(
             f"Saved a probabilistic rastergram for channel #{c} in rastergram{c}.png file"
         )
