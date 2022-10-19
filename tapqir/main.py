@@ -985,9 +985,9 @@ def ttfb(
         ax.set_xlabel("Time (frame)")
         ax.set_ylabel("AOI")
         ax.set_title(f"Channel {c}")
-        plt.savefig(cd / f"ttfb_rastergram{c}.png", dpi=600)
+        plt.savefig(cd / f"ttfb_rastergram_#{c}.png", dpi=600)
         logger.info(
-            f"Saved a {r_type} rastergram for channel #{c} in ttfb_rastergram{c}.png file"
+            f"Saved a {r_type} rastergram for channel #{c} in ttfb_rastergram_#{c}.png file"
         )
 
         fig, ax = plt.subplots()
@@ -1027,8 +1027,10 @@ def ttfb(
         results.loc["Af", "Mean"] = pyro.param("Af").mean().item()
         ll, ul = hpdi(pyro.param("Af").data.squeeze(), 0.95, dim=0)
         results.loc["Af", "95% LL"], results.loc["Af", "95% UL"] = ll.item(), ul.item()
-        results.to_csv(cd / f"ttfb{c}.csv")
-        logger.info(f"Saved fit parameters for channel {c} in ttfb{c}.csv file")
+        results.to_csv(cd / f"ttfb_params_#{c}.csv")
+        logger.info(
+            f"Saved fit parameters for channel #{c} in ttfb_params_#{c}.csv file"
+        )
 
         # use cuda
         torch.set_default_tensor_type(torch.FloatTensor)
@@ -1038,28 +1040,43 @@ def ttfb(
 
         fraction_bound = (data.unsqueeze(-1) < torch.arange(Tmax)).float().mean(1)
         fb_ll, fb_ul = hpdi(fraction_bound, 0.95, dim=0)
+        fb_mean = fraction_bound.mean(0)
+        best_fit = (
+            nz / N
+            + (1 - nz / N)
+            * (
+                results.loc["Af", "Mean"]
+                * (
+                    1
+                    - torch.exp(
+                        -(results.loc["ka", "Mean"] + results.loc["kns", "Mean"])
+                        * torch.arange(Tmax)
+                    )
+                )
+                + (1 - results.loc["Af", "Mean"])
+                * (1 - torch.exp(-results.loc["kns", "Mean"] * torch.arange(Tmax)))
+            )
+        ).mean(0)
+
+        # save the fit data
+        fit_df = pd.DataFrame(
+            data={
+                "time": torch.arange(Tmax),
+                "best fit": best_fit,
+                "fraction bound mean": fb_mean,
+                "fraction bound 95% ll": fb_ll,
+                "fraction bound 95% ul": fb_ul,
+            }
+        )
+        fit_df.to_csv(cd / f"ttfb_data_#{c}.csv")
+        logger.info(f"Saved fit data for channel #{c} in ttfb_data_#{c}.csv file")
 
         ax.fill_between(torch.arange(Tmax), fb_ll, fb_ul, alpha=0.3, color="C2")
-        ax.plot(torch.arange(Tmax), fraction_bound.mean(0), color="C2")
+        ax.plot(torch.arange(Tmax), fb_mean, color="C2")
 
         ax.plot(
             torch.arange(Tmax),
-            (
-                nz / N
-                + (1 - nz / N)
-                * (
-                    results.loc["Af", "Mean"]
-                    * (
-                        1
-                        - torch.exp(
-                            -(results.loc["ka", "Mean"] + results.loc["kns", "Mean"])
-                            * torch.arange(Tmax)
-                        )
-                    )
-                    + (1 - results.loc["Af", "Mean"])
-                    * (1 - torch.exp(-results.loc["kns", "Mean"] * torch.arange(Tmax)))
-                )
-            ).mean(0),
+            best_fit,
             color="k",
         )
 
@@ -1089,8 +1106,8 @@ def ttfb(
         ax.set_title(f"Channel {c}")
         ax.set_ylim(-0.05, 1.05)
 
-        plt.savefig(cd / f"ttfb_fit{c}.png", dpi=600)
-        logger.info(f"Saved data plots for channel {c} in ttfb_fit{c}.png file")
+        plt.savefig(cd / f"ttfb_plot_#{c}.png", dpi=600)
+        logger.info(f"Saved data plots for channel #{c} in ttfb_plot_#{c}.png file")
 
 
 @app.command()
