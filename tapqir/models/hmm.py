@@ -43,6 +43,7 @@ class hmm(cosmos):
 
     def __init__(
         self,
+        S: int = 1,
         K: int = 2,
         device: str = "cpu",
         dtype: str = "double",
@@ -61,7 +62,7 @@ class hmm(cosmos):
     ):
         self.vectorized = vectorized
         super().__init__(
-            K=K, device=device, dtype=dtype, use_pykeops=use_pykeops, priors=priors
+            S=S, K=K, device=device, dtype=dtype, use_pykeops=use_pykeops, priors=priors
         )
         self._global_params = ["gain", "proximity", "lamda", "trans"]
         self.ci_params = [

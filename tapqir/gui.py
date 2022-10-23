@@ -93,6 +93,9 @@ class inputBox(widgets.VBox):
     def __getitem__(self, name):
         return self._children[name]["widget"]
 
+    def hidden(self, name):
+        return self._children[name]["hide"]
+
     @property
     def kwargs(self):
         result = {}
@@ -433,6 +436,15 @@ def fitUI(out, DEFAULTS):
         ),
     )
     layout.add_child(
+        "S",
+        widgets.IntText(
+            value=1,
+            description="Number of spot states",
+            style={"description_width": "initial"},
+        ),
+        hide=True,
+    )
+    layout.add_child(
         "cuda",
         widgets.Checkbox(
             value=DEFAULTS["cuda"],
@@ -492,8 +504,22 @@ def fitUI(out, DEFAULTS):
     # Fit the data
     layout.add_child("fit", widgets.Button(description="Fit the data"))
     # Callbacks
+    layout["model"].observe(partial(toggleS, layout=layout, out=out), names="value")
     layout["fit"].on_click(partial(fitCmd, layout=layout, out=out, DEFAULTS=DEFAULTS))
     return layout
+
+
+def toggleS(model, layout, out):
+    with out:
+        model = get_value(model)
+        if model == "cosmos" and not layout.hidden("S"):
+            layout["S"].value = 1
+            layout.toggle_hide(names=("S",))
+        elif model == "crosstalk" and not layout.hidden("S"):
+            layout["S"].value = 1
+            layout.toggle_hide(names=("S",))
+        elif model == "cosmos+hmm" and layout.hidden("S"):
+            layout.toggle_hide(names=("S",))
 
 
 def fitCmd(b, layout, out, DEFAULTS):

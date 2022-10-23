@@ -60,6 +60,10 @@ def deactivate_prompts(ctx, param, value):
         for p in ctx.command.params:
             if p.name in ("frame_start", "frame_end"):
                 p.prompt = None
+    elif param.name == "model" and value == "cosmos+hmm":
+        for p in ctx.command.params:
+            if p.name == "S":
+                p.prompt = None
     return value
 
 
@@ -321,7 +325,17 @@ def glimpse(
 @app.command()
 def fit(
     model: avail_models = typer.Option(
-        "cosmos", help="Tapqir model", prompt="Tapqir model"
+        "cosmos",
+        help="Tapqir model",
+        prompt="Tapqir model",
+        callback=deactivate_prompts,
+    ),
+    S: int = typer.Option(
+        1,
+        "--num-states",
+        "-S",
+        help="Number of spot states",
+        prompt="Number of spot states",
     ),
     cuda: bool = typer.Option(
         partial(get_default, "cuda"),
@@ -413,6 +427,7 @@ def fit(
     logger = logging.getLogger("tapqir")
 
     settings = {}
+    settings["S"] = S
     settings["K"] = k_max
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
