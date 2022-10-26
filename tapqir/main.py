@@ -321,7 +321,16 @@ def glimpse(
 @app.command()
 def fit(
     model: avail_models = typer.Option(
-        "cosmos", help="Tapqir model", prompt="Tapqir model"
+        "cosmos",
+        help="Tapqir model",
+        prompt="Tapqir model",
+    ),
+    S: int = typer.Option(
+        1,
+        "--num-states",
+        "-S",
+        help="Number of spot states",
+        prompt="Number of spot states",
     ),
     cuda: bool = typer.Option(
         partial(get_default, "cuda"),
@@ -413,6 +422,7 @@ def fit(
     logger = logging.getLogger("tapqir")
 
     settings = {}
+    settings["S"] = S
     settings["K"] = k_max
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"

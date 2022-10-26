@@ -41,6 +41,7 @@ class crosstalk(cosmos):
 
     def __init__(
         self,
+        S: int = 1,
         K: int = 2,
         Q: int = None,
         device: str = "cpu",
@@ -57,7 +58,7 @@ class crosstalk(cosmos):
             "gain_std": 50.0,
         },
     ):
-        super().__init__(K=K, Q=Q, device=device, dtype=dtype, priors=priors)
+        super().__init__(S=S, K=K, Q=Q, device=device, dtype=dtype, priors=priors)
         self._global_params = ["gain", "proximity", "lamda", "pi", "alpha"]
         self.ci_params = [
             "alpha",
