@@ -60,10 +60,6 @@ def deactivate_prompts(ctx, param, value):
         for p in ctx.command.params:
             if p.name in ("frame_start", "frame_end"):
                 p.prompt = None
-    elif param.name == "model" and value == "cosmos+hmm":
-        for p in ctx.command.params:
-            if p.name == "S":
-                p.prompt = None
     return value
 
 
@@ -328,7 +324,6 @@ def fit(
         "cosmos",
         help="Tapqir model",
         prompt="Tapqir model",
-        callback=deactivate_prompts,
     ),
     S: int = typer.Option(
         1,
