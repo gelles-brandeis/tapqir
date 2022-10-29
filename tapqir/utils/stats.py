@@ -116,7 +116,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     ci_stats["z_map"] = model.z_map.data.cpu()
     ci_stats["p_specific"] = ci_stats["theta_probs"].sum(0)
 
-    if not os.environ["CI"]:
+    if not os.environ.get("CI", None):
         for c in range(model.data.C):
             fig, ax = plt.subplots()
             norm = mpl.colors.Normalize(vmin=0, vmax=1)
@@ -218,7 +218,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
         mask = torch.from_numpy(model.data.labels["z"][: model.data.N]) > 0
-        samples = torch.masked_select(model.z_probs[model.data.is_ontarget].cpu(), mask)
+        samples = torch.masked_select(
+            model.z_probs[model.data.is_ontarget].argmax(dim=-1).cpu(), mask
+        )
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)
             summary.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()

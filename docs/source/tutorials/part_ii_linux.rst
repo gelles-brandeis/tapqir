@@ -1,5 +1,5 @@
-Part II: Tapqir analysis (Linux/WSL 2)
-======================================
+Part II: Tapqir analysis (Linux/Windows)
+========================================
 
 In this tutorial we will use a linux computer to analyze the Data set A in `Ordabayev et al., 2022`_. The data
 are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `imscroll`_ (`Friedman et al., 2015`_).
@@ -7,7 +7,8 @@ are taken from `Rosen et al., 2020`_ and have already been preprocesssed using `
 Set up the environment
 ----------------------
 
-1. If Tapqir is not installed, please follow these :doc:`instructions </install/linux>` to do so.
+1. If Tapqir is not installed, please follow these instructions for :doc:`Linux </install/linux>`
+   or :doc:`Windows </install/windows>` system to do so.
 
 2. Open the terminal and activate the virtual environment (e.g., if named ``tapqir-env``)::
 

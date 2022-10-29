@@ -960,7 +960,6 @@ def ttfb(
 
     logger = logging.getLogger("tapqir")
 
-    mpl.rc("text", usetex=True)
     mpl.rcParams["font.family"] = "sans-serif"
     mpl.rcParams.update({"font.size": 8})
 
@@ -1143,7 +1142,6 @@ def dwelltime(
 
     logger = logging.getLogger("tapqir")
 
-    mpl.rc("text", usetex=True)
     mpl.rcParams["font.family"] = "sans-serif"
     mpl.rcParams.update({"font.size": 8})
 
