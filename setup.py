@@ -66,7 +66,7 @@ setuptools.setup(
         "ipyfilechooser",
         "ipympl",
         "ipywidgets",
-        "matplotlib",
+        "matplotlib>=3.5.3",
         "pandas",
         "protobuf>=3.9,<3.20",
         "pykeops>=2.0",
