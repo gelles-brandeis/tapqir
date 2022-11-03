@@ -75,7 +75,7 @@ setuptools.setup(
         "scikit-learn",
         "scipy",
         "tensorboard",
-        "torch==1.11.0",
+        "torch>=1.11.0",
         "typer",
     ],
     extras_require={
