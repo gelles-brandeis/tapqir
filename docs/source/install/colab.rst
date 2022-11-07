@@ -20,6 +20,8 @@ start.
 
     !pip install --quiet tapqir > install.log
 
+5. After installing ``tapqir``, restart the runtime (in the menu click ``Runtime -> Restart runtime``)
+
 Check version
 -------------
 
