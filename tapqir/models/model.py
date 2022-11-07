@@ -294,8 +294,15 @@ class Model:
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
                 writer.add_scalar(name, val.item(), self.iter)
-            elif val.dim() == 1 and len(val) <= self.S + 1:
+            elif val.dim() == 1 and len(val) <= self.Q * 2:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
+                writer.add_scalars(name, scalars, self.iter)
+            elif val.dim() == 2 and len(val) <= self.Q * 2:
+                scalars = {
+                    f"{i}_{j}": k.item()
+                    for i, v in enumerate(val)
+                    for j, k in enumerate(v)
+                }
                 writer.add_scalars(name, scalars, self.iter)
 
         if False and self.data.labels is not None:
