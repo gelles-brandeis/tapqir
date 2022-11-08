@@ -188,8 +188,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             model.data.P,
             ci_stats["theta_probs"][:, n],
         )
-    snr_masked = snr[ci_stats["theta_probs"] > 0.5]
-    summary.loc["SNR", "Mean"] = snr_masked.mean().item()
+    for q in range(model.Q):
+        snr_masked = snr[..., q][ci_stats["theta_probs"][..., q] > 0.5]
+        summary.loc[f"SNR_{q}", "Mean"] = snr_masked.mean().item()
     ci_stats["chi2"] = {}
     ci_stats["chi2"]["values"] = chi2
     cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
