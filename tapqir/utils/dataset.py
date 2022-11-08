@@ -55,6 +55,7 @@ class CosmosDataset:
         time1=None,
         ttb=None,
         name=None,
+        channels=None,
     ):
         self.images = images
         self.xy = xy
@@ -68,6 +69,9 @@ class CosmosDataset:
         self.time1 = time1
         self.ttb = ttb
         self.name = name
+        if channels is None:
+            channels = tuple(f"channel{c}" for c in range(self.C))
+        self.channels = channels
 
     @lazy_property
     def N(self) -> int:
@@ -196,6 +200,7 @@ def save(obj, path):
             "name": obj.name,
             "time1": obj.time1,
             "ttb": obj.ttb,
+            "channels": obj.channels,
         },
         path / "data.tpqr",
     )

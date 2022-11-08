@@ -8,7 +8,16 @@ from pyroapi import distributions as dist
 from pyroapi import handlers, infer, optim, pyro
 
 
-def train(model, guide, lr=1e-3, n_steps=1000, jit=True, verbose=False, **kwargs):
+def train(
+    model,
+    guide,
+    lr=1e-3,
+    n_steps=1000,
+    jit=True,
+    progress_bar=None,
+    verbose=False,
+    **kwargs,
+):
 
     pyro.clear_param_store()
     optimizer = optim.Adam({"lr": lr})
@@ -19,7 +28,7 @@ def train(model, guide, lr=1e-3, n_steps=1000, jit=True, verbose=False, **kwargs
     )
     svi = infer.SVI(model, guide, optimizer, elbo)
 
-    for step in range(n_steps):
+    for step in progress_bar(range(n_steps)):
         svi.step(**kwargs)
         if step % 100 == 99 and verbose:
             values = tuple(f"{k}: {v}" for k, v in pyro.get_param_store().items())
