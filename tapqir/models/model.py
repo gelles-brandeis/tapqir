@@ -120,18 +120,18 @@ class Model:
         # load fit results
         if not data_only:
             try:
-                self.params = torch.load(self.path / f"{self.name}-params.tpqr")
+                self.params = torch.load(self.path / f"{self.name}_params.tpqr")
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "parameter", self.path / f"{self.name}-params.tpqr"
+                    "parameter", self.path / f"{self.name}_params.tpqr"
                 )
             try:
                 self.summary = pd.read_csv(
-                    self.path / f"{self.name}-summary.csv", index_col=0
+                    self.path / f"{self.name}_summary.csv", index_col=0
                 )
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "summary", self.path / f"{self.name}-summary.csv"
+                    "summary", self.path / f"{self.name}_summary.csv"
                 )
 
     def model(self):
@@ -286,7 +286,7 @@ class Model:
                 "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
             },
-            self.run_path / f"{self.name}-model.tpqr",
+            self.run_path / f"{self.name}_model.tpqr",
         )
 
         # save global parameters for tensorboard
@@ -345,7 +345,7 @@ class Model:
         """
         device = self.device
         path = Path(path) if path else self.run_path
-        model_path = path / f"{self.name}-model.tpqr"
+        model_path = path / f"{self.name}_model.tpqr"
         try:
             checkpoint = torch.load(model_path, map_location=device)
         except FileNotFoundError:

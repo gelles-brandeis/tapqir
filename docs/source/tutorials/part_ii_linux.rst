@@ -158,12 +158,12 @@ Next, press ``Fit the data`` button:
 .. figure:: fit-data.png
    :width: 800
 
-The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos-channel0-model.tpqr``).
+The program will automatically save a checkpoint every 200 iterations (checkpoint is saved at ``.tapqir/cosmos_model.tpqr``).
 The program can be stopped at any time by clicking in the *terminal window* and pressing ``Ctrl-C``. To restart the program again re-run
 ``tapqir-gui`` command and the program will resume from the last saved checkpoint.
 
 After fitting is finished, the program computes 95% credible intervals (CI) of model parameters and saves the parameters and CIs in
-``cosmos-channel0-params.tqpr``, ``cosmos-channel0-params.mat`` (if Matlab format is selected), and ``cosmos-channel0-summary.csv`` files.
+``cosmos_params.tqpr``, ``cosmos_params.mat`` (if Matlab format is selected), and ``cosmos_summary.csv`` files.
 
 If you get an error message saying that there is a memory overflow you can decrease either frame batch size (e.g., to ``128`` or ``256``)
 or AOI batch size (e.g., to ``5``).
@@ -206,11 +206,11 @@ View results
 ------------
 
 After fitting is done open ``View results`` tab to visualize analysis results. Click on ``Load results`` button which will display parameter values
-from the ``cosmos-channel0-params.tpqr`` file:
+from the ``cosmos_params.tpqr`` file:
 
 .. note::
 
-   ``cosmos-channel0-params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has finished or
+   ``cosmos_params.tpqr`` file is generated after fitting has completed (either when specified number of iterations has finished or
    the model has converged).
 
 .. note::

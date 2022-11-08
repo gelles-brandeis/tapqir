@@ -129,9 +129,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             ax.set_xlabel("Time (frame)")
             ax.set_ylabel("AOI")
             ax.set_title(f"Channel {c}")
-            plt.savefig(path / f"rastergram{c}.png", dpi=600)
+            plt.savefig(path / f"{model.name}_rastergram-channel{c}.png", dpi=600)
             logger.info(
-                f"Saved a probabilistic rastergram for channel #{c} in rastergram{c}.png file"
+                f"Saved a probabilistic rastergram for channel #{c} in {model.name}_rastergram-channel{c}.png file"
             )
 
     # calculate vmin/vmax
@@ -256,10 +256,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     continue
                 for stat, value in field.items():
                     ci_stats[param][stat] = np.asarray(value)
-            mat_path = path / f"{model.name}-params.mat"
+            mat_path = path / f"{model.name}_params.mat"
             savemat(mat_path, ci_stats)
             logger.info(f"Matlab parameters were saved in {mat_path}")
-        csv_path = path / f"{model.name}-summary.csv"
+        csv_path = path / f"{model.name}_summary.csv"
         summary.to_csv(csv_path)
         logger.info(f"Summary statistics were saved in {csv_path}")
 
