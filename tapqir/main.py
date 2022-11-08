@@ -946,6 +946,7 @@ def ttfb(
         help="Number of iterations",
         prompt="Number of iterations",
     ),
+    progress_bar=None,
 ):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
@@ -966,6 +967,9 @@ def ttfb(
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
+    if progress_bar is None:
+        progress_bar = tqdm
+
     model = models[model](device="cpu", dtype="float")
     try:
         model.load(cd, data_only=False)
@@ -978,6 +982,7 @@ def ttfb(
     r_type = "binary" if binary else "probabilistic"
     z_samples = model.z_sample(num_samples=num_samples)
     for c in range(model.data.C):
+        logger.info(f"Channel #{c} ({model.data.channels[c]})")
         # sorted on-target
         ttfb = time_to_first_binding(z[: model.data.N, :, c])
         # sort ttfb
@@ -996,7 +1001,7 @@ def ttfb(
         ax.set_title(f"Channel {c}")
         plt.savefig(cd / f"{model.name}_ttfb-rastergram-channel{c}.png", dpi=600)
         logger.info(
-            f"Saved a {r_type} rastergram for channel #{c} in {model.name}_ttfb-rastergram-channel{c}.png file"
+            f"Saved a {r_type} rastergram in {model.name}_ttfb-rastergram-channel{c}.png file"
         )
 
         fig, ax = plt.subplots()
@@ -1018,6 +1023,7 @@ def ttfb(
             control=None,
             Tmax=Tmax,
             jit=False,
+            progress_bar=progress_bar,
         )
 
         results = pd.DataFrame(columns=["Mean", "95% LL", "95% UL"])
@@ -1038,7 +1044,7 @@ def ttfb(
         results.loc["Af", "95% LL"], results.loc["Af", "95% UL"] = ll.item(), ul.item()
         results.to_csv(cd / f"{model.name}_ttfb-params-channel{c}.csv")
         logger.info(
-            f"Saved fit parameters for channel #{c} in {model.name}_ttfb-params-channel{c}.csv file"
+            f"Saved fit parameters in {model.name}_ttfb-params-channel{c}.csv file"
         )
 
         # use cuda
@@ -1078,9 +1084,7 @@ def ttfb(
             }
         )
         fit_df.to_csv(cd / f"{model.name}_ttfb-data-channel{c}.csv")
-        logger.info(
-            f"Saved fit data for channel #{c} in {model.name}_ttfb-data-channel{c}.csv file"
-        )
+        logger.info(f"Saved fit data in {model.name}_ttfb-data-channel{c}.csv file")
 
         ax.fill_between(torch.arange(Tmax), fb_ll, fb_ul, alpha=0.3, color="C2")
         ax.plot(torch.arange(Tmax), fb_mean, color="C2")
@@ -1118,9 +1122,7 @@ def ttfb(
         ax.set_ylim(-0.05, 1.05)
 
         plt.savefig(cd / f"{model.name}_ttfb-plot-channel{c}.png", dpi=600)
-        logger.info(
-            f"Saved data plots for channel #{c} in {model.name}_ttfb-plot-channel{c}.png file"
-        )
+        logger.info(f"Saved data plots in {model.name}_ttfb-plot-channel{c}.png file")
 
 
 @app.command()
@@ -1129,6 +1131,7 @@ def dwelltime(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
     K: int = typer.Option(3, "-K", help="Number of exponentials"),
+    progress_bar=None,
 ):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
@@ -1152,6 +1155,9 @@ def dwelltime(
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
+    if progress_bar is None:
+        progress_bar = tqdm
+
     model = models[model](device="cpu", dtype="float")
     try:
         model.load(cd, data_only=False)
@@ -1159,8 +1165,10 @@ def dwelltime(
         logger.exception(f"Failed to load {err.name} file")
         return 1
     for c in range(model.data.C):
+        logger.info(f"Channel #{c} ({model.data.channels[c]})")
         intervals = count_intervals(model.params["z_map"][:, :, c])
 
+        logger.info("Off-rate calculation ...")
         bound_dt = bound_dwell_times(intervals)
         pyro.clear_param_store()
         train(
@@ -1169,6 +1177,7 @@ def dwelltime(
             lr=5e-3,
             n_steps=10000,
             jit=False,
+            progress_bar=progress_bar,
             data=torch.as_tensor(bound_dt),
             K=K,
         )
@@ -1180,7 +1189,7 @@ def dwelltime(
             results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
         results.to_csv(cd / f"{model.name}_koff-channel{c}.csv")
         logger.info(
-            f"Saved off-rate parameters for channel #{c} in {model.name}_koff-channel{c}.csv file"
+            f"Saved off-rate parameters in {model.name}_koff-channel{c}.csv file"
         )
 
         fig, ax = plt.subplots()
@@ -1199,9 +1208,10 @@ def dwelltime(
         # plt.yscale("log")
         plt.savefig(cd / f"{model.name}_bound-dwell-times-channel{c}.png", dpi=600)
         logger.info(
-            f"Saved bound dwell-time histograms for channel #{c} in {model.name}_bound-dwell-times-channel{c}.png file"
+            f"Saved bound dwell-time histograms in {model.name}_bound-dwell-times-channel{c}.png file"
         )
 
+        logger.info("On-rate calculation ...")
         unbound_dt = unbound_dwell_times(intervals)
         pyro.clear_param_store()
         train(
@@ -1210,6 +1220,7 @@ def dwelltime(
             lr=5e-3,
             n_steps=10000,
             jit=False,
+            progress_bar=progress_bar,
             data=torch.as_tensor(unbound_dt),
             K=K,
         )
@@ -1220,9 +1231,7 @@ def dwelltime(
             results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
             results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
         results.to_csv(cd / f"{model.name}_kon-channel{c}.csv")
-        logger.info(
-            f"Saved on-rate parameters for channel #{c} in {model.name}_kon-channel{c}.csv file"
-        )
+        logger.info(f"Saved on-rate parameters in {model.name}_kon-channel{c}.csv file")
         fig, ax = plt.subplots()
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
         ax.hist(unbound_dt, bins=100, density=True)
@@ -1239,8 +1248,7 @@ def dwelltime(
         # plt.yscale("log")
         plt.savefig(cd / f"{model.name}_unbound-dwell-times-channel{c}.png", dpi=600)
         logger.info(
-            f"Saved unbound dwell-time histograms for channel #{c}"
-            " in {model.name}_unbound-dwell-times-channel{c}.png file"
+            f"Saved unbound dwell-time histograms in {model.name}_unbound-dwell-times-channel{c}.png file"
         )
 
 

@@ -459,6 +459,7 @@ def read_glimpse(path, progress_bar, **kwargs):
         time1=time1,
         ttb=ttb,
         name=name,
+        channels=tuple(channel["name"] for channel in channels),
     )
     logger.info(
         f"Dataset: N={dataset.N} on-target AOIs, "
