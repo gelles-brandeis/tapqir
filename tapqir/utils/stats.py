@@ -235,7 +235,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        param_path = path / f"{model.name}-params.tpqr"
+        param_path = path / f"{model.name}_params.tpqr"
         torch.save(ci_stats, param_path)
         logger.info(f"Parameters were saved in {param_path}")
         if save_matlab:
