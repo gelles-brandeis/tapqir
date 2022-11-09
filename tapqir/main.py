@@ -916,6 +916,7 @@ def subset():
         time1=data.time1,
         ttb=data.ttb,
         name=data.name,
+        channels=data.channels,
     )
     save(subset_data, subset_path)
     logger.info("Created a new data file at `subset/data.tpqr`")
@@ -1009,6 +1010,11 @@ def ttfb(
         Tmax = model.data.F
         torch.manual_seed(0)
         data = time_to_first_binding(z_samples[..., c])
+        data_df = pd.DataFrame(data=data)
+        data_df.to_csv(cd / f"{model.name}_ttfb-values-channel{c}.csv")
+        logger.info(
+            f"Saved time-to-first-binding values in {model.name}_ttfb-values-channel{c}.csv file"
+        )
 
         # use cuda
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
