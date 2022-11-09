@@ -1011,9 +1011,9 @@ def ttfb(
         torch.manual_seed(0)
         data = time_to_first_binding(z_samples[..., c])
         data_df = pd.DataFrame(data=data)
-        data_df.to_csv(cd / f"{model.name}_ttfb-values-channel{c}.csv")
+        data_df.to_csv(cd / f"{model.name}_ttfb-data-points-channel{c}.csv")
         logger.info(
-            f"Saved time-to-first-binding values in {model.name}_ttfb-values-channel{c}.csv file"
+            f"Saved time-to-first-binding values in {model.name}_ttfb-data-points-channel{c}.csv file"
         )
 
         # use cuda
@@ -1089,8 +1089,10 @@ def ttfb(
                 "fraction bound 95% ul": fb_ul,
             }
         )
-        fit_df.to_csv(cd / f"{model.name}_ttfb-data-channel{c}.csv")
-        logger.info(f"Saved fit data in {model.name}_ttfb-data-channel{c}.csv file")
+        fit_df.to_csv(cd / f"{model.name}_ttfb-fraction-bound-channel{c}.csv")
+        logger.info(
+            f"Saved fit data in {model.name}_ttfb-fraction-bound-channel{c}.csv file"
+        )
 
         ax.fill_between(torch.arange(Tmax), fb_ll, fb_ul, alpha=0.3, color="C2")
         ax.plot(torch.arange(Tmax), fb_mean, color="C2")
