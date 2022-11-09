@@ -1292,6 +1292,14 @@ def postUI(out):
             style={"description_width": "initial"},
         ),
     )
+    dt_layout.add_child(
+        "num_iter",
+        widgets.IntText(
+            value=10000,
+            description="Number of iterations",
+            style={"description_width": "initial"},
+        ),
+    )
     dt_layout.add_child("dwelltime", widgets.Button(description="Analyze"))
     dt_layout["dwelltime"].on_click(partial(dtCmd, layout=dt_layout, out=out))
     # Layout
@@ -1302,7 +1310,6 @@ def postUI(out):
 
 
 def ttfbCmd(b, layout, out):
-    layout.toggle_hide(names=("ttfb",))
     with out:
         logger.info("Time-to-first binding analysis ...")
         ttfb(**layout.kwargs)
@@ -1311,7 +1318,6 @@ def ttfbCmd(b, layout, out):
 
 
 def dtCmd(b, layout, out):
-    layout.toggle_hide(names=("dwelltime",))
     with out:
         logger.info("Dwell-time analysis ...")
         dwelltime(**layout.kwargs)
