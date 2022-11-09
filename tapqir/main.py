@@ -1131,6 +1131,13 @@ def dwelltime(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
     K: int = typer.Option(3, "-K", help="Number of exponentials"),
+    num_iter: int = typer.Option(
+        10000,
+        "--num-iter",
+        "-it",
+        help="Number of iterations",
+        prompt="Number of iterations",
+    ),
     progress_bar=None,
 ):
     import matplotlib as mpl
@@ -1175,7 +1182,7 @@ def dwelltime(
             exp_model,
             exp_guide,
             lr=5e-3,
-            n_steps=10000,
+            n_steps=num_iter,
             jit=False,
             progress_bar=progress_bar,
             data=torch.as_tensor(bound_dt),
