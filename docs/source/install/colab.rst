@@ -1,6 +1,14 @@
 Install on Google Colab
 =======================
 
+Google Colab <https://research.google.com/colaboratory/faq.html> is a cloud computing environment
+provided by Google as an inexpensive way to access powerful, GPU-equipped computers to do machine
+learning computations like Tapqir. If you are new to Tapqir, it will be easiest to run it in Colab.
+
+To get started, get a Colab account (if you or your lab don’t already have one). Grab a credit card and head to
+https://colab.research.google.com/signup. We use a Colab Pro + account ($50/month), but even
+a Colab Pro account ($10 / month) may work.
+
 Colab notebooks start in a fresh environment and thus require installation for each new
 start.
 
