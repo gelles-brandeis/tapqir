@@ -8,7 +8,7 @@ start.
    commands by prepending ``!`` to them. Installation commands and all tapqir commands
    are shell commands and therefore need a prepended ``!`` sign.
 
-1. Start `a new notebook`_ or use our existing `example notebook`_ as a template.
+1. Start `a new notebook`_.
 
 2. Before installing ``tapqir``, switch runtime to GPU (in the menu select ``Runtime ->
    Change runtime type -> GPU``)
@@ -30,4 +30,3 @@ To check Tapqir version run::
    !tapqir --version
 
 .. _a new notebook: https://colab.research.google.com/?utm_source=scs-index 
-.. _example notebook: https://colab.research.google.com/github/gelles-brandeis/tapqir/blob/latest/notebooks/part_ii_colab.ipynb
