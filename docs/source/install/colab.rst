@@ -10,7 +10,7 @@ https://colab.research.google.com/signup. We use a Colab Pro + account ($50/mont
 a Colab Pro account ($10 / month) may work.
 
 Colab notebooks start in a fresh environment and thus require Tapqir installation for each new
-start. New users should use `example notebook`_ in our `tutorial (make a link)` - which already contains the commands to install Tapqir.
+start. New users should use `example notebook`_ in our :doc:`tutorial </tutorials/part_ii_colab>` - which already contains the commands to install Tapqir.
 
 Installing Tapqir in a new notebook (Advanced)
 ----------------------------------------------
