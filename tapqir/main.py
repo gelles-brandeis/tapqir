@@ -847,13 +847,14 @@ def show(
         )
 
     if show_fov:
+        fov = {}
         P = DEFAULTS.pop("P")
         channels = DEFAULTS.pop("channels")
         for c in range(model.data.C):
             ax[f"glimpse_c{c}"] = fig.add_subplot(gs2[c])
-            fov = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
-            fov.plot(
-                fov.dtypes,
+            fov[c] = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
+            fov[c].plot(
+                fov[c].dtypes,
                 P,
                 n=0,
                 f=0,

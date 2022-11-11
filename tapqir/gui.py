@@ -685,14 +685,14 @@ def showCmd(b, layout, out):
     controls.children = [n, f1_box, checkboxes]
     # fov controls
     if fov is not None:
-        for dtype in fov.dtypes:
+        for dtype in fov[0].dtypes:
             fov_controls.add_child(
                 dtype, widgets.Checkbox(value=True, description=f"Show {dtype} AOIs")
             )
             fov_controls[dtype].observe(
                 partial(
                     showAOIs,
-                    fov=fov,
+                    fov=fov[0],
                     n=n_counter,
                     item=item,
                     fig=fig,
@@ -1054,8 +1054,8 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov):
             item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     if fov is not None:
         for c in range(model.data.C):
-            fov.plot(
-                fov.dtypes,
+            fov[c].plot(
+                fov[c].dtypes,
                 model.data.P,
                 n=n,
                 f=f1,
