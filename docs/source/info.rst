@@ -63,7 +63,7 @@ pipelines. We welcome help from outside users to:
 * Make Tapqir work with other data file formats and preprocessing pipelines
 * Export Tapqir results to different post-processing software
 
-The Tapqir source repository is on Github: <https://github.com/gelles-brandeis/tapqir>.
+The Tapqir source repository is on Github: https://github.com/gelles-brandeis/tapqir.
 
 Backend
 -------
