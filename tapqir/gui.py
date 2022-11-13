@@ -1312,7 +1312,10 @@ def postUI(out):
 def ttfbCmd(b, layout, out):
     with out:
         logger.info("Time-to-first binding analysis ...")
-        ttfb(**layout.kwargs)
+        ttfb(
+            **layout.kwargs,
+            progress_bar=tqdm_notebook,
+        )
         logger.info("Time-to-first binding analysis: Done")
     out.clear_output(wait=True)
 
@@ -1320,7 +1323,10 @@ def ttfbCmd(b, layout, out):
 def dtCmd(b, layout, out):
     with out:
         logger.info("Dwell-time analysis ...")
-        dwelltime(**layout.kwargs)
+        dwelltime(
+            **layout.kwargs,
+            progress_bar=tqdm_notebook,
+        )
         logger.info("Dwell-time analysis: Done")
     out.clear_output(wait=True)
 
