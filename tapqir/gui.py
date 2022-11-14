@@ -581,6 +581,8 @@ def showUI(out, DEFAULTS):
 
 
 def showCmd(b, layout, out):
+    from google.colab import output
+    output.enable_custom_widget_manager()
     layout.toggle_hide(names=("show",))
     params, summary = layout["view"].children
     controls, view, fov_controls = params.children
@@ -1344,10 +1346,6 @@ def app():
 
 
 def run():
-    from google.colab import output
-
     from tapqir.main import DEFAULTS
-
-    # output.enable_custom_widget_manager()
 
     display(initUI(DEFAULTS))
