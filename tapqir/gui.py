@@ -1348,6 +1348,6 @@ def run():
 
     from tapqir.main import DEFAULTS
 
-    output.enable_custom_widget_manager()
+    # output.enable_custom_widget_manager()
 
     display(initUI(DEFAULTS))
