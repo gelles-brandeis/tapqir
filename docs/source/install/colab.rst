@@ -43,4 +43,5 @@ To check Tapqir version run::
    !tapqir --version
 
 .. _Google Colab: https://research.google.com/colaboratory/faq.html
-.. _a new notebook: https://colab.research.google.com/?utm_source=scs-index 
+.. _a new notebook: https://colab.research.google.com/?utm_source=scs-index
+.. _example notebook: https://colab.research.google.com/github/gelles-brandeis/tapqir/blob/latest/notebooks/colab_tutorial.ipynb
