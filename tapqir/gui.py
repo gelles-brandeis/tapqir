@@ -207,6 +207,8 @@ def cdCmd(path, DEFAULTS, layout):
         # layout.remove_child("cd")
         print("add tab")
         layout.add_child("tab", tab, beginning=True)
+        print("add button")
+        layout.add_child("tab", widgets.Button(), beginning=True)
         print("add wd")
         layout.add_child("wd", wd, beginning=True)
 
