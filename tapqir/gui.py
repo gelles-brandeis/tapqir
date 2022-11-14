@@ -205,10 +205,12 @@ def cdCmd(path, DEFAULTS, layout):
         # insert tabs into GUI
         wd = widgets.Label(value=f"Working directory: {path}")
         # layout.remove_child("cd")
-        print("add tab")
+        print("add Tab")
         layout.add_child("tab", tab, beginning=True)
         print("add button")
-        layout.add_child("tab", widgets.Button(), beginning=True)
+        layout.add_child("tab", widgets.Tab(), beginning=True)
+        print("add slider")
+        layout.add_child("tab", widgets.IntSlider(), beginning=True)
         print("add wd")
         layout.add_child("wd", wd, beginning=True)
 
