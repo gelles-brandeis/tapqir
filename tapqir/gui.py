@@ -863,7 +863,9 @@ def updateParams(
         f1 = get_value(f1)
         f2 = f1 + 15
         color = (
-            [f"C{2+q}" for q in range(model.Q)] if model.data.mask[n] else ["C7"] * model.Q
+            [f"C{2+q}" for q in range(model.Q)]
+            if model.data.mask[n]
+            else ["C7"] * model.Q
         )
 
         exclude_aoi.value = not model.data.mask[n]
@@ -1342,6 +1344,10 @@ def app():
 
 
 def run():
+    from google.colab import output
+
     from tapqir.main import DEFAULTS
+
+    output.enable_custom_widget_manager()
 
     display(initUI(DEFAULTS))
