@@ -168,45 +168,45 @@ def cdCmd(path, DEFAULTS, layout):
         main(cd=path)
         logger.info("Loading configuration data ...")
 
-    # Tabs
-    tab = widgets.Tab()
-    tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
-    if IN_LINUX:
-        tensorboard = widgets.Output()
-        tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
-    elif IN_WSL2 or IN_COLAB:
-        tensorboard = None
-        tensorboard_info = widgets.Label(
-            value=(
-                'Run "tensorboard --logdir=<working directory>" in the terminal'
-                ' and then open "localhost:6006" in the browser'
+        # Tabs
+        tab = widgets.Tab()
+        tab.children = [glimpseUI(out, DEFAULTS), fitUI(out, DEFAULTS)]
+        if IN_LINUX:
+            tensorboard = widgets.Output()
+            tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard)
+        elif IN_WSL2 or IN_COLAB:
+            tensorboard = None
+            tensorboard_info = widgets.Label(
+                value=(
+                    'Run "tensorboard --logdir=<working directory>" in the terminal'
+                    ' and then open "localhost:6006" in the browser'
+                )
             )
-        )
-        tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard_info)
-    #  elif IN_COLAB:
-    #      tensorboard = None
-    #      tab.children = tab.children + (
-    #          widgets.Label(value="Disabled in Colab"),
-    #          widgets.Label(value="Disabled in Colab"),
-    #      )
-    tab.children = tab.children + (postUI(out), logUI(out))
-    tab.set_title(0, "Extract AOIs")
-    tab.set_title(1, "Fit the data")
-    tab.set_title(2, "View results")
-    tab.set_title(3, "Tensorboard")
-    tab.set_title(4, "Post analysis")
-    tab.set_title(5, "View logs")
+            tab.children = tab.children + (showUI(out, DEFAULTS), tensorboard_info)
+        #  elif IN_COLAB:
+        #      tensorboard = None
+        #      tab.children = tab.children + (
+        #          widgets.Label(value="Disabled in Colab"),
+        #          widgets.Label(value="Disabled in Colab"),
+        #      )
+        tab.children = tab.children + (postUI(out), logUI(out))
+        tab.set_title(0, "Extract AOIs")
+        tab.set_title(1, "Fit the data")
+        tab.set_title(2, "View results")
+        tab.set_title(3, "Tensorboard")
+        tab.set_title(4, "Post analysis")
+        tab.set_title(5, "View logs")
 
-    if tensorboard is not None:
-        with tensorboard:
-            notebook.start(f"--logdir '{path}'")
-            notebook.display(height=1000)
+        if tensorboard is not None:
+            with tensorboard:
+                notebook.start(f"--logdir '{path}'")
+                notebook.display(height=1000)
 
-    # insert tabs into GUI
-    wd = widgets.Label(value=f"Working directory: {path}")
-    layout.remove_child("cd")
-    layout.add_child("tab", tab, beginning=True)
-    layout.add_child("wd", wd, beginning=True)
+        # insert tabs into GUI
+        wd = widgets.Label(value=f"Working directory: {path}")
+        layout.remove_child("cd")
+        layout.add_child("tab", tab, beginning=True)
+        layout.add_child("wd", wd, beginning=True)
 
     with out:
         logger.info("Loading configuration data: Done")
@@ -581,8 +581,6 @@ def showUI(out, DEFAULTS):
 
 
 def showCmd(b, layout, out):
-    from google.colab import output
-    output.enable_custom_widget_manager()
     layout.toggle_hide(names=("show",))
     params, summary = layout["view"].children
     controls, view, fov_controls = params.children
@@ -1346,6 +1344,8 @@ def app():
 
 
 def run():
+    from google.colab import output
+    output.enable_custom_widget_manager()
     from tapqir.main import DEFAULTS
 
     display(initUI(DEFAULTS))
