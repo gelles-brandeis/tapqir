@@ -323,7 +323,7 @@ class hmm(cosmos):
 
         with channels as cdx, aois as ndx:
             ndx = ndx[:, None, None]
-            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            mask = Vindex(self.data.mask.to(self.device))[ndx]
             with handlers.mask(mask=mask):
                 pyro.sample(
                     "background_mean",
