@@ -341,7 +341,7 @@ class crosstalk(cosmos):
 
         with aois as ndx:
             ndx = ndx[:, None]
-            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            mask = Vindex(self.data.mask.to(self.device))[ndx]
             with handlers.mask(mask=mask):
                 pyro.sample(
                     "background_mean",

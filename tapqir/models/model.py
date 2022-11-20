@@ -89,14 +89,6 @@ class Model:
             torch.set_default_tensor_type(torch.DoubleTensor)
         else:
             torch.set_default_tensor_type(torch.FloatTensor)
-        # change loaded data device
-        if hasattr(self, "data"):
-            self.data.ontarget = self.data.ontarget._replace(device=self.device)
-            self.data.offtarget = self.data.offtarget._replace(device=self.device)
-            self.data.offset = self.data.offset._replace(
-                samples=self.data.offset.samples.to(self.device),
-                weights=self.data.offset.weights.to(self.device),
-            )
 
     @property
     def Q(self):

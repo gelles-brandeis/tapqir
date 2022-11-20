@@ -139,9 +139,9 @@ class CosmosDataset:
 
     def fetch(self, ndx, fdx, cdx):
         return (
-            Vindex(self.images)[ndx, fdx, cdx].to(self.device),
-            Vindex(self.xy)[ndx, fdx, cdx].to(self.device),
-            Vindex(self.is_ontarget)[ndx].to(self.device),
+            Vindex(self.images.to(self.device))[ndx, fdx, cdx],
+            Vindex(self.xy.to(self.device))[ndx, fdx, cdx],
+            Vindex(self.is_ontarget.to(self.device))[ndx],
         )
 
     @lazy_property
