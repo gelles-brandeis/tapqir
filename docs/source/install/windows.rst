@@ -123,4 +123,4 @@ in the console window and open that URL in a windows web browsser to access the 
    
       $ CUDA_VISIBLE_DEVICES=1 tapqir-gui
 
-   to run Tapqir on the second GPU.  You can use these two commends in two different Ubuntu windows, so that you can process data in twwo separate Tapqir runs at the same time.
+   to run Tapqir on the second GPU. You can use these two commands in two different Ubuntu windows, so that you can process data in two separate Tapqir runs at the same time.
