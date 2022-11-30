@@ -1293,6 +1293,14 @@ def postUI(out):
         ),
     )
     dt_layout.add_child(
+        "num_samples",
+        widgets.IntText(
+            value=2000,
+            description="Number of posterior samples",
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child(
         "num_iter",
         widgets.IntText(
             value=10000,

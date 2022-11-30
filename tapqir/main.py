@@ -1140,6 +1140,13 @@ def dwelltime(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
     K: int = typer.Option(3, "-K", help="Number of exponentials"),
+    num_samples: int = typer.Option(
+        2000,
+        "--num-samples",
+        "-n",
+        help="Number of posterior samples",
+        prompt="Number of posterior samples",
+    ),
     num_iter: int = typer.Option(
         10000,
         "--num-iter",
@@ -1154,6 +1161,7 @@ def dwelltime(
     import pandas as pd
     import pyro
     import torch
+    from pyro.ops.stats import hpdi
 
     from tapqir.models import models
     from tapqir.utils.imscroll import (
@@ -1180,9 +1188,14 @@ def dwelltime(
     except TapqirFileNotFoundError as err:
         logger.exception(f"Failed to load {err.name} file")
         return 1
+    z_samples = model.z_sample(num_samples=num_samples)
     for c in range(model.data.C):
         logger.info(f"Channel #{c} ({model.data.channels[c]})")
-        intervals = count_intervals(model.params["z_map"][:, :, c])
+        intervals = count_intervals(z_samples[..., c])
+        intervals.to_csv(cd / f"{model.name}_intervals-channel{c}.csv")
+        logger.info(
+            f"Saved time intervals in {model.name}_intervals-channel{c}.csv file"
+        )
 
         logger.info("Off-rate calculation ...")
         bound_dt = bound_dwell_times(intervals)
@@ -1198,11 +1211,25 @@ def dwelltime(
             K=K,
         )
 
-        results = pd.DataFrame(columns=["MLE"])
+        results = pd.DataFrame(columns=["Mean", "95% LL", "95% UL"])
         A, k = {}, {}
         for i in range(K):
-            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
-            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[..., i].mean().item()
+            ll, ul = hpdi(pyro.param("A")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"A{i}", "95% LL"], results.loc[f"A{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
+
+            results.loc[f"koff{i}", "Mean"] = k[i] = (
+                pyro.param("k")[..., i].mean().item()
+            )
+            ll, ul = hpdi(pyro.param("k")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"koff{i}", "95% LL"], results.loc[f"koff{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
+
         results.to_csv(cd / f"{model.name}_koff-channel{c}.csv")
         logger.info(
             f"Saved off-rate parameters in {model.name}_koff-channel{c}.csv file"
@@ -1210,7 +1237,11 @@ def dwelltime(
 
         fig, ax = plt.subplots()
         # ax.hist(bound_dt, bins=100, density=True, log=True)
-        ax.hist(bound_dt, bins=100, density=True)
+        ax.hist(
+            bound_dwell_times(count_intervals(model.params["z_map"][None, :, :, c]))[0],
+            bins=100,
+            density=True,
+        )
         t = torch.arange(bound_dt.max())
         y = 0
         for i in range(K):
@@ -1234,23 +1265,42 @@ def dwelltime(
             exp_model,
             exp_guide,
             lr=5e-3,
-            n_steps=10000,
+            n_steps=num_iter,
             jit=False,
             progress_bar=progress_bar,
             data=torch.as_tensor(unbound_dt),
             K=K,
         )
 
-        results = pd.DataFrame(columns=["MLE"])
+        results = pd.DataFrame(columns=["Mean", "95% LL", "95% UL"])
         A, k = {}, {}
         for i in range(K):
-            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
-            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[..., i].mean().item()
+            ll, ul = hpdi(pyro.param("A")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"A{i}", "95% LL"], results.loc[f"A{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
+
+            results.loc[f"kon{i}", "Mean"] = k[i] = (
+                pyro.param("k")[..., i].mean().item()
+            )
+            ll, ul = hpdi(pyro.param("k")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"kon{i}", "95% LL"], results.loc[f"kon{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
         results.to_csv(cd / f"{model.name}_kon-channel{c}.csv")
         logger.info(f"Saved on-rate parameters in {model.name}_kon-channel{c}.csv file")
         fig, ax = plt.subplots()
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
-        ax.hist(unbound_dt, bins=100, density=True)
+        ax.hist(
+            unbound_dwell_times(count_intervals(model.params["z_map"][None, :, :, c]))[
+                0
+            ],
+            bins=100,
+            density=True,
+        )
         t = torch.arange(unbound_dt.max())
         y = 0
         for i in range(K):
