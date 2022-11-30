@@ -76,27 +76,28 @@ def _(labels):
 def _(labels):
     z = labels
     labels = labels.bool()
-    start_condition = torch.cat((~labels[:, 0:1], labels[:, :-1]), dim=1) != labels
-    start_aoi, start_frame = torch.nonzero(start_condition, as_tuple=True)
+    start_condition = torch.cat((~labels[..., 0:1], labels[..., :-1]), dim=-1) != labels
+    start_sample, start_aoi, start_frame = torch.nonzero(start_condition, as_tuple=True)
     start_type = labels.long()
-    start_type[:, 0] = -start_type[:, 0] - 2
-    start_type = start_type[start_aoi, start_frame]
+    start_type[..., 0] = -start_type[..., 0] - 2
+    start_type = start_type[start_sample, start_aoi, start_frame]
 
     stop_condition = torch.cat(
-        (labels[:, :-1] != labels[:, 1:], torch.ones_like(labels[:, 0:1])), dim=1
+        (labels[..., :-1] != labels[..., 1:], torch.ones_like(labels[..., 0:1])), dim=-1
     )
-    stop_aoi, stop_frame = torch.nonzero(stop_condition, as_tuple=True)
+    stop_sample, stop_aoi, stop_frame = torch.nonzero(stop_condition, as_tuple=True)
     stop_type = labels.long()
-    stop_type[:, -1] += 2
-    stop_type = stop_type[stop_aoi, stop_frame]
+    stop_type[..., -1] += 2
+    stop_type = stop_type[stop_sample, stop_aoi, stop_frame]
 
     assert all(start_aoi == stop_aoi)
 
     low_or_high = torch.where(abs(start_type) > abs(stop_type), start_type, stop_type)
-    z_type = z[start_aoi, start_frame]
+    z_type = z[start_sample, start_aoi, start_frame]
 
     result = pd.DataFrame(
         data={
+            "posterior_sample": start_sample,
             "aoi": start_aoi,
             "start_frame": start_frame,
             "stop_frame": stop_frame,
@@ -111,13 +112,31 @@ def _(labels):
 def bound_dwell_times(intervals):
     assert isinstance(intervals, pd.DataFrame)
     mask = intervals["low_or_high"] == 1
-    return intervals.loc[mask, "dwell_time"].values
+    result = intervals.loc[mask, ["posterior_sample", "dwell_time"]]
+    value_counts = result["posterior_sample"].value_counts()
+    max_count = value_counts.max()
+    n_values = len(value_counts)
+    data = np.zeros((n_values, max_count), dtype=np.float32)
+    for i in range(n_values):
+        mask = result["posterior_sample"] == i
+        dwell_times = result.loc[mask, "dwell_time"]
+        data[i, : len(dwell_times)] = dwell_times.values
+    return data
 
 
 def unbound_dwell_times(intervals):
     assert isinstance(intervals, pd.DataFrame)
     mask = intervals["low_or_high"] == 0
-    return intervals.loc[mask, "dwell_time"].values
+    result = intervals.loc[mask, ["posterior_sample", "dwell_time"]]
+    value_counts = result["posterior_sample"].value_counts()
+    max_count = value_counts.max()
+    n_values = len(value_counts)
+    data = np.zeros((n_values, max_count), dtype=np.float32)
+    for i in range(n_values):
+        mask = result["posterior_sample"] == i
+        dwell_times = result.loc[mask, "dwell_time"]
+        data[i, : len(dwell_times)] = dwell_times.values
+    return data
 
 
 @singledispatch

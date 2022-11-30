@@ -106,15 +106,25 @@ def ttfb_guide(data, control, Tmax):
 
 
 def exp_model(data, K):
-    with pyro.plate("components", K):
-        k = pyro.param(
-            "k", lambda: torch.logspace(-K + 1, 0, K), constraint=constraints.positive
-        )
-    A = pyro.param("A", lambda: torch.ones(K), constraint=constraints.simplex)
+    n_samples = data.shape[0]
+    k = pyro.param(
+        "k",
+        lambda: torch.logspace(-K + 1, 0, K).expand(n_samples, -1),
+        constraint=constraints.positive,
+    )
+    A = pyro.param(
+        "A", lambda: torch.ones(n_samples, 1, K), constraint=constraints.simplex
+    )
 
-    with pyro.plate("data", len(data)):
-        m = pyro.sample("m", dist.Categorical(A), infer={"enumerate": "parallel"})
-        pyro.sample("obs", dist.Exponential(k[m.long()]), obs=data)
+    with pyro.plate("posterior_samples", n_samples, dim=-2) as pdx:
+        with pyro.plate("data", data.shape[1]):
+            with handlers.mask(mask=(data > 0)):
+                m = pyro.sample(
+                    "m", dist.Categorical(A), infer={"enumerate": "parallel"}
+                )
+                pyro.sample(
+                    "obs", dist.Exponential(Vindex(k)[pdx[:, None], m.long()]), obs=data
+                )
 
 
 def exp_guide(data, K):
