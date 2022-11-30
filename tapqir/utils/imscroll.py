@@ -39,28 +39,29 @@ def _(labels):
     z = labels
     labels = labels.astype("bool")
     start_condition = (
-        np.concatenate((~labels[:, 0:1], labels[:, :-1]), axis=1) != labels
+        np.concatenate((~labels[..., 0:1], labels[..., :-1]), axis=-1) != labels
     )
-    start_aoi, start_frame = np.nonzero(start_condition)
+    start_sample, start_aoi, start_frame = np.nonzero(start_condition)
     start_type = labels.astype("long")
-    start_type[:, 0] = -start_type[:, 0] - 2
-    start_type = start_type[start_aoi, start_frame]
+    start_type[..., 0] = -start_type[..., 0] - 2
+    start_type = start_type[start_sample, start_aoi, start_frame]
 
     stop_condition = np.concatenate(
-        (labels[:, :-1] != labels[:, 1:], np.ones_like(labels[:, 0:1])), axis=1
+        (labels[..., :-1] != labels[..., 1:], np.ones_like(labels[..., 0:1])), axis=-1
     )
-    stop_aoi, stop_frame = np.nonzero(stop_condition)
+    stop_sample, stop_aoi, stop_frame = np.nonzero(stop_condition)
     stop_type = labels.astype("long")
-    stop_type[:, -1] += 2
-    stop_type = stop_type[stop_aoi, stop_frame]
+    stop_type[..., -1] += 2
+    stop_type = stop_type[stop_sample, stop_aoi, stop_frame]
 
     assert all(start_aoi == stop_aoi)
 
     low_or_high = np.where(abs(start_type) > abs(stop_type), start_type, stop_type)
-    z_type = z[start_aoi, start_frame]
+    z_type = z[start_sample, start_aoi, start_frame]
 
     result = pd.DataFrame(
         data={
+            "posterior_sample": start_sample,
             "aoi": start_aoi,
             "start_frame": start_frame,
             "stop_frame": stop_frame,

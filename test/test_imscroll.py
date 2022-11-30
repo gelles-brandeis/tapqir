@@ -35,7 +35,7 @@ from tapqir.utils.imscroll import (
     ],
 )
 def test_count_intervals(labels, expected):
-    result = count_intervals(labels)
+    result = count_intervals(labels[None, :, :])
     actual = result[["aoi", "dwell_time", "low_or_high"]].values
     assert (actual == expected).all()
 
