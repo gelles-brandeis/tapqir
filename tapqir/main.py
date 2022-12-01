@@ -936,6 +936,13 @@ def ttfb(
         help="Plot a binary or probabilistic rastergram",
         prompt="Plot a binary rastergram?",
     ),
+    cuda: bool = typer.Option(
+        partial(get_default, "cuda"),
+        "--cuda/--cpu",
+        help="Run computations on GPU or CPU",
+        prompt="Run computations on GPU?",
+        show_default=False,
+    ),
     num_samples: int = typer.Option(
         2000,
         "--num-samples",
@@ -1022,7 +1029,9 @@ def ttfb(
         )
 
         # use cuda
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
+        if cuda:
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            data = data.cuda()
 
         # Tapqir fit
         train(
@@ -1030,7 +1039,7 @@ def ttfb(
             ttfb_guide,
             lr=5e-3,
             n_steps=num_iter,
-            data=data.cuda(),
+            data=data,
             control=None,
             Tmax=Tmax,
             jit=False,
@@ -1058,8 +1067,10 @@ def ttfb(
             f"Saved fit parameters in {model.name}_ttfb-params-channel{c}.csv file"
         )
 
-        # use cuda
-        torch.set_default_tensor_type(torch.FloatTensor)
+        # change back to cpu
+        if cuda:
+            torch.set_default_tensor_type(torch.FloatTensor)
+            data = data.cpu()
 
         nz = (data == 0).sum(1, keepdim=True)
         N = data.shape[1]
@@ -1144,6 +1155,13 @@ def dwelltime(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
     K: int = typer.Option(3, "-K", help="Number of exponentials"),
+    cuda: bool = typer.Option(
+        partial(get_default, "cuda"),
+        "--cuda/--cpu",
+        help="Run computations on GPU or CPU",
+        prompt="Run computations on GPU?",
+        show_default=False,
+    ),
     num_samples: int = typer.Option(
         2000,
         "--num-samples",
@@ -1204,6 +1222,13 @@ def dwelltime(
 
         logger.info("Off-rate calculation ...")
         bound_dt = bound_dwell_times(intervals)
+
+        data = torch.as_tensor(bound_dt)
+        # use cuda
+        if cuda:
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            data = data.cuda()
+
         pyro.clear_param_store()
         train(
             exp_model,
@@ -1212,7 +1237,7 @@ def dwelltime(
             n_steps=num_iter,
             jit=False,
             progress_bar=progress_bar,
-            data=torch.as_tensor(bound_dt),
+            data=data,
             K=K,
         )
 
@@ -1240,8 +1265,11 @@ def dwelltime(
             f"Saved off-rate parameters in {model.name}_dwelltime-koff-channel{c}.csv file"
         )
 
+        # change back to cpu
+        if cuda:
+            torch.set_default_tensor_type(torch.FloatTensor)
+
         fig, ax = plt.subplots()
-        # ax.hist(bound_dt, bins=100, density=True, log=True)
         ax.hist(
             bound_dwell_times(
                 count_intervals(
@@ -1271,6 +1299,13 @@ def dwelltime(
 
         logger.info("On-rate calculation ...")
         unbound_dt = unbound_dwell_times(intervals)
+
+        data = torch.as_tensor(unbound_dt)
+        # use cuda
+        if cuda:
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            data = data.cuda()
+
         pyro.clear_param_store()
         train(
             exp_model,
@@ -1279,7 +1314,7 @@ def dwelltime(
             n_steps=num_iter,
             jit=False,
             progress_bar=progress_bar,
-            data=torch.as_tensor(unbound_dt),
+            data=data,
             K=K,
         )
 
@@ -1305,8 +1340,12 @@ def dwelltime(
         logger.info(
             f"Saved on-rate parameters in {model.name}_dwelltime-kon-channel{c}.csv file"
         )
+
+        # change back to cpu
+        if cuda:
+            torch.set_default_tensor_type(torch.FloatTensor)
+
         fig, ax = plt.subplots()
-        # ax.hist(unbound_dt, bins=100, density=True, log=True)
         ax.hist(
             unbound_dwell_times(
                 count_intervals(
