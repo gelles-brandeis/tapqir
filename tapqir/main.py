@@ -764,7 +764,9 @@ def show(
             "-",
             lw=1,
             color=color[q],
+            label=f"dye {q}",
         )
+        ax["z_map"].legend(loc="upper right")
 
         (item[f"p_specific_q{q}"],) = ax["p_specific"].plot(
             torch.arange(0, model.data.F),
