@@ -1254,6 +1254,14 @@ def postUI(out):
         ),
     )
     ttfb_layout.add_child(
+        "cuda",
+        widgets.Checkbox(
+            value=True,
+            description="Run computations on GPU?",
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child(
         "num_samples",
         widgets.IntText(
             value=2000,
@@ -1289,6 +1297,14 @@ def postUI(out):
             min=1,
             max=6,
             description="Number of exponentials",
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child(
+        "cuda",
+        widgets.Checkbox(
+            value=True,
+            description="Run computations on GPU?",
             style={"description_width": "initial"},
         ),
     )
