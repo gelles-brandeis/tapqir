@@ -1197,9 +1197,9 @@ def dwelltime(
     for c in range(model.data.C):
         logger.info(f"Channel #{c} ({model.data.channels[c]})")
         intervals = count_intervals(z_samples_masked[..., c])
-        intervals.to_csv(cd / f"{model.name}_intervals-channel{c}.csv")
+        intervals.to_csv(cd / f"{model.name}_dwelltime-intervals-channel{c}.csv")
         logger.info(
-            f"Saved time intervals in {model.name}_intervals-channel{c}.csv file"
+            f"Saved time intervals in {model.name}_dwelltime-intervals-channel{c}.csv file"
         )
 
         logger.info("Off-rate calculation ...")
@@ -1235,9 +1235,9 @@ def dwelltime(
                 ul.item(),
             )
 
-        results.to_csv(cd / f"{model.name}_koff-channel{c}.csv")
+        results.to_csv(cd / f"{model.name}_dwelltime-koff-channel{c}.csv")
         logger.info(
-            f"Saved off-rate parameters in {model.name}_koff-channel{c}.csv file"
+            f"Saved off-rate parameters in {model.name}_dwelltime-koff-channel{c}.csv file"
         )
 
         fig, ax = plt.subplots()
@@ -1262,9 +1262,11 @@ def dwelltime(
         ax.set_title(f"Bound dwell times channel {c}")
         # ax.set_ylim(1e-4, 1e-1)
         # plt.yscale("log")
-        plt.savefig(cd / f"{model.name}_bound-dwell-times-channel{c}.png", dpi=600)
+        plt.savefig(
+            cd / f"{model.name}_dwelltime-bound-histogram-channel{c}.png", dpi=600
+        )
         logger.info(
-            f"Saved bound dwell-time histograms in {model.name}_bound-dwell-times-channel{c}.png file"
+            f"Saved bound dwell-time histograms in {model.name}_dwelltime-bound-histogram-channel{c}.png file"
         )
 
         logger.info("On-rate calculation ...")
@@ -1299,8 +1301,10 @@ def dwelltime(
                 ll.item(),
                 ul.item(),
             )
-        results.to_csv(cd / f"{model.name}_kon-channel{c}.csv")
-        logger.info(f"Saved on-rate parameters in {model.name}_kon-channel{c}.csv file")
+        results.to_csv(cd / f"{model.name}_dwelltime-kon-channel{c}.csv")
+        logger.info(
+            f"Saved on-rate parameters in {model.name}_dwelltime-kon-channel{c}.csv file"
+        )
         fig, ax = plt.subplots()
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
         ax.hist(
@@ -1323,9 +1327,11 @@ def dwelltime(
         ax.set_title(f"Unbound dwell times channel {c}")
         # ax.set_ylim(1e-4, 1e-1)
         # plt.yscale("log")
-        plt.savefig(cd / f"{model.name}_unbound-dwell-times-channel{c}.png", dpi=600)
+        plt.savefig(
+            cd / f"{model.name}_dwelltime-unbound-histogram-channel{c}.png", dpi=600
+        )
         logger.info(
-            f"Saved unbound dwell-time histograms in {model.name}_unbound-dwell-times-channel{c}.png file"
+            f"Saved unbound dwell-time histograms in {model.name}_dwelltime-unbound-histogram-channel{c}.png file"
         )
 
 
