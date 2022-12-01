@@ -985,17 +985,19 @@ def ttfb(
     z = model.params["p_specific"] > 0.5 if binary else model.params["p_specific"]
     r_type = "binary" if binary else "probabilistic"
     z_samples = model.z_sample(num_samples=num_samples)
+    z_samples_masked = z_samples[:, model.data.mask[: model.data.N]]
     for c in range(model.data.C):
         logger.info(f"Channel #{c} ({model.data.channels[c]})")
+        z_masked = z[: model.data.N, :, c][model.data.mask[: model.data.N]]
         # sorted on-target
-        ttfb = time_to_first_binding(z[: model.data.N, :, c])
+        ttfb = time_to_first_binding(z_masked)
         # sort ttfb
         sdx = torch.argsort(ttfb, descending=True)
 
         fig, ax = plt.subplots()
         norm = mpl.colors.Normalize(vmin=0, vmax=1)
         ax.imshow(
-            z[: model.data.N, :, c][sdx],
+            z_masked[sdx],
             norm=norm,
             aspect="equal",
             interpolation="none",
@@ -1012,7 +1014,7 @@ def ttfb(
         # prepare data
         Tmax = model.data.F
         torch.manual_seed(0)
-        data = time_to_first_binding(z_samples[..., c])
+        data = time_to_first_binding(z_samples_masked[..., c])
         data_df = pd.DataFrame(data=data)
         data_df.to_csv(cd / f"{model.name}_ttfb-data-points-channel{c}.csv")
         logger.info(
@@ -1191,9 +1193,10 @@ def dwelltime(
         logger.exception(f"Failed to load {err.name} file")
         return 1
     z_samples = model.z_sample(num_samples=num_samples)
+    z_samples_masked = z_samples[:, model.data.mask[: model.data.N]]
     for c in range(model.data.C):
         logger.info(f"Channel #{c} ({model.data.channels[c]})")
-        intervals = count_intervals(z_samples[..., c])
+        intervals = count_intervals(z_samples_masked[..., c])
         intervals.to_csv(cd / f"{model.name}_intervals-channel{c}.csv")
         logger.info(
             f"Saved time intervals in {model.name}_intervals-channel{c}.csv file"
@@ -1240,7 +1243,11 @@ def dwelltime(
         fig, ax = plt.subplots()
         # ax.hist(bound_dt, bins=100, density=True, log=True)
         ax.hist(
-            bound_dwell_times(count_intervals(model.params["z_map"][None, :, :, c]))[0],
+            bound_dwell_times(
+                count_intervals(
+                    model.params["z_map"][None, model.data.mask[: model.data.N], :, c]
+                )
+            )[0],
             bins=100,
             density=True,
         )
@@ -1297,9 +1304,11 @@ def dwelltime(
         fig, ax = plt.subplots()
         # ax.hist(unbound_dt, bins=100, density=True, log=True)
         ax.hist(
-            unbound_dwell_times(count_intervals(model.params["z_map"][None, :, :, c]))[
-                0
-            ],
+            unbound_dwell_times(
+                count_intervals(
+                    model.params["z_map"][None, model.data.mask[: model.data.N], :, c]
+                )
+            )[0],
             bins=100,
             density=True,
         )

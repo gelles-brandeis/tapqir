@@ -121,7 +121,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             fig, ax = plt.subplots()
             norm = mpl.colors.Normalize(vmin=0, vmax=1)
             ax.imshow(
-                ci_stats["p_specific"][: model.data.N, :, c],
+                ci_stats["p_specific"][: model.data.N, :, c][
+                    model.data.mask[: model.data.N]
+                ],
                 norm=norm,
                 aspect="equal",
                 interpolation="none",
