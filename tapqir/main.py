@@ -1141,7 +1141,7 @@ def ttfb(
         ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
         ax.set_yticklabels([r"$0$", r"$0.2$", r"$0.4$", r"$0.6$", r"$0.8$", r"$1$"])
         ax.set_xlabel("Time (frame)")
-        ax.set_ylabel("Fraction bound")
+        ax.set_ylabel("Cumulative fraction")
         ax.set_title(f"Channel {c}")
         ax.set_ylim(-0.05, 1.05)
 
