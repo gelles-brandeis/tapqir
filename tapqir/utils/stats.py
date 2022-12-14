@@ -115,6 +115,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()
     ci_stats["p_specific"] = ci_stats["theta_probs"].sum(0)
+    if "hmm" in model.name:
+        ci_stats["z_trans"] = pyro.param("z_trans").data.cpu()
 
     if not os.environ.get("CI", None):
         for c in range(model.data.C):
@@ -251,6 +253,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     "z_probs",
                     "z_map",
                     "p_specific",
+                    "z_trans",
                     "h_specific",
                     "time1",
                     "ttb",
