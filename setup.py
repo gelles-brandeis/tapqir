@@ -66,7 +66,7 @@ setuptools.setup(
         "ipyfilechooser",
         "ipympl",
         "ipywidgets",
-        "matplotlib",
+        "matplotlib>=3.5.3",
         "pandas",
         "protobuf>=3.9,<3.20",
         "pykeops>=2.0",
@@ -75,7 +75,7 @@ setuptools.setup(
         "scikit-learn",
         "scipy",
         "tensorboard",
-        "torch==1.11.0",
+        "torch>=1.11.0",
         "typer",
     ],
     extras_require={

@@ -91,14 +91,6 @@ class Model(nn.Module):
             torch.set_default_tensor_type(torch.DoubleTensor)
         else:
             torch.set_default_tensor_type(torch.FloatTensor)
-        # change loaded data device
-        if hasattr(self, "data"):
-            self.data.ontarget = self.data.ontarget._replace(device=self.device)
-            self.data.offtarget = self.data.offtarget._replace(device=self.device)
-            self.data.offset = self.data.offset._replace(
-                samples=self.data.offset.samples.to(self.device),
-                weights=self.data.offset.weights.to(self.device),
-            )
 
     @property
     def Q(self):
@@ -122,18 +114,18 @@ class Model(nn.Module):
         # load fit results
         if not data_only:
             try:
-                self.params = torch.load(self.path / f"{self.name}-params.tpqr")
+                self.params = torch.load(self.path / f"{self.name}_params.tpqr")
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "parameter", self.path / f"{self.name}-params.tpqr"
+                    "parameter", self.path / f"{self.name}_params.tpqr"
                 )
             try:
                 self.summary = pd.read_csv(
-                    self.path / f"{self.name}-summary.csv", index_col=0
+                    self.path / f"{self.name}_summary.csv", index_col=0
                 )
             except FileNotFoundError:
                 raise TapqirFileNotFoundError(
-                    "summary", self.path / f"{self.name}-summary.csv"
+                    "summary", self.path / f"{self.name}_summary.csv"
                 )
 
     def model(self):
@@ -218,31 +210,31 @@ class Model(nn.Module):
 
         with SummaryWriter(log_dir=self.run_path / "logs" / self.name) as writer:
             for i in progress_bar(range(num_iter)):
-                # try:
-                self.iter_loss = self.svi.step()
-                # save a checkpoint every 200 iterations
-                if not self.iter % 200:
-                    self.save_checkpoint(writer)
-                    if use_crit and self.converged:
-                        logger.info(f"Iteration #{self.iter} model converged.")
-                        break
-                self.iter += 1
-                #  except ValueError:
-                #      # load last checkpoint
-                #      self.init(
-                #          lr=self.lr,
-                #          nbatch_size=self.nbatch_size,
-                #          fbatch_size=self.fbatch_size,
-                #      )
-                #      # change rng seed
-                #      new_seed = random.randint(0, 100)
-                #      pyro.set_rng_seed(new_seed)
-                #      logger.debug(
-                #          f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
-                #      )
-                #  except RuntimeError as err:
-                #      assert err.args[0].startswith("CUDA out of memory")
-                #      raise CudaOutOfMemoryError()
+                try:
+                    self.iter_loss = self.svi.step()
+                    # save a checkpoint every 200 iterations
+                    if not self.iter % 200:
+                        self.save_checkpoint(writer)
+                        if use_crit and self.converged:
+                            logger.info(f"Iteration #{self.iter} model converged.")
+                            break
+                    self.iter += 1
+                except ValueError:
+                    # load last checkpoint
+                    self.init(
+                        lr=self.lr,
+                        nbatch_size=self.nbatch_size,
+                        fbatch_size=self.fbatch_size,
+                    )
+                    # change rng seed
+                    new_seed = random.randint(0, 100)
+                    pyro.set_rng_seed(new_seed)
+                    logger.warning(
+                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                    )
+                except RuntimeError as err:
+                    assert err.args[0].startswith("CUDA out of memory")
+                    raise CudaOutOfMemoryError()
             else:
                 logger.warning(f"Iteration #{self.iter} model has not converged.")
 
@@ -293,7 +285,7 @@ class Model(nn.Module):
                 "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
             },
-            self.run_path / f"{self.name}-model.tpqr",
+            self.run_path / f"{self.name}_model.tpqr",
         )
 
         # save global parameters for tensorboard
@@ -301,8 +293,15 @@ class Model(nn.Module):
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
                 writer.add_scalar(name, val.item(), self.iter)
-            elif val.dim() == 1 and len(val) <= self.S + 1:
+            elif val.dim() == 1 and len(val) <= self.Q * 2:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
+                writer.add_scalars(name, scalars, self.iter)
+            elif val.dim() == 2 and len(val) <= self.Q * 2:
+                scalars = {
+                    f"{i}_{j}": k.item()
+                    for i, v in enumerate(val)
+                    for j, k in enumerate(v)
+                }
                 writer.add_scalars(name, scalars, self.iter)
 
         if False and self.data.labels is not None:
@@ -345,7 +344,7 @@ class Model(nn.Module):
         """
         device = self.device
         path = Path(path) if path else self.run_path
-        model_path = path / f"{self.name}-model.tpqr"
+        model_path = path / f"{self.name}_model.tpqr"
         try:
             checkpoint = torch.load(model_path, map_location=device)
         except FileNotFoundError:

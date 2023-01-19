@@ -3,9 +3,12 @@
 
 import logging
 import math
+import os
 from pathlib import Path
 from typing import Tuple
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyro
@@ -112,6 +115,28 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
     ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()
     ci_stats["p_specific"] = ci_stats["theta_probs"].sum(0)
+    if "hmm" in model.name:
+        ci_stats["z_trans"] = pyro.param("z_trans").data.cpu()
+
+    if not os.environ.get("CI", None):
+        for c in range(model.data.C):
+            fig, ax = plt.subplots()
+            norm = mpl.colors.Normalize(vmin=0, vmax=1)
+            ax.imshow(
+                ci_stats["p_specific"][: model.data.N, :, c][
+                    model.data.mask[: model.data.N]
+                ],
+                norm=norm,
+                aspect="equal",
+                interpolation="none",
+            )
+            ax.set_xlabel("Time (frame)")
+            ax.set_ylabel("AOI")
+            ax.set_title(f"Channel {c}")
+            plt.savefig(path / f"{model.name}_rastergram-channel{c}.png", dpi=600)
+            logger.info(
+                f"Saved a probabilistic rastergram for channel #{c} in {model.name}_rastergram-channel{c}.png file"
+            )
 
     # calculate vmin/vmax
     theta_mask = ci_stats["theta_probs"] > 0.5
@@ -167,8 +192,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             model.data.P,
             ci_stats["theta_probs"][:, n],
         )
-    snr_masked = snr[ci_stats["theta_probs"] > 0.5]
-    summary.loc["SNR", "Mean"] = snr_masked.mean().item()
+    for q in range(model.Q):
+        snr_masked = snr[..., q][ci_stats["theta_probs"][..., q] > 0.5]
+        summary.loc[f"SNR_{q}", "Mean"] = snr_masked.mean().item()
     ci_stats["chi2"] = {}
     ci_stats["chi2"]["values"] = chi2
     cmax = quantile(ci_stats["chi2"]["values"].flatten(), 0.99)
@@ -197,7 +223,9 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         ) = confusion_matrix(true_labels, pred_labels, labels=(0, 1)).ravel()
 
         mask = torch.from_numpy(model.data.labels["z"][: model.data.N]) > 0
-        samples = torch.masked_select(model.z_probs[model.data.is_ontarget].cpu(), mask)
+        samples = torch.masked_select(
+            model.z_probs[model.data.is_ontarget].argmax(dim=-1).cpu(), mask
+        )
         if len(samples):
             z_ll, z_ul = hpdi(samples, CI)
             summary.loc["p(specific)", "Mean"] = quantile(samples, 0.5).item()
@@ -212,7 +240,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
     if path is not None:
         path = Path(path)
-        param_path = path / f"{model.name}-params.tpqr"
+        param_path = path / f"{model.name}_params.tpqr"
         torch.save(ci_stats, param_path)
         logger.info(f"Parameters were saved in {param_path}")
         if save_matlab:
@@ -225,6 +253,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     "z_probs",
                     "z_map",
                     "p_specific",
+                    "z_trans",
                     "h_specific",
                     "time1",
                     "ttb",
@@ -233,10 +262,10 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
                     continue
                 for stat, value in field.items():
                     ci_stats[param][stat] = np.asarray(value)
-            mat_path = path / f"{model.name}-params.mat"
+            mat_path = path / f"{model.name}_params.mat"
             savemat(mat_path, ci_stats)
             logger.info(f"Matlab parameters were saved in {mat_path}")
-        csv_path = path / f"{model.name}-summary.csv"
+        csv_path = path / f"{model.name}_summary.csv"
         summary.to_csv(csv_path)
         logger.info(f"Summary statistics were saved in {csv_path}")
 

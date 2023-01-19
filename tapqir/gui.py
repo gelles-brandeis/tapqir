@@ -18,7 +18,7 @@ from tqdm import tqdm_notebook
 from traitlets.utils.bunch import Bunch
 
 from tapqir.distributions.util import gaussian_spots
-from tapqir.main import avail_models, fit, glimpse, log, main, show
+from tapqir.main import avail_models, dwelltime, fit, glimpse, log, main, show, ttfb
 from tapqir.utils.dataset import save
 
 logger = logging.getLogger("tapqir")
@@ -92,6 +92,9 @@ class inputBox(widgets.VBox):
 
     def __getitem__(self, name):
         return self._children[name]["widget"]
+
+    def hidden(self, name):
+        return self._children[name]["hide"]
 
     @property
     def kwargs(self):
@@ -186,12 +189,13 @@ def cdCmd(path, DEFAULTS, layout):
             widgets.Label(value="Disabled in Colab"),
             widgets.Label(value="Disabled in Colab"),
         )
-    tab.children = tab.children + (logUI(out),)
+    tab.children = tab.children + (postUI(out), logUI(out))
     tab.set_title(0, "Extract AOIs")
     tab.set_title(1, "Fit the data")
     tab.set_title(2, "View results")
     tab.set_title(3, "Tensorboard")
-    tab.set_title(4, "View logs")
+    tab.set_title(4, "Post analysis")
+    tab.set_title(5, "View logs")
 
     if tensorboard is not None:
         with tensorboard:
@@ -432,6 +436,15 @@ def fitUI(out, DEFAULTS):
         ),
     )
     layout.add_child(
+        "S",
+        widgets.IntText(
+            value=1,
+            description="Number of spot states",
+            style={"description_width": "initial"},
+        ),
+        hide=True,
+    )
+    layout.add_child(
         "cuda",
         widgets.Checkbox(
             value=DEFAULTS["cuda"],
@@ -491,8 +504,21 @@ def fitUI(out, DEFAULTS):
     # Fit the data
     layout.add_child("fit", widgets.Button(description="Fit the data"))
     # Callbacks
+    layout["model"].observe(partial(toggleS, layout=layout), names="value")
     layout["fit"].on_click(partial(fitCmd, layout=layout, out=out, DEFAULTS=DEFAULTS))
     return layout
+
+
+def toggleS(model, layout):
+    model = get_value(model)
+    if model == "cosmos" and not layout.hidden("S"):
+        layout["S"].value = 1
+        layout.toggle_hide(names=("S",))
+    elif model == "crosstalk" and not layout.hidden("S"):
+        layout["S"].value = 1
+        layout.toggle_hide(names=("S",))
+    elif model == "cosmos+hmm" and layout.hidden("S"):
+        layout.toggle_hide(names=("S",))
 
 
 def fitCmd(b, layout, out, DEFAULTS):
@@ -659,14 +685,14 @@ def showCmd(b, layout, out):
     controls.children = [n, f1_box, checkboxes]
     # fov controls
     if fov is not None:
-        for dtype in fov.dtypes:
+        for dtype in fov[0].dtypes:
             fov_controls.add_child(
                 dtype, widgets.Checkbox(value=True, description=f"Show {dtype} AOIs")
             )
             fov_controls[dtype].observe(
                 partial(
                     showAOIs,
-                    fov=fov,
+                    fov=fov[0],
                     n=n_counter,
                     item=item,
                     fig=fig,
@@ -1028,8 +1054,8 @@ def updateRange(f1, n, model, fig, item, ax, zoom, targets, fov):
             item[f"{p}_vspan"] = ax[p].axvspan(f1, f2, facecolor="C0", alpha=0.3)
     if fov is not None:
         for c in range(model.data.C):
-            fov.plot(
-                fov.dtypes,
+            fov[c].plot(
+                fov[c].dtypes,
                 model.data.P,
                 n=n,
                 f=f1,
@@ -1202,6 +1228,130 @@ def logCmd(b, layout, logView, out):
     with out:
         logger.info("Loading logs: Done")
     logView.clear_output(wait=True)
+    out.clear_output(wait=True)
+
+
+def postUI(out):
+    layout = inputBox()
+    layout.add_child("post", widgets.Tab())
+    # Time-to-first binding analysis
+    ttfb_layout = inputBox()
+    ttfb_layout.add_child(
+        "model",
+        widgets.Dropdown(
+            description="Tapqir model",
+            value="cosmos",
+            options=avail_models,
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child(
+        "binary",
+        widgets.Checkbox(
+            value=False,
+            description="Plot a binary rastergram?",
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child(
+        "cuda",
+        widgets.Checkbox(
+            value=True,
+            description="Run computations on GPU?",
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child(
+        "num_samples",
+        widgets.IntText(
+            value=2000,
+            description="Number of posterior samples",
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child(
+        "num_iter",
+        widgets.IntText(
+            value=15000,
+            description="Number of iterations",
+            style={"description_width": "initial"},
+        ),
+    )
+    ttfb_layout.add_child("ttfb", widgets.Button(description="Analyze"))
+    ttfb_layout["ttfb"].on_click(partial(ttfbCmd, layout=ttfb_layout, out=out))
+    # Dwell time analysis
+    dt_layout = inputBox()
+    dt_layout.add_child(
+        "model",
+        widgets.Dropdown(
+            description="Tapqir model",
+            value="cosmos",
+            options=avail_models,
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child(
+        "K",
+        widgets.BoundedIntText(
+            value=1,
+            min=1,
+            max=6,
+            description="Number of exponentials",
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child(
+        "cuda",
+        widgets.Checkbox(
+            value=True,
+            description="Run computations on GPU?",
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child(
+        "num_samples",
+        widgets.IntText(
+            value=2000,
+            description="Number of posterior samples",
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child(
+        "num_iter",
+        widgets.IntText(
+            value=10000,
+            description="Number of iterations",
+            style={"description_width": "initial"},
+        ),
+    )
+    dt_layout.add_child("dwelltime", widgets.Button(description="Analyze"))
+    dt_layout["dwelltime"].on_click(partial(dtCmd, layout=dt_layout, out=out))
+    # Layout
+    layout["post"].children = (ttfb_layout, dt_layout)
+    layout["post"].set_title(0, "Time-to-first binding")
+    layout["post"].set_title(1, "Dwell-time")
+    return layout
+
+
+def ttfbCmd(b, layout, out):
+    with out:
+        logger.info("Time-to-first binding analysis ...")
+        ttfb(
+            **layout.kwargs,
+            progress_bar=tqdm_notebook,
+        )
+        logger.info("Time-to-first binding analysis: Done")
+    out.clear_output(wait=True)
+
+
+def dtCmd(b, layout, out):
+    with out:
+        logger.info("Dwell-time analysis ...")
+        dwelltime(
+            **layout.kwargs,
+            progress_bar=tqdm_notebook,
+        )
+        logger.info("Dwell-time analysis: Done")
     out.clear_output(wait=True)
 
 

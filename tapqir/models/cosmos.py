@@ -9,6 +9,7 @@ cosmos
 import itertools
 import math
 from functools import reduce
+from typing import Tuple
 
 import torch
 import torch.distributions.constraints as constraints
@@ -44,6 +45,7 @@ class cosmos(Model):
 
     def __init__(
         self,
+        S: int = 1,
         K: int = 2,
         Q: int = None,
         device: str = "cpu",
@@ -60,7 +62,7 @@ class cosmos(Model):
             "gain_std": 50.0,
         },
     ):
-        super().__init__(K=K, Q=Q, device=device, dtype=dtype, priors=priors)
+        super().__init__(S=S, K=K, Q=Q, device=device, dtype=dtype, priors=priors)
         self._global_params = ["gain", "proximity", "lamda", "pi"]
         self.use_pykeops = use_pykeops
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
@@ -214,7 +216,7 @@ class cosmos(Model):
 
         with channels as cdx, aois as ndx:
             ndx = ndx[:, None, None]
-            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            mask = Vindex(self.data.mask.to(self.device))[ndx]
             with handlers.mask(mask=mask):
                 # background mean and std
                 background_mean = pyro.sample(
@@ -396,7 +398,7 @@ class cosmos(Model):
 
         with channels as cdx, aois as ndx:
             ndx = ndx[:, None, None]
-            mask = Vindex(self.data.mask)[ndx].to(self.device)
+            mask = Vindex(self.data.mask.to(self.device))[ndx]
             with handlers.mask(mask=mask):
                 pyro.sample(
                     "background_mean",
@@ -611,8 +613,8 @@ class cosmos(Model):
         )
 
     @lazy_property
-    def compute_probs(self) -> torch.Tensor:
-        z_probs = torch.zeros(self.data.Nt, self.data.F, self.Q)
+    def compute_probs(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        z_probs = torch.zeros(self.data.Nt, self.data.F, self.Q, 1 + self.S)
         theta_probs = torch.zeros(self.K, self.data.Nt, self.data.F, self.Q)
         nbatch_size = self.nbatch_size
         fbatch_size = self.fbatch_size
@@ -662,7 +664,7 @@ class cosmos(Model):
                 # marginalize theta
                 z_logits = result.logsumexp(theta_dims)
                 z_probs[ndx[:, None, None], fdx[:, None], qdx] = (
-                    z_logits[1].exp().mean(-4)
+                    z_logits.exp().mean(-4).permute(1, 2, 3, 0)
                 )
                 # marginalize z
                 theta_logits = result.logsumexp(z_dims)
@@ -685,7 +687,7 @@ class cosmos(Model):
     @property
     def theta_probs(self) -> torch.Tensor:
         r"""
-        Posterior target-specific spot probability :math:`q(\theta = k)`.
+        Posterior target-specific spot probability :math:`q(\theta = k)` for :math:`k \in \{1, \dots, K\}`.
         """
         return self.compute_probs[1]
 
@@ -705,4 +707,9 @@ class cosmos(Model):
 
     @property
     def z_map(self) -> torch.Tensor:
-        return self.z_probs > 0.5
+        return torch.argmax(self.z_probs, dim=-1)
+
+    def z_sample(self, num_samples):
+        return dist.Categorical(self.params["z_probs"][: self.data.N]).sample(
+            (num_samples,)
+        )

@@ -322,7 +322,16 @@ def glimpse(
 @app.command()
 def fit(
     model: avail_models = typer.Option(
-        "cosmos", help="Tapqir model", prompt="Tapqir model"
+        "cosmos",
+        help="Tapqir model",
+        prompt="Tapqir model",
+    ),
+    S: int = typer.Option(
+        1,
+        "--num-states",
+        "-S",
+        help="Number of spot states",
+        prompt="Number of spot states",
     ),
     cuda: bool = typer.Option(
         partial(get_default, "cuda"),
@@ -414,6 +423,7 @@ def fit(
     logger = logging.getLogger("tapqir")
 
     settings = {}
+    settings["S"] = S
     settings["K"] = k_max
     settings["device"] = "cuda" if cuda else "cpu"
     settings["dtype"] = "double"
@@ -755,7 +765,9 @@ def show(
             "-",
             lw=1,
             color=color[q],
+            label=f"dye {q}",
         )
+        ax["z_map"].legend(loc="upper right")
 
         (item[f"p_specific_q{q}"],) = ax["p_specific"].plot(
             torch.arange(0, model.data.F),
@@ -838,13 +850,14 @@ def show(
         )
 
     if show_fov:
+        fov = {}
         P = DEFAULTS.pop("P")
         channels = DEFAULTS.pop("channels")
         for c in range(model.data.C):
             ax[f"glimpse_c{c}"] = fig.add_subplot(gs2[c])
-            fov = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
-            fov.plot(
-                fov.dtypes,
+            fov[c] = GlimpseDataset(**DEFAULTS, **channels[c], c=c)
+            fov[c].plot(
+                fov[c].dtypes,
                 P,
                 n=0,
                 f=0,
@@ -907,6 +920,7 @@ def subset():
         time1=data.time1,
         ttb=data.ttb,
         name=data.name,
+        channels=data.channels,
     )
     save(subset_data, subset_path)
     logger.info("Created a new data file at `subset/data.tpqr`")
@@ -917,13 +931,40 @@ def ttfb(
     model: avail_models = typer.Option(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
+    binary: bool = typer.Option(
+        False,
+        "--binary/--probabilistic",
+        help="Plot a binary or probabilistic rastergram",
+        prompt="Plot a binary rastergram?",
+    ),
+    cuda: bool = typer.Option(
+        partial(get_default, "cuda"),
+        "--cuda/--cpu",
+        help="Run computations on GPU or CPU",
+        prompt="Run computations on GPU?",
+        show_default=False,
+    ),
+    num_samples: int = typer.Option(
+        2000,
+        "--num-samples",
+        "-n",
+        help="Number of posterior samples",
+        prompt="Number of posterior samples",
+    ),
+    num_iter: int = typer.Option(
+        15000,
+        "--num-iter",
+        "-it",
+        help="Number of iterations",
+        prompt="Number of iterations",
+    ),
+    progress_bar=None,
 ):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import pandas as pd
     import pyro
     import torch
-    from pyro import distributions as dist
     from pyro.ops.stats import hpdi
 
     from tapqir.models import models
@@ -932,30 +973,39 @@ def ttfb(
 
     logger = logging.getLogger("tapqir")
 
-    mpl.rc("text", usetex=True)
     mpl.rcParams["font.family"] = "sans-serif"
     mpl.rcParams.update({"font.size": 8})
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
 
+    if progress_bar is None:
+        progress_bar = tqdm
+
     model = models[model](device="cpu", dtype="float")
     try:
         model.load(cd, data_only=False)
+        model.load_checkpoint(param_only=True)
     except TapqirFileNotFoundError as err:
         logger.exception(f"Failed to load {err.name} file")
         return 1
 
+    z = model.params["p_specific"] > 0.5 if binary else model.params["p_specific"]
+    r_type = "binary" if binary else "probabilistic"
+    z_samples = model.z_sample(num_samples=num_samples)
+    z_samples_masked = z_samples[:, model.data.mask[: model.data.N]]
     for c in range(model.data.C):
+        logger.info(f"Channel #{c} ({model.data.channels[c]})")
+        z_masked = z[: model.data.N, :, c][model.data.mask[: model.data.N]]
         # sorted on-target
-        ttfb = time_to_first_binding(model.params["z_map"][: model.data.N, :, c])
+        ttfb = time_to_first_binding(z_masked)
         # sort ttfb
         sdx = torch.argsort(ttfb, descending=True)
 
         fig, ax = plt.subplots()
         norm = mpl.colors.Normalize(vmin=0, vmax=1)
         ax.imshow(
-            model.params["z_probs"][: model.data.N, :, c][sdx],
+            z_masked[sdx],
             norm=norm,
             aspect="equal",
             interpolation="none",
@@ -963,30 +1013,38 @@ def ttfb(
         ax.set_xlabel("Time (frame)")
         ax.set_ylabel("AOI")
         ax.set_title(f"Channel {c}")
-        plt.savefig(f"ttfb_rastergram{c}.png", dpi=600)
+        plt.savefig(cd / f"{model.name}_ttfb-rastergram-channel{c}.png", dpi=600)
+        logger.info(
+            f"Saved a {r_type} rastergram in {model.name}_ttfb-rastergram-channel{c}.png file"
+        )
 
         fig, ax = plt.subplots()
         # prepare data
         Tmax = model.data.F
         torch.manual_seed(0)
-        z = dist.Bernoulli(model.params["z_probs"][: model.data.N, :, c]).sample(
-            (2000,)
+        data = time_to_first_binding(z_samples_masked[..., c])
+        data_df = pd.DataFrame(data=data)
+        data_df.to_csv(cd / f"{model.name}_ttfb-data-points-channel{c}.csv")
+        logger.info(
+            f"Saved time-to-first-binding values in {model.name}_ttfb-data-points-channel{c}.csv file"
         )
-        data = time_to_first_binding(z)
 
         # use cuda
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
+        if cuda:
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            data = data.cuda()
 
         # Tapqir fit
         train(
             ttfb_model,
             ttfb_guide,
             lr=5e-3,
-            n_steps=15000,
-            data=data.cuda(),
+            n_steps=num_iter,
+            data=data,
             control=None,
             Tmax=Tmax,
             jit=False,
+            progress_bar=progress_bar,
         )
 
         results = pd.DataFrame(columns=["Mean", "95% LL", "95% UL"])
@@ -1005,38 +1063,60 @@ def ttfb(
         results.loc["Af", "Mean"] = pyro.param("Af").mean().item()
         ll, ul = hpdi(pyro.param("Af").data.squeeze(), 0.95, dim=0)
         results.loc["Af", "95% LL"], results.loc["Af", "95% UL"] = ll.item(), ul.item()
-        results.to_csv(f"ttfb{c}.csv")
+        results.to_csv(cd / f"{model.name}_ttfb-params-channel{c}.csv")
+        logger.info(
+            f"Saved fit parameters in {model.name}_ttfb-params-channel{c}.csv file"
+        )
 
-        # use cuda
-        torch.set_default_tensor_type(torch.FloatTensor)
+        # change back to cpu
+        if cuda:
+            torch.set_default_tensor_type(torch.FloatTensor)
+            data = data.cpu()
 
         nz = (data == 0).sum(1, keepdim=True)
         N = data.shape[1]
 
         fraction_bound = (data.unsqueeze(-1) < torch.arange(Tmax)).float().mean(1)
         fb_ll, fb_ul = hpdi(fraction_bound, 0.95, dim=0)
+        fb_mean = fraction_bound.mean(0)
+        best_fit = (
+            nz / N
+            + (1 - nz / N)
+            * (
+                results.loc["Af", "Mean"]
+                * (
+                    1
+                    - torch.exp(
+                        -(results.loc["ka", "Mean"] + results.loc["kns", "Mean"])
+                        * torch.arange(Tmax)
+                    )
+                )
+                + (1 - results.loc["Af", "Mean"])
+                * (1 - torch.exp(-results.loc["kns", "Mean"] * torch.arange(Tmax)))
+            )
+        ).mean(0)
+
+        # save the fit data
+        fit_df = pd.DataFrame(
+            data={
+                "time": torch.arange(Tmax),
+                "best fit": best_fit,
+                "fraction bound mean": fb_mean,
+                "fraction bound 95% ll": fb_ll,
+                "fraction bound 95% ul": fb_ul,
+            }
+        )
+        fit_df.to_csv(cd / f"{model.name}_ttfb-fraction-bound-channel{c}.csv")
+        logger.info(
+            f"Saved fit data in {model.name}_ttfb-fraction-bound-channel{c}.csv file"
+        )
 
         ax.fill_between(torch.arange(Tmax), fb_ll, fb_ul, alpha=0.3, color="C2")
-        ax.plot(torch.arange(Tmax), fraction_bound.mean(0), color="C2")
+        ax.plot(torch.arange(Tmax), fb_mean, color="C2")
 
         ax.plot(
             torch.arange(Tmax),
-            (
-                nz / N
-                + (1 - nz / N)
-                * (
-                    results.loc["Af", "Mean"]
-                    * (
-                        1
-                        - torch.exp(
-                            -(results.loc["ka", "Mean"] + results.loc["kns", "Mean"])
-                            * torch.arange(Tmax)
-                        )
-                    )
-                    + (1 - results.loc["Af", "Mean"])
-                    * (1 - torch.exp(-results.loc["kns", "Mean"] * torch.arange(Tmax)))
-                )
-            ).mean(0),
+            best_fit,
             color="k",
         )
 
@@ -1062,11 +1142,12 @@ def ttfb(
         ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
         ax.set_yticklabels([r"$0$", r"$0.2$", r"$0.4$", r"$0.6$", r"$0.8$", r"$1$"])
         ax.set_xlabel("Time (frame)")
-        ax.set_ylabel("Fraction bound")
+        ax.set_ylabel("Cumulative fraction")
         ax.set_title(f"Channel {c}")
         ax.set_ylim(-0.05, 1.05)
 
-        plt.savefig(f"ttfb_fit{c}.png", dpi=600)
+        plt.savefig(cd / f"{model.name}_ttfb-plot-channel{c}.png", dpi=600)
+        logger.info(f"Saved data plots in {model.name}_ttfb-plot-channel{c}.png file")
 
 
 @app.command()
@@ -1075,12 +1156,35 @@ def dwelltime(
         "cosmos", help="Tapqir model", prompt="Tapqir model"
     ),
     K: int = typer.Option(3, "-K", help="Number of exponentials"),
+    cuda: bool = typer.Option(
+        partial(get_default, "cuda"),
+        "--cuda/--cpu",
+        help="Run computations on GPU or CPU",
+        prompt="Run computations on GPU?",
+        show_default=False,
+    ),
+    num_samples: int = typer.Option(
+        2000,
+        "--num-samples",
+        "-n",
+        help="Number of posterior samples",
+        prompt="Number of posterior samples",
+    ),
+    num_iter: int = typer.Option(
+        10000,
+        "--num-iter",
+        "-it",
+        help="Number of iterations",
+        prompt="Number of iterations",
+    ),
+    progress_bar=None,
 ):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import pandas as pd
     import pyro
     import torch
+    from pyro.ops.stats import hpdi
 
     from tapqir.models import models
     from tapqir.utils.imscroll import (
@@ -1092,12 +1196,14 @@ def dwelltime(
 
     logger = logging.getLogger("tapqir")
 
-    mpl.rc("text", usetex=True)
     mpl.rcParams["font.family"] = "sans-serif"
     mpl.rcParams.update({"font.size": 8})
 
     global DEFAULTS
     cd = DEFAULTS["cd"]
+
+    if progress_bar is None:
+        progress_bar = tqdm
 
     model = models[model](device="cpu", dtype="float")
     try:
@@ -1105,31 +1211,75 @@ def dwelltime(
     except TapqirFileNotFoundError as err:
         logger.exception(f"Failed to load {err.name} file")
         return 1
+    z_samples = model.z_sample(num_samples=num_samples)
+    z_samples_masked = z_samples[:, model.data.mask[: model.data.N]]
     for c in range(model.data.C):
-        intervals = count_intervals(model.params["z_map"][:, :, c])
+        logger.info(f"Channel #{c} ({model.data.channels[c]})")
+        intervals = count_intervals(z_samples_masked[..., c])
+        intervals.to_csv(cd / f"{model.name}_dwelltime-intervals-channel{c}.csv")
+        logger.info(
+            f"Saved time intervals in {model.name}_dwelltime-intervals-channel{c}.csv file"
+        )
 
+        logger.info("Off-rate calculation ...")
         bound_dt = bound_dwell_times(intervals)
+
+        data = torch.as_tensor(bound_dt)
+        # use cuda
+        if cuda:
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            data = data.cuda()
+
         pyro.clear_param_store()
         train(
             exp_model,
             exp_guide,
             lr=5e-3,
-            n_steps=10000,
+            n_steps=num_iter,
             jit=False,
-            data=torch.as_tensor(bound_dt),
+            progress_bar=progress_bar,
+            data=data,
             K=K,
         )
 
-        results = pd.DataFrame(columns=["MLE"])
+        results = pd.DataFrame(columns=["Mean", "95% LL", "95% UL"])
         A, k = {}, {}
         for i in range(K):
-            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
-            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
-        results.to_csv(f"koff{c}.csv")
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[..., i].mean().item()
+            ll, ul = hpdi(pyro.param("A")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"A{i}", "95% LL"], results.loc[f"A{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
+
+            results.loc[f"koff{i}", "Mean"] = k[i] = (
+                pyro.param("k")[..., i].mean().item()
+            )
+            ll, ul = hpdi(pyro.param("k")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"koff{i}", "95% LL"], results.loc[f"koff{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
+
+        results.to_csv(cd / f"{model.name}_dwelltime-koff-channel{c}.csv")
+        logger.info(
+            f"Saved off-rate parameters in {model.name}_dwelltime-koff-channel{c}.csv file"
+        )
+
+        # change back to cpu
+        if cuda:
+            torch.set_default_tensor_type(torch.FloatTensor)
 
         fig, ax = plt.subplots()
-        # ax.hist(bound_dt, bins=100, density=True, log=True)
-        ax.hist(bound_dt, bins=100, density=True)
+        ax.hist(
+            bound_dwell_times(
+                count_intervals(
+                    model.params["z_map"][None, model.data.mask[: model.data.N], :, c]
+                )
+            )[0],
+            bins=100,
+            density=True,
+        )
         t = torch.arange(bound_dt.max())
         y = 0
         for i in range(K):
@@ -1141,29 +1291,71 @@ def dwelltime(
         ax.set_title(f"Bound dwell times channel {c}")
         # ax.set_ylim(1e-4, 1e-1)
         # plt.yscale("log")
-        plt.savefig(f"bound_dwell_times{c}.png", dpi=600)
+        plt.savefig(
+            cd / f"{model.name}_dwelltime-bound-histogram-channel{c}.png", dpi=600
+        )
+        logger.info(
+            f"Saved bound dwell-time histograms in {model.name}_dwelltime-bound-histogram-channel{c}.png file"
+        )
 
+        logger.info("On-rate calculation ...")
         unbound_dt = unbound_dwell_times(intervals)
+
+        data = torch.as_tensor(unbound_dt)
+        # use cuda
+        if cuda:
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            data = data.cuda()
+
         pyro.clear_param_store()
         train(
             exp_model,
             exp_guide,
             lr=5e-3,
-            n_steps=10000,
+            n_steps=num_iter,
             jit=False,
-            data=torch.as_tensor(unbound_dt),
+            progress_bar=progress_bar,
+            data=data,
             K=K,
         )
 
-        results = pd.DataFrame(columns=["MLE"])
+        results = pd.DataFrame(columns=["Mean", "95% LL", "95% UL"])
         A, k = {}, {}
         for i in range(K):
-            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[i].item()
-            results.loc[f"k{i}", "Mean"] = k[i] = pyro.param("k")[i].item()
-        results.to_csv(f"kon{c}.csv")
+            results.loc[f"A{i}", "Mean"] = A[i] = pyro.param("A")[..., i].mean().item()
+            ll, ul = hpdi(pyro.param("A")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"A{i}", "95% LL"], results.loc[f"A{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
+
+            results.loc[f"kon{i}", "Mean"] = k[i] = (
+                pyro.param("k")[..., i].mean().item()
+            )
+            ll, ul = hpdi(pyro.param("k")[..., i].data.squeeze(), 0.95, dim=0)
+            results.loc[f"kon{i}", "95% LL"], results.loc[f"kon{i}", "95% UL"] = (
+                ll.item(),
+                ul.item(),
+            )
+        results.to_csv(cd / f"{model.name}_dwelltime-kon-channel{c}.csv")
+        logger.info(
+            f"Saved on-rate parameters in {model.name}_dwelltime-kon-channel{c}.csv file"
+        )
+
+        # change back to cpu
+        if cuda:
+            torch.set_default_tensor_type(torch.FloatTensor)
+
         fig, ax = plt.subplots()
-        # ax.hist(unbound_dt, bins=100, density=True, log=True)
-        ax.hist(unbound_dt, bins=100, density=True)
+        ax.hist(
+            unbound_dwell_times(
+                count_intervals(
+                    model.params["z_map"][None, model.data.mask[: model.data.N], :, c]
+                )
+            )[0],
+            bins=100,
+            density=True,
+        )
         t = torch.arange(unbound_dt.max())
         y = 0
         for i in range(K):
@@ -1175,7 +1367,12 @@ def dwelltime(
         ax.set_title(f"Unbound dwell times channel {c}")
         # ax.set_ylim(1e-4, 1e-1)
         # plt.yscale("log")
-        plt.savefig(f"unbound_dwell_times{c}.png", dpi=600)
+        plt.savefig(
+            cd / f"{model.name}_dwelltime-unbound-histogram-channel{c}.png", dpi=600
+        )
+        logger.info(
+            f"Saved unbound dwell-time histograms in {model.name}_dwelltime-unbound-histogram-channel{c}.png file"
+        )
 
 
 @app.callback()

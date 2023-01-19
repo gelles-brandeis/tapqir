@@ -55,6 +55,7 @@ class CosmosDataset:
         time1=None,
         ttb=None,
         name=None,
+        channels=None,
     ):
         self.images = images
         self.xy = xy
@@ -68,6 +69,9 @@ class CosmosDataset:
         self.time1 = time1
         self.ttb = ttb
         self.name = name
+        if channels is None:
+            channels = tuple(f"channel{c}" for c in range(self.C))
+        self.channels = channels
 
     @lazy_property
     def N(self) -> int:
@@ -135,9 +139,9 @@ class CosmosDataset:
 
     def fetch(self, ndx, fdx, cdx):
         return (
-            Vindex(self.images)[ndx, fdx, cdx].to(self.device),
-            Vindex(self.xy)[ndx, fdx, cdx].to(self.device),
-            Vindex(self.is_ontarget)[ndx].to(self.device),
+            Vindex(self.images.to(self.device))[ndx, fdx, cdx],
+            Vindex(self.xy.to(self.device))[ndx, fdx, cdx],
+            Vindex(self.is_ontarget.to(self.device))[ndx],
         )
 
     @lazy_property
@@ -196,6 +200,7 @@ def save(obj, path):
             "name": obj.name,
             "time1": obj.time1,
             "ttb": obj.ttb,
+            "channels": obj.channels,
         },
         path / "data.tpqr",
     )
