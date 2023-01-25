@@ -110,7 +110,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].tolist()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].tolist()
     logger.info("- spot probabilities")
-    # ci_stats["m_probs"] = model.m_probs.data.cpu()
+    ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
     ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()

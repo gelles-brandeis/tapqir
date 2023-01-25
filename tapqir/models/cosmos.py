@@ -237,7 +237,7 @@ class cosmos(Model):
                             (background_mean / background_std) ** 2,
                             background_mean / background_std**2,
                         ),
-                        # dist.Gamma(150 / 3, 1 / 3),
+                        #  dist.Gamma(150 / 3, 1 / 3),
                     )
 
                     # sample hidden model state (1+S,)
@@ -271,15 +271,15 @@ class cosmos(Model):
                             # sample spot variables
                             height = pyro.sample(
                                 f"height_k{kdx}",
-                                # dist.HalfNormal(self.priors["height_std"]),
-                                dist.Gamma(5, 0.002),
+                                dist.HalfNormal(self.priors["height_std"]),
+                                # dist.Gamma(5, 0.002),
                             )
                             width = pyro.sample(
                                 f"width_k{kdx}",
                                 AffineBeta(
                                     1.5,
-                                    # 2,
-                                    20,
+                                    2,
+                                    # 20,
                                     self.priors["width_min"],
                                     self.priors["width_max"],
                                 ),

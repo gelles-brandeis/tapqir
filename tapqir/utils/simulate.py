@@ -52,7 +52,7 @@ def simulate(
                 samples[f"height_k{k}_q{q}"] = torch.full((1, N, F), params["height"])
     elif "pi" in params:
         samples["pi"] = torch.tensor([[1 - params["pi"], params["pi"]]]).expand(1, Q, 2)
-        samples["background"] = torch.full((1, N, 1, C), params["background"])
+        # samples["background"] = torch.full((1, N, 1, C), params["background"])
         #  for k in range(model.K):
         #      samples[f"width_k{k}"] = torch.full((1, N, F, Q), params["width"])
         #      samples[f"height_k{k}"] = torch.full((1, N, F, Q), params["height"])
@@ -95,7 +95,8 @@ def simulate(
     is_ontarget[: N // 2] = True
     # placeholder dataset
     model.data = CosmosDataset(
-        torch.full((N, F, C, P, P), params["background"] + params["offset"]),
+        # torch.full((N, F, C, P, P), params["background"] + params["offset"]),
+        torch.full((N, F, C, P, P), params["offset"]),
         target_locs,
         is_ontarget,
         None,

@@ -1,0 +1,21 @@
+channels: []
+P: 14
+nbatch-size: 10
+fbatch-size: 512
+learning-rate: 0.005
+num-channels: 1
+cuda: true
+matlab: false
+priors:
+  background_mean_std: 1000
+  background_std_std: 100
+  lamda_rate: 1
+  height_std: 10000
+  width_min: 0.75
+  width_max: 2.25
+  proximity_rate: 1
+  gain_std: 50
+offset-x: 10
+offset-y: 10
+offset-P: 30
+bin-size: 1
