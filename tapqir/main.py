@@ -1273,7 +1273,9 @@ def dwelltime(
         ax.hist(
             bound_dwell_times(
                 count_intervals(
-                    model.params["z_map"][: model.data.N][None, model.data.mask[: model.data.N], :, c]
+                    model.params["z_map"][: model.data.N][
+                        None, model.data.mask[: model.data.N], :, c
+                    ]
                 )
             )[0],
             bins=100,
@@ -1349,7 +1351,9 @@ def dwelltime(
         ax.hist(
             unbound_dwell_times(
                 count_intervals(
-                    model.params["z_map"][: model.data.N][None, model.data.mask[: model.data.N], :, c]
+                    model.params["z_map"][: model.data.N][
+                        None, model.data.mask[: model.data.N], :, c
+                    ]
                 )
             )[0],
             bins=100,
