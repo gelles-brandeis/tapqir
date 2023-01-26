@@ -1163,7 +1163,7 @@ def dwelltime(
         show_default=False,
     ),
     num_samples: int = typer.Option(
-        2000,
+        500,
         "--num-samples",
         "-n",
         help="Number of posterior samples",
@@ -1215,9 +1215,9 @@ def dwelltime(
     for c in range(model.data.C):
         logger.info(f"Channel #{c} ({model.data.channels[c]})")
         intervals = count_intervals(z_samples_masked[..., c])
-        intervals.to_csv(cd / f"{model.name}_dwelltime-intervals-channel{c}.csv")
+        intervals.to_pickle(cd / f"{model.name}_dwelltime-intervals-channel{c}.pkl")
         logger.info(
-            f"Saved time intervals in {model.name}_dwelltime-intervals-channel{c}.csv file"
+            f"Saved time intervals in {model.name}_dwelltime-intervals-channel{c}.pkl file"
         )
 
         logger.info("Off-rate calculation ...")
@@ -1273,7 +1273,9 @@ def dwelltime(
         ax.hist(
             bound_dwell_times(
                 count_intervals(
-                    model.params["z_map"][None, model.data.mask[: model.data.N], :, c]
+                    model.params["z_map"][: model.data.N][
+                        None, model.data.mask[: model.data.N], :, c
+                    ]
                 )
             )[0],
             bins=100,
@@ -1349,7 +1351,9 @@ def dwelltime(
         ax.hist(
             unbound_dwell_times(
                 count_intervals(
-                    model.params["z_map"][None, model.data.mask[: model.data.N], :, c]
+                    model.params["z_map"][: model.data.N][
+                        None, model.data.mask[: model.data.N], :, c
+                    ]
                 )
             )[0],
             bins=100,
