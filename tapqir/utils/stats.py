@@ -110,7 +110,7 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].tolist()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].tolist()
     logger.info("- spot probabilities")
-    ci_stats["m_probs"] = model.m_probs.data.cpu()
+    # ci_stats["m_probs"] = model.m_probs.data.cpu()
     ci_stats["theta_probs"] = model.theta_probs.data.cpu()
     ci_stats["z_probs"] = model.z_probs.data.cpu()
     ci_stats["z_map"] = model.z_map.data.cpu()
@@ -272,6 +272,26 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
 
 def compute_ci(model, ci_params, CI):
     ci_stats = {}
+    obs = model.data.images.cuda()
+    b_locs, m_probss, h_locs, w_means, x_means, y_means = [], [], [], [], [], []
+    for idx in torch.split(torch.arange(len(obs)), 200):
+        b_loc = model.get_background(
+            obs[idx], pyro.param("background_mean_loc")[idx].data
+        )
+        m_probs, h_loc, w_mean, x_mean, y_mean = model.get_spot_params(obs[idx], b_loc)
+        b_locs.append(b_loc)
+        m_probss.append(m_probs)
+        h_locs.append(h_loc)
+        w_means.append(w_mean)
+        x_means.append(x_mean)
+        y_means.append(y_mean)
+    b_loc = torch.cat(b_locs, 0)
+    m_probs = torch.cat(m_probss, 0)
+    h_loc = torch.cat(h_locs, 0)
+    w_mean = torch.cat(w_means, 0)
+    x_mean = torch.cat(x_means, 0)
+    y_mean = torch.cat(y_means, 0)
+    ci_stats["m_probs"] = m_probs.permute(3, 0, 1, 2).data.cpu()
     for param in ci_params:
         if param == "gain":
             fn = dist.Gamma(
@@ -299,32 +319,37 @@ def compute_ci(model, ci_params, CI):
                 (model.data.P + 1) / math.sqrt(12),
             )
         elif param == "background":
-            fn = dist.Gamma(
-                pyro.param("b_loc") * pyro.param("b_beta"),
-                pyro.param("b_beta"),
-            )
+            fn = dist.Gamma(b_loc * pyro.param("b_beta"), pyro.param("b_beta"))
+            #  fn = dist.Gamma(
+            #      pyro.param("b_loc") * pyro.param("b_beta"),
+            #      pyro.param("b_beta"),
+            #  )
         elif param == "height":
             fn = dist.Gamma(
-                pyro.param("h_loc") * pyro.param("h_beta"),
+                h_loc.permute(3, 0, 1, 2) * pyro.param("h_beta"),
+                # pyro.param("h_loc") * pyro.param("h_beta"),
                 pyro.param("h_beta"),
             )
         elif param == "width":
             fn = AffineBeta(
-                pyro.param("w_mean"),
+                w_mean.permute(3, 0, 1, 2),
+                # pyro.param("w_mean"),
                 pyro.param("w_size"),
                 model.priors["width_min"],
                 model.priors["width_max"],
             )
         elif param == "x":
             fn = AffineBeta(
-                pyro.param("x_mean"),
+                x_mean.permute(3, 0, 1, 2),
+                # pyro.param("x_mean"),
                 pyro.param("size"),
                 -(model.data.P + 1) / 2,
                 (model.data.P + 1) / 2,
             )
         elif param == "y":
             fn = AffineBeta(
-                pyro.param("y_mean"),
+                y_mean.permute(3, 0, 1, 2),
+                # pyro.param("y_mean"),
                 pyro.param("size"),
                 -(model.data.P + 1) / 2,
                 (model.data.P + 1) / 2,

@@ -44,41 +44,13 @@ class MLP(nn.Module):
 # Takes the guide RNN hidden state to parameters of the guide
 # distributions over z_where and z_pres.
 class Predict(nn.Module):
-    def __init__(self, input_size, h_sizes, non_linear_layer):
+    def __init__(self, input_size, output_size, h_sizes, non_linear_layer):
         super().__init__()
-        output_size = 2
         self.mlp = MLP(input_size, h_sizes + [output_size], non_linear_layer)
 
     def forward(self, h):
         out = self.mlp(h)
-        b_loc = torch.exp(out[:, 0])
-        b_std = torch.exp(out[:, 1])
-        return b_loc, b_std
-        #  eps = torch.finfo(out.dtype).eps
-        #  loc = -(14 + 1) / 2 + eps
-        #  scale = (14 + 1) - 2 * eps
-        #  w_min = 0.75 + eps
-        #  w_scale = 1.5 - 2 * eps
-        #  # params
-        #  m_probs = transforms.SigmoidTransform()(out[:, 0])
-        #  h_loc = transforms.ExpTransform()(out[:, 1])
-        #  h_beta = transforms.ExpTransform()(out[:, 2])
-        #  w_mean = transforms.ComposeTransform(
-        #      [transforms.SigmoidTransform(), transforms.AffineTransform(w_min, w_scale)]
-        #  )(out[:, 3])
-        #  w_size = transforms.ComposeTransform(
-        #      [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
-        #  )(out[:, 4])
-        #  x_mean = transforms.ComposeTransform(
-        #      [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
-        #  )(out[:, 5])
-        #  y_mean = transforms.ComposeTransform(
-        #      [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
-        #  )(out[:, 6])
-        #  size = transforms.ComposeTransform(
-        #      [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
-        #  )(out[:, 7])
-        #  return m_probs, h_loc, h_beta, w_mean, w_size, x_mean, y_mean, size
+        return out
 
 
 class cosmosnn(cosmos):
@@ -127,33 +99,19 @@ class cosmosnn(cosmos):
         self.conv_params = ["-ELBO", "proximity_loc", "gain_loc", "lamda_loc"]
 
         # AIR
-        p = 4
-        rnn_input_size = 14 * 14 + p
-        rnn_hidden_size = 256
-        # self.rnn = nn.LSTMCell(rnn_input_size, rnn_hidden_size)
         non_linearity = "ReLU"
         nl = getattr(nn, non_linearity)
         predict_net = [128, 128]
-        self.predict = Predict(14 * 14, predict_net, nl)
+        input_size = 14 * 14
+        self.predict_b = Predict(input_size, 1, predict_net, nl)
+        self.predict_spots = Predict(input_size, 10, predict_net, nl)
 
         # Create parameters.
-        #  self.h_init = nn.Parameter(torch.zeros(1, rnn_hidden_size))
-        #  self.c_init = nn.Parameter(torch.zeros(1, rnn_hidden_size))
-        #  self.height_init = nn.Parameter(torch.zeros(1, 1))
-        #  self.width_init = nn.Parameter(torch.zeros(1, 1))
-        #  self.x_init = nn.Parameter(torch.zeros(1, 1))
-        #  self.y_init = nn.Parameter(torch.zeros(1, 1))
 
     def guide(self):
         # register PyTorch module `encoder` with Pyro
-        pyro.module("predict", self.predict)
-        #  pyro.module("rnn", self.rnn)
-        #  pyro.param("h_init", self.h_init)
-        #  pyro.param("c_init", self.c_init)
-        #  pyro.param("height_init", self.height_init)
-        #  pyro.param("width_init", self.width_init)
-        #  pyro.param("x_init", self.x_init)
-        #  pyro.param("y_init", self.y_init)
+        pyro.module("predict_b", self.predict_b)
+        pyro.module("predict_spots", self.predict_spots)
         # global parameters
         pyro.sample(
             "gain",
@@ -212,7 +170,7 @@ class cosmosnn(cosmos):
             ndx = ndx[:, None, None]
             mask = Vindex(self.data.mask.to(self.device))[ndx]
             with handlers.mask(mask=mask):
-                pyro.sample(
+                background_mean = pyro.sample(
                     "background_mean",
                     dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0, cdx]),
                 )
@@ -224,118 +182,129 @@ class cosmosnn(cosmos):
                     fdx = fdx[:, None]
                     # fetch data
                     obs, _, __ = self.data.fetch(ndx, fdx, cdx)
-                    data = obs - self.data.offset.mean
-                    # shape = background.shape
-                    shape = (self.nbatch_size, self.fbatch_size, self.data.C)
-                    #  data = data.expand(shape + (14, 14))
-                    data = data.reshape(-1, 196)
-                    # data = torch.log(1 + data)
-                    data = data / 100
-                    # n = torch.numel(background)
-                    #  b_loc, b_var = self.predict(data)
-                    #  b_loc = b_loc.reshape(shape)
-                    #  b_beta = b_var.reshape(shape)
+                    b_loc = self.get_background(obs, background_mean)
                     # sample background intensity
                     background = pyro.sample(
                         "background",
                         dist.Gamma(
-                            # b_loc * b_beta, b_beta
-                            Vindex(pyro.param("b_loc"))[ndx, fdx, cdx]
-                            * Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
+                            b_loc * Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
                             Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
                         ),
                     )
+                    m_probs, h_loc, w_mean, x_mean, y_mean = self.get_spot_params(
+                        obs, background
+                    )
 
-                    # data = (obs - self.data.offset.mean) / background[..., None, None] - 1
-                    # data = (obs - 90 - 150) / 100
-                    # data = (obs - self.data.offset.mean - background[..., None, None]) / 100
-
-                    #  state = {
-                    #      "h": self.h_init.expand(n, -1),
-                    #      "c": self.c_init.expand(n, -1),
-                    #      "height": self.height_init.expand(n, -1),
-                    #      "width": self.width_init.expand(n, -1),
-                    #      "x": self.x_init.expand(n, -1),
-                    #      "y": self.y_init.expand(n, -1),
-                    #  }
                     for kdx in spots:
-                        # state = self.guide_step(kdx, ndx, fdx, state, data)
-                        #  rnn_input = torch.cat(
-                        #      (
-                        #          data,
-                        #          state["height"],
-                        #          state["width"],
-                        #          state["x"],
-                        #          state["y"],
-                        #      ),
-                        #      -1,
-                        #  )
-                        #  h, c = self.rnn(rnn_input, (state["h"], state["c"]))
-                        #  (
-                        #      m_probs,
-                        #      h_loc,
-                        #      h_beta,
-                        #      w_mean,
-                        #      w_size,
-                        #      x_mean,
-                        #      y_mean,
-                        #      size,
-                        #  ) = self.predict(h)
-                        #  m_probs = m_probs.reshape(shape)
-                        #  h_loc = h_loc.reshape(shape)
-                        #  h_beta = h_beta.reshape(shape)
-                        #  w_mean = w_mean.reshape(shape)
-                        #  w_size = w_size.reshape(shape)
-                        #  x_mean = x_mean.reshape(shape)
-                        #  y_mean = y_mean.reshape(shape)
-                        #  size = size.reshape(shape)
                         # sample spot presence m
                         m = pyro.sample(
                             f"m_k{kdx}",
                             dist.Bernoulli(
-                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
+                                m_probs[..., kdx]
+                                # Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
                             ),
                             infer={"enumerate": "parallel"},
                         )
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
-                            pyro.sample(
+                            height = pyro.sample(
                                 f"height_k{kdx}",
                                 dist.Gamma(
-                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
+                                    h_loc[..., kdx]
+                                    # Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
                                     * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
                                 ),
                             )
-                            pyro.sample(
+                            width = pyro.sample(
                                 f"width_k{kdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
+                                    w_mean[..., kdx],
+                                    # Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
                                     self.priors["width_min"],
                                     self.priors["width_max"],
                                 ),
                             )
-                            pyro.sample(
+                            x = pyro.sample(
                                 f"x_k{kdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, cdx],
+                                    x_mean[..., kdx],
+                                    # Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
                             )
-                            pyro.sample(
+                            y = pyro.sample(
                                 f"y_k{kdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, cdx],
+                                    y_mean[..., kdx],
+                                    # Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
                             )
 
-    def init_parameters2(self):
+    @torch.no_grad()
+    def get_background(self, obs, b):
+        offset = self.data.offset.mean
+        data = (obs - offset - b[..., None, None]) / b[..., None, None]
+        shape = data.shape[:-2]
+        data = data.reshape(-1, 196)
+        out = self.predict_b(data)
+
+        relu = nn.ReLU()
+        b_loc = relu(out[:, 0] + 1)
+        b_loc = b_loc.reshape(shape)
+        b_loc = b * b_loc
+        return b_loc
+
+    @torch.no_grad()
+    def get_spot_params(self, obs, b):
+        offset = self.data.offset.mean
+        data = (obs - offset - b[..., None, None]) / b[..., None, None]
+        shape = data.shape[:-2]
+        data = data.reshape(-1, 196)
+        out = self.predict_spots(data)
+        eps = torch.finfo(out.dtype).eps
+
+        # spot probs
+        m_probs = transforms.SigmoidTransform()(out[:, :2])
+        # intensity
+        h_loc = transforms.ExpTransform()(out[:, 2:4])
+        # width
+        w_min = 0.75 + eps
+        w_scale = 1.5 - 2 * eps
+        w_mean = transforms.ComposeTransform(
+            [transforms.SigmoidTransform(), transforms.AffineTransform(w_min, w_scale)]
+        )(out[:, 4:6])
+        #  w_size = transforms.ComposeTransform(
+        #      [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
+        #  )(out[:, 3])
+        # position
+        loc = -(14 + 1) / 2 + eps
+        scale = (14 + 1) - 2 * eps
+        x_mean = transforms.ComposeTransform(
+            [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
+        )(out[:, 6:8])
+        y_mean = transforms.ComposeTransform(
+            [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
+        )(out[:, 8:10])
+        #  size = transforms.ComposeTransform(
+        #      [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
+        #  )(out[:, 6])
+
+        # reshape
+        m_probs = m_probs.reshape(shape + (2,))
+        h_loc = h_loc.reshape(shape + (2,)) * b[..., None]
+        w_mean = w_mean.reshape(shape + (2,))
+        x_mean = x_mean.reshape(shape + (2,))
+        y_mean = y_mean.reshape(shape + (2,))
+        return m_probs, h_loc, w_mean, x_mean, y_mean
+
+    def init_parameters(self):
         """
         Initialize variational parameters.
         """
@@ -352,15 +321,15 @@ class cosmosnn(cosmos):
             lambda: torch.full((self.Q, 1), 2, device=device),
             constraint=constraints.positive,
         )
-        pyro.param(
-            "m_probs",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
-            constraint=constraints.unit_interval,
-        )
+        #  pyro.param(
+        #      "m_probs",
+        #      lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
+        #      constraint=constraints.unit_interval,
+        #  )
 
         self._init_parameters()
 
-    def __init_parameters(self):
+    def _init_parameters(self):
         """
         Parameters shared between different models.
         """
@@ -415,27 +384,28 @@ class cosmosnn(cosmos):
         )
 
         pyro.param(
-            "b_loc",
-            lambda: (data.median.to(device) - self.data.offset.mean).expand(
-                data.Nt, data.F, data.C
-            ),
-            constraint=constraints.positive,
-        )
-        pyro.param(
             "b_beta",
             lambda: torch.ones(data.Nt, data.F, data.C, device=device),
             constraint=constraints.positive,
         )
-        pyro.param(
-            "h_loc",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
-            constraint=constraints.positive,
-        )
+        #  pyro.param(
+        #      "h_loc",
+        #      lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
+        #      constraint=constraints.positive,
+        #  )
         pyro.param(
             "h_beta",
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.001, device=device),
             constraint=constraints.positive,
         )
+        #  pyro.param(
+        #      "w_mean",
+        #      lambda: torch.full((self.K, data.Nt, data.F, self.Q), 1.5, device=device),
+        #      constraint=constraints.interval(
+        #          0.75 + torch.finfo(self.dtype).eps,
+        #          2.25 - torch.finfo(self.dtype).eps,
+        #      ),
+        #  )
         pyro.param(
             "w_size",
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 100, device=device),
@@ -446,11 +416,3 @@ class cosmosnn(cosmos):
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
-
-    #  @property
-    #  def m_probs(self) -> torch.Tensor:
-    #      r"""
-    #      Posterior spot presence probability :math:`q(m=1)`.
-    #      """
-    #      return torch.ones(self.K, self.data.Nt, self.data.F, self.Q)
-    #      # return pyro.param("m_probs").data
