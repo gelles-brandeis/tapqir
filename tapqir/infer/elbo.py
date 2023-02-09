@@ -17,7 +17,6 @@ from .sum_product import compute_expectations
 
 class TraceMarkovEnum_ELBO(ELBO):
     def differentiable_loss(self, model, guide, *args, **kwargs):
-
         # get batched, enumerated, to_funsor-ed traces from the guide and model
         with plate(
             size=self.num_particles
