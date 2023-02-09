@@ -1182,6 +1182,7 @@ def dwelltime(
     import pyro
     import torch
     from pyro.ops.stats import hpdi
+    from scipy.io import savemat
 
     from tapqir.models import models
     from tapqir.utils.imscroll import (
@@ -1216,6 +1217,13 @@ def dwelltime(
         intervals.to_pickle(cd / f"{model.name}_dwelltime-intervals-channel{c}.pkl")
         logger.info(
             f"Saved time intervals in {model.name}_dwelltime-intervals-channel{c}.pkl file"
+        )
+        savemat(
+            cd / f"{model.name}_dwelltime-intervals-channel{c}.mat",
+            intervals.to_dict("list"),
+        )
+        logger.info(
+            f"Saved time intervals in {model.name}_dwelltime-intervals-channel{c}.mat file"
         )
 
         logger.info("Off-rate calculation ...")
