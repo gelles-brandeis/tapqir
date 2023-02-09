@@ -18,7 +18,6 @@ def train(
     verbose=False,
     **kwargs,
 ):
-
     pyro.clear_param_store()
     optimizer = optim.Adam({"lr": lr})
     elbo = (
