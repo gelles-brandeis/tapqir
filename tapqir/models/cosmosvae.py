@@ -72,7 +72,7 @@ class cosmosnn(cosmos):
     :param priors: Dictionary of parameters of prior distributions.
     """
 
-    name = "cosmosnn"
+    name = "cosmosnnb"
 
     def __init__(
         self,
@@ -191,17 +191,17 @@ class cosmosnn(cosmos):
                             Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
                         ),
                     )
-                    m_probs, h_loc, w_mean, x_mean, y_mean = self.get_spot_params(
-                        obs, background
-                    )
+                    #  m_probs, h_loc, w_mean, x_mean, y_mean = self.get_spot_params(
+                    #      obs, background
+                    #  )
 
                     for kdx in spots:
                         # sample spot presence m
                         m = pyro.sample(
                             f"m_k{kdx}",
                             dist.Bernoulli(
-                                m_probs[..., kdx]
-                                # Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
+                                # m_probs[..., kdx]
+                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
                             ),
                             infer={"enumerate": "parallel"},
                         )
@@ -210,8 +210,8 @@ class cosmosnn(cosmos):
                             height = pyro.sample(
                                 f"height_k{kdx}",
                                 dist.Gamma(
-                                    h_loc[..., kdx]
-                                    # Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
+                                    # h_loc[..., kdx]
+                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
                                     * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
                                 ),
@@ -219,8 +219,8 @@ class cosmosnn(cosmos):
                             width = pyro.sample(
                                 f"width_k{kdx}",
                                 AffineBeta(
-                                    w_mean[..., kdx],
-                                    # Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
+                                    # w_mean[..., kdx],
+                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
                                     self.priors["width_min"],
                                     self.priors["width_max"],
@@ -229,8 +229,8 @@ class cosmosnn(cosmos):
                             x = pyro.sample(
                                 f"x_k{kdx}",
                                 AffineBeta(
-                                    x_mean[..., kdx],
-                                    # Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, cdx],
+                                    # x_mean[..., kdx],
+                                    Vindex(pyro.param("x_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
@@ -239,8 +239,8 @@ class cosmosnn(cosmos):
                             y = pyro.sample(
                                 f"y_k{kdx}",
                                 AffineBeta(
-                                    y_mean[..., kdx],
-                                    # Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, cdx],
+                                    # y_mean[..., kdx],
+                                    Vindex(pyro.param("y_mean"))[kdx, ndx, fdx, cdx],
                                     Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
@@ -255,8 +255,8 @@ class cosmosnn(cosmos):
         data = data.reshape(-1, 196)
         out = self.predict_b(data)
 
-        relu = nn.ReLU()
-        b_loc = relu(out[:, 0] + 1)
+        eps = torch.finfo(out.dtype).eps
+        b_loc = torch.maximum(out[:, 0] + 1, torch.tensor(eps))
         b_loc = b_loc.reshape(shape)
         b_loc = b * b_loc
         return b_loc
@@ -321,11 +321,11 @@ class cosmosnn(cosmos):
             lambda: torch.full((self.Q, 1), 2, device=device),
             constraint=constraints.positive,
         )
-        #  pyro.param(
-        #      "m_probs",
-        #      lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
-        #      constraint=constraints.unit_interval,
-        #  )
+        pyro.param(
+            "m_probs",
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
+            constraint=constraints.unit_interval,
+        )
 
         self._init_parameters()
 
@@ -372,9 +372,7 @@ class cosmosnn(cosmos):
 
         pyro.param(
             "background_mean_loc",
-            lambda: (data.median.to(device) - data.offset.mean).expand(
-                data.Nt, 1, data.C
-            ),
+            lambda: (data.images.double().mean((-2, -1)).mean(-2, keepdim=True).to(device) - data.offset.mean),
             constraint=constraints.positive,
         )
         pyro.param(
@@ -388,28 +386,44 @@ class cosmosnn(cosmos):
             lambda: torch.ones(data.Nt, data.F, data.C, device=device),
             constraint=constraints.positive,
         )
-        #  pyro.param(
-        #      "h_loc",
-        #      lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
-        #      constraint=constraints.positive,
-        #  )
+        pyro.param(
+            "h_loc",
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
+            constraint=constraints.positive,
+        )
         pyro.param(
             "h_beta",
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.001, device=device),
             constraint=constraints.positive,
         )
-        #  pyro.param(
-        #      "w_mean",
-        #      lambda: torch.full((self.K, data.Nt, data.F, self.Q), 1.5, device=device),
-        #      constraint=constraints.interval(
-        #          0.75 + torch.finfo(self.dtype).eps,
-        #          2.25 - torch.finfo(self.dtype).eps,
-        #      ),
-        #  )
+        pyro.param(
+            "w_mean",
+            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 1.5, device=device),
+            constraint=constraints.interval(
+                0.75 + torch.finfo(self.dtype).eps,
+                2.25 - torch.finfo(self.dtype).eps,
+            ),
+        )
         pyro.param(
             "w_size",
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 100, device=device),
             constraint=constraints.greater_than(2.0),
+        )
+        pyro.param(
+            "x_mean",
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
+            constraint=constraints.interval(
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+            ),
+        )
+        pyro.param(
+            "y_mean",
+            lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
+            constraint=constraints.interval(
+                -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
+                (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
+            ),
         )
         pyro.param(
             "size",
