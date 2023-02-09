@@ -84,7 +84,6 @@ class KSMOGN(TorchDistribution):
         use_pykeops: bool = True,
         validate_args=None,
     ):
-
         # shapes for cosmos and crosstalk models
         self.height = height  # (N, F, C, K) or (N, F, Q, K)
         self.width = width  # (N, F, C, K) or (N, F, Q, K)
