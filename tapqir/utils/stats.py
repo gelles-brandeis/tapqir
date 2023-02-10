@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import math
 import os
 from pathlib import Path
 from typing import Tuple
@@ -11,7 +10,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pyro
 import pyro.distributions as dist
 import scipy.stats as stats
 import torch
@@ -23,7 +21,6 @@ from sklearn.metrics import (
     recall_score,
 )
 
-from tapqir.distributions import AffineBeta
 from tapqir.distributions.util import gaussian_spots
 
 logger = logging.getLogger(__name__)
@@ -97,8 +94,8 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         columns=["Mean", f"{int(100*CI)}% LL", f"{int(100*CI)}% UL"],
     )
 
-    logger.info("- credible intervals")
-    ci_stats = compute_ci(model, model.ci_params, CI)
+    logger.info("- credible intervals & spot probabilities")
+    ci_stats = model.compute_params(CI)
 
     for param in global_params:
         if ci_stats[param]["Mean"].ndim == 0:
@@ -109,14 +106,6 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
             summary.loc[param, "Mean"] = ci_stats[param]["Mean"].tolist()
             summary.loc[param, "95% LL"] = ci_stats[param]["LL"].tolist()
             summary.loc[param, "95% UL"] = ci_stats[param]["UL"].tolist()
-    logger.info("- spot probabilities")
-    ci_stats["m_probs"] = model.m_probs.data.cpu()
-    ci_stats["theta_probs"] = model.theta_probs.data.cpu()
-    ci_stats["z_probs"] = model.z_probs.data.cpu()
-    ci_stats["z_map"] = model.z_map.data.cpu()
-    ci_stats["p_specific"] = ci_stats["theta_probs"].sum(0)
-    if "hmm" in model.name:
-        ci_stats["z_trans"] = pyro.param("z_trans").data.cpu()
 
     if not os.environ.get("CI", None):
         for c in range(model.data.C):
@@ -268,99 +257,6 @@ def save_stats(model, path, CI=0.95, save_matlab=False):
         csv_path = path / f"{model.name}_summary.csv"
         summary.to_csv(csv_path)
         logger.info(f"Summary statistics were saved in {csv_path}")
-
-
-def compute_ci(model, ci_params, CI):
-    ci_stats = {}
-    obs = model.data.images.cuda()
-    b_locs, m_probss, h_locs, w_means, x_means, y_means = [], [], [], [], [], []
-    for idx in torch.split(torch.arange(len(obs)), 200):
-        b_loc = model.get_background(
-            obs[idx], pyro.param("background_mean_loc")[idx].data
-        )
-        #  m_probs, h_loc, w_mean, x_mean, y_mean = model.get_spot_params(obs[idx], b_loc)
-        b_locs.append(b_loc)
-        #  m_probss.append(m_probs)
-        #  h_locs.append(h_loc)
-        #  w_means.append(w_mean)
-        #  x_means.append(x_mean)
-        #  y_means.append(y_mean)
-    b_loc = torch.cat(b_locs, 0)
-    #  m_probs = torch.cat(m_probss, 0)
-    #  h_loc = torch.cat(h_locs, 0)
-    #  w_mean = torch.cat(w_means, 0)
-    #  x_mean = torch.cat(x_means, 0)
-    #  y_mean = torch.cat(y_means, 0)
-    # ci_stats["m_probs"] = m_probs.permute(3, 0, 1, 2).data.cpu()
-    for param in ci_params:
-        if param == "gain":
-            fn = dist.Gamma(
-                pyro.param("gain_loc") * pyro.param("gain_beta"),
-                pyro.param("gain_beta"),
-            )
-        elif param == "alpha":
-            fn = dist.Dirichlet(pyro.param("alpha_mean") * pyro.param("alpha_size"))
-        elif param == "pi":
-            fn = dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size"))
-        elif param == "init":
-            fn = dist.Dirichlet(pyro.param("init_mean") * pyro.param("init_size"))
-        elif param == "trans":
-            fn = dist.Dirichlet(pyro.param("trans_mean") * pyro.param("trans_size"))
-        elif param == "lamda":
-            fn = dist.Gamma(
-                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                pyro.param("lamda_beta"),
-            )
-        elif param == "proximity":
-            fn = AffineBeta(
-                pyro.param("proximity_loc"),
-                pyro.param("proximity_size"),
-                0,
-                (model.data.P + 1) / math.sqrt(12),
-            )
-        elif param == "background":
-            fn = dist.Gamma(b_loc * pyro.param("b_beta"), pyro.param("b_beta"))
-            #  fn = dist.Gamma(
-            #      pyro.param("b_loc") * pyro.param("b_beta"),
-            #      pyro.param("b_beta"),
-            #  )
-        elif param == "height":
-            fn = dist.Gamma(
-                # h_loc.permute(3, 0, 1, 2) * pyro.param("h_beta"),
-                pyro.param("h_loc") * pyro.param("h_beta"),
-                pyro.param("h_beta"),
-            )
-        elif param == "width":
-            fn = AffineBeta(
-                # w_mean.permute(3, 0, 1, 2),
-                pyro.param("w_mean"),
-                pyro.param("w_size"),
-                model.priors["width_min"],
-                model.priors["width_max"],
-            )
-        elif param == "x":
-            fn = AffineBeta(
-                # x_mean.permute(3, 0, 1, 2),
-                pyro.param("x_mean"),
-                pyro.param("size"),
-                -(model.data.P + 1) / 2,
-                (model.data.P + 1) / 2,
-            )
-        elif param == "y":
-            fn = AffineBeta(
-                # y_mean.permute(3, 0, 1, 2),
-                pyro.param("y_mean"),
-                pyro.param("size"),
-                -(model.data.P + 1) / 2,
-                (model.data.P + 1) / 2,
-            )
-        scipy_dist = torch_to_scipy_dist(fn)
-        LL, UL = scipy_dist.interval(alpha=CI)
-        ci_stats[param] = {}
-        ci_stats[param]["LL"] = torch.as_tensor(LL, device=torch.device("cpu"))
-        ci_stats[param]["UL"] = torch.as_tensor(UL, device=torch.device("cpu"))
-        ci_stats[param]["Mean"] = fn.mean.detach().cpu()
-    return ci_stats
 
 
 def torch_to_scipy_dist(torch_dist):

@@ -433,3 +433,103 @@ class cosmosnn(cosmos):
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
             constraint=constraints.greater_than(2.0),
         )
+
+    @torch.no_grad()
+    def compute_params(self, CI):
+        obs = self.data.images.cuda()
+        b_locs, m_probss, h_locs, w_means, x_means, y_means = [], [], [], [], [], []
+        for idx in torch.split(torch.arange(len(obs)), 200):
+            b_loc = model.get_background(
+                obs[idx], pyro.param("background_mean_loc")[idx]
+            )
+            #  m_probs, h_loc, w_mean, x_mean, y_mean = model.get_spot_params(obs[idx], b_loc)
+            b_locs.append(b_loc)
+            #  m_probss.append(m_probs)
+            #  h_locs.append(h_loc)
+            #  w_means.append(w_mean)
+            #  x_means.append(x_mean)
+            #  y_means.append(y_mean)
+        b_loc = torch.cat(b_locs, 0)
+        #  m_probs = torch.cat(m_probss, 0)
+        #  h_loc = torch.cat(h_locs, 0)
+        #  w_mean = torch.cat(w_means, 0)
+        #  x_mean = torch.cat(x_means, 0)
+        #  y_mean = torch.cat(y_means, 0)
+        # ci_stats["m_probs"] = m_probs.permute(3, 0, 1, 2).data.cpu()
+        params = {}
+        for param in self.ci_params:
+            if param == "gain":
+                fn = dist.Gamma(
+                    pyro.param("gain_loc") * pyro.param("gain_beta"),
+                    pyro.param("gain_beta"),
+                )
+            elif param == "alpha":
+                fn = dist.Dirichlet(pyro.param("alpha_mean") * pyro.param("alpha_size"))
+            elif param == "pi":
+                fn = dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size"))
+            elif param == "init":
+                fn = dist.Dirichlet(pyro.param("init_mean") * pyro.param("init_size"))
+            elif param == "trans":
+                fn = dist.Dirichlet(pyro.param("trans_mean") * pyro.param("trans_size"))
+            elif param == "lamda":
+                fn = dist.Gamma(
+                    pyro.param("lamda_loc") * pyro.param("lamda_beta"),
+                    pyro.param("lamda_beta"),
+                )
+            elif param == "proximity":
+                fn = AffineBeta(
+                    pyro.param("proximity_loc"),
+                    pyro.param("proximity_size"),
+                    0,
+                    (self.data.P + 1) / math.sqrt(12),
+                )
+            elif param == "background":
+                fn = dist.Gamma(b_loc * pyro.param("b_beta"), pyro.param("b_beta"))
+                #  fn = dist.Gamma(
+                #      pyro.param("b_loc") * pyro.param("b_beta"),
+                #      pyro.param("b_beta"),
+                #  )
+            elif param == "height":
+                fn = dist.Gamma(
+                    # h_loc.permute(3, 0, 1, 2) * pyro.param("h_beta"),
+                    pyro.param("h_loc") * pyro.param("h_beta"),
+                    pyro.param("h_beta"),
+                )
+            elif param == "width":
+                fn = AffineBeta(
+                    # w_mean.permute(3, 0, 1, 2),
+                    pyro.param("w_mean"),
+                    pyro.param("w_size"),
+                    self.priors["width_min"],
+                    self.priors["width_max"],
+                )
+            elif param == "x":
+                fn = AffineBeta(
+                    # x_mean.permute(3, 0, 1, 2),
+                    pyro.param("x_mean"),
+                    pyro.param("size"),
+                    -(self.data.P + 1) / 2,
+                    (self.data.P + 1) / 2,
+                )
+            elif param == "y":
+                fn = AffineBeta(
+                    # y_mean.permute(3, 0, 1, 2),
+                    pyro.param("y_mean"),
+                    pyro.param("size"),
+                    -(self.data.P + 1) / 2,
+                    (self.data.P + 1) / 2,
+                )
+            scipy_dist = torch_to_scipy_dist(fn)
+            LL, UL = scipy_dist.interval(alpha=CI)
+            params[param] = {}
+            params[param]["LL"] = torch.as_tensor(LL, device=torch.device("cpu"))
+            params[param]["UL"] = torch.as_tensor(UL, device=torch.device("cpu"))
+            params[param]["Mean"] = fn.mean.detach().cpu()
+
+        params["m_probs"] = self.m_probs.cpu()
+        params["z_probs"] = self.z_probs.cpu()
+        params["theta_probs"] = self.theta_probs.cpu()
+        params["z_map"] = self.z_map.data.cpu()
+        params["p_specific"] = params["theta_probs"].sum(0)
+
+        return params
