@@ -459,7 +459,6 @@ def fit(
         raise ValueError("Only pyro and funsor backends are supported.")
 
     with pyro_backend(PYRO_BACKEND):
-
         logger.info("Fitting the data ...")
         model = models[model](**settings)
         try:
@@ -558,7 +557,6 @@ def stats(
         raise ValueError("Only pyro and funsor backends are supported.")
 
     with pyro_backend(PYRO_BACKEND):
-
         logger.info("Computing stats ...")
         model = models[model](**settings)
         try:

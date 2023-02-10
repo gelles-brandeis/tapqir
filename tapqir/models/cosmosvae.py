@@ -29,7 +29,7 @@ class MLP(nn.Module):
         layers = []
         in_sizes = [in_size] + out_sizes[0:-1]
         sizes = list(zip(in_sizes, out_sizes))
-        for (i, o) in sizes[0:-1]:
+        for i, o in sizes[0:-1]:
             layers.append(nn.Linear(i, o))
             layers.append(non_linear_layer())
         layers.append(nn.Linear(sizes[-1][0], sizes[-1][1]))
@@ -247,7 +247,7 @@ class cosmosnn(cosmos):
                                 ),
                             )
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def get_background(self, obs, b):
         offset = self.data.offset.mean
         data = (obs - offset - b[..., None, None]) / b[..., None, None]
@@ -261,7 +261,7 @@ class cosmosnn(cosmos):
         b_loc = b * b_loc
         return b_loc
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def get_spot_params(self, obs, b):
         offset = self.data.offset.mean
         data = (obs - offset - b[..., None, None]) / b[..., None, None]
@@ -372,7 +372,10 @@ class cosmosnn(cosmos):
 
         pyro.param(
             "background_mean_loc",
-            lambda: (data.images.double().mean((-2, -1)).mean(-2, keepdim=True).to(device) - data.offset.mean),
+            lambda: (
+                data.images.double().mean((-2, -1)).mean(-2, keepdim=True).to(device)
+                - data.offset.mean
+            ),
             constraint=constraints.positive,
         )
         pyro.param(

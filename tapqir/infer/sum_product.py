@@ -206,7 +206,7 @@ def compute_expectations(
         leaf_factors = ordinal_to_factors.pop(leaf)
         leaf_integrands = ordinal_to_integrands.pop(leaf)
         leaf_reduce_vars = ordinal_to_vars[leaf]
-        for (group_factors, group_vars) in _partition(
+        for group_factors, group_vars in _partition(
             leaf_factors + leaf_integrands, leaf_reduce_vars | markov_prod_vars
         ):
             # compute the expectation of integrand wrt group_vars
