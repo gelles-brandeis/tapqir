@@ -665,3 +665,9 @@ class hmm(cosmos):
         xs = _sequential_index(xs)
         x = Vindex(xs)[..., :, x]
         return x.permute(0, 1, 3, 2)
+
+    @torch.no_grad()
+    def compute_params(self, CI):
+        params = super().compute_params(CI)
+        params["z_trans"] = pyro.param("z_trans").cpu()
+        return params
