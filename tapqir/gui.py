@@ -1311,7 +1311,7 @@ def postUI(out):
     dt_layout.add_child(
         "num_samples",
         widgets.IntText(
-            value=2000,
+            value=500,
             description="Number of posterior samples",
             style={"description_width": "initial"},
         ),
