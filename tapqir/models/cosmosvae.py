@@ -97,7 +97,7 @@ class cosmosvae(cosmos, PyroModule):
         # nn config
         nl = nn.ReLU
         predict_net = [128, 128]
-        image_size = self.data.P**2
+        image_size = 14**2
 
         # background
         self.predict_b = PyroModule[Predict](image_size, 1, predict_net, nl)
@@ -258,12 +258,12 @@ class cosmosvae(cosmos, PyroModule):
                                 ),
                             )
                             # update state
-                            state["height"] = ((height / b_loc).reshape(-1, 1),)
+                            state["height"] = (height / b_loc).reshape(-1, 1)
                             state["width"] = width.reshape(-1, 1)
                             state["x"] = x.reshape(-1, 1)
                             state["y"] = y.reshape(-1, 1)
 
-    def get_background(self, obs, b):
+    def get_b_loc(self, obs, b):
         offset = self.data.offset.mean
         data = (obs - offset - b[..., None, None]) / b[..., None, None]
         shape = data.shape[:-2]
@@ -421,22 +421,6 @@ class cosmosvae(cosmos, PyroModule):
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 100, device=device),
             constraint=constraints.greater_than(2.0),
         )
-        #  pyro.param(
-        #      "x_mean",
-        #      lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
-        #      constraint=constraints.interval(
-        #          -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-        #          (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-        #      ),
-        #  )
-        #  pyro.param(
-        #      "y_mean",
-        #      lambda: torch.zeros(self.K, data.Nt, data.F, self.Q, device=device),
-        #      constraint=constraints.interval(
-        #          -(data.P + 1) / 2 + torch.finfo(self.dtype).eps,
-        #          (data.P + 1) / 2 - torch.finfo(self.dtype).eps,
-        #      ),
-        #  )
         pyro.param(
             "size",
             lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
