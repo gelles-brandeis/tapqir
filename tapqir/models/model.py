@@ -275,7 +275,7 @@ class Model(nn.Module):
         if self.name.startswith("cosmosnn"):
             torch.save(
                 self.state_dict(),
-                self.run_path / f"{self.name}-nn.tpqr",
+                self.run_path / f"{self.name}_nn.tpqr",
             )
         torch.save(
             {
@@ -353,7 +353,7 @@ class Model(nn.Module):
         pyro.clear_param_store()
         pyro.get_param_store().set_state(checkpoint["params"])
         if self.name.startswith("cosmosnn"):
-            nn_path = path / f"{self.name}-nn.tpqr"
+            nn_path = path / f"{self.name}_nn.tpqr"
             self.load_state_dict(torch.load(nn_path))
         if not param_only:
             self.converged = checkpoint["convergence_status"]
@@ -365,6 +365,8 @@ class Model(nn.Module):
             )
         if warnings and not checkpoint["convergence_status"]:
             logger.warning(f"Model at {path} has not been fully trained")
+        new_seed = random.randint(0, 100)
+        pyro.set_rng_seed(new_seed)
 
     def compute_stats(self, CI: float = 0.95, save_matlab: bool = False):
         """
