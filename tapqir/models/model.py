@@ -179,6 +179,9 @@ class Model:
             self.iter = 0
             self.converged = False
             self._rolling = defaultdict(lambda: deque([], maxlen=100))
+            # load pretrained model
+            #  pretrained_nn = torch.load(".tapqir/pretrained_nn.tpqr")
+            #  self.load_state_dict(pretrained_nn)
             self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)

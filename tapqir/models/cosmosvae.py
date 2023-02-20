@@ -265,6 +265,7 @@ class cosmosvae(cosmos, PyroModule):
                             state["x"] = x.reshape(-1, 1)
                             state["y"] = y.reshape(-1, 1)
 
+    # @torch.no_grad()
     def get_b_loc(self, obs, b):
         offset = self.data.offset.mean
         data = (obs - offset - b[..., None, None]) / b[..., None, None]
@@ -278,6 +279,7 @@ class cosmosvae(cosmos, PyroModule):
         b_loc = b * b_loc
         return b_loc
 
+    # @torch.no_grad()
     def get_xy(self, obs, b_loc, state):
         offset = self.data.offset.mean
         data = (obs - offset - b_loc[..., None, None]) / b_loc[..., None, None]
