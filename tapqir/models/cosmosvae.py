@@ -103,10 +103,10 @@ class cosmosvae(cosmos, PyroModule):
         self.predict_b = PyroModule[Predict](image_size, 1, predict_net, nl)
 
         # x and y
-        rnn_input_size = image_size + 4
+        rnn_input_size = image_size + 4 # height, width, x, y
         rnn_hidden_size = 256
         self.rnn = PyroModule[nn.LSTMCell](rnn_input_size, rnn_hidden_size)
-        self.predict_xy = PyroModule[Predict](rnn_hidden_size, 2, predict_net, nl)
+        self.predict_xy = PyroModule[Predict](rnn_hidden_size, 5, predict_net, nl)
 
         # rnn parameters
         self.h_init = PyroParam(torch.zeros(1, rnn_hidden_size))
@@ -211,17 +211,36 @@ class cosmosvae(cosmos, PyroModule):
 
                     for kdx in spots:
                         # sample spot presence m
-                        x_mean, y_mean, state = self.get_xy(obs, b_loc, state)
+                        m_probs, h_loc, w_mean, x_mean, y_mean, state = self.get_xy(obs, b_loc, state)
                         m = pyro.sample(
                             f"m_k{kdx}",
                             dist.Bernoulli(
-                                # m_probs[..., kdx]
-                                Vindex(self.m_probs)[kdx, ndx, fdx, cdx]
+                                m_probs
+                                # Vindex(self.m_probs)[kdx, ndx, fdx, cdx]
                             ),
                             infer={"enumerate": "parallel"},
                         )
                         with handlers.mask(mask=m > 0):
                             # sample spot variables
+                            height = pyro.sample(
+                                f"height_k{kdx}",
+                                dist.Gamma(
+                                    # Vindex(self.h_loc)[kdx, ndx, fdx, cdx]
+                                    h_loc
+                                    * Vindex(self.h_beta)[kdx, ndx, fdx, cdx],
+                                    Vindex(self.h_beta)[kdx, ndx, fdx, cdx],
+                                ),
+                            )
+                            width = pyro.sample(
+                                f"width_k{kdx}",
+                                AffineBeta(
+                                    # Vindex(self.w_mean)[kdx, ndx, fdx, cdx],
+                                    w_mean,
+                                    Vindex(self.w_size)[kdx, ndx, fdx, cdx],
+                                    self.priors["width_min"],
+                                    self.priors["width_max"],
+                                ),
+                            )
                             x = pyro.sample(
                                 f"x_k{kdx}",
                                 AffineBeta(
@@ -238,23 +257,6 @@ class cosmosvae(cosmos, PyroModule):
                                     Vindex(self.size)[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
-                                ),
-                            )
-                            width = pyro.sample(
-                                f"width_k{kdx}",
-                                AffineBeta(
-                                    Vindex(self.w_mean)[kdx, ndx, fdx, cdx],
-                                    Vindex(self.w_size)[kdx, ndx, fdx, cdx],
-                                    self.priors["width_min"],
-                                    self.priors["width_max"],
-                                ),
-                            )
-                            height = pyro.sample(
-                                f"height_k{kdx}",
-                                dist.Gamma(
-                                    Vindex(self.h_loc)[kdx, ndx, fdx, cdx]
-                                    * Vindex(self.h_beta)[kdx, ndx, fdx, cdx],
-                                    Vindex(self.h_beta)[kdx, ndx, fdx, cdx],
                                 ),
                             )
                             # update state
@@ -296,22 +298,50 @@ class cosmosvae(cosmos, PyroModule):
         h, c = self.rnn(rnn_input, (state["h"], state["c"]))
 
         # predict
-        xy = self.predict_xy(h)
-        eps = torch.finfo(xy.dtype).eps
+        out = self.predict_xy(h)
+        eps = torch.finfo(out.dtype).eps
 
         loc = -(14 + 1) / 2 + 3 * eps
         scale = (14 + 1) - 6 * eps
+        #  x_mean = transforms.ComposeTransform(
+        #      [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
+        #  )(xy[:, 0])
+        #  y_mean = transforms.ComposeTransform(
+        #      [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
+        #  )(xy[:, 1])
+
+        loc = -(14 + 1) / 2 + eps
+        scale = (14 + 1) - 2 * eps
+        w_min = 0.75 + eps
+        w_scale = 1.5 - 2 * eps
+        # params
+        m_probs = transforms.SigmoidTransform()(out[:, 0])
+        h_loc = transforms.ExpTransform()(out[:, 1])
+        # h_beta = transforms.ExpTransform()(out[:, 2])
+        w_mean = transforms.ComposeTransform(
+            [transforms.SigmoidTransform(), transforms.AffineTransform(w_min, w_scale)]
+        )(out[:, 2])
+        #  w_size = transforms.ComposeTransform(
+        #      [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
+        #  )(out[:, 4])
         x_mean = transforms.ComposeTransform(
             [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
-        )(xy[:, 0])
+        )(out[:, 3])
         y_mean = transforms.ComposeTransform(
             [transforms.SigmoidTransform(), transforms.AffineTransform(loc, scale)]
-        )(xy[:, 1])
+        )(out[:, 4])
+        #  size = transforms.ComposeTransform(
+        #      [transforms.ExpTransform(), transforms.AffineTransform(2, 1)]
+        #  )(out[:, 7])
+        m_probs = m_probs.reshape(shape)
+        h_loc = h_loc.reshape(shape)
+        w_mean = w_mean.reshape(shape)
         x_mean = x_mean.reshape(shape)
         y_mean = y_mean.reshape(shape)
+        h_loc = h_loc * b_loc  # scale back
         state["h"] = h
         state["c"] = c
-        return x_mean, y_mean, state
+        return m_probs, h_loc, w_mean, x_mean, y_mean, state
 
     def init_parameters(self):
         """
@@ -322,7 +352,7 @@ class cosmosvae(cosmos, PyroModule):
     def init_params(self):
         self.pi_mean
         self.pi_size
-        self.m_probs
+        # self.m_probs
         self.proximity_loc
         self.proximity_size
         self.lamda_loc
@@ -332,9 +362,9 @@ class cosmosvae(cosmos, PyroModule):
         self.background_mean_loc
         self.background_std_loc
         self.b_beta
-        self.h_loc
+        # self.h_loc
         self.h_beta
-        self.w_mean
+        # self.w_mean
         self.w_size
         self.size
 
@@ -346,9 +376,9 @@ class cosmosvae(cosmos, PyroModule):
     def pi_size(self):
         return torch.full((self.Q, 1), 2)
 
-    @PyroParam(constraint=constraints.unit_interval)
-    def m_probs(self):
-        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 0.5)
+    #  @PyroParam(constraint=constraints.unit_interval)
+    #  def m_probs(self):
+    #      return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 0.5)
 
     @PyroParam(
         constraint=constraints.interval(
@@ -397,22 +427,22 @@ class cosmosvae(cosmos, PyroModule):
     def b_beta(self):
         return torch.ones(self.data.Nt, self.data.F, self.data.C)
 
-    @PyroParam(constraint=constraints.positive)
-    def h_loc(self):
-        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 2000)
+    #  @PyroParam(constraint=constraints.positive)
+    #  def h_loc(self):
+    #      return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 2000)
 
     @PyroParam(constraint=constraints.positive)
     def h_beta(self):
         return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 0.001)
 
-    @PyroParam(
-        constraint=constraints.interval(
-            0.75 + torch.finfo(torch.float).eps,
-            2.25 - torch.finfo(torch.float).eps,
-        )
-    )
-    def w_mean(self):
-        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 1.5)
+    #  @PyroParam(
+    #      constraint=constraints.interval(
+    #          0.75 + torch.finfo(torch.float).eps,
+    #          2.25 - torch.finfo(torch.float).eps,
+    #      )
+    #  )
+    #  def w_mean(self):
+    #      return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 1.5)
 
     @PyroParam(constraint=constraints.greater_than(2.0))
     def w_size(self):
@@ -425,7 +455,7 @@ class cosmosvae(cosmos, PyroModule):
     @torch.no_grad()
     def compute_params(self, CI):
         obs = self.data.images.cuda()
-        b_locs, x_means, y_means = [], [], []
+        b_locs, m_probs, h_locs, w_means, x_means, y_means = [], [], [], [], [], []
         for ndx in torch.split(torch.arange(len(obs)), 200):
             # background
             b_loc = self.get_b_loc(obs[ndx], self.background_mean_loc[ndx])
@@ -441,19 +471,28 @@ class cosmosvae(cosmos, PyroModule):
                 "y": self.y_init.expand(n, -1),
             }
 
-            x_means_k, y_means_k = [], []
+            m_probs_k, h_locs_k, w_means_k, x_means_k, y_means_k = [], [], [], [], []
             for kdx in range(self.K):
-                x_mean, y_mean, state = self.get_xy(obs[ndx], b_loc, state)
+                m_prob, h_loc, w_mean, x_mean, y_mean, state = self.get_xy(obs[ndx], b_loc, state)
                 # update state
-                state["height"] = (self.h_loc[kdx, ndx] / b_loc).reshape(-1, 1)
-                state["width"] = self.w_mean[kdx, ndx].reshape(-1, 1)
+                state["height"] = (h_loc / b_loc).reshape(-1, 1)
+                state["width"] = w_mean.reshape(-1, 1)
                 state["x"] = x_mean.reshape(-1, 1)
                 state["y"] = y_mean.reshape(-1, 1)
+                m_probs_k.append(m_prob)
+                h_locs_k.append(h_loc)
+                w_means_k.append(w_mean)
                 x_means_k.append(x_mean)
                 y_means_k.append(y_mean)
+            m_probs.append(torch.stack(m_probs_k, 0))
+            h_locs.append(torch.stack(h_locs_k, 0))
+            w_means.append(torch.stack(w_means_k, 0))
             x_means.append(torch.stack(x_means_k, 0))
             y_means.append(torch.stack(y_means_k, 0))
         b_loc = torch.cat(b_locs, 0)
+        m_prob = torch.cat(m_probs, 1)
+        h_loc = torch.cat(h_locs, 1)
+        w_mean = torch.cat(w_means, 1)
         x_mean = torch.cat(x_means, 1)
         y_mean = torch.cat(y_means, 1)
         params = {}
@@ -487,12 +526,12 @@ class cosmosvae(cosmos, PyroModule):
                 fn = dist.Gamma(b_loc * self.b_beta, self.b_beta)
             elif param == "height":
                 fn = dist.Gamma(
-                    self.h_loc * self.h_beta,
+                    h_loc * self.h_beta,
                     self.h_beta,
                 )
             elif param == "width":
                 fn = AffineBeta(
-                    self.w_mean,
+                    w_mean,
                     self.w_size,
                     self.priors["width_min"],
                     self.priors["width_max"],
@@ -518,7 +557,7 @@ class cosmosvae(cosmos, PyroModule):
             params[param]["UL"] = torch.as_tensor(UL, device=torch.device("cpu"))
             params[param]["Mean"] = fn.mean.detach().cpu()
 
-        params["m_probs"] = self.m_probs.cpu()
+        params["m_probs"] = m_prob.cpu()
         params["z_probs"] = self.z_probs.cpu()
         params["theta_probs"] = self.theta_probs.cpu()
         params["z_map"] = self.z_map.data.cpu()
