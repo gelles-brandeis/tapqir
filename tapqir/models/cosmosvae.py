@@ -122,26 +122,26 @@ class cosmosvae(cosmos, PyroModule):
         pyro.sample(
             "gain",
             dist.Gamma(
-                pyro.param("gain_loc") * pyro.param("gain_beta"),
-                pyro.param("gain_beta"),
+                self.gain_loc * self.gain_beta,
+                self.gain_beta,
             ),
         )
         pyro.sample(
             "pi",
-            dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size")).to_event(1),
+            dist.Dirichlet(self.pi_mean * self.pi_size).to_event(1),
         )
         pyro.sample(
             "lamda",
             dist.Gamma(
-                pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                pyro.param("lamda_beta"),
+                self.lamda_loc * self.lamda_beta,
+                self.lamda_beta,
             ).to_event(1),
         )
         pyro.sample(
             "proximity",
             AffineBeta(
-                pyro.param("proximity_loc"),
-                pyro.param("proximity_size"),
+                self.proximity_loc,
+                self.proximity_size,
                 0,
                 (self.data.P + 1) / math.sqrt(12),
             ),
@@ -178,11 +178,11 @@ class cosmosvae(cosmos, PyroModule):
             with handlers.mask(mask=mask):
                 background_mean = pyro.sample(
                     "background_mean",
-                    dist.Delta(Vindex(pyro.param("background_mean_loc"))[ndx, 0, cdx]),
+                    dist.Delta(Vindex(self.background_mean_loc)[ndx, 0, cdx]),
                 )
                 pyro.sample(
                     "background_std",
-                    dist.Delta(Vindex(pyro.param("background_std_loc"))[ndx, 0, cdx]),
+                    dist.Delta(Vindex(self.background_std_loc)[ndx, 0, cdx]),
                 )
                 with frames as fdx:
                     fdx = fdx[:, None]
@@ -193,8 +193,8 @@ class cosmosvae(cosmos, PyroModule):
                     background = pyro.sample(
                         "background",
                         dist.Gamma(
-                            b_loc * Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
-                            Vindex(pyro.param("b_beta"))[ndx, fdx, cdx],
+                            b_loc * Vindex(self.b_beta)[ndx, fdx, cdx],
+                            Vindex(self.b_beta)[ndx, fdx, cdx],
                         ),
                     )
 
@@ -216,7 +216,7 @@ class cosmosvae(cosmos, PyroModule):
                             f"m_k{kdx}",
                             dist.Bernoulli(
                                 # m_probs[..., kdx]
-                                Vindex(pyro.param("m_probs"))[kdx, ndx, fdx, cdx]
+                                Vindex(self.m_probs)[kdx, ndx, fdx, cdx]
                             ),
                             infer={"enumerate": "parallel"},
                         )
@@ -226,7 +226,7 @@ class cosmosvae(cosmos, PyroModule):
                                 f"x_k{kdx}",
                                 AffineBeta(
                                     x_mean,
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
+                                    Vindex(self.size)[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
@@ -235,7 +235,7 @@ class cosmosvae(cosmos, PyroModule):
                                 f"y_k{kdx}",
                                 AffineBeta(
                                     y_mean,
-                                    Vindex(pyro.param("size"))[kdx, ndx, fdx, cdx],
+                                    Vindex(self.size)[kdx, ndx, fdx, cdx],
                                     -(self.data.P + 1) / 2,
                                     (self.data.P + 1) / 2,
                                 ),
@@ -243,8 +243,8 @@ class cosmosvae(cosmos, PyroModule):
                             width = pyro.sample(
                                 f"width_k{kdx}",
                                 AffineBeta(
-                                    Vindex(pyro.param("w_mean"))[kdx, ndx, fdx, cdx],
-                                    Vindex(pyro.param("w_size"))[kdx, ndx, fdx, cdx],
+                                    Vindex(self.w_mean)[kdx, ndx, fdx, cdx],
+                                    Vindex(self.w_size)[kdx, ndx, fdx, cdx],
                                     self.priors["width_min"],
                                     self.priors["width_max"],
                                 ),
@@ -252,9 +252,9 @@ class cosmosvae(cosmos, PyroModule):
                             height = pyro.sample(
                                 f"height_k{kdx}",
                                 dist.Gamma(
-                                    Vindex(pyro.param("h_loc"))[kdx, ndx, fdx, cdx]
-                                    * Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
-                                    Vindex(pyro.param("h_beta"))[kdx, ndx, fdx, cdx],
+                                    Vindex(self.h_loc)[kdx, ndx, fdx, cdx]
+                                    * Vindex(self.h_beta)[kdx, ndx, fdx, cdx],
+                                    Vindex(self.h_beta)[kdx, ndx, fdx, cdx],
                                 ),
                             )
                             # update state
@@ -317,115 +317,110 @@ class cosmosvae(cosmos, PyroModule):
         """
         Initialize variational parameters.
         """
-        device = self.device
-        data = self.data
+        pass
 
-        pyro.param(
-            "pi_mean",
-            lambda: torch.ones((self.Q, self.S + 1), device=device),
-            constraint=constraints.simplex,
-        )
-        pyro.param(
-            "pi_size",
-            lambda: torch.full((self.Q, 1), 2, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "m_probs",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.5, device=device),
-            constraint=constraints.unit_interval,
-        )
+    def init_params(self):
+        self.pi_mean
+        self.pi_size
+        self.m_probs
+        self.proximity_loc
+        self.proximity_size
+        self.lamda_loc
+        self.lamda_beta
+        self.gain_loc
+        self.gain_beta
+        self.background_mean_loc
+        self.background_std_loc
+        self.b_beta
+        self.h_loc
+        self.h_beta
+        self.w_mean
+        self.w_size
+        self.size
 
-        self._init_parameters()
+    @PyroParam(constraint=constraints.simplex)
+    def pi_mean(self):
+        return torch.ones((self.Q, self.S + 1))
 
-    def _init_parameters(self):
-        """
-        Parameters shared between different models.
-        """
-        device = self.device
-        data = self.data
+    @PyroParam(constraint=constraints.positive)
+    def pi_size(self):
+        return torch.full((self.Q, 1), 2)
 
-        pyro.param(
-            "proximity_loc",
-            lambda: torch.tensor(0.5, device=device),
-            constraint=constraints.interval(
-                0,
-                (self.data.P + 1) / math.sqrt(12) - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "proximity_size",
-            lambda: torch.tensor(100, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            "lamda_loc",
-            lambda: torch.full((self.Q,), 0.5, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "lamda_beta",
-            lambda: torch.full((self.Q,), 100, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "gain_loc",
-            lambda: torch.tensor(5, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "gain_beta",
-            lambda: torch.tensor(100, device=device),
-            constraint=constraints.positive,
-        )
+    @PyroParam(constraint=constraints.unit_interval)
+    def m_probs(self):
+        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 0.5)
 
-        pyro.param(
-            "background_mean_loc",
-            lambda: (
-                data.images.double().mean((-2, -1)).mean(-2, keepdim=True).to(device)
-                - data.offset.mean
-            ),
-            constraint=constraints.positive,
+    @PyroParam(
+        constraint=constraints.interval(
+            0,
+            (14 + 1) / math.sqrt(12) - torch.finfo(torch.float).eps,
         )
-        pyro.param(
-            "background_std_loc",
-            lambda: torch.ones(data.Nt, 1, data.C, device=device),
-            constraint=constraints.positive,
+    )
+    def proximity_loc(self):
+        return torch.tensor(0.5)
+
+    @PyroParam(constraint=constraints.greater_than(2.0))
+    def proximity_size(self):
+        return torch.tensor(100)
+
+    @PyroParam(constraint=constraints.positive)
+    def lamda_loc(self):
+        return torch.full((self.Q,), 0.5)
+
+    @PyroParam(constraint=constraints.positive)
+    def lamda_beta(self):
+        return torch.full((self.Q,), 100)
+
+    @PyroParam(constraint=constraints.positive)
+    def gain_loc(self):
+        return torch.tensor(5)
+
+    @PyroParam(constraint=constraints.positive)
+    def gain_beta(self):
+        return torch.tensor(100)
+
+    @PyroParam(constraint=constraints.positive)
+    def background_mean_loc(self):
+        return (
+            self.data.images.double()
+            .mean((-2, -1))
+            .mean(-2, keepdim=True)
+            .to(self.device)
+            - self.data.offset.mean
         )
 
-        pyro.param(
-            "b_beta",
-            lambda: torch.ones(data.Nt, data.F, data.C, device=device),
-            constraint=constraints.positive,
+    @PyroParam(constraint=constraints.positive)
+    def background_std_loc(self):
+        return torch.ones(self.data.Nt, 1, self.data.C)
+
+    @PyroParam(constraint=constraints.positive)
+    def b_beta(self):
+        return torch.ones(self.data.Nt, self.data.F, self.data.C)
+
+    @PyroParam(constraint=constraints.positive)
+    def h_loc(self):
+        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 2000)
+
+    @PyroParam(constraint=constraints.positive)
+    def h_beta(self):
+        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 0.001)
+
+    @PyroParam(
+        constraint=constraints.interval(
+            0.75 + torch.finfo(torch.float).eps,
+            2.25 - torch.finfo(torch.float).eps,
         )
-        pyro.param(
-            "h_loc",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 2000, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "h_beta",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 0.001, device=device),
-            constraint=constraints.positive,
-        )
-        pyro.param(
-            "w_mean",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 1.5, device=device),
-            constraint=constraints.interval(
-                0.75 + torch.finfo(self.dtype).eps,
-                2.25 - torch.finfo(self.dtype).eps,
-            ),
-        )
-        pyro.param(
-            "w_size",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 100, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
-        pyro.param(
-            "size",
-            lambda: torch.full((self.K, data.Nt, data.F, self.Q), 200, device=device),
-            constraint=constraints.greater_than(2.0),
-        )
+    )
+    def w_mean(self):
+        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 1.5)
+
+    @PyroParam(constraint=constraints.greater_than(2.0))
+    def w_size(self):
+        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 100)
+
+    @PyroParam(constraint=constraints.greater_than(2.0))
+    def size(self):
+        return torch.full((self.K, self.data.Nt, self.data.F, self.Q), 200)
 
     @torch.no_grad()
     def compute_params(self, CI):
@@ -433,9 +428,7 @@ class cosmosvae(cosmos, PyroModule):
         b_locs, x_means, y_means = [], [], []
         for ndx in torch.split(torch.arange(len(obs)), 200):
             # background
-            b_loc = self.get_background(
-                obs[ndx], pyro.param("background_mean_loc")[ndx]
-            )
+            b_loc = self.get_b_loc(obs[ndx], self.background_mean_loc[ndx])
             b_locs.append(b_loc)
             # xy
             n = torch.numel(b_loc)
@@ -452,10 +445,10 @@ class cosmosvae(cosmos, PyroModule):
             for kdx in range(self.K):
                 x_mean, y_mean, state = self.get_xy(obs[ndx], b_loc, state)
                 # update state
-                state["height"] = (pyro.param("h_loc")[kdx, ndx] / b_loc).reshape(-1, 1)
-                state["width"] = pyro.param("w_mean")[kdx, ndx].reshape(-1, 1)
-                state["x"] = pyro.param("x_mean")[kdx, ndx].reshape(-1, 1)
-                state["y"] = pyro.param("y_mean")[kdx, ndx].reshape(-1, 1)
+                state["height"] = (self.h_loc[kdx, ndx] / b_loc).reshape(-1, 1)
+                state["width"] = self.w_mean[kdx, ndx].reshape(-1, 1)
+                state["x"] = x_mean.reshape(-1, 1)
+                state["y"] = y_mean.reshape(-1, 1)
                 x_means_k.append(x_mean)
                 y_means_k.append(y_mean)
             x_means.append(torch.stack(x_means_k, 0))
@@ -467,54 +460,54 @@ class cosmosvae(cosmos, PyroModule):
         for param in self.ci_params:
             if param == "gain":
                 fn = dist.Gamma(
-                    pyro.param("gain_loc") * pyro.param("gain_beta"),
-                    pyro.param("gain_beta"),
+                    self.gain_loc * self.gain_beta,
+                    self.gain_beta,
                 )
             elif param == "alpha":
-                fn = dist.Dirichlet(pyro.param("alpha_mean") * pyro.param("alpha_size"))
+                fn = dist.Dirichlet(self.alpha_mean * self.alpha_size)
             elif param == "pi":
-                fn = dist.Dirichlet(pyro.param("pi_mean") * pyro.param("pi_size"))
+                fn = dist.Dirichlet(self.pi_mean * self.pi_size)
             elif param == "init":
-                fn = dist.Dirichlet(pyro.param("init_mean") * pyro.param("init_size"))
+                fn = dist.Dirichlet(self.init_mean * self.init_size)
             elif param == "trans":
-                fn = dist.Dirichlet(pyro.param("trans_mean") * pyro.param("trans_size"))
+                fn = dist.Dirichlet(self.trans_mean * self.trans_size)
             elif param == "lamda":
                 fn = dist.Gamma(
-                    pyro.param("lamda_loc") * pyro.param("lamda_beta"),
-                    pyro.param("lamda_beta"),
+                    self.lamda_loc * self.lamda_beta,
+                    self.lamda_beta,
                 )
             elif param == "proximity":
                 fn = AffineBeta(
-                    pyro.param("proximity_loc"),
-                    pyro.param("proximity_size"),
+                    self.proximity_loc,
+                    self.proximity_size,
                     0,
                     (self.data.P + 1) / math.sqrt(12),
                 )
             elif param == "background":
-                fn = dist.Gamma(b_loc * pyro.param("b_beta"), pyro.param("b_beta"))
+                fn = dist.Gamma(b_loc * self.b_beta, self.b_beta)
             elif param == "height":
                 fn = dist.Gamma(
-                    pyro.param("h_loc") * pyro.param("h_beta"),
-                    pyro.param("h_beta"),
+                    self.h_loc * self.h_beta,
+                    self.h_beta,
                 )
             elif param == "width":
                 fn = AffineBeta(
-                    pyro.param("w_mean"),
-                    pyro.param("w_size"),
+                    self.w_mean,
+                    self.w_size,
                     self.priors["width_min"],
                     self.priors["width_max"],
                 )
             elif param == "x":
                 fn = AffineBeta(
                     x_mean,
-                    pyro.param("size"),
+                    self.size,
                     -(self.data.P + 1) / 2,
                     (self.data.P + 1) / 2,
                 )
             elif param == "y":
                 fn = AffineBeta(
                     y_mean,
-                    pyro.param("size"),
+                    self.size,
                     -(self.data.P + 1) / 2,
                     (self.data.P + 1) / 2,
                 )

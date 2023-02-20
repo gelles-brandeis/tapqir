@@ -29,7 +29,7 @@ from tapqir.utils.stats import save_stats
 logger = logging.getLogger(__name__)
 
 
-class Model(nn.Module):
+class Model:
     r"""
     Base class for tapqir models.
 
@@ -273,14 +273,13 @@ class Model(nn.Module):
 
         # save the model state
         if self.name.startswith("cosmosvae"):
-            torch.save(
-                self.state_dict(),
-                self.run_path / f"{self.name}_nn.tpqr",
-            )
+            params = self.state_dict()
+        else:
+            params = pyro.get_param_store().get_state()
         torch.save(
             {
                 "iter": self.iter,
-                "params": pyro.get_param_store().get_state(),
+                "params": params,
                 "optimizer": self.optim.get_state(),
                 "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
@@ -351,10 +350,11 @@ class Model(nn.Module):
             raise TapqirFileNotFoundError("model", model_path)
 
         pyro.clear_param_store()
-        pyro.get_param_store().set_state(checkpoint["params"])
         if self.name.startswith("cosmosvae"):
-            nn_path = path / f"{self.name}_nn.tpqr"
-            self.load_state_dict(torch.load(nn_path))
+            self.init_params()
+            self.load_state_dict(checkpoint["params"])
+        else:
+            pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
             self.converged = checkpoint["convergence_status"]
             self._rolling = checkpoint["rolling"]
