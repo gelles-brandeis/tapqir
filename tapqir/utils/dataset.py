@@ -138,10 +138,16 @@ class CosmosDataset:
         )
 
     def fetch(self, ndx, fdx, cdx):
+        if isinstance(ndx, torch.Tensor):
+            ndx = ndx.cpu()
+        if isinstance(fdx, torch.Tensor):
+            fdx = fdx.cpu()
+        if isinstance(cdx, torch.Tensor):
+            cdx = cdx.cpu()
         return (
-            Vindex(self.images.to(self.device))[ndx, fdx, cdx],
-            Vindex(self.xy.to(self.device))[ndx, fdx, cdx],
-            Vindex(self.is_ontarget.to(self.device))[ndx],
+            Vindex(self.images)[ndx, fdx, cdx].to(self.device),
+            Vindex(self.xy)[ndx, fdx, cdx].to(self.device),
+            Vindex(self.is_ontarget)[ndx].to(self.device),
         )
 
     @lazy_property
