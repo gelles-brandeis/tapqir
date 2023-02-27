@@ -190,8 +190,6 @@ class cosmos(Model):
             dim=-1,
         )
 
-        # spots
-        spots = pyro.plate("spots", self.K)
         # aoi sites
         aois = pyro.plate(
             "aois",
@@ -258,7 +256,7 @@ class cosmos(Model):
                     onehot_theta = one_hot(theta, num_classes=1 + self.K)
 
                     ms, heights, widths, xs, ys = [], [], [], [], []
-                    for kdx in spots:
+                    for kdx in range(self.K):
                         specific = onehot_theta[..., 1 + kdx]
                         # spot presence
                         m = pyro.sample(
@@ -369,8 +367,6 @@ class cosmos(Model):
             ),
         )
 
-        # spots
-        spots = pyro.plate("spots", self.K)
         # aoi sites
         aois = pyro.plate(
             "aois",
@@ -418,7 +414,7 @@ class cosmos(Model):
                         ),
                     )
 
-                    for kdx in spots:
+                    for kdx in range(self.K):
                         # sample spot presence m
                         m = pyro.sample(
                             f"m_k{kdx}",
