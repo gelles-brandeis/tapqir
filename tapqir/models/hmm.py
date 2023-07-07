@@ -670,4 +670,6 @@ class hmm(cosmos):
     def compute_params(self, CI):
         params = super().compute_params(CI)
         params["z_trans"] = pyro.param("z_trans").cpu()
+        # Remove weakrefs in preparation for pickling.
+        params["z_trans"].__dict__.pop("unconstrained", None)
         return params
