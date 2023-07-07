@@ -60,7 +60,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "colorama",
-        "funsor==0.4.2",
+        "funsor>=0.4.4",
         "future",
         "ipyevents",
         "ipyfilechooser",
