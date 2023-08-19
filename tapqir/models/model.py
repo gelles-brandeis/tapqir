@@ -10,6 +10,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from pyroapi import infer, optim, pyro
 from sklearn.metrics import (
     confusion_matrix,
@@ -71,6 +72,7 @@ class Model:
         self.run_path = None
         # set device & dtype
         self.to(device, dtype)
+        super().__init__()
 
     def to(self, device: str, dtype: str = "double") -> None:
         """
@@ -177,6 +179,9 @@ class Model:
             self.iter = 0
             self.converged = False
             self._rolling = defaultdict(lambda: deque([], maxlen=100))
+            # load pretrained model
+            # pretrained_nn = torch.load(".tapqir/pretrained_nn.tpqr")
+            # self.load_state_dict(pretrained_nn)
             self.init_parameters()
 
         self.elbo = self.TraceELBO(jit)
@@ -208,31 +213,31 @@ class Model:
 
         with SummaryWriter(log_dir=self.run_path / "logs" / self.name) as writer:
             for i in progress_bar(range(num_iter)):
-                try:
-                    self.iter_loss = self.svi.step()
-                    # save a checkpoint every 200 iterations
-                    if not self.iter % 200:
-                        self.save_checkpoint(writer)
-                        if use_crit and self.converged:
-                            logger.info(f"Iteration #{self.iter} model converged.")
-                            break
-                    self.iter += 1
-                except ValueError:
-                    # load last checkpoint
-                    self.init(
-                        lr=self.lr,
-                        nbatch_size=self.nbatch_size,
-                        fbatch_size=self.fbatch_size,
-                    )
-                    # change rng seed
-                    new_seed = random.randint(0, 100)
-                    pyro.set_rng_seed(new_seed)
-                    logger.warning(
-                        f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
-                    )
-                except RuntimeError as err:
-                    assert err.args[0].startswith("CUDA out of memory")
-                    raise CudaOutOfMemoryError()
+                # try:
+                self.iter_loss = self.svi.step()
+                # save a checkpoint every 200 iterations
+                if not self.iter % 200:
+                    self.save_checkpoint(writer)
+                    if use_crit and self.converged:
+                        logger.info(f"Iteration #{self.iter} model converged.")
+                        break
+                self.iter += 1
+                #  except ValueError:
+                #      # load last checkpoint
+                #      self.init(
+                #          lr=self.lr,
+                #          nbatch_size=self.nbatch_size,
+                #          fbatch_size=self.fbatch_size,
+                #      )
+                #      # change rng seed
+                #      new_seed = random.randint(0, 100)
+                #      pyro.set_rng_seed(new_seed)
+                #      logger.warning(
+                #          f"Iteration #{self.iter} restarting with a new seed: {new_seed}."
+                #      )
+                #  except RuntimeError as err:
+                #      assert err.args[0].startswith("CUDA out of memory")
+                #      raise CudaOutOfMemoryError()
             else:
                 logger.warning(f"Iteration #{self.iter} model has not converged.")
 
@@ -270,10 +275,14 @@ class Model:
                 self.converged = True
 
         # save the model state
+        if self.name.startswith("cosmosvae"):
+            params = self.state_dict()
+        else:
+            params = pyro.get_param_store().get_state()
         torch.save(
             {
                 "iter": self.iter,
-                "params": pyro.get_param_store().get_state(),
+                "params": params,
                 "optimizer": self.optim.get_state(),
                 "rolling": dict(self._rolling),
                 "convergence_status": self.converged,
@@ -286,10 +295,10 @@ class Model:
         for name, val in pyro.get_param_store().items():
             if val.dim() == 0:
                 writer.add_scalar(name, val.item(), self.iter)
-            elif val.dim() == 1 and len(val) <= self.Q * 2:
+            elif val.dim() == 1 and torch.numel(val) <= self.Q * 2:
                 scalars = {str(i): v.item() for i, v in enumerate(val)}
                 writer.add_scalars(name, scalars, self.iter)
-            elif val.dim() == 2 and len(val) <= self.Q * 2:
+            elif val.dim() == 2 and torch.numel(val) <= self.Q * 2:
                 scalars = {
                     f"{i}_{j}": k.item()
                     for i, v in enumerate(val)
@@ -344,7 +353,11 @@ class Model:
             raise TapqirFileNotFoundError("model", model_path)
 
         pyro.clear_param_store()
-        pyro.get_param_store().set_state(checkpoint["params"])
+        if self.name.startswith("cosmosvae"):
+            self.init_params()
+            self.load_state_dict(checkpoint["params"])
+        else:
+            pyro.get_param_store().set_state(checkpoint["params"])
         if not param_only:
             self.converged = checkpoint["convergence_status"]
             self._rolling = checkpoint["rolling"]
@@ -363,9 +376,9 @@ class Model:
         :param CI: credible region.
         :param save_matlab: Save output in Matlab format as well.
         """
-        try:
-            save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
-        except RuntimeError as err:
-            assert err.args[0].startswith("CUDA out of memory")
-            raise CudaOutOfMemoryError()
+        # try:
+        save_stats(self, self.path, CI=CI, save_matlab=save_matlab)
+        #  except RuntimeError as err:
+        #      assert err.args[0].startswith("CUDA out of memory")
+        #      raise CudaOutOfMemoryError()
         logger.debug("Computing stats: Successful.")

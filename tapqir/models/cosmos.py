@@ -236,6 +236,7 @@ class cosmos(Model):
                             (background_mean / background_std) ** 2,
                             background_mean / background_std**2,
                         ),
+                        #  dist.Gamma(150 / 3, 1 / 3),
                     )
 
                     # sample hidden model state (1+S,)
@@ -270,12 +271,14 @@ class cosmos(Model):
                             height = pyro.sample(
                                 f"height_k{kdx}",
                                 dist.HalfNormal(self.priors["height_std"]),
+                                # dist.Gamma(5, 0.002),
                             )
                             width = pyro.sample(
                                 f"width_k{kdx}",
                                 AffineBeta(
                                     1.5,
                                     2,
+                                    # 20,
                                     self.priors["width_min"],
                                     self.priors["width_max"],
                                 ),
@@ -628,7 +631,7 @@ class cosmos(Model):
                 self.fbatch_size = len(fdx)
                 qdx = torch.arange(self.Q)
                 with torch.no_grad(), pyro.plate(
-                    "particles", size=50, dim=-4
+                    "particles", size=5, dim=-4
                 ), handlers.enum(first_available_dim=-5):
                     guide_tr = handlers.trace(self.guide).get_trace()
                     model_tr = handlers.trace(
